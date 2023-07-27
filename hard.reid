@@ -1,0 +1,8 @@
+// New types, type-casting
+
+import std::print;
+
+let text: string = "hello there!";
+let value: i16 = 123;
+
+print(text + (value as string));

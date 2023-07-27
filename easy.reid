@@ -1,0 +1,9 @@
+// Arithmetic, function calls and imports!
+
+import std::print;
+
+let arithmetic = 3 + 2 * 5 + 1 * 2;
+let multiplier = 5 * 2;
+
+let result = arithmetic * multiplier + arithmetic;
+print(result);
