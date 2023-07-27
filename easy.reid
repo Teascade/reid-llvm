@@ -3,8 +3,9 @@
 import std::print;
 
 let test = 5;
+let simpleAdd = 2 + 2;
 let arithmetic = 3 + 2 * 5 + 1 * 2;
 let multiplier = 5 * 2;
 
-let result = arithmetic * multiplier + arithmetic;
+let result = arithmetic + multiplier * arithmetic;
 print(result);

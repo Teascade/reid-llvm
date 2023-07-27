@@ -7,24 +7,71 @@ where
     fn parse(stream: TokenStream) -> Result<Self, ()>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     VariableName(String),
     ContantI32(i32),
+    BinopAdd(Box<Expression>, Box<Expression>),
+    BinopMult(Box<Expression>, Box<Expression>),
 }
 
 impl Parseable for Expression {
     fn parse(mut stream: TokenStream) -> Result<Expression, ()> {
-        if let Some(token) = stream.next() {
-            Ok(match &token {
-                Token::Identifier(v) => Expression::VariableName(v.clone()),
-                Token::DecimalValue(v) => Expression::ContantI32(v.parse().unwrap()),
-                _ => Err(())?,
-            })
+        let lhs = parse_primary_expression(&mut stream)?;
+        parse_binop_rhs(&mut stream, lhs, 0)
+    }
+}
+
+fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> {
+    if let Some(token) = stream.next() {
+        Ok(match &token {
+            Token::Identifier(v) => Expression::VariableName(v.clone()),
+            Token::DecimalValue(v) => Expression::ContantI32(v.parse().unwrap()),
+            _ => Err(())?,
+        })
+    } else {
+        Err(())
+    }
+}
+
+/// This algorithm seems somewhat like magic to me. I understand it if I read
+/// carefully, but it is difficult to read every single time.
+///
+/// Reference for how the algorithm is formed:
+/// https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl02.html#binary-expression-parsing
+fn parse_binop_rhs(
+    stream: &mut TokenStream,
+    mut lhs: Expression,
+    expr_prec: i8,
+) -> Result<Expression, ()> {
+    while let Some(token) = stream.peek() {
+        let curr_token_prec = token.get_token_prec();
+
+        if curr_token_prec < expr_prec {
+            break; // Just return lhs
         } else {
-            Err(())
+            // token has to be an operator
+            stream.next(); // Eat token
+
+            let mut rhs = parse_primary_expression(stream)?;
+            if let Some(next_op) = stream.peek() {
+                let next_prec = next_op.get_token_prec();
+                if curr_token_prec < next_prec {
+                    // Operator on the right of rhs has more precedence, turn
+                    // rhs into lhs for new binop
+                    rhs = parse_binop_rhs(stream, rhs, curr_token_prec + 1)?;
+                }
+            }
+
+            lhs = match &token {
+                Token::Plus => Expression::BinopAdd(Box::new(lhs), Box::new(rhs)),
+                Token::Times => Expression::BinopMult(Box::new(lhs), Box::new(rhs)),
+                _ => Err(())?,
+            };
         }
     }
+
+    Ok(lhs)
 }
 
 #[derive(Debug)]

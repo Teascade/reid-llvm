@@ -93,22 +93,6 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Strin
     Ok(tokens)
 }
 
-pub struct FullToken {
-    pub token: Token,
-    position: Position,
-}
-
-impl Debug for FullToken {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_fmt(format_args!(
-            "{:?} (Ln {}, Col {})",
-            self.token, self.position.1, self.position.0
-        ))
-    }
-}
-
-pub type Position = (u32, u32);
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Token {
     // Values
@@ -131,6 +115,32 @@ pub enum Token {
 
     Eof,
 }
+
+impl Token {
+    pub fn get_token_prec(&self) -> i8 {
+        match &self {
+            Token::Plus => 10,
+            Token::Times => 20,
+            _ => -1,
+        }
+    }
+}
+
+pub struct FullToken {
+    pub token: Token,
+    position: Position,
+}
+
+impl Debug for FullToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_fmt(format_args!(
+            "{:?} (Ln {}, Col {})",
+            self.token, self.position.1, self.position.0
+        ))
+    }
+}
+
+pub type Position = (u32, u32);
 
 pub struct Cursor<'a> {
     pub position: Position,

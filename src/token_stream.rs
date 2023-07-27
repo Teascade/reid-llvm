@@ -20,7 +20,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
 
     pub fn expect(&mut self, token: Token) -> Result<(), ()> {
         if let Some(peeked) = self.peek() {
-            if token == *peeked {
+            if token == peeked {
                 self.position += 1;
                 Ok(())
             } else {
@@ -41,11 +41,11 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         value
     }
 
-    pub fn peek(&mut self) -> Option<&Token> {
+    pub fn peek(&mut self) -> Option<Token> {
         if self.tokens.len() < self.position {
             None
         } else {
-            Some(&self.tokens[self.position].token)
+            Some(self.tokens[self.position].token.clone())
         }
     }
 
