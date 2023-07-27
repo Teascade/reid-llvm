@@ -7,7 +7,7 @@ pub static EASIEST: &str = include_str!("../easiest.reid");
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
+pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, String> {
     let to_tokenize = to_tokenize.into();
     let mut position = (0, 1);
     let mut cursor = Cursor {
@@ -17,7 +17,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
 
     let mut tokens = Vec::new();
 
-    while let Some(character) = &cursor.consume() {
+    while let Some(character) = &cursor.next() {
         position.0 += 1;
         if *character == '\n' {
             position.1 += 1;
@@ -32,7 +32,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
             // Comments
             '/' if peek == Some(&'/') => {
                 while !matches!(&cursor.peek(), Some('\n')) {
-                    cursor.consume();
+                    cursor.next();
                 }
                 continue;
             }
@@ -44,13 +44,13 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
                         break;
                     }
                     value += &c.to_string();
-                    cursor.consume();
+                    cursor.next();
                 }
 
                 // Check for keywords
                 let variant = match value.as_str() {
-                    "let" => TokenVariant::LetKeyword,
-                    _ => TokenVariant::Identifier(value),
+                    "let" => Token::LetKeyword,
+                    _ => Token::Identifier(value),
                 };
                 variant
             }
@@ -62,13 +62,13 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
                         break;
                     }
                     value += &c.to_string();
-                    cursor.consume();
+                    cursor.next();
                 }
-                TokenVariant::DecimalValue(value)
+                Token::DecimalValue(value)
             }
             // Single character tokens
-            '=' => TokenVariant::Equals,
-            ';' => TokenVariant::Semicolon,
+            '=' => Token::Equals,
+            ';' => Token::Semicolon,
             // Invalid token
             _ => Err(format!(
                 "Unknown token '{}' at {}, {}",
@@ -76,37 +76,40 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<Token>, String> {
             ))?,
         };
 
-        tokens.push(Token { variant, position });
+        tokens.push(FullToken {
+            token: variant,
+            position,
+        });
     }
 
     position.0 += 1;
 
-    tokens.push(Token {
-        variant: TokenVariant::Eof,
+    tokens.push(FullToken {
+        token: Token::Eof,
         position,
     });
 
     Ok(tokens)
 }
 
-pub struct Token {
-    variant: TokenVariant,
+pub struct FullToken {
+    pub token: Token,
     position: Position,
 }
 
-impl Debug for Token {
+impl Debug for FullToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
             "{:?} (Ln {}, Col {})",
-            self.variant, self.position.1, self.position.0
+            self.token, self.position.1, self.position.0
         ))
     }
 }
 
 pub type Position = (u32, u32);
 
-#[derive(Debug)]
-pub enum TokenVariant {
+#[derive(Debug, Eq, PartialEq, Clone)]
+pub enum Token {
     LetKeyword,
     Semicolon,
     Equals,
@@ -122,7 +125,7 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn consume(&mut self) -> Option<char> {
+    fn next(&mut self) -> Option<char> {
         let next = self.char_stream.next();
         self.position.0 += 1;
         if let Some('\n') = next {
