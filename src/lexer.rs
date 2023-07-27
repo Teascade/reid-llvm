@@ -1,10 +1,5 @@
 use std::{fmt::Debug, iter::Peekable, str::Chars};
 
-pub static EASIEST: &str = include_str!("../easiest.reid");
-// pub static EASY: &str = include_str!("../easy.reid");
-// pub static MEDIUM: &str = include_str!("../medium.reid");
-// pub static HARD: &str = include_str!("../hard.reid");
-
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, String> {
@@ -50,6 +45,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Strin
                 // Check for keywords
                 let variant = match value.as_str() {
                     "let" => Token::LetKeyword,
+                    "import" => Token::ImportKeyword,
                     _ => Token::Identifier(value),
                 };
                 variant
@@ -69,6 +65,11 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Strin
             // Single character tokens
             '=' => Token::Equals,
             ';' => Token::Semicolon,
+            ':' => Token::Colon,
+            '+' => Token::Plus,
+            '*' => Token::Times,
+            '(' => Token::ParenOpen,
+            ')' => Token::ParenClose,
             // Invalid token
             _ => Err(format!(
                 "Unknown token '{}' at {}, {}",
@@ -110,12 +111,24 @@ pub type Position = (u32, u32);
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Token {
-    LetKeyword,
-    Semicolon,
-    Equals,
+    // Values
     Identifier(String),
     /// Number with at most one decimal point
     DecimalValue(String),
+
+    // Keywords
+    LetKeyword,
+    ImportKeyword,
+
+    // Symbols
+    Semicolon,
+    Equals,
+    Colon,
+    Plus,
+    Times,
+    ParenOpen,  // (
+    ParenClose, // )
+
     Eof,
 }
 

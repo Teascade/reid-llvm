@@ -2,6 +2,7 @@
 
 import std::print;
 
+let test = 5;
 let arithmetic = 3 + 2 * 5 + 1 * 2;
 let multiplier = 5 * 2;
 
