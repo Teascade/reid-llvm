@@ -70,6 +70,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Strin
             '*' => Token::Times,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
+            ',' => Token::Comma,
             // Invalid token
             _ => Err(format!(
                 "Unknown token '{}' at {}, {}",
@@ -112,6 +113,7 @@ pub enum Token {
     Times,
     ParenOpen,  // (
     ParenClose, // )
+    Comma,
 
     Eof,
 }

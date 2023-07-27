@@ -1,6 +1,6 @@
 use crate::{
     lexer::{FullToken, Token},
-    parser::Parseable,
+    parser::Parse,
 };
 
 pub struct TokenStream<'a, 'b> {
@@ -49,7 +49,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn parse<T: Parseable>(&mut self) -> Result<T, ()> {
+    pub fn parse<T: Parse>(&mut self) -> Result<T, ()> {
         let mut ref_pos = self.position;
 
         let position = self.position;

@@ -1,6 +1,6 @@
 use crate::{lexer::Token, token_stream::TokenStream};
 
-pub trait Parseable
+pub trait Parse
 where
     Self: std::marker::Sized,
 {
@@ -13,9 +13,10 @@ pub enum Expression {
     ContantI32(i32),
     BinopAdd(Box<Expression>, Box<Expression>),
     BinopMult(Box<Expression>, Box<Expression>),
+    FunctionCall(Box<FunctionCallExpression>),
 }
 
-impl Parseable for Expression {
+impl Parse for Expression {
     fn parse(mut stream: TokenStream) -> Result<Expression, ()> {
         let lhs = parse_primary_expression(&mut stream)?;
         parse_binop_rhs(&mut stream, lhs, 0)
@@ -23,14 +24,16 @@ impl Parseable for Expression {
 }
 
 fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> {
-    if let Some(token) = stream.next() {
+    if let Ok(exp) = stream.parse() {
+        Ok(Expression::FunctionCall(Box::new(exp)))
+    } else if let Some(token) = stream.next() {
         Ok(match &token {
             Token::Identifier(v) => Expression::VariableName(v.clone()),
             Token::DecimalValue(v) => Expression::ContantI32(v.parse().unwrap()),
-            _ => Err(())?,
+            _ => Err(())?, // TODO: Add error raporting!
         })
     } else {
-        Err(())
+        Err(()) // TODO: Add error raporting!
     }
 }
 
@@ -66,7 +69,7 @@ fn parse_binop_rhs(
             lhs = match &token {
                 Token::Plus => Expression::BinopAdd(Box::new(lhs), Box::new(rhs)),
                 Token::Times => Expression::BinopMult(Box::new(lhs), Box::new(rhs)),
-                _ => Err(())?,
+                _ => Err(())?, // TODO: Add error raporting!
             };
         }
     }
@@ -74,18 +77,53 @@ fn parse_binop_rhs(
     Ok(lhs)
 }
 
+#[derive(Debug, Clone)]
+pub struct FunctionCallExpression(String, Vec<Expression>);
+
+impl Parse for FunctionCallExpression {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        if let Some(Token::Identifier(name)) = stream.next() {
+            stream.expect(Token::ParenOpen)?;
+
+            let mut args = Vec::new();
+
+            if let Ok(exp) = stream.parse() {
+                args.push(exp);
+
+                while stream.expect(Token::Comma).is_ok() {
+                    args.push(stream.parse()?);
+                }
+            }
+
+            stream.expect(Token::ParenClose)?;
+
+            Ok(FunctionCallExpression(name, args))
+        } else {
+            Err(())? // TODO: Add error raporting!
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum TopLevelStatement {
     Let(LetStatement),
     Import(ImportStatement),
+    TLExpression(Expression),
 }
 
-impl Parseable for TopLevelStatement {
+impl Parse for TopLevelStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {
         Ok(match stream.peek() {
             Some(Token::LetKeyword) => TopLevelStatement::Let(stream.parse()?),
             Some(Token::ImportKeyword) => TopLevelStatement::Import(stream.parse()?),
-            _ => Err(())?,
+            _ => {
+                if let Ok(e) = stream.parse() {
+                    stream.expect(Token::Semicolon)?;
+                    TopLevelStatement::TLExpression(e)
+                } else {
+                    Err(())? // TODO: Add error raporting!
+                }
+            }
         })
     }
 }
@@ -93,7 +131,7 @@ impl Parseable for TopLevelStatement {
 #[derive(Debug)]
 pub struct LetStatement(String, Expression);
 
-impl Parseable for LetStatement {
+impl Parse for LetStatement {
     fn parse(mut stream: TokenStream) -> Result<LetStatement, ()> {
         stream.expect(Token::LetKeyword)?;
 
@@ -104,7 +142,7 @@ impl Parseable for LetStatement {
             stream.expect(Token::Semicolon)?;
             Ok(LetStatement(variable, expression))
         } else {
-            Err(())
+            Err(()) // TODO: Add error raporting!
         }
     }
 }
@@ -112,7 +150,7 @@ impl Parseable for LetStatement {
 #[derive(Debug)]
 pub struct ImportStatement(Vec<String>);
 
-impl Parseable for ImportStatement {
+impl Parse for ImportStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {
         stream.expect(Token::ImportKeyword)?;
 
@@ -124,11 +162,11 @@ impl Parseable for ImportStatement {
                 if let Some(Token::Identifier(name)) = stream.next() {
                     import_list.push(name);
                 } else {
-                    Err(())?
+                    Err(())? // TODO: Add error raporting!
                 }
             }
         } else {
-            Err(())?
+            Err(())? // TODO: Add error raporting!
         }
 
         stream.expect(Token::Semicolon)?;

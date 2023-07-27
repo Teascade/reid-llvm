@@ -9,3 +9,4 @@ let multiplier = 5 * 2;
 
 let result = arithmetic + multiplier * arithmetic;
 print(result);
+function(one, two);
