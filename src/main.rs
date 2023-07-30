@@ -1,9 +1,9 @@
 use crate::{lexer::Token, parser::TopLevelStatement, token_stream::TokenStream};
 
-pub static EASIEST: &str = include_str!("../easiest.reid");
-pub static EASY: &str = include_str!("../easy.reid");
-pub static MEDIUM: &str = include_str!("../medium.reid");
-pub static HARD: &str = include_str!("../hard.reid");
+pub static EASIEST: &str = include_str!("../reid/easiest.reid");
+pub static EASY: &str = include_str!("../reid/easy.reid");
+pub static MEDIUM: &str = include_str!("../reid/medium.reid");
+pub static HARD: &str = include_str!("../reid/hard.reid");
 
 mod lexer;
 mod parser;
