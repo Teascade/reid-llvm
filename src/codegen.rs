@@ -73,14 +73,6 @@ impl IRModule {
             IRFunction {
                 value: Value(return_type, anon_func),
             }
-
-            // // Create a basic block in the function and set our builder to generate
-            // // code in it.
-            // let bb = LLVMAppendBasicBlockInContext(self.context, anon_func, cstr!("entry"));
-            // LLVMPositionBuilderAtEnd(self.builder, bb);
-
-            // // Emit a `ret i64` into the function to return the computed sum.
-            // LLVMBuildRet(self.builder, ret.1);
         }
     }
 }
