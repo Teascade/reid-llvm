@@ -208,22 +208,23 @@ impl Parse for FunctionSignature {
 }
 
 #[derive(Debug)]
-pub struct Block(Vec<BlockLevelStatement>);
+pub struct Block(Vec<BlockLevelStatement>, Option<Expression>);
 
 impl Parse for Block {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {
         let mut statements = Vec::new();
+        let mut return_stmt = None;
         stream.expect(Token::BraceOpen)?;
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
             let statement = stream.parse()?;
-            if let BlockLevelStatement::Return(_) = &statement {
-                statements.push(statement);
+            if let BlockLevelStatement::Return(e) = &statement {
+                return_stmt = Some(e.clone());
                 break; // Return has to be the last statement
             }
             statements.push(statement);
         }
         stream.expect(Token::BraceClose)?;
-        Ok(Block(statements))
+        Ok(Block(statements, return_stmt))
     }
 }
 
