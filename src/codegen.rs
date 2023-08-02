@@ -64,7 +64,7 @@ impl BlockLevelStatement {
                 scope.set(&let_statement.0, val)?;
                 Ok(())
             }
-            BlockLevelStatement::Return(_) => panic!("Should never exist!"),
+            BlockLevelStatement::Return(_) => panic!("Should never happen"),
             BlockLevelStatement::Import(_) => Ok(()),
             BlockLevelStatement::Expression(_) => Ok(()),
         }
@@ -85,10 +85,10 @@ impl Expression {
             },
             BlockExpr(_) => panic!("Not implemented!"),
             FunctionCall(_) => panic!("Not implemented!"),
-            VariableName(name) => Ok(scope
+            VariableName(name) => scope
                 .get(name)
                 .cloned()
-                .unwrap_or(Err(Error::UndefinedVariable(name.clone()))?)),
+                .ok_or(Error::UndefinedVariable(name.clone())),
             Literal(lit) => Ok(scope.block.get_const(lit)),
         }
     }
@@ -96,9 +96,9 @@ impl Expression {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Variable already defined {0}")]
+    #[error("Variable '{0}' already defined")]
     VariableAlreadyDefined(String),
-    #[error("Variable not yet defined {0}")]
+    #[error("Variable '{0}' not yet defined")]
     UndefinedVariable(String),
     #[error(transparent)]
     Deeper(#[from] llvm_ir::Error),
