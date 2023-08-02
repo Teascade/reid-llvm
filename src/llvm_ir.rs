@@ -3,25 +3,12 @@ use std::mem;
 
 use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
 
-use crate::ast::Literal;
+use crate::ast::{FunctionSignature, Literal};
 
 macro_rules! cstr {
     ($string:expr) => {
         core::ffi::CStr::from_bytes_with_nul_unchecked(concat!($string, "\0").as_bytes()).as_ptr()
     };
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum IRValueType {
-    I32,
-}
-
-impl IRValueType {
-    unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
-        match *self {
-            Self::I32 => LLVMInt32TypeInContext(codegen.context),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -96,6 +83,20 @@ impl Drop for IRModule {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IRValueType {
+    I32,
+}
+
+impl IRValueType {
+    unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
+        match *self {
+            Self::I32 => LLVMInt32TypeInContext(codegen.context),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct IRFunction {
     value: IRValue,
 }
@@ -152,6 +153,45 @@ impl<'a> IRBlock<'a> {
             } else {
                 Err(Error::TypeMismatch(lhs.0, rhs.0))
             }
+        }
+    }
+
+    pub fn mul(&mut self, lhs: IRValue, rhs: IRValue) -> Result<IRValue, Error> {
+        unsafe {
+            if lhs.0 == rhs.0 {
+                Ok(IRValue(
+                    lhs.0,
+                    LLVMBuildMul(self.module.builder, lhs.1, rhs.1, cstr!("tmpadd")),
+                ))
+            } else {
+                Err(Error::TypeMismatch(lhs.0, rhs.0))
+            }
+        }
+    }
+
+    pub fn function_call(&mut self, callee: &FunctionSignature) -> Result<IRValue, Error> {
+        unsafe {
+            let function = LLVMGetNamedFunction(
+                self.module.module,
+                into_cstring(callee.name.clone()).as_ptr(),
+            );
+
+            let ret_t = LLVMInt32TypeInContext(self.module.context);
+            let mut argts = [];
+            let mut args = [];
+
+            let fun_t = LLVMFunctionType(ret_t, argts.as_mut_ptr(), argts.len() as u32, 0);
+
+            let call = LLVMBuildCall2(
+                self.module.builder,
+                fun_t,
+                function,
+                args.as_mut_ptr(),
+                args.len() as u32,
+                into_cstring(&callee.name).as_ptr(),
+            );
+
+            Ok(IRValue(IRValueType::I32, call))
         }
     }
 }

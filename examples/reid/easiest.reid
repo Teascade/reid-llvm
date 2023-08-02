@@ -9,6 +9,6 @@ fn somethingelse() {
 fn main() {
     let hello = 32 + 2 + 4;
     let beep = 
-        hello + 100;
+        hello + 100 + somethingelse();
     return beep;
 }

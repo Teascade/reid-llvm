@@ -101,7 +101,7 @@ fn parse_binop_rhs(
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallExpression(String, Vec<Expression>);
+pub struct FunctionCallExpression(pub String, pub Vec<Expression>);
 
 impl Parse for FunctionCallExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -184,7 +184,7 @@ impl Parse for FunctionDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: String,
 }

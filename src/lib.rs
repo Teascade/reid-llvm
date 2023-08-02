@@ -1,4 +1,7 @@
-use crate::{ast::TopLevelStatement, lexer::Token, llvm_ir::IRModule, token_stream::TokenStream};
+use crate::{
+    ast::TopLevelStatement, codegen::codegen_from_statements, lexer::Token, llvm_ir::IRModule,
+    token_stream::TokenStream,
+};
 
 mod ast;
 mod codegen;
@@ -37,10 +40,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
         statements.push(statement);
     }
 
-    let mut module = IRModule::new("testmod");
-    for statement in statements {
-        statement.codegen(&mut module)?;
-    }
+    let mut module = codegen_from_statements(statements)?;
     let text = module.print_to_string().unwrap();
     Ok(text.to_owned())
 }

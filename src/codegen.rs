@@ -1,28 +1,29 @@
 use std::collections::{hash_map, HashMap};
 
 use crate::{
-    ast::{BinaryOperator, BlockLevelStatement, Expression, FunctionDefinition, TopLevelStatement},
-    llvm_ir::{self, IRBlock, IRModule, IRValue, IRValueType},
+    ast::{
+        BinaryOperator, BlockLevelStatement, Expression, FunctionCallExpression,
+        FunctionDefinition, FunctionSignature, TopLevelStatement,
+    },
+    llvm_ir::{self, IRBlock, IRFunction, IRModule, IRValue, IRValueType},
 };
 
-pub struct Scope<'a> {
-    pub block: IRBlock<'a>,
+#[derive(Clone)]
+pub struct ScopeData {
     named_vars: HashMap<String, IRValue>,
+    defined_functions: HashMap<String, (FunctionSignature, Option<IRFunction>)>,
 }
 
-impl<'a> Scope<'a> {
-    pub fn from(block: IRBlock<'a>) -> Self {
-        Scope {
-            block,
-            named_vars: HashMap::new(),
-        }
+impl ScopeData {
+    pub fn inner<'a>(&'a mut self, block: IRBlock<'a>) -> Scope {
+        Scope { block, data: self }
     }
 
-    pub fn get(&self, name: &String) -> Option<&IRValue> {
+    pub fn var(&self, name: &String) -> Option<&IRValue> {
         self.named_vars.get(name)
     }
 
-    pub fn set(&mut self, name: &str, val: IRValue) -> Result<(), Error> {
+    pub fn set_var(&mut self, name: &str, val: IRValue) -> Result<(), Error> {
         if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name.to_owned()) {
             e.insert(val);
             Ok(())
@@ -30,25 +31,83 @@ impl<'a> Scope<'a> {
             Err(Error::VariableAlreadyDefined(name.to_owned()))
         }
     }
+
+    pub fn function(
+        &mut self,
+        name: &String,
+    ) -> Option<&mut (FunctionSignature, Option<IRFunction>)> {
+        self.defined_functions.get_mut(name)
+    }
+
+    pub fn set_function_signature(
+        &mut self,
+        name: &str,
+        sig: FunctionSignature,
+        ir: IRFunction,
+    ) -> Result<(), Error> {
+        if let hash_map::Entry::Vacant(e) = self.defined_functions.entry(name.to_owned()) {
+            e.insert((sig, Some(ir)));
+            Ok(())
+        } else {
+            Err(Error::VariableAlreadyDefined(name.to_owned()))
+        }
+    }
+}
+
+pub struct Scope<'a, 'b> {
+    pub block: IRBlock<'a>,
+    pub data: &'b mut ScopeData,
+}
+
+pub fn codegen_from_statements(statements: Vec<TopLevelStatement>) -> Result<IRModule, Error> {
+    let mut module = IRModule::new("testmod");
+
+    let mut scope = ScopeData {
+        defined_functions: HashMap::new(),
+        named_vars: HashMap::new(),
+    };
+
+    for statement in &statements {
+        match statement {
+            TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, _)) => {
+                let function = module.create_func(&sig.name, IRValueType::I32);
+                scope.set_function_signature(&sig.name.clone(), sig.clone(), function)?;
+            }
+            TopLevelStatement::Import(_) => {}
+        }
+    }
+
+    for statement in &statements {
+        statement.codegen(&mut module, &mut scope)?;
+    }
+
+    Ok(module)
 }
 
 impl TopLevelStatement {
-    pub fn codegen(&self, module: &mut IRModule) -> Result<(), Error> {
+    pub fn codegen(&self, module: &mut IRModule, root_data: &mut ScopeData) -> Result<(), Error> {
         match self {
             TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
-                let func = module.create_func(&sig.name, IRValueType::I32);
-                let mut scope = Scope::from(module.create_block());
+                if let Some((_, ir)) = root_data.function(&sig.name) {
+                    if let Some(ir) = ir.take() {
+                        let mut scope = root_data.inner(module.create_block());
 
-                for statement in &block.0 {
-                    statement.codegen(&mut scope)?;
-                }
+                        for statement in &block.0 {
+                            statement.codegen(&mut scope)?;
+                        }
 
-                let value = if let Some(exp) = &block.1 {
-                    exp.codegen(&mut scope)?
+                        let value = if let Some(exp) = &block.1 {
+                            exp.codegen(&mut scope)?
+                        } else {
+                            panic!("Void-return type function not yet implemented!");
+                        };
+                        ir.add_definition(value, scope.block);
+                    } else {
+                        Err(Error::FunctionAlreadyDefined(sig.name.clone()))?
+                    }
                 } else {
-                    panic!("Void-return type function not yet implemented!");
-                };
-                func.add_definition(value, scope.block);
+                    panic!("Function was not declared before it's definition")
+                }
             }
             TopLevelStatement::Import(_) => {}
         }
@@ -61,7 +120,7 @@ impl BlockLevelStatement {
         match self {
             BlockLevelStatement::Let(let_statement) => {
                 let val = let_statement.1.codegen(scope)?;
-                scope.set(&let_statement.0, val)?;
+                scope.data.set_var(&let_statement.0, val)?;
                 Ok(())
             }
             BlockLevelStatement::Return(_) => panic!("Should never happen"),
@@ -81,12 +140,24 @@ impl Expression {
                     let rhs = rhs.codegen(scope)?;
                     Ok(scope.block.add(lhs, rhs)?)
                 }
-                BinaryOperator::Mult => panic!("Not implemented!"),
+                BinaryOperator::Mult => {
+                    let lhs = lhs.codegen(scope)?;
+                    let rhs = rhs.codegen(scope)?;
+                    Ok(scope.block.mul(lhs, rhs)?)
+                }
             },
-            BlockExpr(_) => panic!("Not implemented!"),
-            FunctionCall(_) => panic!("Not implemented!"),
+            BlockExpr(_) => panic!("(BlockExpr) Not implemented!"),
+            FunctionCall(fc) => {
+                let FunctionCallExpression(name, _) = &**fc;
+                if let Some((sig, _)) = scope.data.function(name) {
+                    Ok(scope.block.function_call(sig)?)
+                } else {
+                    Err(Error::UndefinedFunction(name.clone()))?
+                }
+            }
             VariableName(name) => scope
-                .get(name)
+                .data
+                .var(name)
                 .cloned()
                 .ok_or(Error::UndefinedVariable(name.clone())),
             Literal(lit) => Ok(scope.block.get_const(lit)),
@@ -100,6 +171,10 @@ pub enum Error {
     VariableAlreadyDefined(String),
     #[error("Variable '{0}' not yet defined")]
     UndefinedVariable(String),
+    #[error("Function '{0}' not defined")]
+    UndefinedFunction(String),
+    #[error("Function '{0}' already defined")]
+    FunctionAlreadyDefined(String),
     #[error(transparent)]
     Deeper(#[from] llvm_ir::Error),
 }

@@ -2,11 +2,11 @@
 
 import std::print;
 
-let test = 5;
-let simpleAdd = 2 + 2;
-let arithmetic = 3 + 2 * 5 + 1 * 2;
-let multiplier = 5 * 2;
+fn main() {
+    let test = 5;
+    let simpleAdd = 2 + 2;
+    let arithmetic = 3 + 2 * 5 + 1 * 2;
+    let multiplier = 5 * 2;
 
-let result = arithmetic + multiplier * arithmetic;
-print(result);
-function(one, two);
+    return arithmetic + multiplier * arithmetic;
+}

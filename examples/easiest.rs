@@ -1,6 +1,6 @@
 use reid::compile;
 
-pub static EASIEST: &str = include_str!("./reid/easiest.reid");
+pub static EASIEST: &str = include_str!("./reid/easy.reid");
 
 fn main() {
     let text = match compile(EASIEST) {
