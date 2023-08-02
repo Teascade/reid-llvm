@@ -25,8 +25,8 @@ impl<'a> Scope<'a> {
         self.named_vars.get(name)
     }
 
-    pub fn set(&mut self, name: &String, val: Value) -> Result<(), ()> {
-        if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name.clone()) {
+    pub fn set(&mut self, name: &str, val: Value) -> Result<(), ()> {
+        if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name.to_owned()) {
             e.insert(val);
             Ok(())
         } else {
@@ -86,8 +86,8 @@ impl Expression {
             },
             BlockExpr(_) => panic!("Not implemented!"),
             FunctionCall(_) => panic!("Not implemented!"),
-            VariableName(name) => scope.get(&name).cloned().unwrap(),
-            Literal(lit) => scope.block.get_const(&lit),
+            VariableName(name) => scope.get(name).cloned().unwrap(),
+            Literal(lit) => scope.block.get_const(lit),
         }
     }
 }

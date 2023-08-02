@@ -1,4 +1,4 @@
-use std::{fmt::Debug, iter::Peekable, str::Chars};
+use std::{fmt::Debug, str::Chars};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -71,8 +71,6 @@ impl Debug for FullToken {
 
 pub type Position = (u32, u32);
 
-const EOF_CHAR: char = '\0';
-
 pub struct Cursor<'a> {
     pub position: Position,
     char_stream: Chars<'a>,
@@ -94,6 +92,7 @@ impl<'a> Cursor<'a> {
         self.char_stream.clone().next()
     }
 
+    #[allow(dead_code)] // Is this actually needed?
     fn second(&mut self) -> Option<char> {
         // `.next()` optimizes better than `.nth(1)`
         let mut stream = self.char_stream.clone();
