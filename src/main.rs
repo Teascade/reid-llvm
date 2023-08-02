@@ -1,4 +1,6 @@
-use crate::{lexer::Token, parser::TopLevelStatement, token_stream::TokenStream};
+use crate::{
+    lexer::Token, llvm_ir::IRModule, parser::TopLevelStatement, token_stream::TokenStream,
+};
 
 pub static EASIEST: &str = include_str!("../reid/easiest.reid");
 pub static EASY: &str = include_str!("../reid/easy.reid");
@@ -32,5 +34,8 @@ fn main() {
         statements.push(statement);
     }
 
-    codegen::codegen(statements);
+    let mut module = IRModule::new();
+    for statement in statements {
+        statement.codegen(&mut module);
+    }
 }

@@ -25,8 +25,8 @@ impl<'a> Scope<'a> {
         self.named_vars.get(name)
     }
 
-    pub fn set(&mut self, name: String, val: Value) -> Result<(), ()> {
-        if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name) {
+    pub fn set(&mut self, name: &String, val: Value) -> Result<(), ()> {
+        if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name.clone()) {
             e.insert(val);
             Ok(())
         } else {
@@ -35,28 +35,19 @@ impl<'a> Scope<'a> {
     }
 }
 
-pub fn codegen(statements: Vec<TopLevelStatement>) {
-    let mut c = IRModule::new();
-    for statement in statements {
-        match statement {
+impl TopLevelStatement {
+    pub fn codegen(&self, module: &mut IRModule) {
+        match self {
             TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
-                let func = c.create_func(sig.name, ValueType::I32);
-                let mut scope = Scope::from(c.create_block());
+                let func = module.create_func(&sig.name, ValueType::I32);
+                let mut scope = Scope::from(module.create_block());
 
-                for stmt in block.0 {
-                    match stmt {
-                        BlockLevelStatement::Let(let_statement) => {
-                            let value = codegen_exp(&mut scope, let_statement.1);
-                            scope.set(let_statement.0, value).unwrap();
-                        }
-                        BlockLevelStatement::Return(_) => panic!("Should never exist!"),
-                        BlockLevelStatement::Import(_) => {}
-                        BlockLevelStatement::Expression(_) => {}
-                    }
+                for statement in &block.0 {
+                    statement.codegen(&mut scope);
                 }
 
-                let value = if let Some(exp) = block.1 {
-                    codegen_exp(&mut scope, exp)
+                let value = if let Some(exp) = &block.1 {
+                    exp.codegen(&mut scope)
                 } else {
                     scope.block.get_const(&Literal::I32(0))
                 };
@@ -67,20 +58,36 @@ pub fn codegen(statements: Vec<TopLevelStatement>) {
     }
 }
 
-fn codegen_exp(scope: &mut Scope, expression: Expression) -> Value {
-    use Expression::*;
-    match expression {
-        Binop(op, lhs, rhs) => match op {
-            BinaryOperator::Add => {
-                let lhs = codegen_exp(scope, *lhs);
-                let rhs = codegen_exp(scope, *rhs);
-                scope.block.add(lhs, rhs).unwrap()
+impl BlockLevelStatement {
+    pub fn codegen(&self, scope: &mut Scope) {
+        match self {
+            BlockLevelStatement::Let(let_statement) => {
+                let val = let_statement.1.codegen(scope);
+                scope.set(&let_statement.0, val).unwrap();
             }
-            BinaryOperator::Mult => panic!("Not implemented!"),
-        },
-        BlockExpr(_) => panic!("Not implemented!"),
-        FunctionCall(_) => panic!("Not implemented!"),
-        VariableName(name) => scope.get(&name).cloned().unwrap(),
-        Literal(lit) => scope.block.get_const(&lit),
+            BlockLevelStatement::Return(_) => panic!("Should never exist!"),
+            BlockLevelStatement::Import(_) => {}
+            BlockLevelStatement::Expression(_) => {}
+        }
+    }
+}
+
+impl Expression {
+    pub fn codegen(&self, scope: &mut Scope) -> Value {
+        use Expression::*;
+        match self {
+            Binop(op, lhs, rhs) => match op {
+                BinaryOperator::Add => {
+                    let lhs = lhs.codegen(scope);
+                    let rhs = rhs.codegen(scope);
+                    scope.block.add(lhs, rhs).unwrap()
+                }
+                BinaryOperator::Mult => panic!("Not implemented!"),
+            },
+            BlockExpr(_) => panic!("Not implemented!"),
+            FunctionCall(_) => panic!("Not implemented!"),
+            VariableName(name) => scope.get(&name).cloned().unwrap(),
+            Literal(lit) => scope.block.get_const(&lit),
+        }
     }
 }
