@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::mem;
 
 use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
@@ -80,10 +80,8 @@ impl IRModule {
         }
     }
 
-    pub fn dump(&mut self) {
-        unsafe {
-            LLVMDumpModule(self.module);
-        }
+    pub fn print_to_string(&mut self) -> Result<&str, std::str::Utf8Error> {
+        unsafe { CStr::from_ptr(LLVMPrintModuleToString(self.module)).to_str() }
     }
 }
 

@@ -36,5 +36,5 @@ fn main() {
     for statement in statements {
         statement.codegen(&mut module);
     }
-    module.dump();
+    println!("{}", module.print_to_string().unwrap());
 }
