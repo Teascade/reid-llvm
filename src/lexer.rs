@@ -101,12 +101,11 @@ impl<'a> Cursor<'a> {
     }
 }
 
-pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, String> {
+pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error> {
     let to_tokenize = to_tokenize.into();
-    let mut position = (0, 1);
     let mut cursor = Cursor {
         char_stream: to_tokenize.chars(),
-        position,
+        position: (0, 1),
     };
 
     let mut tokens = Vec::new();
@@ -167,24 +166,25 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Strin
             '}' => Token::BraceClose,
             ',' => Token::Comma,
             // Invalid token
-            _ => Err(format!(
-                "Unknown token '{}' at {}, {}",
-                character, position.0, position.1
-            ))?,
+            _ => Err(Error::InvalidToken(*character, cursor.position))?,
         };
 
         tokens.push(FullToken {
             token: variant,
-            position,
+            position: cursor.position,
         });
     }
 
-    position.0 += 1;
-
     tokens.push(FullToken {
         token: Token::Eof,
-        position,
+        position: cursor.position,
     });
 
     Ok(tokens)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Invalid token '{}' at Ln {}, Col {}", .0, (.1).1, (.1).0)]
+    InvalidToken(char, Position),
 }

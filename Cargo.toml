@@ -6,5 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-
+## LLVM Bindings
 llvm-sys = "160"
+## Make it easier to generate errors
+thiserror = "1.0.44"

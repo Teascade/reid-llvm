@@ -1,10 +1,5 @@
 use crate::{ast::TopLevelStatement, lexer::Token, llvm_ir::IRModule, token_stream::TokenStream};
 
-pub static EASIEST: &str = include_str!("../reid/easiest.reid");
-pub static EASY: &str = include_str!("../reid/easy.reid");
-pub static MEDIUM: &str = include_str!("../reid/medium.reid");
-pub static HARD: &str = include_str!("../reid/hard.reid");
-
 mod ast;
 mod codegen;
 mod lexer;
@@ -17,8 +12,14 @@ mod token_stream;
 // 3. Make it so all codegen is done with a Block-struct, that represents a
 //    single proper block
 
-fn main() {
-    let tokens = lexer::tokenize(EASIEST).unwrap();
+#[derive(thiserror::Error, Debug)]
+pub enum ReidError {
+    #[error(transparent)]
+    LexerError(#[from] lexer::Error),
+}
+
+pub fn compile(source: &str) -> Result<String, ReidError> {
+    let tokens = lexer::tokenize(source)?;
 
     dbg!(&tokens);
 
@@ -36,5 +37,6 @@ fn main() {
     for statement in statements {
         statement.codegen(&mut module);
     }
-    println!("{}", module.print_to_string().unwrap());
+    let text = module.print_to_string().unwrap();
+    Ok(text.to_owned())
 }

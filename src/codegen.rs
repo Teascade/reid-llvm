@@ -1,10 +1,7 @@
 use std::collections::{hash_map, HashMap};
 
 use crate::{
-    ast::{
-        BinaryOperator, BlockLevelStatement, Expression, FunctionDefinition, Literal,
-        TopLevelStatement,
-    },
+    ast::{BinaryOperator, BlockLevelStatement, Expression, FunctionDefinition, TopLevelStatement},
     llvm_ir::{IRBlock, IRModule, IRValue, IRValueType},
 };
 
