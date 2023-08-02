@@ -3,7 +3,7 @@ use std::mem;
 
 use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
 
-use crate::parser::Literal;
+use crate::ast::Literal;
 
 macro_rules! cstr {
     ($string:expr) => {
@@ -12,11 +12,11 @@ macro_rules! cstr {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ValueType {
+pub enum IRValueType {
     I32,
 }
 
-impl ValueType {
+impl IRValueType {
     unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
         match *self {
             Self::I32 => LLVMInt32TypeInContext(codegen.context),
@@ -26,7 +26,7 @@ impl ValueType {
 
 #[derive(Clone, Debug)]
 #[must_use = "value contains raw pointer and must be inserted somewhere"]
-pub struct Value(ValueType, LLVMValueRef);
+pub struct IRValue(IRValueType, LLVMValueRef);
 
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
@@ -40,11 +40,11 @@ pub struct IRModule {
 }
 
 impl IRModule {
-    pub fn new() -> IRModule {
+    pub fn new<T: Into<String>>(name: T) -> IRModule {
         unsafe {
             // Set up a context, module and builder in that context.
             let context = LLVMContextCreate();
-            let module = LLVMModuleCreateWithNameInContext(cstr!("testmodule"), context);
+            let module = LLVMModuleCreateWithNameInContext(into_cstring(name).as_ptr(), context);
             let builder = LLVMCreateBuilderInContext(context);
 
             IRModule {
@@ -59,7 +59,11 @@ impl IRModule {
         IRBlock::create("entry", self)
     }
 
-    pub fn create_func<T: Into<String>>(&mut self, name: T, return_type: ValueType) -> IRFunction {
+    pub fn create_func<T: Into<String>>(
+        &mut self,
+        name: T,
+        return_type: IRValueType,
+    ) -> IRFunction {
         unsafe {
             let mut argts = [];
             let func_type = LLVMFunctionType(
@@ -71,8 +75,14 @@ impl IRModule {
 
             let anon_func = LLVMAddFunction(self.module, into_cstring(name).as_ptr(), func_type);
             IRFunction {
-                value: Value(return_type, anon_func),
+                value: IRValue(return_type, anon_func),
             }
+        }
+    }
+
+    pub fn dump(&mut self) {
+        unsafe {
+            LLVMDumpModule(self.module);
         }
     }
 }
@@ -82,7 +92,6 @@ impl Drop for IRModule {
         // Clean up. Values created in the context mostly get cleaned up there.
         unsafe {
             LLVMDisposeBuilder(self.builder);
-            LLVMDumpModule(self.module);
             LLVMDisposeModule(self.module);
             LLVMContextDispose(self.context);
         }
@@ -90,11 +99,11 @@ impl Drop for IRModule {
 }
 
 pub struct IRFunction {
-    value: Value,
+    value: IRValue,
 }
 
 impl IRFunction {
-    pub fn add_definition(self, ret: Value, block: IRBlock) {
+    pub fn add_definition(self, ret: IRValue, block: IRBlock) {
         unsafe {
             LLVMAppendExistingBasicBlock(self.value.1, block.blockref);
             LLVMBuildRet(block.module.builder, ret.1);
@@ -120,11 +129,11 @@ impl<'a> IRBlock<'a> {
         }
     }
 
-    pub fn get_const(&mut self, literal_type: &Literal) -> Value {
+    pub fn get_const(&mut self, literal_type: &Literal) -> IRValue {
         unsafe {
             match *literal_type {
-                Literal::I32(v) => Value(
-                    ValueType::I32,
+                Literal::I32(v) => IRValue(
+                    IRValueType::I32,
                     LLVMConstInt(
                         LLVMInt32TypeInContext(self.module.context),
                         mem::transmute(v as i64),
@@ -135,10 +144,10 @@ impl<'a> IRBlock<'a> {
         }
     }
 
-    pub fn add(&mut self, lhs: Value, rhs: Value) -> Result<Value, ()> {
+    pub fn add(&mut self, lhs: IRValue, rhs: IRValue) -> Result<IRValue, ()> {
         unsafe {
             if lhs.0 == rhs.0 {
-                Ok(Value(
+                Ok(IRValue(
                     lhs.0,
                     LLVMBuildAdd(self.module.builder, lhs.1, rhs.1, cstr!("tmpadd")),
                 ))

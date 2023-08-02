@@ -1,6 +1,6 @@
 use crate::{
+    ast::Parse,
     lexer::{FullToken, Token},
-    parser::Parse,
 };
 
 pub struct TokenStream<'a, 'b> {

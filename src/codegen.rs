@@ -1,16 +1,16 @@
 use std::collections::{hash_map, HashMap};
 
 use crate::{
-    llvm_ir::{IRBlock, IRModule, Value, ValueType},
-    parser::{
+    ast::{
         BinaryOperator, BlockLevelStatement, Expression, FunctionDefinition, Literal,
         TopLevelStatement,
     },
+    llvm_ir::{IRBlock, IRModule, IRValue, IRValueType},
 };
 
 pub struct Scope<'a> {
     pub block: IRBlock<'a>,
-    named_vars: HashMap<String, Value>,
+    named_vars: HashMap<String, IRValue>,
 }
 
 impl<'a> Scope<'a> {
@@ -21,11 +21,11 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn get(&self, name: &String) -> Option<&Value> {
+    pub fn get(&self, name: &String) -> Option<&IRValue> {
         self.named_vars.get(name)
     }
 
-    pub fn set(&mut self, name: &str, val: Value) -> Result<(), ()> {
+    pub fn set(&mut self, name: &str, val: IRValue) -> Result<(), ()> {
         if let hash_map::Entry::Vacant(e) = self.named_vars.entry(name.to_owned()) {
             e.insert(val);
             Ok(())
@@ -39,7 +39,7 @@ impl TopLevelStatement {
     pub fn codegen(&self, module: &mut IRModule) {
         match self {
             TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
-                let func = module.create_func(&sig.name, ValueType::I32);
+                let func = module.create_func(&sig.name, IRValueType::I32);
                 let mut scope = Scope::from(module.create_block());
 
                 for statement in &block.0 {
@@ -49,7 +49,7 @@ impl TopLevelStatement {
                 let value = if let Some(exp) = &block.1 {
                     exp.codegen(&mut scope)
                 } else {
-                    scope.block.get_const(&Literal::I32(0))
+                    panic!("Void-return type function not yet implemented!");
                 };
                 func.add_definition(value, scope.block);
             }
@@ -73,7 +73,7 @@ impl BlockLevelStatement {
 }
 
 impl Expression {
-    pub fn codegen(&self, scope: &mut Scope) -> Value {
+    pub fn codegen(&self, scope: &mut Scope) -> IRValue {
         use Expression::*;
         match self {
             Binop(op, lhs, rhs) => match op {
