@@ -16,6 +16,8 @@ mod token_stream;
 pub enum ReidError {
     #[error(transparent)]
     LexerError(#[from] lexer::Error),
+    #[error(transparent)]
+    ParserError(#[from] token_stream::Error),
 }
 
 pub fn compile(source: &str) -> Result<String, ReidError> {
@@ -28,7 +30,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     let mut statements = Vec::new();
 
     while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
-        let statement = token_stream.parse::<TopLevelStatement>().unwrap();
+        let statement = token_stream.parse::<TopLevelStatement>()?;
         dbg!(&statement);
         statements.push(statement);
     }

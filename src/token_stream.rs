@@ -1,6 +1,6 @@
 use crate::{
     ast::Parse,
-    lexer::{FullToken, Token},
+    lexer::{FullToken, Position, Token},
 };
 
 pub struct TokenStream<'a, 'b> {
@@ -18,16 +18,24 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn expect(&mut self, token: Token) -> Result<(), ()> {
+    pub fn expected_err<T: Into<String>>(&mut self, expected: T) -> Result<Error, Error> {
+        Ok(Error::Expected(
+            expected.into(),
+            self.peek().unwrap_or(Token::Eof),
+            self.get_next_position()?,
+        ))
+    }
+
+    pub fn expect(&mut self, token: Token) -> Result<(), Error> {
         if let Some(peeked) = self.peek() {
             if token == peeked {
                 self.position += 1;
                 Ok(())
             } else {
-                Err(())
+                Err(self.expected_err(token)?)
             }
         } else {
-            Err(())
+            Err(self.expected_err(token)?)
         }
     }
 
@@ -49,7 +57,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn parse<T: Parse>(&mut self) -> Result<T, ()> {
+    pub fn parse<T: Parse>(&mut self) -> Result<T, Error> {
         let mut ref_pos = self.position;
 
         let position = self.position;
@@ -67,6 +75,15 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             Err(e) => Err(e),
         }
     }
+
+    fn get_next_position(&self) -> Result<Position, Error> {
+        if self.tokens.is_empty() {
+            Err(Error::FileEmpty)
+        } else {
+            let token_idx = self.position.min(self.tokens.len() - 1);
+            Ok(self.tokens[token_idx].position)
+        }
+    }
 }
 
 impl Drop for TokenStream<'_, '_> {
@@ -75,4 +92,12 @@ impl Drop for TokenStream<'_, '_> {
             **ref_pos = self.position;
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Expected {} at Ln {}, Col {}, got {:?}", .0, (.2).1, (.2).0, .1)]
+    Expected(String, Token, Position),
+    #[error("Source file contains no tokens")]
+    FileEmpty,
 }

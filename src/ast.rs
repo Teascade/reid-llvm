@@ -1,10 +1,13 @@
-use crate::{lexer::Token, token_stream::TokenStream};
+use crate::{
+    lexer::{Token, TokenList},
+    token_stream::{Error, TokenStream},
+};
 
 pub trait Parse
 where
     Self: std::marker::Sized,
 {
-    fn parse(stream: TokenStream) -> Result<Self, ()>;
+    fn parse(stream: TokenStream) -> Result<Self, Error>;
 }
 
 #[derive(Debug, Clone)]
@@ -28,13 +31,13 @@ pub enum Expression {
 }
 
 impl Parse for Expression {
-    fn parse(mut stream: TokenStream) -> Result<Expression, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Expression, Error> {
         let lhs = parse_primary_expression(&mut stream)?;
         parse_binop_rhs(&mut stream, lhs, 0)
     }
 }
 
-fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> {
+fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Error> {
     if let Ok(exp) = stream.parse() {
         Ok(Expression::FunctionCall(Box::new(exp)))
     } else if let Ok(block) = stream.parse() {
@@ -48,10 +51,10 @@ fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> 
                 stream.expect(Token::ParenClose)?;
                 exp
             }
-            _ => Err(())?, // TODO: Add error raporting!
+            _ => Err(stream.expected_err("identifier, constant or parentheses")?)?,
         })
     } else {
-        Err(()) // TODO: Add error raporting!
+        Err(stream.expected_err("expression")?)?
     }
 }
 
@@ -64,7 +67,7 @@ fn parse_binop_rhs(
     stream: &mut TokenStream,
     mut lhs: Expression,
     expr_prec: i8,
-) -> Result<Expression, ()> {
+) -> Result<Expression, Error> {
     while let Some(token) = stream.peek() {
         let curr_token_prec = token.get_token_prec();
 
@@ -89,7 +92,7 @@ fn parse_binop_rhs(
             lhs = match &token {
                 Token::Plus => Expression::Binop(Add, Box::new(lhs), Box::new(rhs)),
                 Token::Times => Expression::Binop(Mult, Box::new(lhs), Box::new(rhs)),
-                _ => Err(())?, // TODO: Add error raporting!
+                _ => Err(stream.expected_err(TokenList(vec![Token::Plus, Token::Times]))?)?, // TODO: Add error raporting!
             };
         }
     }
@@ -101,7 +104,7 @@ fn parse_binop_rhs(
 pub struct FunctionCallExpression(String, Vec<Expression>);
 
 impl Parse for FunctionCallExpression {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
             stream.expect(Token::ParenOpen)?;
 
@@ -119,7 +122,7 @@ impl Parse for FunctionCallExpression {
 
             Ok(FunctionCallExpression(name, args))
         } else {
-            Err(())? // TODO: Add error raporting!
+            Err(stream.expected_err("identifier")?)
         }
     }
 }
@@ -128,7 +131,7 @@ impl Parse for FunctionCallExpression {
 pub struct LetStatement(pub String, pub Expression);
 
 impl Parse for LetStatement {
-    fn parse(mut stream: TokenStream) -> Result<LetStatement, ()> {
+    fn parse(mut stream: TokenStream) -> Result<LetStatement, Error> {
         stream.expect(Token::LetKeyword)?;
 
         if let Some(Token::Identifier(variable)) = stream.next() {
@@ -138,7 +141,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Semi)?;
             Ok(LetStatement(variable, expression))
         } else {
-            Err(()) // TODO: Add error raporting!
+            Err(stream.expected_err("identifier")?)
         }
     }
 }
@@ -147,7 +150,7 @@ impl Parse for LetStatement {
 pub struct ImportStatement(Vec<String>);
 
 impl Parse for ImportStatement {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::ImportKeyword)?;
 
         let mut import_list = Vec::new();
@@ -158,11 +161,11 @@ impl Parse for ImportStatement {
                 if let Some(Token::Identifier(name)) = stream.next() {
                     import_list.push(name);
                 } else {
-                    Err(())? // TODO: Add error raporting!
+                    Err(stream.expected_err("identifier")?)?
                 }
             }
         } else {
-            Err(())? // TODO: Add error raporting!
+            Err(stream.expected_err("identifier")?)?
         }
 
         stream.expect(Token::Semi)?;
@@ -175,7 +178,7 @@ impl Parse for ImportStatement {
 pub struct FunctionDefinition(pub FunctionSignature, pub Block);
 
 impl Parse for FunctionDefinition {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::FnKeyword)?;
         Ok(FunctionDefinition(stream.parse()?, stream.parse()?))
     }
@@ -187,13 +190,13 @@ pub struct FunctionSignature {
 }
 
 impl Parse for FunctionSignature {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
             stream.expect(Token::ParenOpen)?;
             stream.expect(Token::ParenClose)?;
             Ok(FunctionSignature { name })
         } else {
-            Err(()) // TODO: Add error raporting!
+            Err(stream.expected_err("identifier")?)?
         }
     }
 }
@@ -202,7 +205,7 @@ impl Parse for FunctionSignature {
 pub struct Block(pub Vec<BlockLevelStatement>, pub Option<Expression>);
 
 impl Parse for Block {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let mut statements = Vec::new();
         let mut return_stmt = None;
         stream.expect(Token::BraceOpen)?;
@@ -228,7 +231,7 @@ pub enum BlockLevelStatement {
 }
 
 impl Parse for BlockLevelStatement {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         use BlockLevelStatement as Stmt;
         Ok(match stream.peek() {
             Some(Token::LetKeyword) => Stmt::Let(stream.parse()?),
@@ -244,7 +247,7 @@ impl Parse for BlockLevelStatement {
                     stream.expect(Token::Semi)?;
                     Stmt::Expression(e)
                 } else {
-                    Err(())? // TODO: Add error raporting!
+                    Err(stream.expected_err("expression")?)?
                 }
             }
         })
@@ -258,12 +261,14 @@ pub enum TopLevelStatement {
 }
 
 impl Parse for TopLevelStatement {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         use TopLevelStatement as Stmt;
         Ok(match stream.peek() {
             Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
             Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
-            _ => Err(())?, // TODO: Add error raporting!
+            _ => {
+                Err(stream.expected_err(TokenList(vec![Token::ImportKeyword, Token::FnKeyword]))?)?
+            }
         })
     }
 }
