@@ -1,24 +1,40 @@
-use crate::{lexer::Token, parser::TopLevelStatement, token_stream::TokenStream};
+use crate::{
+    codegen::CodeGenerator, lexer::Token, parser::TopLevelStatement, token_stream::TokenStream,
+};
 
 pub static EASIEST: &str = include_str!("../reid/easiest.reid");
 pub static EASY: &str = include_str!("../reid/easy.reid");
 pub static MEDIUM: &str = include_str!("../reid/medium.reid");
 pub static HARD: &str = include_str!("../reid/hard.reid");
 
+mod codegen;
 mod lexer;
 mod parser;
 mod token_stream;
 
+// TODO:
+// 1. Make it so that TopLevelStatement can only be import or function def
+// 2. Make BlockLevelStatement, that has everything TopLevelStatement has now
+// 3. Make it so all codegen is done with a Block-struct, that represents a
+//    single proper block
+
 fn main() {
-    let tokens = lexer::tokenize(EASY).unwrap();
+    let tokens = lexer::tokenize(EASIEST).unwrap();
 
     dbg!(&tokens);
 
     let mut token_stream = TokenStream::from(&tokens);
 
-    while let Ok(statement) = token_stream.parse::<TopLevelStatement>() {
+    while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
+        let statement = token_stream.parse::<TopLevelStatement>().unwrap();
         dbg!(&statement);
     }
 
-    dbg!(token_stream.expect(Token::Eof).ok());
+    let mut c = CodeGenerator::new();
+    let x = c.get_const(&parser::Literal::I32(3));
+    let y = c.get_const(&parser::Literal::I32(4));
+    let add = c.add(x, y).unwrap();
+    c.create_func(add);
+
+    // dbg!(token_stream.expect(Token::Eof).ok());
 }

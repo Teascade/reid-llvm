@@ -8,11 +8,21 @@ where
 }
 
 #[derive(Debug, Clone)]
+pub enum Literal {
+    I32(i32),
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryOperator {
+    Add,
+    Mult,
+}
+
+#[derive(Debug, Clone)]
 pub enum Expression {
     VariableName(String),
-    ContantI32(i32),
-    BinopAdd(Box<Expression>, Box<Expression>),
-    BinopMult(Box<Expression>, Box<Expression>),
+    Literal(Literal),
+    Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
 }
 
@@ -29,7 +39,7 @@ fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> 
     } else if let Some(token) = stream.next() {
         Ok(match &token {
             Token::Identifier(v) => Expression::VariableName(v.clone()),
-            Token::DecimalValue(v) => Expression::ContantI32(v.parse().unwrap()),
+            Token::DecimalValue(v) => Expression::Literal(Literal::I32(v.parse().unwrap())),
             _ => Err(())?, // TODO: Add error raporting!
         })
     } else {
@@ -66,9 +76,11 @@ fn parse_binop_rhs(
                 }
             }
 
+            use BinaryOperator::*;
+
             lhs = match &token {
-                Token::Plus => Expression::BinopAdd(Box::new(lhs), Box::new(rhs)),
-                Token::Times => Expression::BinopMult(Box::new(lhs), Box::new(rhs)),
+                Token::Plus => Expression::Binop(Add, Box::new(lhs), Box::new(rhs)),
+                Token::Times => Expression::Binop(Mult, Box::new(lhs), Box::new(rhs)),
                 _ => Err(())?, // TODO: Add error raporting!
             };
         }
@@ -106,24 +118,17 @@ impl Parse for FunctionCallExpression {
 
 #[derive(Debug)]
 pub enum TopLevelStatement {
-    Let(LetStatement),
     Import(ImportStatement),
-    TLExpression(Expression),
+    FunctionDefinition(FunctionDefinition),
 }
 
 impl Parse for TopLevelStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        use TopLevelStatement as Stmt;
         Ok(match stream.peek() {
-            Some(Token::LetKeyword) => TopLevelStatement::Let(stream.parse()?),
-            Some(Token::ImportKeyword) => TopLevelStatement::Import(stream.parse()?),
-            _ => {
-                if let Ok(e) = stream.parse() {
-                    stream.expect(Token::Semicolon)?;
-                    TopLevelStatement::TLExpression(e)
-                } else {
-                    Err(())? // TODO: Add error raporting!
-                }
-            }
+            Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
+            Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
+            _ => Err(())?, // TODO: Add error raporting!
         })
     }
 }
@@ -139,7 +144,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Equals)?;
 
             let expression = stream.parse()?;
-            stream.expect(Token::Semicolon)?;
+            stream.expect(Token::Semi)?;
             Ok(LetStatement(variable, expression))
         } else {
             Err(()) // TODO: Add error raporting!
@@ -169,8 +174,87 @@ impl Parse for ImportStatement {
             Err(())? // TODO: Add error raporting!
         }
 
-        stream.expect(Token::Semicolon)?;
+        stream.expect(Token::Semi)?;
 
         Ok(ImportStatement(import_list))
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionDefinition(FunctionSignature, Block);
+
+impl Parse for FunctionDefinition {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        stream.expect(Token::FnKeyword)?;
+        Ok(FunctionDefinition(stream.parse()?, stream.parse()?))
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionSignature {
+    name: String,
+}
+
+impl Parse for FunctionSignature {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        if let Some(Token::Identifier(name)) = stream.next() {
+            stream.expect(Token::ParenOpen)?;
+            stream.expect(Token::ParenClose)?;
+            Ok(FunctionSignature { name })
+        } else {
+            Err(()) // TODO: Add error raporting!
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Block(Vec<BlockLevelStatement>);
+
+impl Parse for Block {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        let mut statements = Vec::new();
+        stream.expect(Token::BraceOpen)?;
+        while !matches!(stream.peek(), Some(Token::BraceClose)) {
+            let statement = stream.parse()?;
+            if let BlockLevelStatement::Return(_) = &statement {
+                statements.push(statement);
+                break; // Return has to be the last statement
+            }
+            statements.push(statement);
+        }
+        stream.expect(Token::BraceClose)?;
+        Ok(Block(statements))
+    }
+}
+
+#[derive(Debug)]
+pub enum BlockLevelStatement {
+    Let(LetStatement),
+    Import(ImportStatement),
+    Expression(Expression),
+    Return(Expression),
+}
+
+impl Parse for BlockLevelStatement {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        use BlockLevelStatement as Stmt;
+        Ok(match stream.peek() {
+            Some(Token::LetKeyword) => Stmt::Let(stream.parse()?),
+            Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
+            Some(Token::ReturnKeyword) => {
+                stream.next();
+                let exp = stream.parse()?;
+                stream.expect(Token::Semi)?;
+                Stmt::Return(exp)
+            }
+            _ => {
+                if let Ok(e) = stream.parse() {
+                    stream.expect(Token::Semi)?;
+                    Stmt::Expression(e)
+                } else {
+                    Err(())? // TODO: Add error raporting!
+                }
+            }
+        })
     }
 }

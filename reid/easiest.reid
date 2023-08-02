@@ -1,4 +1,8 @@
 // Hello, comment here!
-let hello = 32;
-let beep = 
-    hello ;
+
+fn main() {
+    let hello = 32;
+    let beep = 
+        hello ;
+    return beep;
+}
