@@ -18,6 +18,8 @@ pub enum ReidError {
     LexerError(#[from] lexer::Error),
     #[error(transparent)]
     ParserError(#[from] token_stream::Error),
+    #[error(transparent)]
+    CodegenError(#[from] codegen::Error),
 }
 
 pub fn compile(source: &str) -> Result<String, ReidError> {
@@ -37,7 +39,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
 
     let mut module = IRModule::new("testmod");
     for statement in statements {
-        statement.codegen(&mut module);
+        statement.codegen(&mut module)?;
     }
     let text = module.print_to_string().unwrap();
     Ok(text.to_owned())

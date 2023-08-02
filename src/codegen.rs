@@ -40,7 +40,7 @@ impl TopLevelStatement {
                 let mut scope = Scope::from(module.create_block());
 
                 for statement in &block.0 {
-                    statement.codegen(&mut scope);
+                    statement.codegen(&mut scope)?;
                 }
 
                 let value = if let Some(exp) = &block.1 {
