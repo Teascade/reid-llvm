@@ -125,7 +125,7 @@ impl Parse for FunctionCallExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct LetStatement(String, Expression);
+pub struct LetStatement(pub String, pub Expression);
 
 impl Parse for LetStatement {
     fn parse(mut stream: TokenStream) -> Result<LetStatement, ()> {
@@ -172,7 +172,7 @@ impl Parse for ImportStatement {
 }
 
 #[derive(Debug)]
-pub struct FunctionDefinition(FunctionSignature, Block);
+pub struct FunctionDefinition(pub FunctionSignature, pub Block);
 
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {
@@ -183,7 +183,7 @@ impl Parse for FunctionDefinition {
 
 #[derive(Debug)]
 pub struct FunctionSignature {
-    name: String,
+    pub name: String,
 }
 
 impl Parse for FunctionSignature {
@@ -199,7 +199,7 @@ impl Parse for FunctionSignature {
 }
 
 #[derive(Debug, Clone)]
-pub struct Block(Vec<BlockLevelStatement>, Option<Expression>);
+pub struct Block(pub Vec<BlockLevelStatement>, pub Option<Expression>);
 
 impl Parse for Block {
     fn parse(mut stream: TokenStream) -> Result<Self, ()> {

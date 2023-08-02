@@ -1,8 +1,14 @@
 // Hello, comment here!
 
+import std::print;
+
+fn somethingelse() {
+    return 12;
+}
+
 fn main() {
-    let hello = 32;
+    let hello = 32 + 2 + 4;
     let beep = 
-        hello ;
+        hello + 100;
     return beep;
 }

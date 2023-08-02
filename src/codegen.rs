@@ -1,3 +1,4 @@
+use std::ffi::CString;
 use std::mem;
 
 use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
@@ -10,41 +11,117 @@ macro_rules! cstr {
     };
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ValueType {
     I32,
 }
 
 impl ValueType {
-    unsafe fn get_llvm_type(&self, codegen: &mut CodeGenerator) -> LLVMTypeRef {
+    unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
         match *self {
             Self::I32 => LLVMInt32TypeInContext(codegen.context),
         }
     }
 }
 
+#[derive(Clone, Debug)]
 #[must_use = "value contains raw pointer and must be inserted somewhere"]
 pub struct Value(ValueType, LLVMValueRef);
 
-pub struct CodeGenerator {
+fn into_cstring<T: Into<String>>(value: T) -> CString {
+    let string = value.into();
+    unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
+}
+
+pub struct IRModule {
     context: *mut LLVMContext,
     module: *mut LLVMModule,
     builder: *mut LLVMBuilder,
 }
 
-impl CodeGenerator {
-    pub fn new() -> CodeGenerator {
+impl IRModule {
+    pub fn new() -> IRModule {
         unsafe {
             // Set up a context, module and builder in that context.
             let context = LLVMContextCreate();
             let module = LLVMModuleCreateWithNameInContext(cstr!("testmodule"), context);
             let builder = LLVMCreateBuilderInContext(context);
 
-            CodeGenerator {
+            IRModule {
                 context,
                 module,
                 builder,
             }
+        }
+    }
+
+    pub fn create_block(&mut self) -> IRBlock {
+        IRBlock::create("entry", self)
+    }
+
+    pub fn create_func<T: Into<String>>(&mut self, name: T, return_type: ValueType) -> IRFunction {
+        unsafe {
+            let mut argts = [];
+            let func_type = LLVMFunctionType(
+                return_type.get_llvm_type(self),
+                argts.as_mut_ptr(),
+                argts.len() as u32,
+                0,
+            );
+
+            let anon_func = LLVMAddFunction(self.module, into_cstring(name).as_ptr(), func_type);
+            IRFunction {
+                value: Value(return_type, anon_func),
+            }
+
+            // // Create a basic block in the function and set our builder to generate
+            // // code in it.
+            // let bb = LLVMAppendBasicBlockInContext(self.context, anon_func, cstr!("entry"));
+            // LLVMPositionBuilderAtEnd(self.builder, bb);
+
+            // // Emit a `ret i64` into the function to return the computed sum.
+            // LLVMBuildRet(self.builder, ret.1);
+        }
+    }
+}
+
+impl Drop for IRModule {
+    fn drop(&mut self) {
+        // Clean up. Values created in the context mostly get cleaned up there.
+        unsafe {
+            LLVMDisposeBuilder(self.builder);
+            LLVMDumpModule(self.module);
+            LLVMDisposeModule(self.module);
+            LLVMContextDispose(self.context);
+        }
+    }
+}
+
+pub struct IRFunction {
+    value: Value,
+}
+
+impl IRFunction {
+    pub fn add_definition(self, ret: Value, block: IRBlock) {
+        unsafe {
+            LLVMAppendExistingBasicBlock(self.value.1, block.blockref);
+            LLVMBuildRet(block.codegen.builder, ret.1);
+        }
+    }
+}
+
+pub struct IRBlock<'a> {
+    codegen: &'a mut IRModule,
+    blockref: LLVMBasicBlockRef,
+}
+
+impl<'a> IRBlock<'a> {
+    fn create<T: Into<String>>(name: T, codegen: &'a mut IRModule) -> IRBlock<'a> {
+        unsafe {
+            let blockref =
+                LLVMCreateBasicBlockInContext(codegen.context, into_cstring(name).as_ptr());
+            LLVMPositionBuilderAtEnd(codegen.builder, blockref);
+            IRBlock { codegen, blockref }
         }
     }
 
@@ -54,7 +131,7 @@ impl CodeGenerator {
                 Literal::I32(v) => Value(
                     ValueType::I32,
                     LLVMConstInt(
-                        LLVMInt32TypeInContext(self.context),
+                        LLVMInt32TypeInContext(self.codegen.context),
                         mem::transmute(v as i64),
                         1,
                     ),
@@ -68,45 +145,11 @@ impl CodeGenerator {
             if lhs.0 == rhs.0 {
                 Ok(Value(
                     lhs.0,
-                    LLVMBuildAdd(self.builder, lhs.1, rhs.1, cstr!("tmpadd")),
+                    LLVMBuildAdd(self.codegen.builder, lhs.1, rhs.1, cstr!("tmpadd")),
                 ))
             } else {
                 Err(())
             }
-        }
-    }
-
-    pub fn create_func(&mut self, ret: Value) {
-        unsafe {
-            let mut argts = [];
-            let func_type = LLVMFunctionType(
-                ret.0.get_llvm_type(self),
-                argts.as_mut_ptr(),
-                argts.len() as u32,
-                0,
-            );
-
-            let anon_func = LLVMAddFunction(self.module, cstr!("_anon_func"), func_type);
-
-            // Create a basic block in the function and set our builder to generate
-            // code in it.
-            let bb = LLVMAppendBasicBlockInContext(self.context, anon_func, cstr!("entry"));
-            LLVMPositionBuilderAtEnd(self.builder, bb);
-
-            // Emit a `ret i64` into the function to return the computed sum.
-            LLVMBuildRet(self.builder, ret.1);
-        }
-    }
-}
-
-impl Drop for CodeGenerator {
-    fn drop(&mut self) {
-        // Clean up. Values created in the context mostly get cleaned up there.
-        unsafe {
-            LLVMDisposeBuilder(self.builder);
-            LLVMDumpModule(self.module);
-            LLVMDisposeModule(self.module);
-            LLVMContextDispose(self.context);
         }
     }
 }
