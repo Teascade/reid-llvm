@@ -1,147 +1,65 @@
-use std::ffi::CString;
-use std::mem;
+use std::collections::HashMap;
 
-use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
+use crate::{
+    llvm_ir::{IRBlock, IRModule, Value, ValueType},
+    parser::{
+        BinaryOperator, BlockLevelStatement, Expression, FunctionDefinition, Literal,
+        TopLevelStatement,
+    },
+};
 
-use crate::parser::Literal;
+pub fn codegen(statements: Vec<TopLevelStatement>) {
+    let mut c = IRModule::new();
+    for statement in statements {
+        match statement {
+            TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
+                let mut named_vars: HashMap<String, Value> = HashMap::new();
 
-macro_rules! cstr {
-    ($string:expr) => {
-        core::ffi::CStr::from_bytes_with_nul_unchecked(concat!($string, "\0").as_bytes()).as_ptr()
-    };
-}
+                let func = c.create_func(sig.name, ValueType::I32);
+                let mut c_block = c.create_block();
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ValueType {
-    I32,
-}
+                for stmt in block.0 {
+                    match stmt {
+                        BlockLevelStatement::Let(let_statement) => {
+                            let value = codegen_exp(&mut c_block, &named_vars, let_statement.1);
+                            named_vars.insert(let_statement.0, value);
+                        }
+                        BlockLevelStatement::Return(_) => panic!("Should never exist!"),
+                        BlockLevelStatement::Import(_) => {}
+                        BlockLevelStatement::Expression(_) => {}
+                    }
+                }
 
-impl ValueType {
-    unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
-        match *self {
-            Self::I32 => LLVMInt32TypeInContext(codegen.context),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-#[must_use = "value contains raw pointer and must be inserted somewhere"]
-pub struct Value(ValueType, LLVMValueRef);
-
-fn into_cstring<T: Into<String>>(value: T) -> CString {
-    let string = value.into();
-    unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
-}
-
-pub struct IRModule {
-    context: *mut LLVMContext,
-    module: *mut LLVMModule,
-    builder: *mut LLVMBuilder,
-}
-
-impl IRModule {
-    pub fn new() -> IRModule {
-        unsafe {
-            // Set up a context, module and builder in that context.
-            let context = LLVMContextCreate();
-            let module = LLVMModuleCreateWithNameInContext(cstr!("testmodule"), context);
-            let builder = LLVMCreateBuilderInContext(context);
-
-            IRModule {
-                context,
-                module,
-                builder,
+                let value = if let Some(exp) = block.1 {
+                    codegen_exp(&mut c_block, &named_vars, exp)
+                } else {
+                    c_block.get_const(&Literal::I32(0))
+                };
+                func.add_definition(value, c_block);
             }
+            TopLevelStatement::Import(_) => {}
         }
     }
+}
 
-    pub fn create_block(&mut self) -> IRBlock {
-        IRBlock::create("entry", self)
-    }
-
-    pub fn create_func<T: Into<String>>(&mut self, name: T, return_type: ValueType) -> IRFunction {
-        unsafe {
-            let mut argts = [];
-            let func_type = LLVMFunctionType(
-                return_type.get_llvm_type(self),
-                argts.as_mut_ptr(),
-                argts.len() as u32,
-                0,
-            );
-
-            let anon_func = LLVMAddFunction(self.module, into_cstring(name).as_ptr(), func_type);
-            IRFunction {
-                value: Value(return_type, anon_func),
+fn codegen_exp(
+    c_block: &mut IRBlock,
+    named_vars: &HashMap<String, Value>,
+    expression: Expression,
+) -> Value {
+    use Expression::*;
+    match expression {
+        Binop(op, lhs, rhs) => match op {
+            BinaryOperator::Add => {
+                let lhs = codegen_exp(c_block, named_vars, *lhs);
+                let rhs = codegen_exp(c_block, named_vars, *rhs);
+                c_block.add(lhs, rhs).unwrap()
             }
-        }
-    }
-}
-
-impl Drop for IRModule {
-    fn drop(&mut self) {
-        // Clean up. Values created in the context mostly get cleaned up there.
-        unsafe {
-            LLVMDisposeBuilder(self.builder);
-            LLVMDumpModule(self.module);
-            LLVMDisposeModule(self.module);
-            LLVMContextDispose(self.context);
-        }
-    }
-}
-
-pub struct IRFunction {
-    value: Value,
-}
-
-impl IRFunction {
-    pub fn add_definition(self, ret: Value, block: IRBlock) {
-        unsafe {
-            LLVMAppendExistingBasicBlock(self.value.1, block.blockref);
-            LLVMBuildRet(block.codegen.builder, ret.1);
-        }
-    }
-}
-
-pub struct IRBlock<'a> {
-    codegen: &'a mut IRModule,
-    blockref: LLVMBasicBlockRef,
-}
-
-impl<'a> IRBlock<'a> {
-    fn create<T: Into<String>>(name: T, codegen: &'a mut IRModule) -> IRBlock<'a> {
-        unsafe {
-            let blockref =
-                LLVMCreateBasicBlockInContext(codegen.context, into_cstring(name).as_ptr());
-            LLVMPositionBuilderAtEnd(codegen.builder, blockref);
-            IRBlock { codegen, blockref }
-        }
-    }
-
-    pub fn get_const(&mut self, literal_type: &Literal) -> Value {
-        unsafe {
-            match *literal_type {
-                Literal::I32(v) => Value(
-                    ValueType::I32,
-                    LLVMConstInt(
-                        LLVMInt32TypeInContext(self.codegen.context),
-                        mem::transmute(v as i64),
-                        1,
-                    ),
-                ),
-            }
-        }
-    }
-
-    pub fn add(&mut self, lhs: Value, rhs: Value) -> Result<Value, ()> {
-        unsafe {
-            if lhs.0 == rhs.0 {
-                Ok(Value(
-                    lhs.0,
-                    LLVMBuildAdd(self.codegen.builder, lhs.1, rhs.1, cstr!("tmpadd")),
-                ))
-            } else {
-                Err(())
-            }
-        }
+            BinaryOperator::Mult => panic!("Not implemented!"),
+        },
+        BlockExpr(_) => panic!("Not implemented!"),
+        FunctionCall(_) => panic!("Not implemented!"),
+        VariableName(name) => named_vars.get(&name).cloned().unwrap(),
+        Literal(lit) => c_block.get_const(&lit),
     }
 }
