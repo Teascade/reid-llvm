@@ -24,6 +24,7 @@ pub enum Expression {
     Literal(Literal),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
+    BlockExpr(Box<Block>),
 }
 
 impl Parse for Expression {
@@ -36,10 +37,17 @@ impl Parse for Expression {
 fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, ()> {
     if let Ok(exp) = stream.parse() {
         Ok(Expression::FunctionCall(Box::new(exp)))
+    } else if let Ok(block) = stream.parse() {
+        Ok(Expression::BlockExpr(Box::new(block)))
     } else if let Some(token) = stream.next() {
         Ok(match &token {
             Token::Identifier(v) => Expression::VariableName(v.clone()),
             Token::DecimalValue(v) => Expression::Literal(Literal::I32(v.parse().unwrap())),
+            Token::ParenOpen => {
+                let exp = stream.parse()?;
+                stream.expect(Token::ParenClose)?;
+                exp
+            }
             _ => Err(())?, // TODO: Add error raporting!
         })
     } else {
@@ -116,24 +124,7 @@ impl Parse for FunctionCallExpression {
     }
 }
 
-#[derive(Debug)]
-pub enum TopLevelStatement {
-    Import(ImportStatement),
-    FunctionDefinition(FunctionDefinition),
-}
-
-impl Parse for TopLevelStatement {
-    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
-        use TopLevelStatement as Stmt;
-        Ok(match stream.peek() {
-            Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
-            Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
-            _ => Err(())?, // TODO: Add error raporting!
-        })
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LetStatement(String, Expression);
 
 impl Parse for LetStatement {
@@ -152,7 +143,7 @@ impl Parse for LetStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ImportStatement(Vec<String>);
 
 impl Parse for ImportStatement {
@@ -207,7 +198,7 @@ impl Parse for FunctionSignature {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block(Vec<BlockLevelStatement>, Option<Expression>);
 
 impl Parse for Block {
@@ -228,7 +219,7 @@ impl Parse for Block {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BlockLevelStatement {
     Let(LetStatement),
     Import(ImportStatement),
@@ -256,6 +247,23 @@ impl Parse for BlockLevelStatement {
                     Err(())? // TODO: Add error raporting!
                 }
             }
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum TopLevelStatement {
+    Import(ImportStatement),
+    FunctionDefinition(FunctionDefinition),
+}
+
+impl Parse for TopLevelStatement {
+    fn parse(mut stream: TokenStream) -> Result<Self, ()> {
+        use TopLevelStatement as Stmt;
+        Ok(match stream.peek() {
+            Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
+            Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
+            _ => Err(())?, // TODO: Add error raporting!
         })
     }
 }
