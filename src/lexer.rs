@@ -54,27 +54,9 @@ impl Token {
     }
 }
 
-impl Into<String> for Token {
-    fn into(self) -> String {
-        format!("{:?}", self)
-    }
-}
-
-pub struct TokenList(pub Vec<Token>);
-
-impl Into<String> for TokenList {
-    fn into(self) -> String {
-        self.0
-            .iter()
-            .map(|tok| tok.clone().into())
-            .collect::<Vec<String>>()
-            .join(" or ")
-    }
-}
-
-impl Into<TokenList> for &[Token] {
-    fn into(self) -> TokenList {
-        TokenList(self.to_owned())
+impl From<Token> for String {
+    fn from(value: Token) -> Self {
+        format!("{:?}", value)
     }
 }
 

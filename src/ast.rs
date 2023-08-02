@@ -1,5 +1,5 @@
 use crate::{
-    lexer::{Token, TokenList},
+    lexer::Token,
     token_stream::{Error, TokenStream},
 };
 
@@ -92,7 +92,7 @@ fn parse_binop_rhs(
             lhs = match &token {
                 Token::Plus => Expression::Binop(Add, Box::new(lhs), Box::new(rhs)),
                 Token::Times => Expression::Binop(Mult, Box::new(lhs), Box::new(rhs)),
-                _ => Err(stream.expected_err(TokenList(vec![Token::Plus, Token::Times]))?)?, // TODO: Add error raporting!
+                _ => Err(stream.expected_err("+ or *")?)?,
             };
         }
     }
@@ -266,9 +266,7 @@ impl Parse for TopLevelStatement {
         Ok(match stream.peek() {
             Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
             Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
-            _ => {
-                Err(stream.expected_err(TokenList(vec![Token::ImportKeyword, Token::FnKeyword]))?)?
-            }
+            _ => Err(stream.expected_err("import or fn")?)?,
         })
     }
 }

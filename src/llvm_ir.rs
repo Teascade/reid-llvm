@@ -142,7 +142,7 @@ impl<'a> IRBlock<'a> {
         }
     }
 
-    pub fn add(&mut self, lhs: IRValue, rhs: IRValue) -> Result<IRValue, ()> {
+    pub fn add(&mut self, lhs: IRValue, rhs: IRValue) -> Result<IRValue, Error> {
         unsafe {
             if lhs.0 == rhs.0 {
                 Ok(IRValue(
@@ -150,8 +150,14 @@ impl<'a> IRBlock<'a> {
                     LLVMBuildAdd(self.module.builder, lhs.1, rhs.1, cstr!("tmpadd")),
                 ))
             } else {
-                Err(())
+                Err(Error::TypeMismatch(lhs.0, rhs.0))
             }
         }
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Type Mismatch: {0:?} {1:?}")]
+    TypeMismatch(IRValueType, IRValueType),
 }
