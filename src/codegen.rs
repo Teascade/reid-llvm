@@ -173,6 +173,7 @@ impl Expression {
                     let rhs = rhs.codegen(scope)?;
                     Ok(scope.block.mul(lhs, rhs)?)
                 }
+                _ => panic!("Other binary operators not supported yet!"),
             },
             BlockExpr(block) => {
                 let mut inner = scope.inner();
@@ -201,6 +202,7 @@ impl Expression {
                 .cloned()
                 .ok_or(Error::UndefinedVariable(name.clone())),
             Literal(lit) => Ok(scope.block.get_const(lit)),
+            IfExpr(_) => panic!("if expressions not yet supported"),
         }
     }
 }

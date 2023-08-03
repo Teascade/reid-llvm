@@ -20,6 +20,8 @@ pub enum Token {
     FnKeyword,
     /// `->`
     Arrow,
+    /// `if`
+    If,
 
     // Symbols
     /// `;`
@@ -34,10 +36,14 @@ pub enum Token {
     Times,
     /// `-`
     Minus,
+
     /// `>`
     GreaterThan,
     /// `<`
     LessThan,
+    /// `&`
+    Et,
+
     /// `(`
     ParenOpen,
     /// `)`
@@ -153,6 +159,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "import" => Token::ImportKeyword,
                     "return" => Token::ReturnKeyword,
                     "fn" => Token::FnKeyword,
+                    "if" => Token::If,
                     _ => Token::Identifier(value),
                 };
                 variant
@@ -182,6 +189,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '-' => Token::Minus,
             '>' => Token::GreaterThan,
             '<' => Token::LessThan,
+            '&' => Token::Et,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
             '{' => Token::BraceOpen,

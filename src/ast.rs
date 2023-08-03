@@ -34,24 +34,19 @@ pub enum Literal {
 }
 
 #[derive(Debug, Clone)]
-pub enum BinaryOperator {
-    Add,
-    Mult,
-}
-
-#[derive(Debug, Clone)]
 pub enum Expression {
     VariableName(String),
     Literal(Literal),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
+    IfExpr(Box<IfExpression>),
 }
 
 impl Parse for Expression {
     fn parse(mut stream: TokenStream) -> Result<Expression, Error> {
         let lhs = parse_primary_expression(&mut stream)?;
-        parse_binop_rhs(&mut stream, lhs, 0)
+        parse_binop_rhs(&mut stream, lhs, None)
     }
 }
 
@@ -60,6 +55,8 @@ fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Erro
         Ok(Expression::FunctionCall(Box::new(exp)))
     } else if let Ok(block) = stream.parse() {
         Ok(Expression::BlockExpr(Box::new(block)))
+    } else if let Ok(ifexpr) = stream.parse() {
+        Ok(Expression::IfExpr(Box::new(ifexpr)))
     } else if let Some(token) = stream.next() {
         Ok(match &token {
             Token::Identifier(v) => Expression::VariableName(v.clone()),
@@ -84,38 +81,77 @@ fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Erro
 fn parse_binop_rhs(
     stream: &mut TokenStream,
     mut lhs: Expression,
-    expr_prec: i8,
+    mut operator: Option<BinaryOperator>,
 ) -> Result<Expression, Error> {
-    while let Some(token) = stream.peek() {
-        let curr_token_prec = token.get_token_prec();
+    let expr_prec = if let Some(op) = operator {
+        op.get_precedence() + 1
+    } else {
+        0
+    };
+
+    while let Some(op) = operator.take().as_ref().or(stream.parse().as_ref().ok()) {
+        let curr_token_prec = op.get_precedence();
 
         if curr_token_prec < expr_prec {
             break; // Just return lhs
         } else {
-            // token has to be an operator
-            stream.next(); // Eat token
-
             let mut rhs = parse_primary_expression(stream)?;
-            if let Some(next_op) = stream.peek() {
-                let next_prec = next_op.get_token_prec();
+            if let Ok(next_op) = stream.parse::<BinaryOperator>() {
+                let next_prec = next_op.get_precedence();
                 if curr_token_prec < next_prec {
                     // Operator on the right of rhs has more precedence, turn
                     // rhs into lhs for new binop
-                    rhs = parse_binop_rhs(stream, rhs, curr_token_prec + 1)?;
+                    rhs = parse_binop_rhs(stream, rhs, Some(next_op))?;
+                } else {
+                    let _ = operator.insert(next_op);
                 }
             }
 
-            use BinaryOperator::*;
-
-            lhs = match &token {
-                Token::Plus => Expression::Binop(Add, Box::new(lhs), Box::new(rhs)),
-                Token::Times => Expression::Binop(Mult, Box::new(lhs), Box::new(rhs)),
-                _ => Err(stream.expected_err("+ or *")?)?,
-            };
+            lhs = Expression::Binop(*op, Box::new(lhs), Box::new(rhs));
         }
     }
 
     Ok(lhs)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BinaryOperator {
+    Add,
+    Minus,
+    Mult,
+
+    And,
+    LessThan,
+}
+
+impl Parse for BinaryOperator {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        Ok(match (stream.next(), stream.peek()) {
+            (Some(Token::Et), Some(Token::Et)) => {
+                stream.next();
+                BinaryOperator::And
+            }
+            (Some(Token::LessThan), _) => BinaryOperator::LessThan,
+
+            (Some(Token::Plus), _) => BinaryOperator::Add,
+            (Some(Token::Minus), _) => BinaryOperator::Minus,
+            (Some(Token::Times), _) => BinaryOperator::Mult,
+            (_, _) => Err(stream.expected_err("expected operator")?)?,
+        })
+    }
+}
+
+impl BinaryOperator {
+    pub fn get_precedence(&self) -> i8 {
+        use BinaryOperator::*;
+        match &self {
+            Add => 10,
+            Minus => 10,
+            Mult => 20,
+            And => 100,
+            LessThan => 100,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -142,6 +178,16 @@ impl Parse for FunctionCallExpression {
         } else {
             Err(stream.expected_err("identifier")?)
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IfExpression(Expression, pub Block);
+
+impl Parse for IfExpression {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::If)?;
+        Ok(IfExpression(stream.parse()?, stream.parse()?))
     }
 }
 
@@ -260,7 +306,8 @@ impl Parse for Block {
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
             if let Some((r_type, e)) = return_stmt.take() {
                 println!("Oh no, does this statement lack ;");
-                dbg!(r_type, e);
+                dbg!(r_type, &e);
+                statements.push(BlockLevelStatement::Expression(e));
             }
             let statement = stream.parse()?;
             if let BlockLevelStatement::Return((r_type, e)) = &statement {
