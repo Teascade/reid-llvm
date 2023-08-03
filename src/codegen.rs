@@ -149,8 +149,11 @@ impl BlockLevelStatement {
                 Ok(())
             }
             BlockLevelStatement::Return(_) => panic!("Should never happen"),
-            BlockLevelStatement::Import(_) => Ok(()),
-            BlockLevelStatement::Expression(_) => Ok(()),
+            BlockLevelStatement::Import(_) => Ok(()), // TODO: To implement
+            BlockLevelStatement::Expression(e) => {
+                let _value = e.codegen(scope)?;
+                Ok(())
+            }
         }
     }
 }
