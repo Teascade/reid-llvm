@@ -11,6 +11,24 @@ where
 }
 
 #[derive(Debug, Clone)]
+pub enum Type {
+    I32,
+}
+
+impl Parse for Type {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        if let Some(Token::Identifier(ident)) = stream.next() {
+            Ok(match &*ident {
+                "i32" => Type::I32,
+                _ => panic!("asd"),
+            })
+        } else {
+            Err(stream.expected_err("type identifier")?)
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum Literal {
     I32(i32),
 }
@@ -187,14 +205,34 @@ impl Parse for FunctionDefinition {
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: String,
+    pub args: Vec<(String, Type)>,
+    pub return_type: Option<Type>,
 }
 
 impl Parse for FunctionSignature {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
             stream.expect(Token::ParenOpen)?;
+            let mut args = Vec::new();
+
+            while let Some(Token::Identifier(arg_name)) = stream.peek() {
+                stream.next();
+                stream.expect(Token::Colon)?;
+                args.push((arg_name, stream.parse()?));
+            }
+
             stream.expect(Token::ParenClose)?;
-            Ok(FunctionSignature { name })
+
+            let mut return_type = None;
+            if stream.expect(Token::Arrow).is_ok() {
+                return_type = Some(stream.parse()?);
+            }
+
+            Ok(FunctionSignature {
+                name,
+                args,
+                return_type,
+            })
         } else {
             Err(stream.expected_err("identifier")?)?
         }

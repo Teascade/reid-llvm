@@ -2,14 +2,19 @@
 
 import std::print;
 
-fn somethingelse() {
-    return 12;
-}
-
 fn main() {
     let hello = 32 + {
-        2 + somethingelse()
+        2 + 2
     };
-    let beep = hello + 5;
+    let beep = hello + fibonacci(15);
     return beep;
+}
+
+// Fibonacci
+
+fn fibonacci(value: i32) -> i32 {
+    if value < 3 {
+        return 1;
+    }
+    return fibonacci(value - 1) + fibonacci(value - 2);
 }

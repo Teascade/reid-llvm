@@ -18,6 +18,8 @@ pub enum Token {
     ReturnKeyword,
     /// `fn`
     FnKeyword,
+    /// `->`
+    Arrow,
 
     // Symbols
     /// `;`
@@ -30,6 +32,12 @@ pub enum Token {
     Plus,
     /// `*`
     Times,
+    /// `-`
+    Minus,
+    /// `>`
+    GreaterThan,
+    /// `<`
+    LessThan,
     /// `(`
     ParenOpen,
     /// `)`
@@ -48,6 +56,7 @@ impl Token {
     pub fn get_token_prec(&self) -> i8 {
         match &self {
             Token::Plus => 10,
+            Token::Minus => 10,
             Token::Times => 20,
             _ => -1,
         }
@@ -160,12 +169,19 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 }
                 Token::DecimalValue(value)
             }
+            '-' if cursor.first() == Some('>') => {
+                cursor.next(); // Eat `>`
+                Token::Arrow
+            }
             // Single character tokens
             '=' => Token::Equals,
             ';' => Token::Semi,
             ':' => Token::Colon,
             '+' => Token::Plus,
             '*' => Token::Times,
+            '-' => Token::Minus,
+            '>' => Token::GreaterThan,
+            '<' => Token::LessThan,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
             '{' => Token::BraceOpen,
