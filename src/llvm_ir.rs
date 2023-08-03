@@ -15,6 +15,19 @@ macro_rules! cstr {
 #[must_use = "value contains raw pointer and must be inserted somewhere"]
 pub struct IRValue(IRValueType, LLVMValueRef);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum IRValueType {
+    I32,
+}
+
+impl IRValueType {
+    unsafe fn get_llvm_type(&self, module: &mut IRModule) -> LLVMTypeRef {
+        match *self {
+            Self::I32 => LLVMInt32TypeInContext(module.context),
+        }
+    }
+}
+
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
     unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
@@ -79,19 +92,6 @@ impl Drop for IRModule {
             LLVMDisposeBuilder(self.builder);
             LLVMDisposeModule(self.module);
             LLVMContextDispose(self.context);
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum IRValueType {
-    I32,
-}
-
-impl IRValueType {
-    unsafe fn get_llvm_type(&self, codegen: &mut IRModule) -> LLVMTypeRef {
-        match *self {
-            Self::I32 => LLVMInt32TypeInContext(codegen.context),
         }
     }
 }

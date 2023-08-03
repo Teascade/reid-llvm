@@ -2,8 +2,8 @@ use std::collections::{hash_map, HashMap};
 
 use crate::{
     ast::{
-        BinaryOperator, BlockLevelStatement, Expression, FunctionCallExpression,
-        FunctionDefinition, FunctionSignature, TopLevelStatement,
+        BinaryOperator, Block, BlockLevelStatement, Expression, FunctionCallExpression,
+        FunctionDefinition, FunctionSignature, ReturnType, TopLevelStatement,
     },
     llvm_ir::{self, IRBlock, IRFunction, IRModule, IRValue, IRValueType},
 };
@@ -15,8 +15,11 @@ pub struct ScopeData {
 }
 
 impl ScopeData {
-    pub fn inner<'a>(&'a mut self, block: IRBlock<'a>) -> Scope {
-        Scope { block, data: self }
+    pub fn inner<'a, 'b>(&self, block: &'b mut IRBlock<'a>) -> Scope<'a, 'b> {
+        Scope {
+            block,
+            data: self.clone(),
+        }
     }
 
     pub fn var(&self, name: &String) -> Option<&IRValue> {
@@ -55,8 +58,17 @@ impl ScopeData {
 }
 
 pub struct Scope<'a, 'b> {
-    pub block: IRBlock<'a>,
-    pub data: &'b mut ScopeData,
+    pub block: &'b mut IRBlock<'a>,
+    pub data: ScopeData,
+}
+
+impl<'a, 'b> Scope<'a, 'b> {
+    pub fn inner<'c>(&'c mut self) -> Scope<'a, 'c> {
+        Scope {
+            block: self.block,
+            data: self.data.clone(),
+        }
+    }
 }
 
 pub fn codegen_from_statements(statements: Vec<TopLevelStatement>) -> Result<IRModule, Error> {
@@ -89,19 +101,16 @@ impl TopLevelStatement {
         match self {
             TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
                 if let Some((_, ir)) = root_data.function(&sig.name) {
-                    if let Some(ir) = ir.take() {
-                        let mut scope = root_data.inner(module.create_block());
+                    if let Some(ir_function) = ir.take() {
+                        let mut ir_block = module.create_block();
+                        let mut scope = root_data.inner(&mut ir_block);
 
-                        for statement in &block.0 {
-                            statement.codegen(&mut scope)?;
-                        }
-
-                        let value = if let Some(exp) = &block.1 {
-                            exp.codegen(&mut scope)?
-                        } else {
-                            panic!("Void-return type function not yet implemented!");
+                        let (_, value) = match block.codegen(&mut scope)? {
+                            Some(v) => v,
+                            None => panic!("Void-return type function not yet implemented!"),
                         };
-                        ir.add_definition(value, scope.block);
+
+                        ir_function.add_definition(value, ir_block);
                     } else {
                         Err(Error::FunctionAlreadyDefined(sig.name.clone()))?
                     }
@@ -112,6 +121,22 @@ impl TopLevelStatement {
             TopLevelStatement::Import(_) => {}
         }
         Ok(())
+    }
+}
+
+impl Block {
+    pub fn codegen(&self, scope: &mut Scope) -> Result<Option<(ReturnType, IRValue)>, Error> {
+        for statement in &self.0 {
+            statement.codegen(scope)?;
+        }
+
+        let value = if let Some((rt, exp)) = &self.1 {
+            Some((*rt, exp.codegen(scope)?))
+        } else {
+            None
+        };
+
+        Ok(value)
     }
 }
 
@@ -146,7 +171,19 @@ impl Expression {
                     Ok(scope.block.mul(lhs, rhs)?)
                 }
             },
-            BlockExpr(_) => panic!("(BlockExpr) Not implemented!"),
+            BlockExpr(block) => {
+                let mut inner = scope.inner();
+
+                Ok(match block.codegen(&mut inner)? {
+                    Some((r_type, value)) => match r_type {
+                        ReturnType::Soft => value,
+                        ReturnType::Hard => {
+                            panic!("Hard returns in inner blocks not supported yet")
+                        }
+                    },
+                    None => panic!("Void-return type block not yet implemented!"),
+                })
+            }
             FunctionCall(fc) => {
                 let FunctionCallExpression(name, _) = &**fc;
                 if let Some((sig, _)) = scope.data.function(name) {

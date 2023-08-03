@@ -1,5 +1,5 @@
 use crate::{
-    ast::TopLevelStatement, codegen::codegen_from_statements, lexer::Token, llvm_ir::IRModule,
+    ast::TopLevelStatement, codegen::codegen_from_statements, lexer::Token,
     token_stream::TokenStream,
 };
 

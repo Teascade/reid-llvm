@@ -7,8 +7,9 @@ fn somethingelse() {
 }
 
 fn main() {
-    let hello = 32 + 2 + 4;
-    let beep = 
-        hello + 100 + somethingelse();
+    let hello = 32 + {
+        2 + somethingelse()
+    };
+    let beep = hello + 5;
     return beep;
 }

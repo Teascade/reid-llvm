@@ -201,19 +201,42 @@ impl Parse for FunctionSignature {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ReturnType {
+    Soft,
+    Hard,
+}
+
 #[derive(Debug, Clone)]
-pub struct Block(pub Vec<BlockLevelStatement>, pub Option<Expression>);
+pub struct Block(
+    pub Vec<BlockLevelStatement>,
+    pub Option<(ReturnType, Expression)>,
+);
 
 impl Parse for Block {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let mut statements = Vec::new();
         let mut return_stmt = None;
         stream.expect(Token::BraceOpen)?;
+
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
+            if let Some((r_type, e)) = return_stmt.take() {
+                println!("Oh no, does this statement lack ;");
+                dbg!(r_type, e);
+            }
             let statement = stream.parse()?;
-            if let BlockLevelStatement::Return(e) = &statement {
-                return_stmt = Some(e.clone());
-                break; // Return has to be the last statement
+            if let BlockLevelStatement::Return((r_type, e)) = &statement {
+                match r_type {
+                    ReturnType::Hard => {
+                        return_stmt = Some((*r_type, e.clone()));
+                        break; // Return has to be the last statement
+                               // TODO: Make a mechanism that "can" parse even after this
+                    }
+                    ReturnType::Soft => {
+                        return_stmt = Some((*r_type, e.clone()));
+                        continue; // In theory possible to have lines after a soft return
+                    }
+                };
             }
             statements.push(statement);
         }
@@ -227,7 +250,7 @@ pub enum BlockLevelStatement {
     Let(LetStatement),
     Import(ImportStatement),
     Expression(Expression),
-    Return(Expression),
+    Return((ReturnType, Expression)),
 }
 
 impl Parse for BlockLevelStatement {
@@ -240,12 +263,15 @@ impl Parse for BlockLevelStatement {
                 stream.next();
                 let exp = stream.parse()?;
                 stream.expect(Token::Semi)?;
-                Stmt::Return(exp)
+                Stmt::Return((ReturnType::Hard, exp))
             }
             _ => {
                 if let Ok(e) = stream.parse() {
-                    stream.expect(Token::Semi)?;
-                    Stmt::Expression(e)
+                    if stream.expect(Token::Semi).is_ok() {
+                        Stmt::Expression(e)
+                    } else {
+                        Stmt::Return((ReturnType::Soft, e))
+                    }
                 } else {
                     Err(stream.expected_err("expression")?)?
                 }
