@@ -6,7 +6,7 @@ fn main() {
     let hello = 32 + {
         2 + 3
     };
-    let beep = hello + fibonacci(15);
+    let beep = hello + fibonacci();
     return beep;
 }
 

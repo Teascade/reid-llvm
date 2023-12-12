@@ -137,7 +137,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             w if w.is_whitespace() => continue,
             // Comments
             '/' if cursor.first() == Some('/') => {
-                while !matches!(cursor.first(), Some('\n')) {
+                while !matches!(cursor.first(), Some('\n') | None) {
                     cursor.next();
                 }
                 continue;

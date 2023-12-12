@@ -305,8 +305,13 @@ impl Parse for Block {
 
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
             if let Some((r_type, e)) = return_stmt.take() {
-                println!("Oh no, does this statement lack ;");
-                dbg!(r_type, &e);
+                // Special list of expressions that are simply not warned about,
+                // if semicolon is missing.
+                if !matches!(&e, &Expression::IfExpr(_)) {
+                    dbg!(r_type, &e);
+                    println!("Oh no, does this statement lack ;");
+                }
+
                 statements.push(BlockLevelStatement::Expression(e));
             }
             let statement = stream.parse()?;
