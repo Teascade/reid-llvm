@@ -1,6 +1,6 @@
 use crate::{
     lexer::Token,
-    token_stream::{Error, TokenStream},
+    token_stream::{Error, TokenRange, TokenStream},
 };
 
 pub trait Parse
@@ -11,20 +11,25 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub enum Type {
+pub struct Type(pub TypeKind, pub TokenRange);
+
+#[derive(Debug, Clone)]
+pub enum TypeKind {
     I32,
 }
 
 impl Parse for Type {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
-        if let Some(Token::Identifier(ident)) = stream.next() {
+        let kind = if let Some(Token::Identifier(ident)) = stream.next() {
             Ok(match &*ident {
-                "i32" => Type::I32,
+                "i32" => TypeKind::I32,
                 _ => panic!("asd"),
             })
         } else {
             Err(stream.expected_err("type identifier")?)
-        }
+        }?;
+
+        Ok(Type(kind, stream.get_range().unwrap()))
     }
 }
 
@@ -34,7 +39,10 @@ pub enum Literal {
 }
 
 #[derive(Debug, Clone)]
-pub enum Expression {
+pub struct Expression(pub ExpressionKind, pub TokenRange);
+
+#[derive(Debug, Clone)]
+pub enum ExpressionKind {
     VariableName(String),
     Literal(Literal),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
@@ -51,16 +59,32 @@ impl Parse for Expression {
 }
 
 fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Error> {
+    use ExpressionKind as Kind;
+
     if let Ok(exp) = stream.parse() {
-        Ok(Expression::FunctionCall(Box::new(exp)))
+        Ok(Expression(
+            Kind::FunctionCall(Box::new(exp)),
+            stream.get_range().unwrap(),
+        ))
     } else if let Ok(block) = stream.parse() {
-        Ok(Expression::BlockExpr(Box::new(block)))
+        Ok(Expression(
+            Kind::BlockExpr(Box::new(block)),
+            stream.get_range().unwrap(),
+        ))
     } else if let Ok(ifexpr) = stream.parse() {
-        Ok(Expression::IfExpr(Box::new(ifexpr)))
+        Ok(Expression(
+            Kind::IfExpr(Box::new(ifexpr)),
+            stream.get_range().unwrap(),
+        ))
     } else if let Some(token) = stream.next() {
         Ok(match &token {
-            Token::Identifier(v) => Expression::VariableName(v.clone()),
-            Token::DecimalValue(v) => Expression::Literal(Literal::I32(v.parse().unwrap())),
+            Token::Identifier(v) => {
+                Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
+            }
+            Token::DecimalValue(v) => Expression(
+                Kind::Literal(Literal::I32(v.parse().unwrap())),
+                stream.get_range().unwrap(),
+            ),
             Token::ParenOpen => {
                 let exp = stream.parse()?;
                 stream.expect(Token::ParenClose)?;
@@ -109,7 +133,10 @@ fn parse_binop_rhs(
             }
         }
 
-        lhs = Expression::Binop(op, Box::new(lhs), Box::new(rhs));
+        lhs = Expression(
+            ExpressionKind::Binop(op, Box::new(lhs), Box::new(rhs)),
+            stream.get_range().unwrap(),
+        );
     }
 
     Ok(lhs)
@@ -156,7 +183,7 @@ impl BinaryOperator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallExpression(pub String, pub Vec<Expression>);
+pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRange);
 
 impl Parse for FunctionCallExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -175,7 +202,11 @@ impl Parse for FunctionCallExpression {
 
             stream.expect(Token::ParenClose)?;
 
-            Ok(FunctionCallExpression(name, args))
+            Ok(FunctionCallExpression(
+                name,
+                args,
+                stream.get_range().unwrap(),
+            ))
         } else {
             Err(stream.expected_err("identifier")?)
         }
@@ -183,17 +214,21 @@ impl Parse for FunctionCallExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfExpression(Expression, pub Block);
+pub struct IfExpression(Expression, pub Block, pub TokenRange);
 
 impl Parse for IfExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::If)?;
-        Ok(IfExpression(stream.parse()?, stream.parse()?))
+        Ok(IfExpression(
+            stream.parse()?,
+            stream.parse()?,
+            stream.get_range().unwrap(),
+        ))
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct LetStatement(pub String, pub Expression);
+pub struct LetStatement(pub String, pub Expression, pub TokenRange);
 
 impl Parse for LetStatement {
     fn parse(mut stream: TokenStream) -> Result<LetStatement, Error> {
@@ -204,7 +239,11 @@ impl Parse for LetStatement {
 
             let expression = stream.parse()?;
             stream.expect(Token::Semi)?;
-            Ok(LetStatement(variable, expression))
+            Ok(LetStatement(
+                variable,
+                expression,
+                stream.get_range().unwrap(),
+            ))
         } else {
             Err(stream.expected_err("identifier")?)
         }
@@ -212,7 +251,7 @@ impl Parse for LetStatement {
 }
 
 #[derive(Debug, Clone)]
-pub struct ImportStatement(Vec<String>);
+pub struct ImportStatement(Vec<String>, pub TokenRange);
 
 impl Parse for ImportStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -235,17 +274,21 @@ impl Parse for ImportStatement {
 
         stream.expect(Token::Semi)?;
 
-        Ok(ImportStatement(import_list))
+        Ok(ImportStatement(import_list, stream.get_range().unwrap()))
     }
 }
 
 #[derive(Debug)]
-pub struct FunctionDefinition(pub FunctionSignature, pub Block);
+pub struct FunctionDefinition(pub FunctionSignature, pub Block, pub TokenRange);
 
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::FnKeyword)?;
-        Ok(FunctionDefinition(stream.parse()?, stream.parse()?))
+        Ok(FunctionDefinition(
+            stream.parse()?,
+            stream.parse()?,
+            stream.get_range().unwrap(),
+        ))
     }
 }
 
@@ -254,6 +297,7 @@ pub struct FunctionSignature {
     pub name: String,
     pub args: Vec<(String, Type)>,
     pub return_type: Option<Type>,
+    pub range: TokenRange,
 }
 
 impl Parse for FunctionSignature {
@@ -279,6 +323,7 @@ impl Parse for FunctionSignature {
                 name,
                 args,
                 return_type,
+                range: stream.get_range().unwrap(),
             })
         } else {
             Err(stream.expected_err("identifier")?)?
@@ -296,6 +341,7 @@ pub enum ReturnType {
 pub struct Block(
     pub Vec<BlockLevelStatement>,
     pub Option<(ReturnType, Expression)>,
+    pub TokenRange,
 );
 
 impl Parse for Block {
@@ -308,7 +354,7 @@ impl Parse for Block {
             if let Some((r_type, e)) = return_stmt.take() {
                 // Special list of expressions that are simply not warned about,
                 // if semicolon is missing.
-                if !matches!(&e, &Expression::IfExpr(_)) {
+                if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
                     dbg!(r_type, &e);
                     println!("Oh no, does this statement lack ;");
                 }
@@ -332,7 +378,7 @@ impl Parse for Block {
             statements.push(statement);
         }
         stream.expect(Token::BraceClose)?;
-        Ok(Block(statements, return_stmt))
+        Ok(Block(statements, return_stmt, stream.get_range().unwrap()))
     }
 }
 

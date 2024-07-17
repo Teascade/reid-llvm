@@ -139,6 +139,13 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             Ok(self.tokens[token_idx].position)
         }
     }
+
+    pub fn get_range(&self) -> Option<TokenRange> {
+        self.ref_position.as_ref().map(|ref_pos| TokenRange {
+            start: **ref_pos,
+            end: self.position,
+        })
+    }
 }
 
 impl Drop for TokenStream<'_, '_> {
@@ -146,6 +153,18 @@ impl Drop for TokenStream<'_, '_> {
         if let Some(ref_pos) = &mut self.ref_position {
             **ref_pos = self.position;
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenRange {
+    pub start: usize,
+    pub end: usize,
+}
+
+impl std::fmt::Debug for TokenRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Tokens[{} - {}]", self.start, self.end)
     }
 }
 

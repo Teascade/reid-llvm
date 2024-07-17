@@ -1,10 +1,7 @@
-use crate::{
-    ast::TopLevelStatement, codegen::codegen_from_statements, lexer::Token,
-    token_stream::TokenStream,
-};
+use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
 mod ast;
-mod codegen;
+// mod codegen;
 mod lexer;
 mod llvm_ir;
 mod token_stream;
@@ -21,8 +18,8 @@ pub enum ReidError {
     LexerError(#[from] lexer::Error),
     #[error(transparent)]
     ParserError(#[from] token_stream::Error),
-    #[error(transparent)]
-    CodegenError(#[from] codegen::Error),
+    // #[error(transparent)]
+    // CodegenError(#[from] codegen::Error),
 }
 
 pub fn compile(source: &str) -> Result<String, ReidError> {
@@ -40,7 +37,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
         statements.push(statement);
     }
 
-    let mut module = codegen_from_statements(statements)?;
-    let text = module.print_to_string().unwrap();
-    Ok(text.to_owned())
+    // let mut module = codegen_from_statements(statements)?;
+    // let text = module.print_to_string().unwrap();
+    Ok("text".to_owned())
 }
