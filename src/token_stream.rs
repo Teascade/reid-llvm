@@ -57,7 +57,61 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
+    /// Parse the next value of trait Parse. If the parse succeeded, the related
+    /// tokens are consumed, otherwise token stream does not advance.
+    ///
+    /// Parsetime-error is returned on failure.
     pub fn parse<T: Parse + std::fmt::Debug>(&mut self) -> Result<T, Error> {
+        let (res, pos) = self.parse_meta()?;
+        self.position = pos;
+        Ok(res)
+    }
+
+    /// Parse the next item with Parse-trait (Same as [`TokenStream::parse`])
+    /// without consuming the related tokens, essentially only peeking.
+    pub fn parse_peek<T: Parse + std::fmt::Debug>(&mut self) -> Result<T, Error> {
+        self.parse_meta().map(|(res, _)| res)
+    }
+
+    /// Parse the next item with Parse-trait, also mapping it with the given
+    /// function. The token-stream is only consumed, if the inner function
+    /// retuns an Ok.
+    pub fn parse_map<T: Parse + std::fmt::Debug, F, O>(&mut self, inner: F) -> Result<O, Error>
+    where
+        F: Fn(T) -> Result<O, Error>,
+    {
+        let (res, pos) = self.parse_meta::<T>()?;
+        match inner(res) {
+            Ok(mapped) => {
+                self.position = pos;
+                Ok(mapped)
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Parses the item with Parse if the condition specified by the
+    /// lambda-function is passed. Errors returned from this should not be
+    /// passed to the end-user.
+    pub fn parse_if<T: Parse + std::fmt::Debug, F>(&mut self, inner: F) -> Result<T, Error>
+    where
+        F: Fn(&T) -> bool,
+    {
+        let (res, pos) = self.parse_meta::<T>()?;
+        if inner(&res) {
+            self.position = pos;
+            Ok(res)
+        } else {
+            Err(Error::IfFailed)
+        }
+    }
+
+    /// Parse the next item with Parse-trait. If successful, returning the
+    /// parsed item and the new position of the TokenStream. Failing, returning
+    /// parse-error.
+    ///
+    /// Used for [`TokenStream::parse`] and [`TokenStream::parse_peek`]
+    fn parse_meta<T: Parse + std::fmt::Debug>(&mut self) -> Result<(T, usize), Error> {
         let mut ref_pos = self.position;
 
         let position = self.position;
@@ -69,9 +123,9 @@ impl<'a, 'b> TokenStream<'a, 'b> {
 
         match T::parse(clone) {
             Ok(res) => {
-                self.position = ref_pos.max(self.position);
                 dbg!(&res);
-                Ok(res)
+                let new_pos = ref_pos.max(self.position);
+                Ok((res, new_pos))
             }
             Err(e) => Err(e),
         }
@@ -101,4 +155,10 @@ pub enum Error {
     Expected(String, Token, Position),
     #[error("Source file contains no tokens")]
     FileEmpty,
+    /// Only use this error in situations where the error never ends up for the end-user!
+    #[error("Undefined error, should only be used in situations where the error is not emitted!")]
+    Undefined,
+    /// Condition failed for the parse-if
+    #[error("Condition failed for parse-if. Should never be returned to end-user.")]
+    IfFailed,
 }

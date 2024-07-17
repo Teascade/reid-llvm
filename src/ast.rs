@@ -46,7 +46,7 @@ pub enum Expression {
 impl Parse for Expression {
     fn parse(mut stream: TokenStream) -> Result<Expression, Error> {
         let lhs = parse_primary_expression(&mut stream)?;
-        parse_binop_rhs(&mut stream, lhs, 0, None).map(|(rhs, _)| rhs)
+        parse_binop_rhs(&mut stream, lhs, None)
     }
 }
 
@@ -81,38 +81,38 @@ fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Erro
 fn parse_binop_rhs(
     stream: &mut TokenStream,
     mut lhs: Expression,
-    expr_prec: i8,
-    mut operator: Option<BinaryOperator>,
-) -> Result<(Expression, Option<BinaryOperator>), Error> {
-    while let Some(op) = operator.take().as_ref().or(stream.parse().as_ref().ok()) {
+    mut prev_operator: Option<BinaryOperator>,
+) -> Result<Expression, Error> {
+    // Expression precedence = LHS precedence so far.
+    let expr_precedence = if let Some(op) = prev_operator.take() {
+        op.get_precedence()
+    } else {
+        0
+    };
+
+    while let Ok(op) =
+        // If next operator precedence is lower than expression precedence, we
+        // need to climb back up the recursion.
+        stream.parse_if::<BinaryOperator, _>(|b| b.get_precedence() >= expr_precedence)
+    {
         let curr_token_prec = op.get_precedence();
+        let mut rhs = parse_primary_expression(stream)?;
 
-        if curr_token_prec < expr_prec {
-            let _ = operator.insert(*op);
-            break; // Just return lhs
-        } else {
-            let mut rhs = parse_primary_expression(stream)?;
-
-            if let Ok(next_op) = stream.parse::<BinaryOperator>() {
-                let next_prec = next_op.get_precedence();
-                if curr_token_prec < next_prec {
-                    // Operator on the right of rhs has more precedence, turn
-                    // rhs into lhs for new binop
-                    let op;
-                    (rhs, op) = parse_binop_rhs(stream, rhs, curr_token_prec + 1, Some(next_op))?;
-                    if let Some(upcoming_op) = op {
-                        let _ = operator.insert(upcoming_op);
-                    }
-                } else {
-                    let _ = operator.insert(next_op);
-                }
+        if let Ok(next_op) = stream.parse_peek::<BinaryOperator>() {
+            let next_prec = next_op.get_precedence();
+            if curr_token_prec < next_prec {
+                // Operator on the right of rhs has more precedence, turn
+                // rhs into lhs for new binop
+                rhs = parse_binop_rhs(stream, rhs, Some(op))?;
+            } else {
+                let _ = prev_operator.insert(next_op);
             }
-
-            lhs = Expression::Binop(*op, Box::new(lhs), Box::new(rhs));
         }
+
+        lhs = Expression::Binop(op, Box::new(lhs), Box::new(rhs));
     }
 
-    Ok((lhs, operator))
+    Ok(lhs)
 }
 
 #[derive(Debug, Clone, Copy)]
