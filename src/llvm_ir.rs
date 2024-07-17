@@ -55,8 +55,8 @@ impl IRModule {
         }
     }
 
-    pub fn create_block(&mut self) -> IRBlock {
-        IRBlock::create("entry", self)
+    pub fn create_block(&mut self, name: &str) -> IRBlock {
+        IRBlock::create(name, self)
     }
 
     pub fn create_func<T: Into<String>>(
@@ -192,6 +192,75 @@ impl<'a> IRBlock<'a> {
             );
 
             Ok(IRValue(IRValueType::I32, call))
+        }
+    }
+
+    pub fn cmp(&self, lhs: IRValue, rhs: IRValue) -> Result<IRValue, Error> {
+        // FIXME! Only handles I32 comparisons for now
+        unsafe {
+            Ok(IRValue(
+                IRValueType::I32,
+                LLVMBuildICmp(
+                    self.module.builder,
+                    llvm_sys::LLVMIntPredicate::LLVMIntSLT,
+                    lhs.1,
+                    rhs.1,
+                    into_cstring("ifcond").as_ptr(),
+                ),
+            ))
+        }
+    }
+
+    pub fn conditional_branch(
+        &mut self,
+        if_ref: IRValue,
+        then_ret: IRValue,
+        else_ret: IRValue,
+    ) -> Result<IRValue, Error> {
+        unsafe {
+            dbg!("one");
+            let ifcont_blockref =
+                LLVMCreateBasicBlockInContext(self.module.context, into_cstring("ifcont").as_ptr());
+
+            dbg!("two");
+            let (then_val, then_blockref) = {
+                let block_ir = self.module.create_block("then");
+                LLVMBuildBr(block_ir.module.builder, ifcont_blockref);
+                (then_ret, block_ir.blockref)
+            };
+
+            dbg!("three");
+            let (else_val, else_blockref) = {
+                let block_ir = self.module.create_block("else");
+                LLVMBuildBr(block_ir.module.builder, ifcont_blockref);
+                (else_ret, block_ir.blockref)
+            };
+
+            dbg!("f");
+            LLVMPositionBuilderAtEnd(self.module.builder, self.blockref);
+
+            dbg!("s");
+            LLVMBuildCondBr(self.module.builder, if_ref.1, then_blockref, else_blockref);
+
+            dbg!("se");
+            self.blockref = ifcont_blockref;
+            LLVMPositionBuilderAtEnd(self.module.builder, self.blockref);
+
+            let phi = LLVMBuildPhi(
+                self.module.builder,
+                LLVMInt32TypeInContext(self.module.context),
+                into_cstring("iftmp").as_ptr(),
+            );
+            dbg!("e");
+            LLVMAddIncoming(
+                phi,
+                [then_val.1, else_val.1].as_mut_ptr(),
+                [then_blockref, else_blockref].as_mut_ptr(),
+                2,
+            );
+
+            dbg!("ni");
+            Ok(IRValue(IRValueType::I32, phi))
         }
     }
 }

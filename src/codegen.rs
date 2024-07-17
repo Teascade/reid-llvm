@@ -3,7 +3,7 @@ use std::collections::{hash_map, HashMap};
 use crate::{
     ast::{
         BinaryOperator, Block, BlockLevelStatement, Expression, FunctionCallExpression,
-        FunctionDefinition, FunctionSignature, ReturnType, TopLevelStatement,
+        FunctionDefinition, FunctionSignature, IfExpression, ReturnType, TopLevelStatement,
     },
     llvm_ir::{self, IRBlock, IRFunction, IRModule, IRValue, IRValueType},
 };
@@ -102,7 +102,7 @@ impl TopLevelStatement {
             TopLevelStatement::FunctionDefinition(FunctionDefinition(sig, block)) => {
                 if let Some((_, ir)) = root_data.function(&sig.name) {
                     if let Some(ir_function) = ir.take() {
-                        let mut ir_block = module.create_block();
+                        let mut ir_block = module.create_block(&sig.name);
                         let mut scope = root_data.inner(&mut ir_block);
 
                         let (_, value) = match block.codegen(&mut scope)? {
@@ -173,6 +173,11 @@ impl Expression {
                     let rhs = rhs.codegen(scope)?;
                     Ok(scope.block.mul(lhs, rhs)?)
                 }
+                BinaryOperator::LessThan => {
+                    let lhs = lhs.codegen(scope)?;
+                    let rhs = rhs.codegen(scope)?;
+                    Ok(scope.block.cmp(lhs, rhs)?)
+                }
                 _ => panic!("Other binary operators not supported yet!"),
             },
             BlockExpr(block) => {
@@ -202,8 +207,20 @@ impl Expression {
                 .cloned()
                 .ok_or(Error::UndefinedVariable(name.clone())),
             Literal(lit) => Ok(scope.block.get_const(lit)),
-            IfExpr(_) => panic!("if expressions not yet supported"),
+            IfExpr(exp) => Ok(exp.codegen(scope)?),
         }
+    }
+}
+
+impl IfExpression {
+    pub fn codegen(&self, scope: &mut Scope) -> Result<IRValue, Error> {
+        let if_cond = self.0.codegen(scope)?;
+        let then_block = self.1.codegen(scope)?.unwrap();
+        let else_block = self.2.codegen(scope)?.unwrap();
+        let cond = scope
+            .block
+            .conditional_branch(if_cond, then_block.1, else_block.1)?;
+        Ok(cond)
     }
 }
 

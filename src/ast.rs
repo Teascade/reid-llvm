@@ -182,12 +182,16 @@ impl Parse for FunctionCallExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfExpression(Expression, pub Block);
+pub struct IfExpression(pub Expression, pub Block, pub Block);
 
 impl Parse for IfExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::If)?;
-        Ok(IfExpression(stream.parse()?, stream.parse()?))
+        let expr = stream.parse()?;
+        let then_block = stream.parse()?;
+        stream.expect(Token::Else)?;
+        let else_block = stream.parse()?;
+        Ok(IfExpression(expr, then_block, else_block))
     }
 }
 
