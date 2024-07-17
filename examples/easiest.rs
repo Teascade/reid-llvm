@@ -1,9 +1,9 @@
 use reid::compile;
 
-pub static EASIEST: &str = include_str!("./reid/easiest.reid");
+pub static EASY: &str = include_str!("./reid/easy.reid");
 
 fn main() {
-    let text = match compile(EASIEST) {
+    let text = match compile(EASY) {
         Ok(t) => t,
         Err(e) => panic!("{}", e),
     };

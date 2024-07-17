@@ -3,10 +3,10 @@
 import std::print;
 
 fn main() {
-    let test = 5;
+    let test = 9;
     let simpleAdd = 2 + 2;
+    let simpleMult = 7 * 2;
     let arithmetic = 3 + 2 * 5 + 1 * 2;
-    let multiplier = 5 * 2;
 
-    return arithmetic + multiplier * arithmetic;
+    return arithmetic + simpleMult * arithmetic;
 }

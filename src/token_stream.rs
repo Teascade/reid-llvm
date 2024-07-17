@@ -57,7 +57,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn parse<T: Parse>(&mut self) -> Result<T, Error> {
+    pub fn parse<T: Parse + std::fmt::Debug>(&mut self) -> Result<T, Error> {
         let mut ref_pos = self.position;
 
         let position = self.position;
@@ -70,6 +70,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         match T::parse(clone) {
             Ok(res) => {
                 self.position = ref_pos.max(self.position);
+                dbg!(&res);
                 Ok(res)
             }
             Err(e) => Err(e),
