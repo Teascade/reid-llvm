@@ -1,9 +1,11 @@
+use codegen::{form_context, from_statements};
+
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
 mod ast;
-// mod codegen;
+mod codegen;
 mod lexer;
-mod llvm_ir;
+// mod llvm_ir;
 mod token_stream;
 
 // TODO:
@@ -37,7 +39,8 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
         statements.push(statement);
     }
 
-    // let mut module = codegen_from_statements(statements)?;
-    // let text = module.print_to_string().unwrap();
-    Ok("text".to_owned())
+    let mut context = form_context();
+    let mut module = from_statements(&mut context, statements).unwrap();
+    let text = module.print_to_string().unwrap();
+    Ok(text.to_owned())
 }
