@@ -43,7 +43,7 @@ impl FunctionDefinition {
         let FunctionDefinition(signature, block, _) = self;
         let mut ir_function = IRFunction::new(&signature.name, module);
         let ir_block = IRBlock::new(&mut ir_function);
-        block.codegen(scope.with_block(ir_block));
+        block.codegen(scope.inner(ir_block));
     }
 }
 
@@ -112,11 +112,12 @@ impl ScopeData {
         }
     }
 
-    fn with_block<'a, 'b, 'c>(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
-        Scope {
-            data: self.clone(),
-            block,
-        }
+    fn with_block<'a, 'b, 'c>(self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+        Scope { data: self, block }
+    }
+
+    fn inner<'a, 'b, 'c>(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+        self.clone().with_block(block)
     }
 
     fn fetch(&self, name: &String) -> IRValue {
@@ -137,4 +138,10 @@ impl ScopeData {
 struct Scope<'a, 'b, 'c> {
     data: ScopeData,
     block: IRBlock<'a, 'b, 'c>,
+}
+
+impl<'a, 'b, 'c> Scope<'a, 'b, 'c> {
+    fn inner(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+        self.data.clone().with_block(block)
+    }
 }

@@ -1,17 +1,9 @@
-// Hello, comment here!
-
-import std::print;
-
+// Main
 fn main() {
-    let hello = 32 + {
-        2 + 3
-    };
-    let beep = hello + fibonacci();
-    return beep;
+    return fibonacci(10);
 }
 
 // Fibonacci
-
 fn fibonacci(value: i32) -> i32 {
     if value < 3 {
         return 1;
