@@ -1,7 +1,5 @@
 // Arithmetic, function calls and imports!
 
-import std::print;
-
 fn main() {
     let test = 9;
     let simpleAdd = 2 + 2;

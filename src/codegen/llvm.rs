@@ -1,7 +1,7 @@
 use std::ffi::{CStr, CString};
 use std::mem;
 
-use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule};
+use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue};
 
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
@@ -44,29 +44,10 @@ pub struct IRModule<'a> {
 }
 
 impl<'a> IRModule<'a> {
-    fn new(context: &'a mut IRContext, name: String) -> IRModule<'a> {
+    fn new<'b: 'a>(context: &'b mut IRContext, name: String) -> IRModule<'a> {
         unsafe {
             let module =
                 LLVMModuleCreateWithNameInContext(into_cstring(name).as_ptr(), context.context);
-
-            // TODO, fix later!
-
-            let t = LLVMInt32TypeInContext(context.context);
-
-            let mut argts = [];
-            let func_type = LLVMFunctionType(t, argts.as_mut_ptr(), argts.len() as u32, 0);
-
-            let anon_func = LLVMAddFunction(module, into_cstring("testfunc").as_ptr(), func_type);
-
-            let blockref =
-                LLVMCreateBasicBlockInContext(context.context, into_cstring("entryblock").as_ptr());
-            LLVMPositionBuilderAtEnd(context.builder, blockref);
-
-            // What is the last 1 ?
-            let val = LLVMConstInt(t, mem::transmute(3 as i64), 1);
-
-            LLVMAppendExistingBasicBlock(anon_func, blockref);
-            LLVMBuildRet(context.builder, val);
 
             IRModule { context, module }
         }
@@ -82,6 +63,52 @@ impl<'a> Drop for IRModule<'a> {
         // Clean up. Values created in the context mostly get cleaned up there.
         unsafe {
             LLVMDisposeModule(self.module);
+        }
+    }
+}
+
+pub struct IRFunction<'a, 'b> {
+    module: &'b mut IRModule<'a>,
+    /// Signature of the function
+    return_type: *mut LLVMType,
+    /// Signature of the function
+    func_type: *mut LLVMType,
+    /// The actual function
+    value: *mut LLVMValue,
+}
+
+impl<'a, 'b> IRFunction<'a, 'b> {
+    pub fn new(module: &'b mut IRModule<'a>) -> IRFunction<'a, 'b> {
+        unsafe {
+            // TODO, fix later!
+
+            let return_type = LLVMInt32TypeInContext(module.context.context);
+
+            let mut argts = [];
+            let func_type =
+                LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);
+
+            let function =
+                LLVMAddFunction(module.module, into_cstring("testfunc").as_ptr(), func_type);
+
+            let blockref = LLVMCreateBasicBlockInContext(
+                module.context.context,
+                into_cstring("entryblock").as_ptr(),
+            );
+            LLVMPositionBuilderAtEnd(module.context.builder, blockref);
+
+            // What is the last 1 ?
+            let return_value = LLVMConstInt(return_type, mem::transmute(3 as i64), 1);
+
+            LLVMAppendExistingBasicBlock(function, blockref);
+            LLVMBuildRet(module.context.builder, return_value);
+
+            IRFunction {
+                module,
+                return_type,
+                func_type,
+                value: function,
+            }
         }
     }
 }
