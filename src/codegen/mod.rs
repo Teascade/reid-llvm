@@ -2,15 +2,15 @@ mod llvm;
 
 use std::collections::HashMap;
 
-use llvm::{IRBlock, IRContext, IRFunction, IRModule, IRValue};
+use llvm::{Error, IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
 use crate::{
-    ast::{Block, Expression, ExpressionKind, FunctionDefinition},
+    ast::{
+        BinaryOperator, Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition,
+        LetStatement, ReturnType,
+    },
     TopLevelStatement,
 };
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {}
 
 pub fn form_context() -> IRContext {
     IRContext::new()
@@ -49,9 +49,30 @@ impl FunctionDefinition {
 
 impl Block {
     fn codegen(&self, mut scope: Scope) {
+        for statement in &self.0 {
+            statement.codegen(&mut scope);
+        }
+
         if let Some((_, return_exp)) = &self.1 {
             let value = return_exp.codegen(&mut scope);
             scope.block.add_return(Some(value));
+        }
+    }
+}
+
+impl BlockLevelStatement {
+    fn codegen(&self, scope: &mut Scope) {
+        use BlockLevelStatement::*;
+        match self {
+            Expression(exp) | Return(ReturnType::Soft, exp) => {
+                exp.codegen(scope);
+            }
+            Let(LetStatement(name, exp, _)) => {
+                let val = exp.codegen(scope);
+                scope.data.insert(name, val);
+            }
+            Return(ReturnType::Hard, _) => panic!("hard returns here should not be possible.."),
+            Import(_) => panic!("block level import not supported"),
         }
     }
 }
@@ -64,6 +85,16 @@ impl Expression {
         match kind {
             Literal(lit) => IRValue::from_literal(lit, &mut scope.block),
             VariableName(v) => scope.data.fetch(v),
+            Binop(op, lhs, rhs) => {
+                let lhs = lhs.codegen(scope);
+                let rhs = rhs.codegen(scope);
+                use crate::ast::BinaryOperator::*;
+                match op {
+                    Add => scope.block.add(lhs, rhs).unwrap(),
+                    Mult => scope.block.mult(lhs, rhs).unwrap(),
+                    _ => panic!("operator not supported: {:?}", op),
+                }
+            }
             _ => panic!("expression type not supported"),
         }
     }

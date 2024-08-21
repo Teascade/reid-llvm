@@ -12,6 +12,50 @@ fn into_cstring<T: Into<String>>(value: T) -> CString {
     unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Type mismatch: {0:?} vs {1:?}")]
+    TypeMismatch(IRType, IRType),
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum IRType {
+    I32,
+}
+
+impl IRType {
+    fn in_context(&self, context: &mut IRContext) -> *mut LLVMType {
+        use IRType::*;
+        unsafe {
+            return match self {
+                I32 => LLVMInt32TypeInContext(context.context),
+            };
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct IRValue(pub IRType, *mut LLVMValue);
+
+impl IRValue {
+    pub fn from_literal(literal: &ast::Literal, block: &mut IRBlock) -> Self {
+        use ast::Literal;
+        match literal {
+            Literal::I32(v) => {
+                let ir_type = IRType::I32;
+                unsafe {
+                    let ir_value = LLVMConstInt(
+                        ir_type.in_context(block.function.module.context),
+                        mem::transmute(*v as i64),
+                        1,
+                    );
+                    return IRValue(ir_type, ir_value);
+                }
+            }
+        };
+    }
+}
+
 pub struct IRContext {
     context: *mut LLVMContext,
     builder: *mut LLVMBuilder,
@@ -71,22 +115,6 @@ impl<'a> Drop for IRModule<'a> {
     }
 }
 
-#[derive(Clone)]
-pub enum IRType {
-    I32,
-}
-
-impl IRType {
-    fn in_context(&self, context: &mut IRContext) -> *mut LLVMType {
-        use IRType::*;
-        unsafe {
-            return match self {
-                I32 => LLVMInt32TypeInContext(context.context),
-            };
-        }
-    }
-}
-
 pub struct IRFunction<'a, 'b> {
     module: &'b mut IRModule<'a>,
     /// The actual function
@@ -132,10 +160,54 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
         }
     }
 
+    pub fn add(
+        &mut self,
+        IRValue(lhs_t, lhs_v): IRValue,
+        IRValue(rhs_t, rhs_v): IRValue,
+    ) -> Result<IRValue, Error> {
+        unsafe {
+            if lhs_t == rhs_t {
+                Ok(IRValue(
+                    lhs_t,
+                    LLVMBuildAdd(
+                        self.function.module.context.builder,
+                        lhs_v,
+                        rhs_v,
+                        c"tmpadd".as_ptr(),
+                    ),
+                ))
+            } else {
+                Err(Error::TypeMismatch(lhs_t, rhs_t))
+            }
+        }
+    }
+
+    pub fn mult(
+        &mut self,
+        IRValue(lhs_t, lhs_v): IRValue,
+        IRValue(rhs_t, rhs_v): IRValue,
+    ) -> Result<IRValue, Error> {
+        unsafe {
+            if lhs_t == rhs_t {
+                Ok(IRValue(
+                    lhs_t,
+                    LLVMBuildMul(
+                        self.function.module.context.builder,
+                        lhs_v,
+                        rhs_v,
+                        c"tmpadd".as_ptr(),
+                    ),
+                ))
+            } else {
+                Err(Error::TypeMismatch(lhs_t, rhs_t))
+            }
+        }
+    }
+
     pub fn add_return(self, value: Option<IRValue>) {
         unsafe {
-            if let Some(value) = value {
-                LLVMBuildRet(self.function.module.context.builder, value.ir_value);
+            if let Some(IRValue(_, value)) = value {
+                LLVMBuildRet(self.function.module.context.builder, value);
             } else {
                 LLVMBuildRetVoid(self.function.module.context.builder);
             }
@@ -148,30 +220,5 @@ impl<'a, 'b, 'c> Drop for IRBlock<'a, 'b, 'c> {
         unsafe {
             LLVMAppendExistingBasicBlock(self.function.value, self.blockref);
         }
-    }
-}
-
-#[derive(Clone)]
-pub struct IRValue {
-    pub ir_type: IRType,
-    ir_value: *mut LLVMValue,
-}
-
-impl IRValue {
-    pub fn from_literal(literal: &ast::Literal, block: &mut IRBlock) -> Self {
-        use ast::Literal;
-        match literal {
-            Literal::I32(v) => {
-                let ir_type = IRType::I32;
-                unsafe {
-                    let ir_value = LLVMConstInt(
-                        ir_type.in_context(block.function.module.context),
-                        mem::transmute(*v as i64),
-                        1,
-                    );
-                    return IRValue { ir_type, ir_value };
-                }
-            }
-        };
     }
 }

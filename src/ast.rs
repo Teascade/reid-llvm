@@ -362,7 +362,7 @@ impl Parse for Block {
                 statements.push(BlockLevelStatement::Expression(e));
             }
             let statement = stream.parse()?;
-            if let BlockLevelStatement::Return((r_type, e)) = &statement {
+            if let BlockLevelStatement::Return(r_type, e) = &statement {
                 match r_type {
                     ReturnType::Hard => {
                         return_stmt = Some((*r_type, e.clone()));
@@ -387,7 +387,7 @@ pub enum BlockLevelStatement {
     Let(LetStatement),
     Import(ImportStatement),
     Expression(Expression),
-    Return((ReturnType, Expression)),
+    Return(ReturnType, Expression),
 }
 
 impl Parse for BlockLevelStatement {
@@ -400,14 +400,14 @@ impl Parse for BlockLevelStatement {
                 stream.next();
                 let exp = stream.parse()?;
                 stream.expect(Token::Semi)?;
-                Stmt::Return((ReturnType::Hard, exp))
+                Stmt::Return(ReturnType::Hard, exp)
             }
             _ => {
                 if let Ok(e) = stream.parse() {
                     if stream.expect(Token::Semi).is_ok() {
                         Stmt::Expression(e)
                     } else {
-                        Stmt::Return((ReturnType::Soft, e))
+                        Stmt::Return(ReturnType::Soft, e)
                     }
                 } else {
                     Err(stream.expected_err("expression")?)?
