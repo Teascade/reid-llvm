@@ -3,8 +3,8 @@
 fn main() {
     let test = 9;
     let simpleAdd = 2 + 2;
-    let simpleMult = 7 * 2;
-    let arithmetic = 3 + 2 * 5 + 1 * 2;
+    let simpleMult = 7 * 2; // 14
+    let arithmetic = 3 + 2 * 5 + 1 * 2; // 15
 
     return arithmetic + simpleMult * arithmetic;
 }
