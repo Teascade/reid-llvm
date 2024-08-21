@@ -1,7 +1,9 @@
 use std::ffi::{CStr, CString};
 use std::mem;
 
-use llvm_sys::{core::*, prelude::*, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue};
+use llvm_sys::{
+    core::*, prelude::*, LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue,
+};
 
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
@@ -67,12 +69,24 @@ impl<'a> Drop for IRModule<'a> {
     }
 }
 
+pub enum IRType {
+    I32,
+}
+
+impl IRType {
+    fn in_context(&self, context: &mut IRContext) -> *mut LLVMType {
+        use IRType::*;
+        unsafe {
+            return match self {
+                I32 => LLVMInt32TypeInContext(context.context),
+            };
+        }
+    }
+}
+
+#[must_use = "asd"]
 pub struct IRFunction<'a, 'b> {
     module: &'b mut IRModule<'a>,
-    /// Signature of the function
-    return_type: *mut LLVMType,
-    /// Signature of the function
-    func_type: *mut LLVMType,
     /// The actual function
     value: *mut LLVMValue,
 }
@@ -91,24 +105,66 @@ impl<'a, 'b> IRFunction<'a, 'b> {
             let function =
                 LLVMAddFunction(module.module, into_cstring("testfunc").as_ptr(), func_type);
 
-            let blockref = LLVMCreateBasicBlockInContext(
-                module.context.context,
-                into_cstring("entryblock").as_ptr(),
-            );
-            LLVMPositionBuilderAtEnd(module.context.builder, blockref);
-
-            // What is the last 1 ?
-            let return_value = LLVMConstInt(return_type, mem::transmute(3 as i64), 1);
-
-            LLVMAppendExistingBasicBlock(function, blockref);
-            LLVMBuildRet(module.context.builder, return_value);
-
             IRFunction {
                 module,
-                return_type,
-                func_type,
                 value: function,
             }
+        }
+    }
+}
+
+pub struct IRBlock<'a, 'b, 'c> {
+    function: &'a mut IRFunction<'b, 'c>,
+    blockref: *mut LLVMBasicBlock,
+}
+
+impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
+    pub fn new(function: &'a mut IRFunction<'b, 'c>) -> IRBlock<'a, 'b, 'c> {
+        unsafe {
+            let blockref = LLVMCreateBasicBlockInContext(
+                function.module.context.context,
+                into_cstring("entryblock").as_ptr(),
+            );
+            LLVMPositionBuilderAtEnd(function.module.context.builder, blockref);
+
+            IRBlock { function, blockref }
+        }
+    }
+
+    pub fn add_return(self, value: Option<IRValue>) {
+        unsafe {
+            if let Some(value) = value {
+                LLVMBuildRet(self.function.module.context.builder, value.ir_value);
+            } else {
+                LLVMBuildRetVoid(self.function.module.context.builder);
+            }
+        }
+    }
+}
+
+impl<'a, 'b, 'c> Drop for IRBlock<'a, 'b, 'c> {
+    fn drop(&mut self) {
+        unsafe {
+            LLVMAppendExistingBasicBlock(self.function.value, self.blockref);
+        }
+    }
+}
+
+pub struct IRValue {
+    pub ir_type: IRType,
+    ir_value: *mut LLVMValue,
+}
+
+impl IRValue {
+    pub fn const_i32(value: i32, block: &mut IRBlock) -> Self {
+        let ir_type = IRType::I32;
+        unsafe {
+            let ir_value = LLVMConstInt(
+                ir_type.in_context(block.function.module.context),
+                mem::transmute(3 as i64),
+                1,
+            );
+            return IRValue { ir_type, ir_value };
         }
     }
 }

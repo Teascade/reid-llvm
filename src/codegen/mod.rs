@@ -1,6 +1,6 @@
 mod llvm;
 
-use llvm::{IRContext, IRFunction, IRModule};
+use llvm::{IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
 use crate::{ast::FunctionDefinition, TopLevelStatement};
 
@@ -34,6 +34,9 @@ impl TopLevelStatement {
 
 impl FunctionDefinition {
     fn codegen(&self, module: &mut IRModule) {
-        let function = IRFunction::new(module);
+        let mut function = IRFunction::new(module);
+        let mut block = IRBlock::new(&mut function);
+        let value = IRValue::const_i32(3, &mut block);
+        block.add_return(Some(value))
     }
 }
