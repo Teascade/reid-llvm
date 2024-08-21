@@ -35,10 +35,10 @@ impl IRContext {
             let mut argts = [];
             let func_type = LLVMFunctionType(t, argts.as_mut_ptr(), argts.len() as u32, 0);
 
-            let anon_func = LLVMAddFunction(module, into_cstring("test").as_ptr(), func_type);
+            let anon_func = LLVMAddFunction(module, into_cstring("testfunc").as_ptr(), func_type);
 
             let blockref =
-                LLVMCreateBasicBlockInContext(self.context, into_cstring("otus").as_ptr());
+                LLVMCreateBasicBlockInContext(self.context, into_cstring("entryblock").as_ptr());
             LLVMPositionBuilderAtEnd(self.builder, blockref);
 
             // What is the last 1 ?
