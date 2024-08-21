@@ -24,34 +24,7 @@ impl IRContext {
     }
 
     pub fn module<'a>(&'a mut self, name: String) -> IRModule<'a> {
-        unsafe {
-            let module =
-                LLVMModuleCreateWithNameInContext(into_cstring(name).as_ptr(), self.context);
-
-            // TODO, fix later!
-
-            let t = LLVMInt32TypeInContext(self.context);
-
-            let mut argts = [];
-            let func_type = LLVMFunctionType(t, argts.as_mut_ptr(), argts.len() as u32, 0);
-
-            let anon_func = LLVMAddFunction(module, into_cstring("testfunc").as_ptr(), func_type);
-
-            let blockref =
-                LLVMCreateBasicBlockInContext(self.context, into_cstring("entryblock").as_ptr());
-            LLVMPositionBuilderAtEnd(self.builder, blockref);
-
-            // What is the last 1 ?
-            let val = LLVMConstInt(t, mem::transmute(3 as i64), 1);
-
-            LLVMAppendExistingBasicBlock(anon_func, blockref);
-            LLVMBuildRet(self.builder, val);
-
-            IRModule {
-                context: self,
-                module,
-            }
-        }
+        IRModule::new(self, name)
     }
 }
 
@@ -71,6 +44,34 @@ pub struct IRModule<'a> {
 }
 
 impl<'a> IRModule<'a> {
+    fn new(context: &'a mut IRContext, name: String) -> IRModule<'a> {
+        unsafe {
+            let module =
+                LLVMModuleCreateWithNameInContext(into_cstring(name).as_ptr(), context.context);
+
+            // TODO, fix later!
+
+            let t = LLVMInt32TypeInContext(context.context);
+
+            let mut argts = [];
+            let func_type = LLVMFunctionType(t, argts.as_mut_ptr(), argts.len() as u32, 0);
+
+            let anon_func = LLVMAddFunction(module, into_cstring("testfunc").as_ptr(), func_type);
+
+            let blockref =
+                LLVMCreateBasicBlockInContext(context.context, into_cstring("entryblock").as_ptr());
+            LLVMPositionBuilderAtEnd(context.builder, blockref);
+
+            // What is the last 1 ?
+            let val = LLVMConstInt(t, mem::transmute(3 as i64), 1);
+
+            LLVMAppendExistingBasicBlock(anon_func, blockref);
+            LLVMBuildRet(context.builder, val);
+
+            IRModule { context, module }
+        }
+    }
+
     pub fn print_to_string(&mut self) -> Result<&str, std::str::Utf8Error> {
         unsafe { CStr::from_ptr(LLVMPrintModuleToString(self.module)).to_str() }
     }
