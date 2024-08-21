@@ -2,7 +2,10 @@ mod llvm;
 
 use llvm::{IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
-use crate::{ast::FunctionDefinition, TopLevelStatement};
+use crate::{
+    ast::{Block, Expression, ExpressionKind, FunctionDefinition},
+    TopLevelStatement,
+};
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {}
@@ -34,9 +37,31 @@ impl TopLevelStatement {
 
 impl FunctionDefinition {
     fn codegen(&self, module: &mut IRModule) {
-        let mut function = IRFunction::new(module);
-        let mut block = IRBlock::new(&mut function);
-        let value = IRValue::const_i32(3, &mut block);
-        block.add_return(Some(value))
+        let FunctionDefinition(signature, block, _) = self;
+        let mut function = IRFunction::new(&signature.name, module);
+        block.codegen(&mut function)
+    }
+}
+
+impl Block {
+    fn codegen(&self, function: &mut IRFunction) {
+        let mut block = IRBlock::new(function);
+
+        if let Some((_, return_exp)) = &self.1 {
+            let value = return_exp.codegen(&mut block);
+            block.add_return(Some(value))
+        }
+    }
+}
+
+impl Expression {
+    fn codegen(&self, block: &mut IRBlock) -> IRValue {
+        let Expression(kind, _) = self;
+
+        use ExpressionKind::*;
+        match kind {
+            Literal(lit) => IRValue::from_literal(lit, block),
+            _ => panic!("expression type not supported"),
+        }
     }
 }

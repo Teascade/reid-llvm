@@ -1,10 +1,5 @@
 // Arithmetic, function calls and imports!
 
 fn main() {
-    let test = 9;
-    let simpleAdd = 2 + 2;
-    let simpleMult = 7 * 2;
-    let arithmetic = 3 + 2 * 5 + 1 * 2;
-
-    return arithmetic + simpleMult * arithmetic;
+    return 5;
 }

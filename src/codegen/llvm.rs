@@ -5,6 +5,8 @@ use llvm_sys::{
     core::*, prelude::*, LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue,
 };
 
+use crate::ast;
+
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
     unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
@@ -92,7 +94,7 @@ pub struct IRFunction<'a, 'b> {
 }
 
 impl<'a, 'b> IRFunction<'a, 'b> {
-    pub fn new(module: &'b mut IRModule<'a>) -> IRFunction<'a, 'b> {
+    pub fn new(name: &String, module: &'b mut IRModule<'a>) -> IRFunction<'a, 'b> {
         unsafe {
             // TODO, fix later!
 
@@ -102,8 +104,7 @@ impl<'a, 'b> IRFunction<'a, 'b> {
             let func_type =
                 LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);
 
-            let function =
-                LLVMAddFunction(module.module, into_cstring("testfunc").as_ptr(), func_type);
+            let function = LLVMAddFunction(module.module, into_cstring(name).as_ptr(), func_type);
 
             IRFunction {
                 module,
@@ -156,15 +157,20 @@ pub struct IRValue {
 }
 
 impl IRValue {
-    pub fn const_i32(value: i32, block: &mut IRBlock) -> Self {
-        let ir_type = IRType::I32;
-        unsafe {
-            let ir_value = LLVMConstInt(
-                ir_type.in_context(block.function.module.context),
-                mem::transmute(3 as i64),
-                1,
-            );
-            return IRValue { ir_type, ir_value };
-        }
+    pub fn from_literal(literal: &ast::Literal, block: &mut IRBlock) -> Self {
+        use ast::Literal;
+        match literal {
+            Literal::I32(v) => {
+                let ir_type = IRType::I32;
+                unsafe {
+                    let ir_value = LLVMConstInt(
+                        ir_type.in_context(block.function.module.context),
+                        mem::transmute(*v as i64),
+                        1,
+                    );
+                    return IRValue { ir_type, ir_value };
+                }
+            }
+        };
     }
 }
