@@ -71,6 +71,7 @@ impl<'a> Drop for IRModule<'a> {
     }
 }
 
+#[derive(Clone)]
 pub enum IRType {
     I32,
 }
@@ -86,7 +87,6 @@ impl IRType {
     }
 }
 
-#[must_use = "asd"]
 pub struct IRFunction<'a, 'b> {
     module: &'b mut IRModule<'a>,
     /// The actual function
@@ -151,6 +151,7 @@ impl<'a, 'b, 'c> Drop for IRBlock<'a, 'b, 'c> {
     }
 }
 
+#[derive(Clone)]
 pub struct IRValue {
     pub ir_type: IRType,
     ir_value: *mut LLVMValue,
