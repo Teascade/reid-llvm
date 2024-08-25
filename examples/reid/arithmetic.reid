@@ -5,6 +5,10 @@ fn main() {
     let simpleAdd = 2 + 2;
     let simpleMult = 7 * 2; // 14
     let arithmetic = 3 + 2 * 5 + 1 * 2; // 15
+    
+    if simpleAdd < test {
+        return 3;
+    }
 
     return arithmetic + simpleMult * arithmetic;
 }

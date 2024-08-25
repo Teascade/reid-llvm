@@ -6,8 +6,8 @@ use llvm::{Error, IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
 use crate::{
     ast::{
-        BinaryOperator, Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition,
-        LetStatement, ReturnType,
+        Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition, LetStatement,
+        ReturnType,
     },
     TopLevelStatement,
 };
@@ -42,19 +42,23 @@ impl FunctionDefinition {
     fn codegen(&self, scope: &mut ScopeData, module: &mut IRModule) {
         let FunctionDefinition(signature, block, _) = self;
         let mut ir_function = IRFunction::new(&signature.name, module);
-        let ir_block = IRBlock::new(&mut ir_function);
-        block.codegen(scope.inner(ir_block));
+
+        let ir_block = IRBlock::new(&module);
+        let mut scope = scope.inner(ir_block);
+        block.codegen(&mut scope);
+
+        ir_function.attach(scope.block);
     }
 }
 
 impl Block {
-    fn codegen(&self, mut scope: Scope) {
+    fn codegen(&self, scope: &mut Scope) {
         for statement in &self.0 {
-            statement.codegen(&mut scope);
+            statement.codegen(scope);
         }
 
         if let Some((_, return_exp)) = &self.1 {
-            let value = return_exp.codegen(&mut scope);
+            let value = return_exp.codegen(scope);
             scope.block.add_return(Some(value));
         }
     }
@@ -83,7 +87,7 @@ impl Expression {
 
         use ExpressionKind::*;
         match kind {
-            Literal(lit) => IRValue::from_literal(lit, &mut scope.block),
+            Literal(lit) => IRValue::from_literal(lit, &mut scope.block.module),
             VariableName(v) => scope.data.fetch(v),
             Binop(op, lhs, rhs) => {
                 let lhs = lhs.codegen(scope);
@@ -112,11 +116,11 @@ impl ScopeData {
         }
     }
 
-    fn with_block<'a, 'b, 'c>(self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+    fn with_block<'a, 'b>(self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
         Scope { data: self, block }
     }
 
-    fn inner<'a, 'b, 'c>(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+    fn inner<'a, 'b>(&self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
         self.clone().with_block(block)
     }
 
@@ -135,13 +139,13 @@ impl ScopeData {
     }
 }
 
-struct Scope<'a, 'b, 'c> {
+struct Scope<'a, 'b> {
     data: ScopeData,
-    block: IRBlock<'a, 'b, 'c>,
+    block: IRBlock<'a, 'b>,
 }
 
-impl<'a, 'b, 'c> Scope<'a, 'b, 'c> {
-    fn inner(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
+impl<'a, 'b> Scope<'a, 'b> {
+    fn inner(&self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
         self.data.clone().with_block(block)
     }
 }

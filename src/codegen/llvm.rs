@@ -24,7 +24,7 @@ pub enum IRType {
 }
 
 impl IRType {
-    fn in_context(&self, context: &mut IRContext) -> *mut LLVMType {
+    fn in_context(&self, context: &IRContext) -> *mut LLVMType {
         use IRType::*;
         unsafe {
             return match self {
@@ -38,14 +38,14 @@ impl IRType {
 pub struct IRValue(pub IRType, *mut LLVMValue);
 
 impl IRValue {
-    pub fn from_literal(literal: &ast::Literal, block: &mut IRBlock) -> Self {
+    pub fn from_literal(literal: &ast::Literal, module: &IRModule) -> Self {
         use ast::Literal;
         match literal {
             Literal::I32(v) => {
                 let ir_type = IRType::I32;
                 unsafe {
                     let ir_value = LLVMConstInt(
-                        ir_type.in_context(block.function.module.context),
+                        ir_type.in_context(module.context),
                         mem::transmute(*v as i64),
                         1,
                     );
@@ -116,13 +116,13 @@ impl<'a> Drop for IRModule<'a> {
 }
 
 pub struct IRFunction<'a, 'b> {
-    module: &'b mut IRModule<'a>,
+    pub module: &'b IRModule<'a>,
     /// The actual function
     value: *mut LLVMValue,
 }
 
 impl<'a, 'b> IRFunction<'a, 'b> {
-    pub fn new(name: &String, module: &'b mut IRModule<'a>) -> IRFunction<'a, 'b> {
+    pub fn new(name: &String, module: &'b IRModule<'a>) -> IRFunction<'a, 'b> {
         unsafe {
             // TODO, fix later!
 
@@ -140,23 +140,26 @@ impl<'a, 'b> IRFunction<'a, 'b> {
             }
         }
     }
+
+    pub fn attach(&mut self, block: IRBlock) {
+        unsafe { LLVMAppendExistingBasicBlock(self.value, block.blockref) }
+    }
 }
 
-pub struct IRBlock<'a, 'b, 'c> {
-    function: &'a mut IRFunction<'b, 'c>,
+pub struct IRBlock<'a, 'b> {
+    pub module: &'b IRModule<'a>,
     blockref: *mut LLVMBasicBlock,
 }
 
-impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
-    pub fn new(function: &'a mut IRFunction<'b, 'c>) -> IRBlock<'a, 'b, 'c> {
+impl<'a, 'b, 'c> IRBlock<'a, 'b> {
+    pub fn new(module: &'b IRModule<'a>) -> IRBlock<'a, 'b> {
         unsafe {
             let blockref = LLVMCreateBasicBlockInContext(
-                function.module.context.context,
+                module.context.context,
                 into_cstring("entryblock").as_ptr(),
             );
-            LLVMPositionBuilderAtEnd(function.module.context.builder, blockref);
 
-            IRBlock { function, blockref }
+            IRBlock { module, blockref }
         }
     }
 
@@ -166,11 +169,12 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
         IRValue(rhs_t, rhs_v): IRValue,
     ) -> Result<IRValue, Error> {
         unsafe {
+            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
             if lhs_t == rhs_t {
                 Ok(IRValue(
                     lhs_t,
                     LLVMBuildAdd(
-                        self.function.module.context.builder,
+                        self.module.context.builder,
                         lhs_v,
                         rhs_v,
                         c"tmpadd".as_ptr(),
@@ -188,11 +192,12 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
         IRValue(rhs_t, rhs_v): IRValue,
     ) -> Result<IRValue, Error> {
         unsafe {
+            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
             if lhs_t == rhs_t {
                 Ok(IRValue(
                     lhs_t,
                     LLVMBuildMul(
-                        self.function.module.context.builder,
+                        self.module.context.builder,
                         lhs_v,
                         rhs_v,
                         c"tmpadd".as_ptr(),
@@ -204,21 +209,14 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
         }
     }
 
-    pub fn add_return(self, value: Option<IRValue>) {
+    pub fn add_return(&mut self, value: Option<IRValue>) {
         unsafe {
+            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
             if let Some(IRValue(_, value)) = value {
-                LLVMBuildRet(self.function.module.context.builder, value);
+                LLVMBuildRet(self.module.context.builder, value);
             } else {
-                LLVMBuildRetVoid(self.function.module.context.builder);
+                LLVMBuildRetVoid(self.module.context.builder);
             }
-        }
-    }
-}
-
-impl<'a, 'b, 'c> Drop for IRBlock<'a, 'b, 'c> {
-    fn drop(&mut self) {
-        unsafe {
-            LLVMAppendExistingBasicBlock(self.function.value, self.blockref);
         }
     }
 }
