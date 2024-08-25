@@ -45,19 +45,26 @@ impl FunctionDefinition {
 
         let ir_block = IRBlock::new(&ir_function, c"entry");
         let mut scope = scope.inner(ir_block);
-        block.codegen(&mut scope);
+        if let Some((_, val)) = block.codegen(&mut scope) {
+            scope.block.add_return(Some(val));
+        } else {
+            scope.block.add_return(None);
+        }
     }
 }
 
 impl Block {
-    fn codegen(&self, scope: &mut Scope) {
+    #[must_use]
+    fn codegen(&self, scope: &mut Scope) -> Option<(ReturnType, IRValue)> {
         for statement in &self.0 {
             statement.codegen(scope);
         }
 
-        if let Some((_, return_exp)) = &self.1 {
+        if let Some((ret_type, return_exp)) = &self.1 {
             let value = return_exp.codegen(scope);
-            scope.block.add_return(Some(value));
+            Some((*ret_type, value))
+        } else {
+            None
         }
     }
 }
@@ -109,8 +116,10 @@ impl Expression {
                 scope.block = after;
 
                 let mut inner = scope.inner(then);
-                block.codegen(&mut inner);
-                inner.block.move_into(&mut scope.block);
+                match block.codegen(&mut inner) {
+                    Some((ReturnType::Hard, v)) => inner.block.add_return(Some(v)),
+                    _ => inner.block.move_into(&mut scope.block),
+                }
 
                 IRValue::from_literal(&crate::ast::Literal::I32(1), scope.block.function.module)
             }
