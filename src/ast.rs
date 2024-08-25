@@ -214,7 +214,7 @@ impl Parse for FunctionCallExpression {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfExpression(Expression, pub Block, pub TokenRange);
+pub struct IfExpression(pub Expression, pub Block, pub TokenRange);
 
 impl Parse for IfExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {

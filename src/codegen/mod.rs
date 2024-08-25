@@ -6,8 +6,8 @@ use llvm::{Error, IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
 use crate::{
     ast::{
-        Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition, LetStatement,
-        ReturnType,
+        Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition, IfExpression,
+        LetStatement, ReturnType,
     },
     TopLevelStatement,
 };
@@ -41,13 +41,11 @@ impl TopLevelStatement {
 impl FunctionDefinition {
     fn codegen(&self, scope: &mut ScopeData, module: &mut IRModule) {
         let FunctionDefinition(signature, block, _) = self;
-        let mut ir_function = IRFunction::new(&signature.name, module);
+        let ir_function = IRFunction::new(&signature.name, module);
 
-        let ir_block = IRBlock::new(&module);
+        let ir_block = IRBlock::new(&ir_function, c"entry");
         let mut scope = scope.inner(ir_block);
         block.codegen(&mut scope);
-
-        ir_function.attach(scope.block);
     }
 }
 
@@ -87,7 +85,7 @@ impl Expression {
 
         use ExpressionKind::*;
         match kind {
-            Literal(lit) => IRValue::from_literal(lit, &mut scope.block.module),
+            Literal(lit) => IRValue::from_literal(lit, &scope.block.function.module),
             VariableName(v) => scope.data.fetch(v),
             Binop(op, lhs, rhs) => {
                 let lhs = lhs.codegen(scope);
@@ -96,10 +94,28 @@ impl Expression {
                 match op {
                     Add => scope.block.add(lhs, rhs).unwrap(),
                     Mult => scope.block.mult(lhs, rhs).unwrap(),
+                    LessThan => scope.block.less_than(lhs, rhs).unwrap(),
                     _ => panic!("operator not supported: {:?}", op),
                 }
             }
-            _ => panic!("expression type not supported"),
+            IfExpr(ifx) => {
+                let IfExpression(expr, block, _) = ifx.as_ref();
+                let condition = expr.codegen(scope);
+
+                let mut then = IRBlock::new(scope.block.function, c"then");
+                let mut after = IRBlock::new(scope.block.function, c"merge");
+
+                scope.block.branch(condition, &mut then, &mut after);
+                scope.block = after;
+
+                let mut inner = scope.inner(then);
+                block.codegen(&mut inner);
+                inner.block.move_into(&mut scope.block);
+
+                IRValue::from_literal(&crate::ast::Literal::I32(1), scope.block.function.module)
+            }
+            BlockExpr(_) => panic!("block expr not supported"),
+            FunctionCall(_) => panic!("function call expr not supported"),
         }
     }
 }
@@ -116,11 +132,11 @@ impl ScopeData {
         }
     }
 
-    fn with_block<'a, 'b>(self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
+    fn with_block<'a, 'b, 'c>(self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
         Scope { data: self, block }
     }
 
-    fn inner<'a, 'b>(&self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
+    fn inner<'a, 'b, 'c>(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
         self.clone().with_block(block)
     }
 
@@ -139,13 +155,13 @@ impl ScopeData {
     }
 }
 
-struct Scope<'a, 'b> {
+struct Scope<'a, 'b, 'c> {
     data: ScopeData,
-    block: IRBlock<'a, 'b>,
+    block: IRBlock<'a, 'b, 'c>,
 }
 
-impl<'a, 'b> Scope<'a, 'b> {
-    fn inner(&self, block: IRBlock<'a, 'b>) -> Scope<'a, 'b> {
+impl<'a, 'b, 'c> Scope<'a, 'b, 'c> {
+    fn inner(&self, block: IRBlock<'a, 'b, 'c>) -> Scope<'a, 'b, 'c> {
         self.data.clone().with_block(block)
     }
 }

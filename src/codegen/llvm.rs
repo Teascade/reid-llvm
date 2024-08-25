@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use std::ffi::{CStr, CString};
 use std::mem;
 
@@ -21,6 +22,7 @@ pub enum Error {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum IRType {
     I32,
+    Boolean,
 }
 
 impl IRType {
@@ -29,6 +31,7 @@ impl IRType {
         unsafe {
             return match self {
                 I32 => LLVMInt32TypeInContext(context.context),
+                Boolean => LLVMInt1TypeInContext(context.context),
             };
         }
     }
@@ -140,26 +143,20 @@ impl<'a, 'b> IRFunction<'a, 'b> {
             }
         }
     }
-
-    pub fn attach(&mut self, block: IRBlock) {
-        unsafe { LLVMAppendExistingBasicBlock(self.value, block.blockref) }
-    }
 }
 
-pub struct IRBlock<'a, 'b> {
-    pub module: &'b IRModule<'a>,
+pub struct IRBlock<'a, 'b, 'c> {
+    pub function: &'c IRFunction<'a, 'b>,
     blockref: *mut LLVMBasicBlock,
 }
 
-impl<'a, 'b, 'c> IRBlock<'a, 'b> {
-    pub fn new(module: &'b IRModule<'a>) -> IRBlock<'a, 'b> {
+impl<'a, 'b, 'c> IRBlock<'a, 'b, 'c> {
+    pub fn new(function: &'c IRFunction<'a, 'b>, name: &CStr) -> IRBlock<'a, 'b, 'c> {
         unsafe {
-            let blockref = LLVMCreateBasicBlockInContext(
-                module.context.context,
-                into_cstring("entryblock").as_ptr(),
-            );
+            let blockref =
+                LLVMCreateBasicBlockInContext(function.module.context.context, name.as_ptr());
 
-            IRBlock { module, blockref }
+            IRBlock { function, blockref }
         }
     }
 
@@ -169,12 +166,12 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b> {
         IRValue(rhs_t, rhs_v): IRValue,
     ) -> Result<IRValue, Error> {
         unsafe {
-            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
             if lhs_t == rhs_t {
                 Ok(IRValue(
                     lhs_t,
                     LLVMBuildAdd(
-                        self.module.context.builder,
+                        self.function.module.context.builder,
                         lhs_v,
                         rhs_v,
                         c"tmpadd".as_ptr(),
@@ -192,12 +189,12 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b> {
         IRValue(rhs_t, rhs_v): IRValue,
     ) -> Result<IRValue, Error> {
         unsafe {
-            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
             if lhs_t == rhs_t {
                 Ok(IRValue(
                     lhs_t,
                     LLVMBuildMul(
-                        self.module.context.builder,
+                        self.function.module.context.builder,
                         lhs_v,
                         rhs_v,
                         c"tmpadd".as_ptr(),
@@ -209,14 +206,70 @@ impl<'a, 'b, 'c> IRBlock<'a, 'b> {
         }
     }
 
+    pub fn less_than(
+        &mut self,
+        IRValue(lhs_t, lhs_v): IRValue,
+        IRValue(rhs_t, rhs_v): IRValue,
+    ) -> Result<IRValue, Error> {
+        unsafe {
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
+            if lhs_t == rhs_t {
+                Ok(IRValue(
+                    IRType::Boolean,
+                    LLVMBuildICmp(
+                        self.function.module.context.builder,
+                        llvm_sys::LLVMIntPredicate::LLVMIntULT,
+                        lhs_v,
+                        rhs_v,
+                        c"IntULT".as_ptr(),
+                    ),
+                ))
+            } else {
+                Err(Error::TypeMismatch(lhs_t, rhs_t))
+            }
+        }
+    }
+
     pub fn add_return(&mut self, value: Option<IRValue>) {
         unsafe {
-            LLVMPositionBuilderAtEnd(self.module.context.builder, self.blockref);
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
             if let Some(IRValue(_, value)) = value {
-                LLVMBuildRet(self.module.context.builder, value);
+                LLVMBuildRet(self.function.module.context.builder, value);
             } else {
-                LLVMBuildRetVoid(self.module.context.builder);
+                LLVMBuildRetVoid(self.function.module.context.builder);
             }
+        }
+    }
+
+    pub fn branch(
+        &mut self,
+        IRValue(_, condition): IRValue,
+        then_block: &mut IRBlock,
+        else_block: &mut IRBlock,
+    ) {
+        unsafe {
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
+            LLVMBuildCondBr(
+                self.function.module.context.builder,
+                condition,
+                then_block.blockref,
+                else_block.blockref,
+            );
+        }
+    }
+
+    pub fn move_into(&mut self, block: &mut IRBlock) {
+        unsafe {
+            LLVMPositionBuilderAtEnd(self.function.module.context.builder, self.blockref);
+            LLVMBuildBr(self.function.module.context.builder, block.blockref);
+        }
+    }
+}
+
+impl<'a, 'b, 'c> Drop for IRBlock<'a, 'b, 'c> {
+    fn drop(&mut self) {
+        unsafe {
+            LLVMAppendExistingBasicBlock(self.function.value, self.blockref);
         }
     }
 }
