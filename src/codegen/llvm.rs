@@ -1,7 +1,9 @@
 use std::borrow::BorrowMut;
 use std::ffi::{CStr, CString};
 use std::mem;
+use std::ptr::null_mut;
 
+use llvm_sys::analysis::LLVMVerifyModule;
 use llvm_sys::{
     core::*, prelude::*, LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue,
 };
@@ -105,7 +107,14 @@ impl<'a> IRModule<'a> {
     }
 
     pub fn print_to_string(&mut self) -> Result<&str, std::str::Utf8Error> {
-        unsafe { CStr::from_ptr(LLVMPrintModuleToString(self.module)).to_str() }
+        unsafe {
+            LLVMVerifyModule(
+                self.module,
+                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
+                null_mut(),
+            );
+            CStr::from_ptr(LLVMPrintModuleToString(self.module)).to_str()
+        }
     }
 }
 
@@ -130,7 +139,6 @@ impl<'a, 'b> IRFunction<'a, 'b> {
             // TODO, fix later!
 
             let return_type = LLVMInt32TypeInContext(module.context.context);
-
             let mut argts = [];
             let func_type =
                 LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);

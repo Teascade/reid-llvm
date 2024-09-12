@@ -109,16 +109,16 @@ impl Expression {
                 let IfExpression(expr, block, _) = ifx.as_ref();
                 let condition = expr.codegen(scope);
 
-                let mut then = IRBlock::new(scope.block.function, c"then");
-                let mut after = IRBlock::new(scope.block.function, c"merge");
+                let mut thenb = IRBlock::new(scope.block.function, c"then");
+                let mut afterb = IRBlock::new(scope.block.function, c"merge");
 
-                scope.block.branch(condition, &mut then, &mut after);
-                scope.block = after;
+                scope.block.branch(condition, &mut thenb, &mut afterb);
+                scope.block = afterb;
 
-                let mut inner = scope.inner(then);
-                match block.codegen(&mut inner) {
-                    Some((ReturnType::Hard, v)) => inner.block.add_return(Some(v)),
-                    _ => inner.block.move_into(&mut scope.block),
+                let mut then = scope.inner(thenb);
+                match block.codegen(&mut then) {
+                    Some((ReturnType::Hard, v)) => then.block.add_return(Some(v)),
+                    _ => then.block.move_into(&mut scope.block),
                 }
 
                 IRValue::from_literal(&crate::ast::Literal::I32(1), scope.block.function.module)
