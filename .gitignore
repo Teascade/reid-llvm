@@ -3,3 +3,5 @@ src/old_llvm
 /target
 /.vscode
 .env
+hello.*
+main

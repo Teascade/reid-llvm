@@ -4,8 +4,12 @@ use std::mem;
 use std::ptr::null_mut;
 
 use llvm_sys::analysis::LLVMVerifyModule;
+use llvm_sys::transforms::pass_manager_builder::{
+    self, LLVMOpaquePassManagerBuilder, LLVMPassManagerBuilderCreate,
+    LLVMPassManagerBuilderSetOptLevel,
+};
 use llvm_sys::{
-    core::*, prelude::*, LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue,
+    LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue, core::*, prelude::*,
 };
 
 use crate::ast;
