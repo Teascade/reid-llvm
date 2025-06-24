@@ -61,6 +61,8 @@ impl IRType for i32 {
     }
 }
 
+pub struct IROpaqueValue(LLVMTypeRef, LLVMValueRef);
+
 pub struct IRValue<T: IRType>(PhantomData<T>, IROpaqueValue);
 
 impl<T: IRType> IRValue<T> {
@@ -84,8 +86,6 @@ impl<T: IRType> From<IRValue<T>> for IROpaqueValue {
         value.1
     }
 }
-
-pub struct IROpaqueValue(LLVMTypeRef, LLVMValueRef);
 
 pub struct IRContext {
     context: *mut LLVMContext,
@@ -209,8 +209,10 @@ impl<'a> Drop for IRModule<'a> {
 }
 
 pub struct IRFunction<'a> {
+    pub name: String,
     pub module: &'a IRModule<'a>,
-    pub functionref: *mut LLVMValue,
+    pub function_ref: *mut LLVMValue,
+    pub function_type: *mut LLVMType,
 }
 
 impl<'a> IRFunction<'a> {
@@ -222,12 +224,17 @@ impl<'a> IRFunction<'a> {
             let func_type =
                 LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);
 
-            let functionref =
+            let function_ref =
                 LLVMAddFunction(module.module, into_cstring(name).as_ptr(), func_type);
 
+            let function_type =
+                LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);
+
             IRFunction {
+                name: name.clone(),
                 module,
-                functionref,
+                function_ref,
+                function_type,
             }
         }
     }
@@ -249,6 +256,41 @@ impl<'a> IRBlock<'a> {
                 context,
                 blockref,
                 inserted: false,
+            }
+        }
+    }
+
+    pub fn call(&self, function: &IRFunction) -> IROpaqueValue {
+        unsafe {
+            let builder = self.context.builder;
+            LLVMPositionBuilderAtEnd(builder, self.blockref);
+
+            // Add way to check and use parameters
+            let mut args = [];
+
+            let value = LLVMBuildCall2(
+                builder,
+                function.function_type,
+                function.function_ref,
+                args.as_mut_ptr(),
+                args.len() as u32,
+                into_cstring(&function.name).as_ptr(),
+            );
+            IROpaqueValue(i32::llvm_type(&self.context), value)
+        }
+    }
+
+    pub fn add(&self, lhs: IROpaqueValue, rhs: IROpaqueValue) -> Result<IROpaqueValue, ()> {
+        let IROpaqueValue(t1, lhs) = lhs;
+        let IROpaqueValue(t2, rhs) = rhs;
+        if t1 != t2 {
+            Err(())
+        } else {
+            unsafe {
+                let builder = self.context.builder;
+                LLVMPositionBuilderAtEnd(builder, self.blockref);
+                let value = LLVMBuildAdd(builder, lhs, rhs, c"add".as_ptr());
+                Ok(IROpaqueValue(t1, value))
             }
         }
     }
@@ -302,7 +344,7 @@ impl<'a> IRBlock<'a> {
 
     unsafe fn append(mut self, function: &IRFunction<'a>) {
         unsafe {
-            LLVMAppendExistingBasicBlock(function.functionref, self.blockref);
+            LLVMAppendExistingBasicBlock(function.function_ref, self.blockref);
             self.inserted = true;
         }
     }
