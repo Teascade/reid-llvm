@@ -1,10 +1,16 @@
 use reid_lib::*;
 
 pub fn main() {
+    // Notes from inkwell:
+    // - Creating new values should probably just be functions in the context
+    // - Creating functions should probably be functions from module
+    // - Builder could well be it's own struct
+    // - Although, I do like the fact where blocks move the builder by itself..
+
     let context = IRContext::new();
     let module = IRModule::new(&context, &"hello".to_owned());
 
-    let mainfunc = IRFunction::new(&module, &"mainfunc".to_owned());
+    let mainfunc = IRFunction::new(&module, &"main".to_owned());
 
     let secondary_func = IRFunction::new(&module, &"secondary".to_owned());
 

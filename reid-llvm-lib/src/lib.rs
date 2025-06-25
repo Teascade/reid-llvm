@@ -1,46 +1,22 @@
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-use std::mem;
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 
 use llvm_sys::analysis::LLVMVerifyModule;
 use llvm_sys::target::{
     LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
-    LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVM_InitializeNativeAsmParser,
-    LLVM_InitializeNativeTarget, LLVMInitializeAMDGPUAsmPrinter, LLVMInitializeX86Target,
-    LLVMInitializeX86TargetInfo, LLVMInitializeX86TargetMC, LLVMSetModuleDataLayout,
+    LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVMSetModuleDataLayout,
 };
 use llvm_sys::target_machine::{
     LLVMCodeGenFileType, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
-    LLVMGetDefaultTargetTriple, LLVMGetFirstTarget, LLVMGetHostCPUFeatures, LLVMGetHostCPUName,
-    LLVMGetTargetFromTriple, LLVMTargetMachineEmitToFile, LLVMTargetMachineEmitToMemoryBuffer,
-};
-use llvm_sys::transforms::pass_manager_builder::{
-    LLVMPassManagerBuilderCreate, LLVMPassManagerBuilderPopulateModulePassManager,
-    LLVMPassManagerBuilderSetOptLevel,
+    LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetMachineEmitToFile,
 };
 use llvm_sys::{
     LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue, core::*, prelude::*,
 };
+use util::{ErrorMessageHolder, from_cstring, into_cstring};
 
-fn into_cstring<T: Into<String>>(value: T) -> CString {
-    let string = value.into();
-    unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
-}
-
-fn from_cstring(value: *mut c_char) -> Option<String> {
-    if value.is_null() {
-        None
-    } else {
-        unsafe { CString::from_raw(value).into_string().ok() }
-    }
-}
-
-fn cstring_to_err(value: *mut c_char) -> Result<(), String> {
-    from_cstring(value)
-        .filter(|s| !s.is_empty())
-        .map_or(Ok(()), |s| Err(s))
-}
+mod util;
 
 pub trait IRType {
     const SIGNED: LLVMBool;
@@ -131,12 +107,6 @@ impl<'a> IRModule<'a> {
 
     pub fn print_to_string(&self) -> Result<&str, String> {
         unsafe {
-            // let pmb = LLVMPassManagerBuilderCreate();
-            // LLVMPassManagerBuilderSetOptLevel(pmb, 0);
-            // let pm = LLVMCreatePassManager();
-            // LLVMPassManagerBuilderPopulateModulePassManager(pmb, pm);
-            // println!("{}", LLVMRunPassManager(pm, self.module));
-
             LLVM_InitializeAllTargets();
             LLVM_InitializeAllTargetInfos();
             LLVM_InitializeAllTargetMCs();
@@ -146,10 +116,14 @@ impl<'a> IRModule<'a> {
             let triple = LLVMGetDefaultTargetTriple();
 
             let mut target: _ = null_mut();
-            let mut err: _ = null_mut();
-            LLVMGetTargetFromTriple(c"x86_64-unknown-linux-gnu".as_ptr(), &mut target, &mut err);
+            let mut err = ErrorMessageHolder::null();
+            LLVMGetTargetFromTriple(
+                c"x86_64-unknown-linux-gnu".as_ptr(),
+                &mut target,
+                err.borrow_mut(),
+            );
             println!("{:?}, {:?}", from_cstring(triple), target);
-            cstring_to_err(err).unwrap();
+            err.into_result().unwrap();
 
             let target_machine = LLVMCreateTargetMachine(
                 target,
@@ -164,33 +138,33 @@ impl<'a> IRModule<'a> {
             let data_layout = LLVMCreateTargetDataLayout(target_machine);
             LLVMSetModuleDataLayout(self.module, data_layout);
 
-            let mut err = null_mut();
+            let mut err = ErrorMessageHolder::null();
             LLVMVerifyModule(
                 self.module,
                 llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
-                &mut err,
+                err.borrow_mut(),
             );
-            cstring_to_err(err).unwrap();
+            err.into_result().unwrap();
 
-            let mut err = null_mut();
+            let mut err = ErrorMessageHolder::null();
             LLVMTargetMachineEmitToFile(
                 target_machine,
                 self.module,
                 CString::new("hello.asm").unwrap().into_raw(),
                 LLVMCodeGenFileType::LLVMAssemblyFile,
-                &mut err,
+                err.borrow_mut(),
             );
-            cstring_to_err(err).unwrap();
+            err.into_result().unwrap();
 
-            let mut err = null_mut();
+            let mut err = ErrorMessageHolder::null();
             LLVMTargetMachineEmitToFile(
                 target_machine,
                 self.module,
                 CString::new("hello.o").unwrap().into_raw(),
                 LLVMCodeGenFileType::LLVMObjectFile,
-                &mut err,
+                err.borrow_mut(),
             );
-            cstring_to_err(err).unwrap();
+            err.into_result().unwrap();
 
             Ok(CStr::from_ptr(LLVMPrintModuleToString(self.module))
                 .to_str()
