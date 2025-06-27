@@ -1,4 +1,8 @@
-use reid_lib::*;
+use reid_lib::{
+    context::{Comparison, Context},
+    types::BasicType,
+    *,
+};
 
 pub fn main() {
     // Notes from inkwell:
@@ -7,29 +11,33 @@ pub fn main() {
     // - Builder could well be it's own struct
     // - Although, I do like the fact where blocks move the builder by itself..
 
-    let context = IRContext::new();
-    let module = IRModule::new(&context, &"hello".to_owned());
+    let context = Context::new();
 
-    let mainfunc = IRFunction::new(&module, &"main".to_owned());
+    let module = context.module("testmodule");
 
-    let secondary_func = IRFunction::new(&module, &"secondary".to_owned());
+    let int_32 = context.integer_type::<32>();
 
-    let secondary_block = IRBlock::new(&context, &"secondaryblock".to_owned());
-    secondary_block.ret(&secondary_func, IRValue::from_const(&context, 54).into());
+    let secondary = module.add_function(int_32.function_type(&[]), "secondary");
+    let s_entry = secondary.block("entry");
+    s_entry.ret(&int_32.from_const(54, 1)).unwrap();
 
-    let block = IRBlock::new(&context, &"mainblock".to_owned());
+    let function = module.add_function(int_32.function_type(&[]), "main");
 
-    let lhs_1 = IRValue::from_const(&context, 100);
-    let lhs_2 = block.call(&secondary_func);
-    let lhs_cmp = block.add(lhs_1.into(), lhs_2.into()).unwrap();
-    let rhs_cmp = IRValue::from_const(&context, 200);
+    let entry = function.block("entry");
 
-    let compare = block.less_than(lhs_cmp.into(), rhs_cmp.into()).unwrap();
+    let v1 = int_32.from_const(100, 1);
+    let v2 = entry.call(&secondary, vec![], "call").unwrap();
+    let lhs_cmp = entry.add(&v1, &v2, "add").unwrap();
+    let rhs_cmp = int_32.from_const(200, 1);
 
-    let (lhs, rhs) = block.cond_br(&mainfunc, compare);
+    let cond_res = entry
+        .integer_compare(&lhs_cmp, &rhs_cmp, &Comparison::LessThan, "cmp")
+        .unwrap();
 
-    lhs.ret(&mainfunc, IRValue::from_const(&context, 123).into());
-    rhs.ret(&mainfunc, IRValue::from_const(&context, 456).into());
+    let (lhs, rhs) = entry.conditional_br(&cond_res, "lhs", "rhs").unwrap();
+
+    lhs.ret(&int_32.from_const(123, 1)).unwrap();
+    rhs.ret(&int_32.from_const(456, 1)).unwrap();
 
     match module.print_to_string() {
         Ok(v) => println!("{}", v),
