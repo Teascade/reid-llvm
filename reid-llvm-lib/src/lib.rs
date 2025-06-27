@@ -1,5 +1,4 @@
 use std::ffi::{CStr, CString};
-use std::marker::PhantomData;
 use std::ptr::null_mut;
 
 use llvm_sys::analysis::LLVMVerifyModule;
@@ -14,54 +13,13 @@ use llvm_sys::target_machine::{
 use llvm_sys::{
     LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue, core::*, prelude::*,
 };
+use primitives::IRType;
 use util::{ErrorMessageHolder, from_cstring, into_cstring};
 
+pub use primitives::{IRValue, OpaqueIRValue};
+
+mod primitives;
 mod util;
-
-pub trait IRType {
-    const SIGNED: LLVMBool;
-    unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef;
-}
-
-impl IRType for bool {
-    const SIGNED: LLVMBool = 0;
-    unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-        unsafe { LLVMInt1TypeInContext(context.context) }
-    }
-}
-
-impl IRType for i32 {
-    const SIGNED: LLVMBool = 1;
-    unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-        unsafe { LLVMInt32TypeInContext(context.context) }
-    }
-}
-
-pub struct IROpaqueValue(LLVMTypeRef, LLVMValueRef);
-
-pub struct IRValue<T: IRType>(PhantomData<T>, IROpaqueValue);
-
-impl<T: IRType> IRValue<T> {
-    unsafe fn from_runtime(t: LLVMTypeRef, value: LLVMValueRef) -> IRValue<T> {
-        IRValue(PhantomData, IROpaqueValue(t, value))
-    }
-}
-
-impl<T: IRType + Into<i64>> IRValue<T> {
-    pub fn from_const(context: &IRContext, value: T) -> Self {
-        unsafe {
-            let t = T::llvm_type(context);
-            let value = LLVMConstInt(t, value.into() as u64, T::SIGNED);
-            IRValue(PhantomData, IROpaqueValue(t, value))
-        }
-    }
-}
-
-impl<T: IRType> From<IRValue<T>> for IROpaqueValue {
-    fn from(value: IRValue<T>) -> Self {
-        value.1
-    }
-}
 
 pub struct IRContext {
     context: *mut LLVMContext,
@@ -117,11 +75,7 @@ impl<'a> IRModule<'a> {
 
             let mut target: _ = null_mut();
             let mut err = ErrorMessageHolder::null();
-            LLVMGetTargetFromTriple(
-                c"x86_64-unknown-linux-gnu".as_ptr(),
-                &mut target,
-                err.borrow_mut(),
-            );
+            LLVMGetTargetFromTriple(triple, &mut target, err.borrow_mut());
             println!("{:?}, {:?}", from_cstring(triple), target);
             err.into_result().unwrap();
 
@@ -193,7 +147,7 @@ impl<'a> IRFunction<'a> {
     pub fn new(module: &'a IRModule<'a>, name: &String) -> IRFunction<'a> {
         unsafe {
             // TODO, fix later!
-            let return_type = LLVMInt32TypeInContext(module.context.context);
+            let return_type = LLVMInt8TypeInContext(module.context.context);
             let mut argts = [];
             let func_type =
                 LLVMFunctionType(return_type, argts.as_mut_ptr(), argts.len() as u32, 0);
@@ -234,7 +188,7 @@ impl<'a> IRBlock<'a> {
         }
     }
 
-    pub fn call(&self, function: &IRFunction) -> IROpaqueValue {
+    pub fn call(&self, function: &IRFunction) -> OpaqueIRValue {
         unsafe {
             let builder = self.context.builder;
             LLVMPositionBuilderAtEnd(builder, self.blockref);
@@ -250,13 +204,13 @@ impl<'a> IRBlock<'a> {
                 args.len() as u32,
                 into_cstring(&function.name).as_ptr(),
             );
-            IROpaqueValue(i32::llvm_type(&self.context), value)
+            OpaqueIRValue(i32::llvm_type(&self.context), value)
         }
     }
 
-    pub fn add(&self, lhs: IROpaqueValue, rhs: IROpaqueValue) -> Result<IROpaqueValue, ()> {
-        let IROpaqueValue(t1, lhs) = lhs;
-        let IROpaqueValue(t2, rhs) = rhs;
+    pub fn add(&self, lhs: OpaqueIRValue, rhs: OpaqueIRValue) -> Result<OpaqueIRValue, ()> {
+        let OpaqueIRValue(t1, lhs) = lhs;
+        let OpaqueIRValue(t2, rhs) = rhs;
         if t1 != t2 {
             Err(())
         } else {
@@ -264,14 +218,14 @@ impl<'a> IRBlock<'a> {
                 let builder = self.context.builder;
                 LLVMPositionBuilderAtEnd(builder, self.blockref);
                 let value = LLVMBuildAdd(builder, lhs, rhs, c"add".as_ptr());
-                Ok(IROpaqueValue(t1, value))
+                Ok(OpaqueIRValue(t1, value))
             }
         }
     }
 
-    pub fn less_than(&self, lhs: IROpaqueValue, rhs: IROpaqueValue) -> Result<IRValue<bool>, ()> {
-        let IROpaqueValue(t1, lhs) = lhs;
-        let IROpaqueValue(t2, rhs) = rhs;
+    pub fn less_than(&self, lhs: OpaqueIRValue, rhs: OpaqueIRValue) -> Result<IRValue<bool>, ()> {
+        let OpaqueIRValue(t1, lhs) = lhs;
+        let OpaqueIRValue(t2, rhs) = rhs;
 
         if t1 != t2 {
             Err(())
@@ -307,7 +261,7 @@ impl<'a> IRBlock<'a> {
         }
     }
 
-    pub fn ret(self, function: &IRFunction, value: IROpaqueValue) {
+    pub fn ret(self, function: &IRFunction, value: OpaqueIRValue) {
         unsafe {
             let builder = self.context.builder;
             LLVMPositionBuilderAtEnd(builder, self.blockref);
