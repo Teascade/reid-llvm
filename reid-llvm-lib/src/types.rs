@@ -1,4 +1,7 @@
+use std::{any::Any, marker::PhantomData};
+
 use llvm_sys::{
+    LLVMTypeKind,
     core::*,
     prelude::{LLVMTypeRef, LLVMValueRef},
 };
@@ -48,46 +51,51 @@ impl PartialEq<LLVMTypeRef> for &dyn BasicType {
     }
 }
 
-pub struct IntegerType<'ctx, const WIDTH: u32, const SIGNED: bool> {
+pub struct IntegerType<'ctx> {
     context: &'ctx Context,
     type_ref: LLVMTypeRef,
 }
 
-impl<'ctx, const WIDTH: u32, const SIGNED: bool> BasicType for IntegerType<'ctx, WIDTH, SIGNED> {
+impl<'ctx> BasicType for IntegerType<'ctx> {
     fn llvm_type(&self) -> LLVMTypeRef {
         self.type_ref
     }
 }
 
-impl<'ctx, const WIDTH: u32, const SIGNED: bool> IntegerType<'ctx, WIDTH, SIGNED> {
-    pub(crate) fn in_context(context: &Context) -> IntegerType<WIDTH, SIGNED> {
+impl<'ctx> IntegerType<'ctx> {
+    pub(crate) fn in_context(context: &Context, width: u32) -> IntegerType {
         let type_ref = unsafe {
-            match WIDTH {
+            match width {
                 128 => LLVMInt128TypeInContext(context.context_ref),
                 64 => LLVMInt64TypeInContext(context.context_ref),
                 32 => LLVMInt32TypeInContext(context.context_ref),
                 16 => LLVMInt16TypeInContext(context.context_ref),
                 8 => LLVMInt8TypeInContext(context.context_ref),
                 1 => LLVMInt1TypeInContext(context.context_ref),
-                _ => LLVMIntTypeInContext(context.context_ref, WIDTH),
+                _ => LLVMIntTypeInContext(context.context_ref, width),
             }
         };
         IntegerType { context, type_ref }
     }
 
-    pub fn from_const(&self, value: u64) -> OpaqueValue {
-        unsafe {
-            OpaqueValue {
-                basic_type: self,
-                value_ref: LLVMConstInt(self.type_ref, value, Self::sign_to_i32()),
-            }
-        }
+    pub fn from_signed(&self, value: i64) -> IntegerValue<'_> {
+        self.from_const(value as u64, true)
     }
 
-    const fn sign_to_i32() -> i32 {
-        match SIGNED {
-            true => 1,
-            false => 0,
+    pub fn from_unsigned(&self, value: i64) -> IntegerValue<'_> {
+        self.from_const(value as u64, false)
+    }
+
+    fn from_const(&self, value: u64, sign: bool) -> IntegerValue<'_> {
+        unsafe {
+            IntegerValue::from_llvm(LLVMConstInt(
+                self.type_ref,
+                value,
+                match sign {
+                    true => 1,
+                    false => 0,
+                },
+            ))
         }
     }
 }
@@ -122,19 +130,69 @@ impl<'ctx, T: BasicType> BasicType for ArrayType<'ctx, T> {
     }
 }
 
-pub struct OpaqueValue<'ctx> {
-    pub(crate) basic_type: &'ctx dyn BasicType,
+pub trait BasicValue {
+    type BaseType: BasicType;
+    unsafe fn from_llvm(value: LLVMValueRef) -> Self
+    where
+        Self: Sized;
+    fn llvm_value(&self) -> LLVMValueRef;
+    fn llvm_type(&self) -> LLVMTypeRef;
+}
+
+pub struct IntegerValue<'ctx> {
+    phantom: PhantomData<&'ctx ()>,
     pub(crate) value_ref: LLVMValueRef,
 }
 
-impl<'ctx> OpaqueValue<'ctx> {
-    pub(crate) fn new(
-        basic_type: &'ctx dyn BasicType,
-        value_ref: LLVMValueRef,
-    ) -> OpaqueValue<'ctx> {
-        OpaqueValue {
-            basic_type,
-            value_ref,
+impl<'ctx> BasicValue for IntegerValue<'ctx> {
+    type BaseType = IntegerType<'ctx>;
+
+    unsafe fn from_llvm(value: LLVMValueRef) -> Self {
+        IntegerValue {
+            phantom: PhantomData,
+            value_ref: value,
+        }
+    }
+
+    fn llvm_value(&self) -> LLVMValueRef {
+        self.value_ref
+    }
+
+    fn llvm_type(&self) -> LLVMTypeRef {
+        unsafe { LLVMTypeOf(self.value_ref) }
+    }
+}
+
+pub enum Value<'ctx> {
+    Integer(IntegerValue<'ctx>),
+}
+
+impl<'ctx> Value<'ctx> {
+    unsafe fn from_llvm(value: LLVMValueRef) -> Self
+    where
+        Self: Sized,
+    {
+        unsafe {
+            use LLVMTypeKind::*;
+
+            let llvm_type = LLVMTypeOf(value);
+            let type_kind = LLVMGetTypeKind(llvm_type);
+            match type_kind {
+                LLVMIntegerTypeKind => Value::Integer(IntegerValue::from_llvm(value)),
+                _ => panic!("asd"),
+            }
+        }
+    }
+
+    pub fn llvm_value(&self) -> LLVMValueRef {
+        match self {
+            Self::Integer(i) => i.llvm_value(),
+        }
+    }
+
+    pub fn llvm_type(&self) -> LLVMTypeRef {
+        match self {
+            Self::Integer(i) => i.llvm_type(),
         }
     }
 }

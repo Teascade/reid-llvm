@@ -10,17 +10,25 @@ use llvm_sys::target_machine::{
     LLVMCodeGenFileType, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
     LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetMachineEmitToFile,
 };
-use llvm_sys::{LLVMBuilder, LLVMContext, core::*, prelude::*};
-use types::{BasicType, FunctionType, IntegerType};
+use llvm_sys::{LLVMBuilder, LLVMContext, LLVMIntPredicate, core::*, prelude::*};
+use types::{BasicType, BasicValue, FunctionType, IntegerType, Value};
 use util::{ErrorMessageHolder, from_cstring, into_cstring};
-
-pub use types::OpaqueValue;
 
 pub mod types;
 mod util;
 
-pub enum Comparison {
-    LessThan,
+pub enum IntPredicate {
+    ULT,
+    SLT,
+}
+
+impl IntPredicate {
+    pub fn as_llvm(&self) -> LLVMIntPredicate {
+        match *self {
+            Self::ULT => LLVMIntPredicate::LLVMIntULT,
+            Self::SLT => LLVMIntPredicate::LLVMIntSLT,
+        }
+    }
 }
 
 pub struct Context {
@@ -42,10 +50,20 @@ impl Context {
         }
     }
 
-    pub fn integer_type<'a, const WIDTH: u32, const SIGN: bool>(
-        &'a self,
-    ) -> IntegerType<'a, WIDTH, SIGN> {
-        IntegerType::in_context(&self)
+    pub fn type_i1<'a>(&'a self) -> IntegerType<'a> {
+        IntegerType::in_context(&self, 1)
+    }
+
+    pub fn type_i8<'a>(&'a self) -> IntegerType<'a> {
+        IntegerType::in_context(&self, 8)
+    }
+
+    pub fn type_i16<'a>(&'a self) -> IntegerType<'a> {
+        IntegerType::in_context(&self, 16)
+    }
+
+    pub fn type_i32<'a>(&'a self) -> IntegerType<'a> {
+        IntegerType::in_context(&self, 32)
     }
 
     pub fn module<T: Into<String>>(&self, name: T) -> Module {
@@ -83,11 +101,11 @@ impl<'ctx> Module<'ctx> {
         }
     }
 
-    pub fn add_function<ReturnType: BasicType, T: Into<String>>(
+    pub fn add_function<ReturnValue: BasicValue>(
         &self,
-        fn_type: FunctionType<'ctx, ReturnType>,
-        name: T,
-    ) -> Function<'_, ReturnType> {
+        fn_type: FunctionType<'ctx, ReturnValue::BaseType>,
+        name: &str,
+    ) -> Function<'_, ReturnValue> {
         unsafe {
             let name_cstring = into_cstring(name);
             let function_ref =
@@ -172,32 +190,32 @@ impl<'a> Drop for Module<'a> {
     }
 }
 
-pub struct Function<'ctx, ReturnType: BasicType> {
+pub struct Function<'ctx, ReturnValue: BasicValue> {
     module: &'ctx Module<'ctx>,
     name: CString,
-    fn_type: FunctionType<'ctx, ReturnType>,
+    fn_type: FunctionType<'ctx, ReturnValue::BaseType>,
     fn_ref: LLVMValueRef,
 }
 
-impl<'ctx, ReturnType: BasicType> Function<'ctx, ReturnType> {
-    pub fn block<T: Into<String>>(&'ctx self, name: T) -> BasicBlock<'ctx, ReturnType> {
+impl<'ctx, ReturnValue: BasicValue> Function<'ctx, ReturnValue> {
+    pub fn block<T: Into<String>>(&'ctx self, name: T) -> BasicBlock<'ctx, ReturnValue> {
         BasicBlock::in_function(&self, name.into())
     }
 }
 
-pub struct BasicBlock<'ctx, ReturnType: BasicType> {
-    function: &'ctx Function<'ctx, ReturnType>,
+pub struct BasicBlock<'ctx, ReturnValue: BasicValue> {
+    function: &'ctx Function<'ctx, ReturnValue>,
     builder_ref: LLVMBuilderRef,
     name: CString,
     blockref: LLVMBasicBlockRef,
     inserted: bool,
 }
 
-impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
+impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     fn in_function(
-        function: &'ctx Function<ReturnType>,
+        function: &'ctx Function<ReturnValue>,
         name: String,
-    ) -> BasicBlock<'ctx, ReturnType> {
+    ) -> BasicBlock<'ctx, ReturnValue> {
         unsafe {
             let block_name = into_cstring(name);
             let block_ref = LLVMCreateBasicBlockInContext(
@@ -215,49 +233,44 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
     }
 
     #[must_use]
-    pub fn integer_compare<T: Into<String>>(
+    pub fn integer_compare<T: BasicValue>(
         &self,
-        lhs: &'ctx OpaqueValue<'ctx>,
-        rhs: &'ctx OpaqueValue<'ctx>,
-        comparison: &Comparison,
-        name: T,
-    ) -> Result<OpaqueValue<'ctx>, ()> {
-        if lhs.basic_type != rhs.basic_type {
-            return Err(()); // TODO invalid amount of parameters
-        }
+        lhs: &'ctx T,
+        rhs: &'ctx T,
+        comparison: &IntPredicate,
+        name: &str,
+    ) -> Result<T, ()> {
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
-            let value = match comparison {
-                Comparison::LessThan => LLVMBuildICmp(
-                    self.builder_ref,
-                    llvm_sys::LLVMIntPredicate::LLVMIntSLT,
-                    lhs.value_ref,
-                    rhs.value_ref,
-                    into_cstring(name.into()).as_ptr(),
-                ),
-            };
+            let value = LLVMBuildICmp(
+                self.builder_ref,
+                comparison.as_llvm(),
+                lhs.llvm_value(),
+                rhs.llvm_value(),
+                into_cstring(name).as_ptr(),
+            );
 
-            Ok(OpaqueValue::new(lhs.basic_type, value))
+            Ok(T::from_llvm(value))
         }
     }
 
     #[must_use]
-    pub fn call<T: Into<String>>(
+    pub fn call(
         &self,
-        callee: &'ctx Function<'ctx, ReturnType>,
-        params: Vec<&'ctx OpaqueValue<'ctx>>,
-        name: T,
-    ) -> Result<OpaqueValue<'ctx>, ()> {
+        callee: &'ctx Function<'ctx, ReturnValue>,
+        params: Vec<Value<'ctx>>,
+        name: &str,
+    ) -> Result<ReturnValue, ()> {
         if params.len() != callee.fn_type.param_types.len() {
             return Err(()); // TODO invalid amount of parameters
         }
         for (t1, t2) in callee.fn_type.param_types.iter().zip(&params) {
-            if t1 != &t2.basic_type.llvm_type() {
+            if t1 != &t2.llvm_type() {
                 return Err(()); // TODO wrong types in parameters
             }
         }
         unsafe {
-            let mut param_list: Vec<LLVMValueRef> = params.iter().map(|p| p.value_ref).collect();
+            let mut param_list: Vec<LLVMValueRef> = params.iter().map(|p| p.llvm_value()).collect();
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             let ret_val = LLVMBuildCall2(
                 self.builder_ref,
@@ -265,36 +278,31 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
                 callee.fn_ref,
                 param_list.as_mut_ptr(),
                 param_list.len() as u32,
-                into_cstring(name.into()).as_ptr(),
+                into_cstring(name).as_ptr(),
             );
-            Ok(OpaqueValue::new(callee.fn_type.return_type, ret_val))
+            Ok(ReturnValue::from_llvm(ret_val))
         }
     }
 
     #[must_use]
-    pub fn add<T: Into<String>>(
-        &self,
-        lhs: &OpaqueValue<'ctx>,
-        rhs: &OpaqueValue<'ctx>,
-        name: T,
-    ) -> Result<OpaqueValue<'ctx>, ()> {
-        if lhs.basic_type != rhs.basic_type {
+    pub fn add<T: BasicValue>(&self, lhs: &T, rhs: &T, name: &str) -> Result<T, ()> {
+        if lhs.llvm_type() != rhs.llvm_type() {
             return Err(()); // TODO error
         }
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             let add_value_ref = LLVMBuildAdd(
                 self.builder_ref,
-                lhs.value_ref,
-                rhs.value_ref,
-                into_cstring(name.into()).as_ptr(),
+                lhs.llvm_value(),
+                rhs.llvm_value(),
+                into_cstring(name).as_ptr(),
             );
-            Ok(OpaqueValue::new(lhs.basic_type, add_value_ref))
+            Ok(T::from_llvm(add_value_ref))
         }
     }
 
     #[must_use]
-    pub fn br(self, into: BasicBlock<'ctx, ReturnType>) -> Result<(), ()> {
+    pub fn br(self, into: BasicBlock<'ctx, ReturnValue>) -> Result<(), ()> {
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             LLVMBuildBr(self.builder_ref, into.blockref);
@@ -304,12 +312,12 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
     }
 
     #[must_use]
-    pub fn conditional_br<T: Into<String>, U: Into<String>>(
+    pub fn conditional_br<T: BasicValue>(
         self,
-        condition: &OpaqueValue<'ctx>,
-        lhs_name: T,
-        rhs_name: U,
-    ) -> Result<(BasicBlock<'ctx, ReturnType>, BasicBlock<'ctx, ReturnType>), ()> {
+        condition: &T,
+        lhs_name: &str,
+        rhs_name: &str,
+    ) -> Result<(BasicBlock<'ctx, ReturnValue>, BasicBlock<'ctx, ReturnValue>), ()> {
         unsafe {
             let lhs = BasicBlock::in_function(&self.function, lhs_name.into());
             let rhs = BasicBlock::in_function(&self.function, rhs_name.into());
@@ -317,7 +325,7 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             LLVMBuildCondBr(
                 self.builder_ref,
-                condition.value_ref,
+                condition.llvm_value(),
                 lhs.blockref,
                 rhs.blockref,
             );
@@ -327,13 +335,13 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
     }
 
     #[must_use]
-    pub fn ret(self, return_value: &OpaqueValue<'ctx>) -> Result<(), ()> {
-        if self.function.fn_type.return_type().llvm_type() != return_value.basic_type.llvm_type() {
+    pub fn ret(self, return_value: &ReturnValue) -> Result<(), ()> {
+        if self.function.fn_type.return_type().llvm_type() != return_value.llvm_type() {
             return Err(());
         }
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
-            LLVMBuildRet(self.builder_ref, return_value.value_ref);
+            LLVMBuildRet(self.builder_ref, return_value.llvm_value());
             self.terminate();
             Ok(())
         }
@@ -347,7 +355,7 @@ impl<'ctx, ReturnType: BasicType> BasicBlock<'ctx, ReturnType> {
     }
 }
 
-impl<'ctx, ReturnType: BasicType> Drop for BasicBlock<'ctx, ReturnType> {
+impl<'ctx, ReturnValue: BasicValue> Drop for BasicBlock<'ctx, ReturnValue> {
     fn drop(&mut self) {
         if !self.inserted {
             unsafe {
