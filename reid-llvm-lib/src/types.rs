@@ -42,7 +42,7 @@ impl PartialEq for &dyn BasicType {
     }
 }
 
-impl PartialEq<LLVMTypeRef> for dyn BasicType {
+impl PartialEq<LLVMTypeRef> for &dyn BasicType {
     fn eq(&self, other: &LLVMTypeRef) -> bool {
         self.llvm_type() == *other
     }

@@ -1,8 +1,4 @@
-use reid_lib::{
-    context::{Comparison, Context},
-    types::BasicType,
-    *,
-};
+use reid_lib::{Comparison, Context, types::BasicType};
 
 pub fn main() {
     // Notes from inkwell:
