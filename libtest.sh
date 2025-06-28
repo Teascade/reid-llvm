@@ -7,7 +7,7 @@
 
 export .env
 cargo run --example libtest && \
-# clang++ main.cpp hello.o -o main && \
+# clang hello.o -o main && \
 ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 \
    -o main /usr/lib/crt1.o hello.o -lc  && \
 ./main ; echo "Return value: ""$?"

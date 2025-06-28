@@ -1,4 +1,6 @@
 use std::ffi::CString;
+use std::marker::PhantomData;
+use std::net::Incoming;
 use std::ptr::null_mut;
 
 use llvm_sys::analysis::LLVMVerifyModule;
@@ -101,11 +103,11 @@ impl<'ctx> Module<'ctx> {
         }
     }
 
-    pub fn add_function<ReturnValue: BasicValue>(
-        &self,
+    pub fn add_function<ReturnValue: BasicValue<'ctx>>(
+        &'ctx self,
         fn_type: FunctionType<'ctx, ReturnValue::BaseType>,
         name: &str,
-    ) -> Function<'_, ReturnValue> {
+    ) -> Function<'ctx, ReturnValue> {
         unsafe {
             let name_cstring = into_cstring(name);
             let function_ref =
@@ -140,7 +142,7 @@ impl<'ctx> Module<'ctx> {
                 triple,
                 c"generic".as_ptr(),
                 c"".as_ptr(),
-                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
                 llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
                 llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
             );
@@ -190,20 +192,20 @@ impl<'a> Drop for Module<'a> {
     }
 }
 
-pub struct Function<'ctx, ReturnValue: BasicValue> {
+pub struct Function<'ctx, ReturnValue: BasicValue<'ctx>> {
     module: &'ctx Module<'ctx>,
     name: CString,
     fn_type: FunctionType<'ctx, ReturnValue::BaseType>,
     fn_ref: LLVMValueRef,
 }
 
-impl<'ctx, ReturnValue: BasicValue> Function<'ctx, ReturnValue> {
+impl<'ctx, ReturnValue: BasicValue<'ctx>> Function<'ctx, ReturnValue> {
     pub fn block<T: Into<String>>(&'ctx self, name: T) -> BasicBlock<'ctx, ReturnValue> {
         BasicBlock::in_function(&self, name.into())
     }
 }
 
-pub struct BasicBlock<'ctx, ReturnValue: BasicValue> {
+pub struct BasicBlock<'ctx, ReturnValue: BasicValue<'ctx>> {
     function: &'ctx Function<'ctx, ReturnValue>,
     builder_ref: LLVMBuilderRef,
     name: CString,
@@ -211,9 +213,9 @@ pub struct BasicBlock<'ctx, ReturnValue: BasicValue> {
     inserted: bool,
 }
 
-impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
+impl<'ctx, ReturnValue: BasicValue<'ctx>> BasicBlock<'ctx, ReturnValue> {
     fn in_function(
-        function: &'ctx Function<ReturnValue>,
+        function: &'ctx Function<'ctx, ReturnValue>,
         name: String,
     ) -> BasicBlock<'ctx, ReturnValue> {
         unsafe {
@@ -233,7 +235,7 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     }
 
     #[must_use]
-    pub fn integer_compare<T: BasicValue>(
+    pub fn integer_compare<T: BasicValue<'ctx>>(
         &self,
         lhs: &'ctx T,
         rhs: &'ctx T,
@@ -285,7 +287,7 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     }
 
     #[must_use]
-    pub fn add<T: BasicValue>(&self, lhs: &T, rhs: &T, name: &str) -> Result<T, ()> {
+    pub fn add<T: BasicValue<'ctx>>(&self, lhs: &T, rhs: &T, name: &str) -> Result<T, ()> {
         if lhs.llvm_type() != rhs.llvm_type() {
             return Err(()); // TODO error
         }
@@ -302,7 +304,24 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     }
 
     #[must_use]
-    pub fn br(self, into: BasicBlock<'ctx, ReturnValue>) -> Result<(), ()> {
+    pub fn phi<PhiValue: BasicValue<'ctx>>(
+        &self,
+        phi_type: &'ctx PhiValue::BaseType,
+        name: &str,
+    ) -> Result<PhiBuilder<'ctx, ReturnValue, PhiValue>, ()> {
+        unsafe {
+            LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
+            let phi_node = LLVMBuildPhi(
+                self.builder_ref,
+                phi_type.llvm_type(),
+                into_cstring(name).as_ptr(),
+            );
+            Ok(PhiBuilder::new(phi_node))
+        }
+    }
+
+    #[must_use]
+    pub fn br(self, into: &BasicBlock<'ctx, ReturnValue>) -> Result<(), ()> {
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             LLVMBuildBr(self.builder_ref, into.blockref);
@@ -312,7 +331,7 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     }
 
     #[must_use]
-    pub fn conditional_br<T: BasicValue>(
+    pub fn conditional_br<T: BasicValue<'ctx>>(
         self,
         condition: &T,
         lhs_name: &str,
@@ -336,7 +355,13 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
 
     #[must_use]
     pub fn ret(self, return_value: &ReturnValue) -> Result<(), ()> {
-        if self.function.fn_type.return_type().llvm_type() != return_value.llvm_type() {
+        if self
+            .function
+            .fn_type
+            .return_type(self.function.module.context)
+            .llvm_type()
+            != return_value.llvm_type()
+        {
             return Err(());
         }
         unsafe {
@@ -355,12 +380,46 @@ impl<'ctx, ReturnValue: BasicValue> BasicBlock<'ctx, ReturnValue> {
     }
 }
 
-impl<'ctx, ReturnValue: BasicValue> Drop for BasicBlock<'ctx, ReturnValue> {
+impl<'ctx, ReturnValue: BasicValue<'ctx>> Drop for BasicBlock<'ctx, ReturnValue> {
     fn drop(&mut self) {
         if !self.inserted {
             unsafe {
                 LLVMDeleteBasicBlock(self.blockref);
             }
         }
+    }
+}
+
+pub struct PhiBuilder<'ctx, ReturnValue: BasicValue<'ctx>, PhiValue: BasicValue<'ctx>> {
+    phi_node: LLVMValueRef,
+    phantom: PhantomData<&'ctx (PhiValue, ReturnValue)>,
+}
+
+impl<'ctx, ReturnValue: BasicValue<'ctx>, PhiValue: BasicValue<'ctx>>
+    PhiBuilder<'ctx, ReturnValue, PhiValue>
+{
+    fn new(phi_node: LLVMValueRef) -> PhiBuilder<'ctx, ReturnValue, PhiValue> {
+        PhiBuilder {
+            phi_node,
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn add_incoming(&self, value: &PhiValue, block: &BasicBlock<'ctx, ReturnValue>) -> &Self {
+        let mut values = vec![value.llvm_value()];
+        let mut blocks = vec![block.blockref];
+        unsafe {
+            LLVMAddIncoming(
+                self.phi_node,
+                values.as_mut_ptr(),
+                blocks.as_mut_ptr(),
+                values.len() as u32,
+            );
+            self
+        }
+    }
+
+    pub fn build(&self) -> PhiValue {
+        unsafe { PhiValue::from_llvm(self.phi_node) }
     }
 }

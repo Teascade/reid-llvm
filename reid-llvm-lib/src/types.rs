@@ -1,4 +1,4 @@
-use std::{any::Any, marker::PhantomData};
+use std::{any::Any, marker::PhantomData, ptr::null_mut};
 
 use llvm_sys::{
     LLVMTypeKind,
@@ -8,10 +8,13 @@ use llvm_sys::{
 
 use crate::Context;
 
-pub trait BasicType {
+pub trait BasicType<'ctx> {
     fn llvm_type(&self) -> LLVMTypeRef;
+    fn from_llvm(context: &'ctx Context, llvm_type: LLVMTypeRef) -> Self
+    where
+        Self: Sized;
 
-    fn function_type<'a>(&'a self, params: &'a [&'a dyn BasicType]) -> FunctionType<'a, Self>
+    fn function_type(&'ctx self, params: &'ctx [&'ctx dyn BasicType]) -> FunctionType<'ctx, Self>
     where
         Self: Sized,
     {
@@ -20,14 +23,14 @@ pub trait BasicType {
             let param_ptr = typerefs.as_mut_ptr();
             let param_len = typerefs.len();
             FunctionType {
-                return_type: self,
+                phantom: PhantomData,
                 param_types: typerefs,
                 type_ref: LLVMFunctionType(self.llvm_type(), param_ptr, param_len as u32, 0),
             }
         }
     }
 
-    fn array_type(&self, length: u32) -> ArrayType<Self>
+    fn array_type(&'ctx self, length: u32) -> ArrayType<'ctx, Self>
     where
         Self: Sized,
     {
@@ -39,13 +42,13 @@ pub trait BasicType {
     }
 }
 
-impl PartialEq for &dyn BasicType {
+impl<'ctx> PartialEq for &dyn BasicType<'ctx> {
     fn eq(&self, other: &Self) -> bool {
         self.llvm_type() == other.llvm_type()
     }
 }
 
-impl PartialEq<LLVMTypeRef> for &dyn BasicType {
+impl<'ctx> PartialEq<LLVMTypeRef> for &dyn BasicType<'ctx> {
     fn eq(&self, other: &LLVMTypeRef) -> bool {
         self.llvm_type() == *other
     }
@@ -56,9 +59,19 @@ pub struct IntegerType<'ctx> {
     type_ref: LLVMTypeRef,
 }
 
-impl<'ctx> BasicType for IntegerType<'ctx> {
+impl<'ctx> BasicType<'ctx> for IntegerType<'ctx> {
     fn llvm_type(&self) -> LLVMTypeRef {
         self.type_ref
+    }
+
+    fn from_llvm(context: &'ctx Context, llvm_type: LLVMTypeRef) -> Self
+    where
+        Self: Sized,
+    {
+        IntegerType {
+            context,
+            type_ref: llvm_type,
+        }
     }
 }
 
@@ -100,38 +113,72 @@ impl<'ctx> IntegerType<'ctx> {
     }
 }
 
-pub struct FunctionType<'ctx, ReturnType: BasicType> {
-    pub(crate) return_type: &'ctx ReturnType,
+pub struct FunctionType<'ctx, ReturnType: BasicType<'ctx>> {
+    phantom: PhantomData<&'ctx ReturnType>,
     pub(crate) param_types: Vec<LLVMTypeRef>,
     type_ref: LLVMTypeRef,
 }
 
-impl<'ctx, ReturnType: BasicType> BasicType for FunctionType<'ctx, ReturnType> {
+impl<'ctx, ReturnType: BasicType<'ctx>> BasicType<'ctx> for FunctionType<'ctx, ReturnType> {
     fn llvm_type(&self) -> LLVMTypeRef {
         self.type_ref
     }
-}
 
-impl<'ctx, ReturnType: BasicType> FunctionType<'ctx, ReturnType> {
-    pub fn return_type(&self) -> &ReturnType {
-        self.return_type
+    fn from_llvm(_context: &'ctx Context, fn_type: LLVMTypeRef) -> Self
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let param_count = LLVMCountParamTypes(fn_type);
+            let param_types_ptr: *mut LLVMTypeRef = null_mut();
+            LLVMGetParamTypes(fn_type, param_types_ptr);
+            let param_types: Vec<LLVMTypeRef> =
+                std::slice::from_raw_parts(param_types_ptr, param_count as usize)
+                    .iter()
+                    .map(|t| *t)
+                    .collect();
+            FunctionType {
+                phantom: PhantomData,
+                param_types,
+                type_ref: fn_type,
+            }
+        }
     }
 }
 
-pub struct ArrayType<'ctx, T: BasicType> {
+impl<'ctx, ReturnType: BasicType<'ctx>> FunctionType<'ctx, ReturnType> {
+    pub fn return_type(&self, context: &'ctx Context) -> ReturnType {
+        unsafe {
+            let return_type = LLVMGetReturnType(self.type_ref);
+            ReturnType::from_llvm(context, return_type)
+        }
+    }
+}
+
+pub struct ArrayType<'ctx, T: BasicType<'ctx>> {
     element_type: &'ctx T,
     length: u32,
     type_ref: LLVMTypeRef,
 }
 
-impl<'ctx, T: BasicType> BasicType for ArrayType<'ctx, T> {
+impl<'ctx, T: BasicType<'ctx>> BasicType<'ctx> for ArrayType<'ctx, T> {
     fn llvm_type(&self) -> LLVMTypeRef {
         self.type_ref
     }
+
+    fn from_llvm(context: &'ctx Context, llvm_type: LLVMTypeRef) -> Self
+    where
+        Self: Sized,
+    {
+        unsafe {
+            let length = LLVMGetArrayLength(llvm_type);
+            todo!()
+        }
+    }
 }
 
-pub trait BasicValue {
-    type BaseType: BasicType;
+pub trait BasicValue<'ctx> {
+    type BaseType: BasicType<'ctx>;
     unsafe fn from_llvm(value: LLVMValueRef) -> Self
     where
         Self: Sized;
@@ -144,7 +191,7 @@ pub struct IntegerValue<'ctx> {
     pub(crate) value_ref: LLVMValueRef,
 }
 
-impl<'ctx> BasicValue for IntegerValue<'ctx> {
+impl<'ctx> BasicValue<'ctx> for IntegerValue<'ctx> {
     type BaseType = IntegerType<'ctx>;
 
     unsafe fn from_llvm(value: LLVMValueRef) -> Self {

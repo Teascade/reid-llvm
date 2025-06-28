@@ -1,4 +1,7 @@
-use reid_lib::{Context, IntPredicate, types::BasicType};
+use reid_lib::{
+    Context, IntPredicate,
+    types::{BasicType, IntegerType, IntegerValue},
+};
 
 pub fn main() {
     // Notes from inkwell:
@@ -21,19 +24,34 @@ pub fn main() {
 
     let entry = function.block("entry");
 
-    let v1 = int_32.from_signed(100);
-    let v2 = entry.call(&secondary, vec![], "call").unwrap();
-    let lhs_cmp = entry.add(&v1, &v2, "add").unwrap();
+    let call = entry.call(&secondary, vec![], "call").unwrap();
+    let add = entry.add(&int_32.from_signed(100), &call, "add").unwrap();
     let rhs_cmp = int_32.from_signed(200);
 
     let cond_res = entry
-        .integer_compare(&lhs_cmp, &rhs_cmp, &IntPredicate::SLT, "cmp")
+        .integer_compare(&add, &rhs_cmp, &IntPredicate::SLT, "cmp")
         .unwrap();
 
     let (lhs, rhs) = entry.conditional_br(&cond_res, "lhs", "rhs").unwrap();
 
-    lhs.ret(&int_32.from_signed(123)).unwrap();
-    rhs.ret(&int_32.from_signed(456)).unwrap();
+    let left = lhs.add(&call, &int_32.from_signed(20), "add").unwrap();
+    let right = rhs.add(&call, &int_32.from_signed(30), "add").unwrap();
+
+    let final_block = function.block("final");
+    let phi = final_block
+        .phi::<IntegerValue>(&int_32, "phi")
+        .unwrap()
+        .add_incoming(&left, &lhs)
+        .add_incoming(&right, &rhs)
+        .build();
+
+    lhs.br(&final_block).unwrap();
+    rhs.br(&final_block).unwrap();
+
+    let val = final_block
+        .add(&phi, &int_32.from_signed(11), "add")
+        .unwrap();
+    final_block.ret(&val).unwrap();
 
     match module.print_to_string() {
         Ok(v) => println!("{}", v),
