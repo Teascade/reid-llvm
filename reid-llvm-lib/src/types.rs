@@ -48,39 +48,46 @@ impl PartialEq<LLVMTypeRef> for &dyn BasicType {
     }
 }
 
-pub struct IntegerType<'ctx, const T: u32> {
+pub struct IntegerType<'ctx, const WIDTH: u32, const SIGNED: bool> {
     context: &'ctx Context,
     type_ref: LLVMTypeRef,
 }
 
-impl<'ctx, const T: u32> BasicType for IntegerType<'ctx, T> {
+impl<'ctx, const WIDTH: u32, const SIGNED: bool> BasicType for IntegerType<'ctx, WIDTH, SIGNED> {
     fn llvm_type(&self) -> LLVMTypeRef {
         self.type_ref
     }
 }
 
-impl<'ctx, const T: u32> IntegerType<'ctx, T> {
-    pub(crate) fn in_context(context: &Context) -> IntegerType<T> {
+impl<'ctx, const WIDTH: u32, const SIGNED: bool> IntegerType<'ctx, WIDTH, SIGNED> {
+    pub(crate) fn in_context(context: &Context) -> IntegerType<WIDTH, SIGNED> {
         let type_ref = unsafe {
-            match T {
+            match WIDTH {
                 128 => LLVMInt128TypeInContext(context.context_ref),
                 64 => LLVMInt64TypeInContext(context.context_ref),
                 32 => LLVMInt32TypeInContext(context.context_ref),
                 16 => LLVMInt16TypeInContext(context.context_ref),
                 8 => LLVMInt8TypeInContext(context.context_ref),
                 1 => LLVMInt1TypeInContext(context.context_ref),
-                _ => LLVMIntTypeInContext(context.context_ref, T),
+                _ => LLVMIntTypeInContext(context.context_ref, WIDTH),
             }
         };
         IntegerType { context, type_ref }
     }
 
-    pub fn from_const(&self, value: u64, sign: i32) -> OpaqueValue {
+    pub fn from_const(&self, value: u64) -> OpaqueValue {
         unsafe {
             OpaqueValue {
                 basic_type: self,
-                value_ref: LLVMConstInt(self.type_ref, value, sign),
+                value_ref: LLVMConstInt(self.type_ref, value, Self::sign_to_i32()),
             }
+        }
+    }
+
+    const fn sign_to_i32() -> i32 {
+        match SIGNED {
+            true => 1,
+            false => 0,
         }
     }
 }
@@ -131,60 +138,3 @@ impl<'ctx> OpaqueValue<'ctx> {
         }
     }
 }
-
-// pub trait IRType {
-//     const SIGNED: LLVMBool;
-//     unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef;
-// }
-
-// impl IRType for bool {
-//     const SIGNED: LLVMBool = 0;
-//     unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-//         unsafe { LLVMInt1TypeInContext(context.context) }
-//     }
-// }
-
-// impl IRType for i32 {
-//     const SIGNED: LLVMBool = 1;
-//     unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-//         unsafe { LLVMInt32TypeInContext(context.context) }
-//     }
-// }
-
-// impl IRType for u32 {
-//     const SIGNED: LLVMBool = 0;
-//     unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-//         unsafe { LLVMInt32TypeInContext(context.context) }
-//     }
-// }
-
-// impl IRType for u16 {
-//     const SIGNED: LLVMBool = 0;
-//     unsafe fn llvm_type(context: &IRContext) -> LLVMTypeRef {
-//         unsafe { LLVMInt16TypeInContext(context.context) }
-//     }
-// }
-
-// pub struct IRValue<T: IRType>(PhantomData<T>, pub(crate) OpaqueIRValue);
-
-// impl<T: IRType> IRValue<T> {
-//     pub(crate) unsafe fn from_runtime(t: LLVMTypeRef, value: LLVMValueRef) -> IRValue<T> {
-//         IRValue(PhantomData, OpaqueIRValue(t, value))
-//     }
-// }
-
-// impl<T: IRType + Into<i64>> IRValue<T> {
-//     pub fn from_const(context: &IRContext, value: T) -> Self {
-//         unsafe {
-//             let t = T::llvm_type(context);
-//             let value = LLVMConstInt(t, value.into() as u64, T::SIGNED);
-//             IRValue(PhantomData, OpaqueIRValue(t, value))
-//         }
-//     }
-// }
-
-// impl<T: IRType> From<IRValue<T>> for OpaqueIRValue {
-//     fn from(value: IRValue<T>) -> Self {
-//         value.1
-//     }
-// }

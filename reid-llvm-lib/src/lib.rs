@@ -42,7 +42,9 @@ impl Context {
         }
     }
 
-    pub fn integer_type<'a, const T: u32>(&'a self) -> IntegerType<'a, T> {
+    pub fn integer_type<'a, const WIDTH: u32, const SIGN: bool>(
+        &'a self,
+    ) -> IntegerType<'a, WIDTH, SIGN> {
         IntegerType::in_context(&self)
     }
 
