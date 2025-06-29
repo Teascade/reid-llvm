@@ -142,12 +142,13 @@ impl<'ctx> Module<'ctx> {
                 triple,
                 c"generic".as_ptr(),
                 c"".as_ptr(),
-                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
                 llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
                 llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
             );
 
             let data_layout = LLVMCreateTargetDataLayout(target_machine);
+            LLVMSetTarget(self.module_ref, triple);
             LLVMSetModuleDataLayout(self.module_ref, data_layout);
 
             let mut err = ErrorMessageHolder::null();
@@ -178,7 +179,7 @@ impl<'ctx> Module<'ctx> {
             );
             err.into_result().unwrap();
 
-            Ok(from_cstring(LLVMPrintModuleToString(self.module_ref)).expect("UTF8-err"))
+            from_cstring(LLVMPrintModuleToString(self.module_ref)).ok_or("UTF-8 error".to_owned())
         }
     }
 }

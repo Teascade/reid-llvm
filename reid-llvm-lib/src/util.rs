@@ -1,5 +1,5 @@
 use std::{
-    ffi::{CString, c_char},
+    ffi::{CStr, CString, c_char},
     ptr::null_mut,
 };
 
@@ -10,11 +10,11 @@ pub fn into_cstring<T: Into<String>>(value: T) -> CString {
     unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
 }
 
-pub fn from_cstring(value: *mut c_char) -> Option<String> {
-    if value.is_null() {
+pub fn from_cstring(pointer: *mut c_char) -> Option<String> {
+    if pointer.is_null() {
         None
     } else {
-        unsafe { CString::from_raw(value).into_string().ok() }
+        unsafe { CStr::from_ptr(pointer).to_str().ok().map(|s| s.to_owned()) }
     }
 }
 
