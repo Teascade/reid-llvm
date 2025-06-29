@@ -14,7 +14,7 @@ pub trait BasicType<'ctx> {
     where
         Self: Sized;
 
-    fn function_type(&'ctx self, params: &'ctx [&'ctx dyn BasicType]) -> FunctionType<'ctx, Self>
+    fn function_type(&'ctx self, params: Vec<&'ctx dyn BasicType>) -> FunctionType<'ctx, Self>
     where
         Self: Sized,
     {

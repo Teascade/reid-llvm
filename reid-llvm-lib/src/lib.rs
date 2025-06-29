@@ -204,6 +204,17 @@ impl<'ctx, ReturnValue: BasicValue<'ctx>> Function<'ctx, ReturnValue> {
     pub fn block<T: Into<String>>(&'ctx self, name: T) -> BasicBlock<'ctx, ReturnValue> {
         BasicBlock::in_function(&self, name.into())
     }
+
+    pub fn get_param<T: BasicValue<'ctx>>(&'ctx self, nth: usize) -> Result<T, String> {
+        if let Some(param_type) = self.fn_type.param_types.iter().nth(nth) {
+            if self.fn_type.return_type(self.module.context).llvm_type() != *param_type {
+                return Err(String::from("Wrong type"));
+            }
+        } else {
+            return Err(String::from("nth too large"));
+        }
+        unsafe { Ok(T::from_llvm(LLVMGetParam(self.fn_ref, nth as u32))) }
+    }
 }
 
 pub struct BasicBlock<'ctx, ReturnValue: BasicValue<'ctx>> {
@@ -238,8 +249,8 @@ impl<'ctx, ReturnValue: BasicValue<'ctx>> BasicBlock<'ctx, ReturnValue> {
     #[must_use]
     pub fn integer_compare<T: BasicValue<'ctx>>(
         &self,
-        lhs: &'ctx T,
-        rhs: &'ctx T,
+        lhs: &T,
+        rhs: &T,
         comparison: &IntPredicate,
         name: &str,
     ) -> Result<T, ()> {
@@ -295,6 +306,23 @@ impl<'ctx, ReturnValue: BasicValue<'ctx>> BasicBlock<'ctx, ReturnValue> {
         unsafe {
             LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
             let add_value_ref = LLVMBuildAdd(
+                self.builder_ref,
+                lhs.llvm_value(),
+                rhs.llvm_value(),
+                into_cstring(name).as_ptr(),
+            );
+            Ok(T::from_llvm(add_value_ref))
+        }
+    }
+
+    #[must_use]
+    pub fn sub<T: BasicValue<'ctx>>(&self, lhs: &T, rhs: &T, name: &str) -> Result<T, ()> {
+        if lhs.llvm_type() != rhs.llvm_type() {
+            return Err(()); // TODO error
+        }
+        unsafe {
+            LLVMPositionBuilderAtEnd(self.builder_ref, self.blockref);
+            let add_value_ref = LLVMBuildSub(
                 self.builder_ref,
                 lhs.llvm_value(),
                 rhs.llvm_value(),

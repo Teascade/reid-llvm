@@ -1,6 +1,6 @@
 use reid_lib::{
     Context, IntPredicate,
-    types::{BasicType, IntegerType, IntegerValue},
+    types::{BasicType, IntegerType, IntegerValue, Value},
 };
 
 pub fn main() {
@@ -16,42 +16,83 @@ pub fn main() {
 
     let int_32 = context.type_i32();
 
-    let secondary = module.add_function(int_32.function_type(&[]), "secondary");
-    let s_entry = secondary.block("entry");
-    s_entry.ret(&int_32.from_signed(54)).unwrap();
+    let fibonacci = module.add_function(int_32.function_type(vec![&int_32]), "fibonacci");
+    let f_main = fibonacci.block("main");
 
-    let function = module.add_function(int_32.function_type(&[]), "main");
-
-    let entry = function.block("entry");
-
-    let call = entry.call(&secondary, vec![], "call").unwrap();
-    let add = entry.add(&int_32.from_signed(100), &call, "add").unwrap();
-    let rhs_cmp = int_32.from_signed(200);
-
-    let cond_res = entry
-        .integer_compare(&add, &rhs_cmp, &IntPredicate::SLT, "cmp")
+    let param = fibonacci.get_param::<IntegerValue>(0).unwrap();
+    let cmp = f_main
+        .integer_compare(&param, &int_32.from_unsigned(3), &IntPredicate::ULT, "cmp")
         .unwrap();
 
-    let (lhs, rhs) = entry.conditional_br(&cond_res, "lhs", "rhs").unwrap();
+    let (done, recurse) = f_main.conditional_br(&cmp, "done", "recurse").unwrap();
 
-    let left = lhs.add(&call, &int_32.from_signed(20), "add").unwrap();
-    let right = rhs.add(&call, &int_32.from_signed(30), "add").unwrap();
+    done.ret(&int_32.from_unsigned(1)).unwrap();
 
-    let final_block = function.block("final");
-    let phi = final_block
-        .phi::<IntegerValue>(&int_32, "phi")
-        .unwrap()
-        .add_incoming(&left, &lhs)
-        .add_incoming(&right, &rhs)
-        .build();
-
-    lhs.br(&final_block).unwrap();
-    rhs.br(&final_block).unwrap();
-
-    let val = final_block
-        .add(&phi, &int_32.from_signed(11), "add")
+    let minus_one = recurse
+        .sub(&param, &int_32.from_unsigned(1), "minus_one")
         .unwrap();
-    final_block.ret(&val).unwrap();
+    let minus_two = recurse
+        .sub(&param, &int_32.from_unsigned(2), "minus_two")
+        .unwrap();
+    let one = recurse
+        .call(&fibonacci, vec![Value::Integer(minus_one)], "call_one")
+        .unwrap();
+    let two = recurse
+        .call(&fibonacci, vec![Value::Integer(minus_two)], "call_two")
+        .unwrap();
+
+    let add = recurse.add(&one, &two, "add").unwrap();
+
+    recurse.ret(&add).unwrap();
+
+    let main_f = module.add_function(int_32.function_type(Vec::new()), "main");
+
+    let main_b = main_f.block("main");
+    let call = main_b
+        .call(
+            &fibonacci,
+            vec![Value::Integer(int_32.from_unsigned(8))],
+            "fib_call",
+        )
+        .unwrap();
+    main_b.ret(&call).unwrap();
+
+    // let secondary = module.add_function(int_32.function_type(&[]), "secondary");
+    // let s_entry = secondary.block("entry");
+    // s_entry.ret(&int_32.from_signed(54)).unwrap();
+
+    // let function = module.add_function(int_32.function_type(&[]), "main");
+
+    // let entry = function.block("entry");
+
+    // let call = entry.call(&secondary, vec![], "call").unwrap();
+    // let add = entry.add(&int_32.from_signed(100), &call, "add").unwrap();
+    // let rhs_cmp = int_32.from_signed(200);
+
+    // let cond_res = entry
+    //     .integer_compare(&add, &rhs_cmp, &IntPredicate::SLT, "cmp")
+    //     .unwrap();
+
+    // let (lhs, rhs) = entry.conditional_br(&cond_res, "lhs", "rhs").unwrap();
+
+    // let left = lhs.add(&call, &int_32.from_signed(20), "add").unwrap();
+    // let right = rhs.add(&call, &int_32.from_signed(30), "add").unwrap();
+
+    // let final_block = function.block("final");
+    // let phi = final_block
+    //     .phi::<IntegerValue>(&int_32, "phi")
+    //     .unwrap()
+    //     .add_incoming(&left, &lhs)
+    //     .add_incoming(&right, &rhs)
+    //     .build();
+
+    // lhs.br(&final_block).unwrap();
+    // rhs.br(&final_block).unwrap();
+
+    // let val = final_block
+    //     .add(&phi, &int_32.from_signed(11), "add")
+    //     .unwrap();
+    // final_block.ret(&val).unwrap();
 
     match module.print_to_string() {
         Ok(v) => println!("{}", v),
