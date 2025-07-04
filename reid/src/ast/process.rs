@@ -316,11 +316,13 @@ impl ast::Block {
                         Ok(t) => InferredType::Static(*t, s_let.2),
                         Err(e) => InferredType::DownstreamError(e.clone(), s_let.2),
                     };
-                    scope.set_var(VirtualVariable {
-                        name: s_let.0.clone(),
-                        inferred,
-                        meta: s_let.2.into(),
-                    });
+                    state
+                        .note(scope.set_var(VirtualVariable {
+                            name: s_let.0.clone(),
+                            inferred,
+                            meta: s_let.2.into(),
+                        }))
+                        .ok();
 
                     (
                         collapsed.ok().and_then(|t| {
@@ -356,6 +358,7 @@ impl ast::Block {
             if let Some(expr) = r.1.process(state, scope) {
                 Some((r.0.into(), Box::new(expr)))
             } else {
+                state.fatal = true;
                 None?
             }
         } else {

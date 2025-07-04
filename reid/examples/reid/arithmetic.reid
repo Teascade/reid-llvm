@@ -9,5 +9,5 @@ fn main() {
         return 3;
     }
 
-    return test + simpleSub;
+    return arithmetic + simpleSub + boop;
 }
