@@ -1,6 +1,6 @@
 use crate::{
-    ast::Parse,
     lexer::{FullToken, Position, Token},
+    parser::Parse,
 };
 
 pub struct TokenStream<'a, 'b> {
@@ -156,7 +156,7 @@ impl Drop for TokenStream<'_, '_> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct TokenRange {
     pub start: usize,
     pub end: usize,
@@ -165,6 +165,15 @@ pub struct TokenRange {
 impl std::fmt::Debug for TokenRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Tokens[{} - {}]", self.start, self.end)
+    }
+}
+
+impl Default for TokenRange {
+    fn default() -> Self {
+        Self {
+            start: Default::default(),
+            end: Default::default(),
+        }
     }
 }
 

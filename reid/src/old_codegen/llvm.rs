@@ -9,10 +9,10 @@ use llvm_sys::transforms::pass_manager_builder::{
     LLVMPassManagerBuilderSetOptLevel,
 };
 use llvm_sys::{
-    LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue, core::*, prelude::*,
+    core::*, prelude::*, LLVMBasicBlock, LLVMBuilder, LLVMContext, LLVMModule, LLVMType, LLVMValue,
 };
 
-use crate::ast;
+use crate::parser;
 
 fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
@@ -47,8 +47,8 @@ impl IRType {
 pub struct IRValue(pub IRType, *mut LLVMValue);
 
 impl IRValue {
-    pub fn from_literal(literal: &ast::Literal, module: &IRModule) -> Self {
-        use ast::Literal;
+    pub fn from_literal(literal: &parser::Literal, module: &IRModule) -> Self {
+        use parser::Literal;
         match literal {
             Literal::I32(v) => {
                 let ir_type = IRType::I32;

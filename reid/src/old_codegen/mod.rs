@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use llvm::{Error, IRBlock, IRContext, IRFunction, IRModule, IRValue};
 
 use crate::{
-    ast::{
+    parser::{
         Block, BlockLevelStatement, Expression, ExpressionKind, FunctionDefinition, IfExpression,
         LetStatement, ReturnType,
     },
@@ -97,7 +97,7 @@ impl Expression {
             Binop(op, lhs, rhs) => {
                 let lhs = lhs.codegen(scope);
                 let rhs = rhs.codegen(scope);
-                use crate::ast::BinaryOperator::*;
+                use crate::parser::BinaryOperator::*;
                 match op {
                     Add => scope.block.add(lhs, rhs).unwrap(),
                     Mult => scope.block.mult(lhs, rhs).unwrap(),
@@ -121,7 +121,7 @@ impl Expression {
                     _ => then.block.move_into(&mut scope.block),
                 }
 
-                IRValue::from_literal(&crate::ast::Literal::I32(1), scope.block.function.module)
+                IRValue::from_literal(&crate::parser::Literal::I32(1), scope.block.function.module)
             }
             BlockExpr(_) => panic!("block expr not supported"),
             FunctionCall(_) => panic!("function call expr not supported"),

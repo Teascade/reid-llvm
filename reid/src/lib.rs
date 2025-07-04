@@ -1,11 +1,13 @@
-use codegen::{form_context, from_statements};
+use old_codegen::{form_context, from_statements};
 
-use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
+use crate::{lexer::Token, parser::TopLevelStatement, token_stream::TokenStream};
 
-mod ast;
-mod codegen;
 mod lexer;
+pub mod mir;
+mod old_codegen;
+mod parser;
 // mod llvm_ir;
+pub mod codegen;
 mod token_stream;
 
 // TODO:

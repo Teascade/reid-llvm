@@ -100,6 +100,7 @@ name = "reid"
 version = "0.1.0"
 dependencies = [
  "llvm-sys",
+ "reid-lib",
  "thiserror",
 ]
 

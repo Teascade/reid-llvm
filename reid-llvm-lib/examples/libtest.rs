@@ -1,6 +1,6 @@
 use reid_lib::{
     Context, IntPredicate,
-    types::{BasicType, IntegerType, IntegerValue, Value},
+    types::{BasicType, IntegerValue, Value},
 };
 
 pub fn main() {
@@ -16,15 +16,19 @@ pub fn main() {
 
     let int_32 = context.type_i32();
 
-    let fibonacci = module.add_function(int_32.function_type(vec![&int_32]), "fibonacci");
-    let f_main = fibonacci.block("main");
+    let fibonacci = module.add_function(int_32.function_type(vec![int_32.into()]), "fibonacci");
+    let mut f_main = fibonacci.block("main");
 
-    let param = fibonacci.get_param::<IntegerValue>(0).unwrap();
-    let cmp = f_main
+    let param = fibonacci
+        .get_param::<IntegerValue>(0, int_32.into())
+        .unwrap();
+    let mut cmp = f_main
         .integer_compare(&param, &int_32.from_unsigned(3), &IntPredicate::ULT, "cmp")
         .unwrap();
 
-    let (done, recurse) = f_main.conditional_br(&cmp, "done", "recurse").unwrap();
+    let mut done = fibonacci.block("done");
+    let mut recurse = fibonacci.block("recurse");
+    f_main.conditional_br(&cmp, &done, &recurse).unwrap();
 
     done.ret(&int_32.from_unsigned(1)).unwrap();
 
@@ -34,7 +38,7 @@ pub fn main() {
     let minus_two = recurse
         .sub(&param, &int_32.from_unsigned(2), "minus_two")
         .unwrap();
-    let one = recurse
+    let one: IntegerValue = recurse
         .call(&fibonacci, vec![Value::Integer(minus_one)], "call_one")
         .unwrap();
     let two = recurse
@@ -47,8 +51,8 @@ pub fn main() {
 
     let main_f = module.add_function(int_32.function_type(Vec::new()), "main");
 
-    let main_b = main_f.block("main");
-    let call = main_b
+    let mut main_b = main_f.block("main");
+    let call: IntegerValue = main_b
         .call(
             &fibonacci,
             vec![Value::Integer(int_32.from_unsigned(8))],
