@@ -1,6 +1,22 @@
 # Reid-LLVM
 Attempt at re-creating Reid, this time using LLVM.
 
+## What is currently being tested?
+
+Currently when testing the compiler I run `./libtest.sh fibonacci` or
+`./libtest.sh arithmetic`.
+
+What `./libtest.sh $1` does, is it compiles and runs the rust example found with
+name `$1`, which may exist in any of the two projects. The two mentioned above
+are in `reid/examples`.
+
+All examples currently end up producing a `hello.o` and `hello.asm` file to the
+root directory, which is then linked with `ldd` to produce a `main`, which is
+finally executed.
+
+This is currently very work-in-progress and many things about this repository
+change erratically.
+
 ## Various notes in order to get this working properly
 This is what worked for me, might not (probably) work for you, depending on
 various versions of various libraries.
