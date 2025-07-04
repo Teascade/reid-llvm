@@ -1,3 +1,4 @@
+use crate::ast::*;
 use crate::{
     lexer::Token,
     token_stream::{Error, TokenRange, TokenStream},
@@ -8,14 +9,6 @@ where
     Self: std::marker::Sized,
 {
     fn parse(stream: TokenStream) -> Result<Self, Error>;
-}
-
-#[derive(Debug, Clone)]
-pub struct Type(pub TypeKind, pub TokenRange);
-
-#[derive(Debug, Clone)]
-pub enum TypeKind {
-    I32,
 }
 
 impl Parse for Type {
@@ -31,24 +24,6 @@ impl Parse for Type {
 
         Ok(Type(kind, stream.get_range().unwrap()))
     }
-}
-
-#[derive(Debug, Clone)]
-pub enum Literal {
-    I32(i32),
-}
-
-#[derive(Debug, Clone)]
-pub struct Expression(pub ExpressionKind, pub TokenRange);
-
-#[derive(Debug, Clone)]
-pub enum ExpressionKind {
-    VariableName(String),
-    Literal(Literal),
-    Binop(BinaryOperator, Box<Expression>, Box<Expression>),
-    FunctionCall(Box<FunctionCallExpression>),
-    BlockExpr(Box<Block>),
-    IfExpr(Box<IfExpression>),
 }
 
 impl Parse for Expression {
@@ -142,16 +117,6 @@ fn parse_binop_rhs(
     Ok(lhs)
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum BinaryOperator {
-    Add,
-    Minus,
-    Mult,
-
-    And,
-    LessThan,
-}
-
 impl Parse for BinaryOperator {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         Ok(match (stream.next(), stream.peek()) {
@@ -168,22 +133,6 @@ impl Parse for BinaryOperator {
         })
     }
 }
-
-impl BinaryOperator {
-    pub fn get_precedence(&self) -> i8 {
-        use BinaryOperator::*;
-        match &self {
-            Add => 10,
-            Minus => 10,
-            Mult => 20,
-            And => 100,
-            LessThan => 100,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRange);
 
 impl Parse for FunctionCallExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -213,22 +162,17 @@ impl Parse for FunctionCallExpression {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct IfExpression(pub Expression, pub Block, pub TokenRange);
-
 impl Parse for IfExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::If)?;
         Ok(IfExpression(
             stream.parse()?,
             stream.parse()?,
+            None,
             stream.get_range().unwrap(),
         ))
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct LetStatement(pub String, pub Expression, pub TokenRange);
 
 impl Parse for LetStatement {
     fn parse(mut stream: TokenStream) -> Result<LetStatement, Error> {
@@ -249,9 +193,6 @@ impl Parse for LetStatement {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct ImportStatement(Vec<String>, pub TokenRange);
 
 impl Parse for ImportStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -278,9 +219,6 @@ impl Parse for ImportStatement {
     }
 }
 
-#[derive(Debug)]
-pub struct FunctionDefinition(pub FunctionSignature, pub Block, pub TokenRange);
-
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::FnKeyword)?;
@@ -290,14 +228,6 @@ impl Parse for FunctionDefinition {
             stream.get_range().unwrap(),
         ))
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct FunctionSignature {
-    pub name: String,
-    pub args: Vec<(String, Type)>,
-    pub return_type: Option<Type>,
-    pub range: TokenRange,
 }
 
 impl Parse for FunctionSignature {
@@ -330,19 +260,6 @@ impl Parse for FunctionSignature {
         }
     }
 }
-
-#[derive(Debug, Clone, Copy)]
-pub enum ReturnType {
-    Soft,
-    Hard,
-}
-
-#[derive(Debug, Clone)]
-pub struct Block(
-    pub Vec<BlockLevelStatement>,
-    pub Option<(ReturnType, Expression)>,
-    pub TokenRange,
-);
 
 impl Parse for Block {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -382,14 +299,6 @@ impl Parse for Block {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum BlockLevelStatement {
-    Let(LetStatement),
-    Import(ImportStatement),
-    Expression(Expression),
-    Return(ReturnType, Expression),
-}
-
 impl Parse for BlockLevelStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         use BlockLevelStatement as Stmt;
@@ -415,12 +324,6 @@ impl Parse for BlockLevelStatement {
             }
         })
     }
-}
-
-#[derive(Debug)]
-pub enum TopLevelStatement {
-    Import(ImportStatement),
-    FunctionDefinition(FunctionDefinition),
 }
 
 impl Parse for TopLevelStatement {

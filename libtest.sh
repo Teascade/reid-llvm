@@ -6,7 +6,7 @@
 # Do note this file is extremely simply for my own personal convenience
 
 export .env
-cargo run --example testcodegen && \
+cargo run --example $1 && \
 # clang hello.o -o main && \
 ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 \
    -o main /usr/lib/crt1.o hello.o -lc  && \

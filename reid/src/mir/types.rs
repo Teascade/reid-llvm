@@ -26,7 +26,6 @@ impl ReturnType for Statement {
         use StmtKind::*;
         match &self.0 {
             Expression(e) => e.return_type(),
-            If(e) => e.return_type(),
             Import(_) => Err(ReturnTypeOther::Import(self.1.range)),
             Let(_, _) => Err(ReturnTypeOther::Let(self.1.range)),
         }

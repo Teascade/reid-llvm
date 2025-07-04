@@ -1,6 +1,6 @@
 use crate::{
+    ast::parse::Parse,
     lexer::{FullToken, Position, Token},
-    parser::Parse,
 };
 
 pub struct TokenStream<'a, 'b> {
@@ -185,6 +185,16 @@ impl std::ops::Add for TokenRange {
             start: self.start.min(rhs.start),
             end: self.end.min(rhs.end),
         }
+    }
+}
+
+impl std::iter::Sum for TokenRange {
+    fn sum<I: Iterator<Item = Self>>(mut iter: I) -> Self {
+        let mut start = iter.next().unwrap_or(Default::default());
+        for item in iter {
+            start = start + item;
+        }
+        start
     }
 }
 

@@ -107,12 +107,9 @@ impl mir::Statement {
                 scope.stack_values.insert(name.clone(), value);
                 None
             }
-            mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
+            // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),
-            mir::StmtKind::Expression(expression) => {
-                let value = expression.codegen(scope).unwrap();
-                Some(value)
-            }
+            mir::StmtKind::Expression(expression) => expression.codegen(scope),
         }
     }
 }
@@ -249,11 +246,11 @@ impl mir::Block {
         if let Some((kind, expr)) = &self.return_expression {
             let ret = expr.codegen(&mut scope).unwrap();
             match kind {
-                mir::ReturnKind::HardReturn => {
+                mir::ReturnKind::Hard => {
                     scope.block.ret(&ret).unwrap();
                     None
                 }
-                mir::ReturnKind::SoftReturn => Some(ret),
+                mir::ReturnKind::Soft => Some(ret),
             }
         } else {
             None
@@ -276,6 +273,7 @@ impl TypeKind {
         match &self {
             TypeKind::I32 => TypeEnum::Integer(context.type_i32()),
             TypeKind::I16 => TypeEnum::Integer(context.type_i16()),
+            TypeKind::Void => panic!("Void not a supported type"),
         }
     }
 }

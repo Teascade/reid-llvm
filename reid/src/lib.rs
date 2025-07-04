@@ -1,13 +1,11 @@
-use old_codegen::{form_context, from_statements};
+use reid_lib::Context;
 
-use crate::{lexer::Token, parser::TopLevelStatement, token_stream::TokenStream};
+use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
+mod ast;
+mod codegen;
 mod lexer;
 pub mod mir;
-mod old_codegen;
-mod parser;
-// mod llvm_ir;
-pub mod codegen;
 mod token_stream;
 
 // TODO:
@@ -41,8 +39,21 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
         statements.push(statement);
     }
 
-    let mut context = form_context();
-    let mut module = from_statements(&mut context, statements).unwrap();
-    let text = module.print_to_string().unwrap();
-    Ok(text.to_owned())
+    let ast_module = ast::Module {
+        name: "test".to_owned(),
+        top_level_statements: statements,
+    };
+
+    dbg!(&ast_module);
+    let mir_module = ast_module.process();
+
+    dbg!(&mir_module);
+
+    let mut context = Context::new();
+    let cogegen_module = mir_module.codegen(&mut context);
+
+    Ok(match cogegen_module.module.print_to_string() {
+        Ok(v) => v,
+        Err(e) => panic!("Err: {:?}", e),
+    })
 }
