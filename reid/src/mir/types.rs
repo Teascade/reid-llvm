@@ -16,26 +16,26 @@ impl ReturnType for Block {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
         self.return_expression
             .as_ref()
-            .ok_or(ReturnTypeOther::NoBlockReturn(self.range.clone()))
+            .ok_or(ReturnTypeOther::NoBlockReturn(self.meta.range))
             .and_then(|(_, stmt)| stmt.return_type())
     }
 }
 
 impl ReturnType for Statement {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
-        use StatementKind::*;
+        use StmtKind::*;
         match &self.0 {
             Expression(e) => e.return_type(),
             If(e) => e.return_type(),
-            Import(_) => Err(ReturnTypeOther::Import(self.1)),
-            Let(_, _) => Err(ReturnTypeOther::Let(self.1)),
+            Import(_) => Err(ReturnTypeOther::Import(self.1.range)),
+            Let(_, _) => Err(ReturnTypeOther::Let(self.1.range)),
         }
     }
 }
 
 impl ReturnType for Expression {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
-        use ExpressionKind::*;
+        use ExprKind::*;
         match &self.0 {
             Literal(lit) => Ok(lit.as_type()),
             Variable(var) => var.return_type(),

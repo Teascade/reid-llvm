@@ -9,6 +9,19 @@ use crate::token_stream::TokenRange;
 
 pub mod types;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Metadata {
+    range: TokenRange,
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Metadata {
+            range: Default::default(),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum TypeKind {
     I32,
@@ -59,11 +72,11 @@ pub enum ReturnKind {
     SoftReturn,
 }
 
-pub struct VariableReference(pub TypeKind, pub String, pub TokenRange);
+pub struct VariableReference(pub TypeKind, pub String, pub Metadata);
 
-pub struct Import(pub String, pub TokenRange);
+pub struct Import(pub String, pub Metadata);
 
-pub enum ExpressionKind {
+pub enum ExprKind {
     Variable(VariableReference),
     Literal(Literal),
     BinOp(BinaryOperator, Box<Expression>, Box<Expression>),
@@ -72,7 +85,7 @@ pub enum ExpressionKind {
     Block(Block),
 }
 
-pub struct Expression(pub ExpressionKind, pub TokenRange);
+pub struct Expression(pub ExprKind, pub Metadata);
 
 /// Condition, Then, Else
 pub struct IfExpression(pub Box<Expression>, pub Block, pub Option<Block>);
@@ -91,7 +104,7 @@ pub struct FunctionDefinition {
 
 pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range
-    Local(Block, TokenRange),
+    Local(Block, Metadata),
     /// Return Type
     Extern(TypeKind),
 }
@@ -100,12 +113,12 @@ pub struct Block {
     /// List of non-returning statements
     pub statements: Vec<Statement>,
     pub return_expression: Option<(ReturnKind, Box<Expression>)>,
-    pub range: TokenRange,
+    pub meta: Metadata,
 }
 
-pub struct Statement(pub StatementKind, pub TokenRange);
+pub struct Statement(pub StmtKind, pub Metadata);
 
-pub enum StatementKind {
+pub enum StmtKind {
     /// Variable name+type, evaluation
     Let(VariableReference, Expression),
     If(IfExpression),

@@ -11,13 +11,13 @@ fn main() {
         kind: FunctionDefinitionKind::Local(
             Block {
                 statements: vec![Statement(
-                    StatementKind::If(IfExpression(
+                    StmtKind::If(IfExpression(
                         // If N < 3
                         Box::new(Expression(
-                            ExpressionKind::BinOp(
+                            ExprKind::BinOp(
                                 BinaryOperator::Logic(LogicOperator::GreaterThan),
                                 Box::new(Expression(
-                                    ExpressionKind::Variable(VariableReference(
+                                    ExprKind::Variable(VariableReference(
                                         TypeKind::I32,
                                         "N".to_string(),
                                         Default::default(),
@@ -25,7 +25,7 @@ fn main() {
                                     Default::default(),
                                 )),
                                 Box::new(Expression(
-                                    ExpressionKind::Literal(Literal::I32(2)),
+                                    ExprKind::Literal(Literal::I32(2)),
                                     Default::default(),
                                 )),
                             ),
@@ -38,30 +38,26 @@ fn main() {
                                 ReturnKind::HardReturn,
                                 // return fibonacci(n-1) + fibonacci(n-2)
                                 Box::new(Expression(
-                                    ExpressionKind::BinOp(
+                                    ExprKind::BinOp(
                                         BinaryOperator::Add,
                                         // fibonacci(n-1)
                                         Box::new(Expression(
-                                            ExpressionKind::FunctionCall(FunctionCall {
+                                            ExprKind::FunctionCall(FunctionCall {
                                                 name: fibonacci_name.clone(),
                                                 return_type: TypeKind::I32,
                                                 parameters: vec![Expression(
-                                                    ExpressionKind::BinOp(
+                                                    ExprKind::BinOp(
                                                         BinaryOperator::Minus,
                                                         Box::new(Expression(
-                                                            ExpressionKind::Variable(
-                                                                VariableReference(
-                                                                    TypeKind::I32,
-                                                                    fibonacci_n.clone(),
-                                                                    Default::default(),
-                                                                ),
-                                                            ),
+                                                            ExprKind::Variable(VariableReference(
+                                                                TypeKind::I32,
+                                                                fibonacci_n.clone(),
+                                                                Default::default(),
+                                                            )),
                                                             Default::default(),
                                                         )),
                                                         Box::new(Expression(
-                                                            ExpressionKind::Literal(Literal::I32(
-                                                                1,
-                                                            )),
+                                                            ExprKind::Literal(Literal::I32(1)),
                                                             Default::default(),
                                                         )),
                                                     ),
@@ -72,26 +68,22 @@ fn main() {
                                         )),
                                         // fibonacci(n-2)
                                         Box::new(Expression(
-                                            ExpressionKind::FunctionCall(FunctionCall {
+                                            ExprKind::FunctionCall(FunctionCall {
                                                 name: fibonacci_name.clone(),
                                                 return_type: TypeKind::I32,
                                                 parameters: vec![Expression(
-                                                    ExpressionKind::BinOp(
+                                                    ExprKind::BinOp(
                                                         BinaryOperator::Minus,
                                                         Box::new(Expression(
-                                                            ExpressionKind::Variable(
-                                                                VariableReference(
-                                                                    TypeKind::I32,
-                                                                    fibonacci_n.clone(),
-                                                                    Default::default(),
-                                                                ),
-                                                            ),
+                                                            ExprKind::Variable(VariableReference(
+                                                                TypeKind::I32,
+                                                                fibonacci_n.clone(),
+                                                                Default::default(),
+                                                            )),
                                                             Default::default(),
                                                         )),
                                                         Box::new(Expression(
-                                                            ExpressionKind::Literal(Literal::I32(
-                                                                2,
-                                                            )),
+                                                            ExprKind::Literal(Literal::I32(2)),
                                                             Default::default(),
                                                         )),
                                                     ),
@@ -104,7 +96,7 @@ fn main() {
                                     Default::default(),
                                 )),
                             )),
-                            range: Default::default(),
+                            meta: Default::default(),
                         },
                         // No else-block
                         None,
@@ -115,11 +107,11 @@ fn main() {
                 return_expression: Some((
                     ReturnKind::SoftReturn,
                     Box::new(Expression(
-                        ExpressionKind::Literal(Literal::I32(1)),
+                        ExprKind::Literal(Literal::I32(1)),
                         Default::default(),
                     )),
                 )),
-                range: Default::default(),
+                meta: Default::default(),
             },
             Default::default(),
         ),
@@ -134,18 +126,18 @@ fn main() {
                 return_expression: Some((
                     ReturnKind::SoftReturn,
                     Box::new(Expression(
-                        ExpressionKind::FunctionCall(FunctionCall {
+                        ExprKind::FunctionCall(FunctionCall {
                             name: fibonacci_name.clone(),
                             return_type: TypeKind::I32,
                             parameters: vec![Expression(
-                                ExpressionKind::Literal(Literal::I32(5)),
+                                ExprKind::Literal(Literal::I32(5)),
                                 Default::default(),
                             )],
                         }),
                         Default::default(),
                     )),
                 )),
-                range: Default::default(),
+                meta: Default::default(),
             },
             Default::default(),
         ),

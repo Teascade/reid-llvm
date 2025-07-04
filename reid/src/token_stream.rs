@@ -177,6 +177,17 @@ impl Default for TokenRange {
     }
 }
 
+impl std::ops::Add for TokenRange {
+    type Output = TokenRange;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        TokenRange {
+            start: self.start.min(rhs.start),
+            end: self.end.min(rhs.end),
+        }
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Expected {} at Ln {}, Col {}, got {:?}", .0, (.2).1, (.2).0, .1)]

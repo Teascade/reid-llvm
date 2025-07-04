@@ -102,14 +102,14 @@ impl<'ctx> Scope<'ctx> {
 impl mir::Statement {
     pub fn codegen<'ctx>(&self, scope: &mut Scope<'ctx>) -> Option<Value<'ctx>> {
         match &self.0 {
-            mir::StatementKind::Let(VariableReference(_, name, _), expression) => {
+            mir::StmtKind::Let(VariableReference(_, name, _), expression) => {
                 let value = expression.codegen(scope).unwrap();
                 scope.stack_values.insert(name.clone(), value);
                 None
             }
-            mir::StatementKind::If(if_expression) => if_expression.codegen(scope),
-            mir::StatementKind::Import(_) => todo!(),
-            mir::StatementKind::Expression(expression) => {
+            mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
+            mir::StmtKind::Import(_) => todo!(),
+            mir::StmtKind::Expression(expression) => {
                 let value = expression.codegen(scope).unwrap();
                 Some(value)
             }
@@ -178,15 +178,15 @@ impl mir::IfExpression {
 impl mir::Expression {
     pub fn codegen<'ctx>(&self, scope: &mut Scope<'ctx>) -> Option<Value<'ctx>> {
         match &self.0 {
-            mir::ExpressionKind::Variable(varref) => {
+            mir::ExprKind::Variable(varref) => {
                 let v = scope
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
                 Some(v.clone())
             }
-            mir::ExpressionKind::Literal(lit) => Some(lit.codegen(scope.context)),
-            mir::ExpressionKind::BinOp(binop, lhs_exp, rhs_exp) => {
+            mir::ExprKind::Literal(lit) => Some(lit.codegen(scope.context)),
+            mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
                 let lhs = lhs_exp.codegen(scope).expect("lhs has no return value");
                 let rhs = rhs_exp.codegen(scope).expect("rhs has no return value");
                 Some(match binop {
@@ -203,7 +203,7 @@ impl mir::Expression {
                     }
                 })
             }
-            mir::ExpressionKind::FunctionCall(call) => {
+            mir::ExprKind::FunctionCall(call) => {
                 let params = call
                     .parameters
                     .iter()
@@ -215,8 +215,8 @@ impl mir::Expression {
                     .expect("function not found!");
                 Some(scope.block.call(callee, params, "call").unwrap())
             }
-            mir::ExpressionKind::If(if_expression) => if_expression.codegen(scope),
-            mir::ExpressionKind::Block(block) => {
+            mir::ExprKind::If(if_expression) => if_expression.codegen(scope),
+            mir::ExprKind::Block(block) => {
                 let mut inner_scope = scope.with_block(scope.function.block("inner"));
                 if let Some(ret) = block.codegen(&mut inner_scope) {
                     inner_scope.block.br(&scope.block);
