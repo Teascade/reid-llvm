@@ -28,47 +28,50 @@ impl Parse for Type {
 
 impl Parse for Expression {
     fn parse(mut stream: TokenStream) -> Result<Expression, Error> {
-        let lhs = parse_primary_expression(&mut stream)?;
+        let lhs = stream.parse::<PrimaryExpression>()?.0;
         parse_binop_rhs(&mut stream, lhs, None)
     }
 }
 
-fn parse_primary_expression(stream: &mut TokenStream) -> Result<Expression, Error> {
-    use ExpressionKind as Kind;
+#[derive(Debug)]
+pub struct PrimaryExpression(Expression);
 
-    if let Ok(exp) = stream.parse() {
-        Ok(Expression(
-            Kind::FunctionCall(Box::new(exp)),
-            stream.get_range().unwrap(),
-        ))
-    } else if let Ok(block) = stream.parse() {
-        Ok(Expression(
-            Kind::BlockExpr(Box::new(block)),
-            stream.get_range().unwrap(),
-        ))
-    } else if let Ok(ifexpr) = stream.parse() {
-        Ok(Expression(
-            Kind::IfExpr(Box::new(ifexpr)),
-            stream.get_range().unwrap(),
-        ))
-    } else if let Some(token) = stream.next() {
-        Ok(match &token {
-            Token::Identifier(v) => {
-                Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
-            }
-            Token::DecimalValue(v) => Expression(
-                Kind::Literal(Literal::I32(v.parse().unwrap())),
+impl Parse for PrimaryExpression {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        use ExpressionKind as Kind;
+
+        let expr = if let Ok(exp) = stream.parse() {
+            Expression(
+                Kind::FunctionCall(Box::new(exp)),
                 stream.get_range().unwrap(),
-            ),
-            Token::ParenOpen => {
-                let exp = stream.parse()?;
-                stream.expect(Token::ParenClose)?;
-                exp
+            )
+        } else if let Ok(block) = stream.parse() {
+            Expression(
+                Kind::BlockExpr(Box::new(block)),
+                stream.get_range().unwrap(),
+            )
+        } else if let Ok(ifexpr) = stream.parse() {
+            Expression(Kind::IfExpr(Box::new(ifexpr)), stream.get_range().unwrap())
+        } else if let Some(token) = stream.next() {
+            match &token {
+                Token::Identifier(v) => {
+                    Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
+                }
+                Token::DecimalValue(v) => Expression(
+                    Kind::Literal(Literal::I32(v.parse().unwrap())),
+                    stream.get_range().unwrap(),
+                ),
+                Token::ParenOpen => {
+                    let exp = stream.parse()?;
+                    stream.expect(Token::ParenClose)?;
+                    exp
+                }
+                _ => Err(stream.expected_err("identifier, constant or parentheses")?)?,
             }
-            _ => Err(stream.expected_err("identifier, constant or parentheses")?)?,
-        })
-    } else {
-        Err(stream.expected_err("expression")?)?
+        } else {
+            Err(stream.expected_err("expression")?)?
+        };
+        Ok(PrimaryExpression(expr))
     }
 }
 
@@ -95,7 +98,7 @@ fn parse_binop_rhs(
         stream.parse_if::<BinaryOperator, _>(|b| b.get_precedence() >= expr_precedence)
     {
         let curr_token_prec = op.get_precedence();
-        let mut rhs = parse_primary_expression(stream)?;
+        let mut rhs = stream.parse::<PrimaryExpression>()?.0;
 
         if let Ok(next_op) = stream.parse_peek::<BinaryOperator>() {
             let next_prec = next_op.get_precedence();
