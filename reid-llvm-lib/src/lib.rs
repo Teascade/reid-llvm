@@ -16,6 +16,7 @@ use llvm_sys::{LLVMBuilder, LLVMContext, LLVMIntPredicate, core::*, prelude::*};
 use types::{BasicType, BasicValue, FunctionType, IntegerType, Value};
 use util::{ErrorMessageHolder, from_cstring, into_cstring};
 
+pub mod test;
 pub mod types;
 mod util;
 

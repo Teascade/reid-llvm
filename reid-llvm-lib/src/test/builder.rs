@@ -1,0 +1,334 @@
+use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+
+use crate::test::{ConstValue, InstructionKind, TerminatorKind, Type};
+
+use super::{BlockData, FunctionData, InstructionData, ModuleData, util::match_types};
+
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+pub struct ModuleValue(usize);
+
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+pub struct FunctionValue(ModuleValue, usize);
+
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+pub struct BlockValue(FunctionValue, usize);
+
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+pub struct InstructionValue(BlockValue, usize);
+
+#[derive(Debug, Clone)]
+pub struct ModuleHolder {
+    pub(crate) value: ModuleValue,
+    pub(crate) data: ModuleData,
+    pub(crate) functions: Vec<FunctionHolder>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionHolder {
+    pub(crate) value: FunctionValue,
+    pub(crate) data: FunctionData,
+    pub(crate) blocks: Vec<BlockHolder>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockHolder {
+    pub(crate) value: BlockValue,
+    pub(crate) data: BlockData,
+    pub(crate) instructions: Vec<InstructionHolder>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InstructionHolder {
+    pub(crate) value: InstructionValue,
+    pub(crate) data: InstructionData,
+}
+
+#[derive(Debug, Clone)]
+pub struct Builder {
+    modules: Rc<RefCell<Vec<ModuleHolder>>>,
+}
+
+impl Builder {
+    pub fn new() -> Builder {
+        Builder {
+            modules: Rc::new(RefCell::new(Vec::new())),
+        }
+    }
+
+    pub(crate) fn add_module(&self, data: ModuleData) -> ModuleValue {
+        let value = ModuleValue(self.modules.borrow().len());
+        self.modules.borrow_mut().push(ModuleHolder {
+            value,
+            data,
+            functions: Vec::new(),
+        });
+        value
+    }
+
+    pub(crate) unsafe fn add_function(
+        &self,
+        mod_val: &ModuleValue,
+        data: FunctionData,
+    ) -> FunctionValue {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(mod_val.0);
+            let value = FunctionValue(module.value, module.functions.len());
+            module.functions.push(FunctionHolder {
+                value,
+                data,
+                blocks: Vec::new(),
+            });
+            value
+        }
+    }
+
+    pub(crate) unsafe fn add_block(&self, fun_val: &FunctionValue, data: BlockData) -> BlockValue {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(fun_val.0.0);
+            let function = module.functions.get_unchecked_mut(fun_val.1);
+            let value = BlockValue(function.value, function.blocks.len());
+            function.blocks.push(BlockHolder {
+                value,
+                data,
+                instructions: Vec::new(),
+            });
+            value
+        }
+    }
+
+    pub(crate) unsafe fn add_instruction(
+        &self,
+        block_val: &BlockValue,
+        data: InstructionData,
+    ) -> Result<InstructionValue, ()> {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(block_val.0.0.0);
+            let function = module.functions.get_unchecked_mut(block_val.0.1);
+            let block = function.blocks.get_unchecked_mut(block_val.1);
+            let value = InstructionValue(block.value, block.instructions.len());
+            block.instructions.push(InstructionHolder { value, data });
+
+            // Drop modules so that it is no longer mutable borrowed
+            // (check_instruction requires an immutable borrow).
+            drop(modules);
+
+            self.check_instruction(&value)?;
+            Ok(value)
+        }
+    }
+
+    pub(crate) unsafe fn terminate(
+        &self,
+        block: &BlockValue,
+        value: TerminatorKind,
+    ) -> Result<(), ()> {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(block.0.0.0);
+            let function = module.functions.get_unchecked_mut(block.0.1);
+            let block = function.blocks.get_unchecked_mut(block.1);
+            if let Some(_) = &block.data.terminator {
+                Err(())
+            } else {
+                block.data.terminator = Some(value);
+                Ok(())
+            }
+        }
+    }
+
+    pub(crate) unsafe fn module_data(&self, value: &ModuleValue) -> ModuleData {
+        unsafe { self.modules.borrow().get_unchecked(value.0).data.clone() }
+    }
+
+    pub(crate) unsafe fn function_data(&self, value: &FunctionValue) -> FunctionData {
+        unsafe {
+            self.modules
+                .borrow()
+                .get_unchecked(value.0.0)
+                .functions
+                .get_unchecked(value.1)
+                .data
+                .clone()
+        }
+    }
+
+    pub(crate) unsafe fn block_data(&self, value: &BlockValue) -> BlockData {
+        unsafe {
+            self.modules
+                .borrow()
+                .get_unchecked(value.0.0.0)
+                .functions
+                .get_unchecked(value.0.1)
+                .blocks
+                .get_unchecked(value.1)
+                .data
+                .clone()
+        }
+    }
+
+    pub(crate) unsafe fn instr_data(&self, value: &InstructionValue) -> InstructionData {
+        unsafe {
+            self.modules
+                .borrow()
+                .get_unchecked(value.0.0.0.0)
+                .functions
+                .get_unchecked(value.0.0.1)
+                .blocks
+                .get_unchecked(value.0.1)
+                .instructions
+                .get_unchecked(value.1)
+                .data
+                .clone()
+        }
+    }
+
+    pub(crate) fn get_modules(&self) -> Rc<RefCell<Vec<ModuleHolder>>> {
+        self.modules.clone()
+    }
+
+    // pub(crate) fn get_functions(&self, module: ModuleValue) -> Vec<(FunctionValue, FunctionData)> {
+    //     unsafe {
+    //         self.modules
+    //             .borrow()
+    //             .get_unchecked(module.0)
+    //             .2
+    //             .iter()
+    //             .map(|h| (h.0, h.1.clone()))
+    //             .collect()
+    //     }
+    // }
+
+    // pub(crate) fn get_blocks(&self, function: FunctionValue) -> Vec<(BlockValue, BlockData)> {
+    //     unsafe {
+    //         self.modules
+    //             .borrow()
+    //             .get_unchecked(function.0.0)
+    //             .2
+    //             .get_unchecked(function.1)
+    //             .2
+    //             .iter()
+    //             .map(|h| (h.0, h.1.clone()))
+    //             .collect()
+    //     }
+    // }
+
+    // pub(crate) fn get_instructions(
+    //     &self,
+    //     block: BlockValue,
+    // ) -> (
+    //     Vec<(InstructionValue, InstructionData)>,
+    //     Option<TerminatorKind>,
+    // ) {
+    //     unsafe {
+    //         let modules = self.modules.borrow();
+    //         let block = modules
+    //             .get_unchecked(block.0.0.0)
+    //             .2
+    //             .get_unchecked(block.0.1)
+    //             .2
+    //             .get_unchecked(block.1);
+    //         (
+    //             block.2.iter().map(|h| (h.0, h.1.clone())).collect(),
+    //             block.1.terminator.clone(),
+    //         )
+    //     }
+    // }
+
+    pub fn check_instruction(&self, instruction: &InstructionValue) -> Result<(), ()> {
+        use super::InstructionKind::*;
+        unsafe {
+            match self.instr_data(&instruction).kind {
+                Param(_) => Ok(()),
+                Constant(_) => Ok(()),
+                Add(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Sub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                ICmp(_, lhs, rhs) => {
+                    let t = match_types(&lhs, &rhs, self)?;
+                    if t.comparable() {
+                        Ok(())
+                    } else {
+                        Err(()) // TODO error: Types not comparable
+                    }
+                }
+                FunctionCall(fun, params) => {
+                    let param_types = self.function_data(&fun).params;
+                    if param_types.len() != params.len() {
+                        return Err(()); // TODO error: invalid amount of params
+                    }
+                    for (a, b) in param_types.iter().zip(params) {
+                        if *a != b.get_type(&self)? {
+                            return Err(()); // TODO error: params do not match
+                        }
+                    }
+                    Ok(())
+                }
+            }
+        }
+    }
+}
+
+impl InstructionValue {
+    pub fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+        use InstructionKind::*;
+        use Type::*;
+        unsafe {
+            match &builder.instr_data(self).kind {
+                Param(nth) => builder
+                    .function_data(&self.0.0)
+                    .params
+                    .get(*nth)
+                    .copied()
+                    .ok_or(()),
+                Constant(c) => Ok(c.get_type()),
+                Add(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                ICmp(pred, lhs, rhs) => Ok(Type::Bool),
+                FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
+            }
+        }
+    }
+}
+
+impl ConstValue {
+    pub fn get_type(&self) -> Type {
+        use Type::*;
+        match self {
+            ConstValue::I32(_) => I32,
+            ConstValue::U32(_) => U32,
+        }
+    }
+}
+
+impl Type {
+    pub fn comparable(&self) -> bool {
+        match self {
+            Type::I32 => true,
+            Type::U32 => true,
+            Type::Bool => true,
+            Type::Void => false,
+        }
+    }
+
+    pub fn signed(&self) -> bool {
+        match self {
+            Type::I32 => true,
+            Type::U32 => false,
+            Type::Bool => false,
+            Type::Void => false,
+        }
+    }
+}
+
+impl TerminatorKind {
+    pub fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+        use TerminatorKind::*;
+        match self {
+            Ret(instr_val) => instr_val.get_type(builder),
+            Branch(_) => Ok(Type::Void),
+            CondBr(_, _, _) => Ok(Type::Void),
+        }
+    }
+}
