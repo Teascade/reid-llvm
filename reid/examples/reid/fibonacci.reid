@@ -1,6 +1,6 @@
 // Main
 fn main() {
-    return fibonacci(10);
+    return fibonacci(3);
 }
 
 // Fibonacci

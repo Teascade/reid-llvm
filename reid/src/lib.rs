@@ -50,10 +50,15 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     dbg!(&mir_module);
 
     let mut context = Context::new();
-    let cogegen_module = mir_module.codegen(&mut context);
+    let codegen_module = mir_module.codegen(&mut context);
 
-    Ok(match cogegen_module.module.print_to_string() {
-        Ok(v) => v,
-        Err(e) => panic!("Err: {:?}", e),
-    })
+    dbg!(&codegen_module.context);
+    codegen_module.context.compile();
+
+    Ok(String::new())
+
+    // Ok(match cogegen_module.module.print_to_string() {
+    //     Ok(v) => v,
+    //     Err(e) => panic!("Err: {:?}", e),
+    // })
 }

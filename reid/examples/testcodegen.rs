@@ -164,8 +164,9 @@ fn main() {
 
     println!("test3");
 
-    match codegen_module.module.print_to_string() {
-        Ok(v) => println!("{}", v),
-        Err(e) => println!("Err: {:?}", e),
-    }
+    codegen_module.context.compile();
+    // match codegen_module.module.print_to_string() {
+    //     Ok(v) => println!("{}", v),
+    //     Err(e) => println!("Err: {:?}", e),
+    // }
 }

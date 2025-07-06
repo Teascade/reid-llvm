@@ -5,6 +5,11 @@ use std::{
 
 use llvm_sys::error::LLVMDisposeErrorMessage;
 
+use crate::{
+    Type,
+    builder::{Builder, InstructionValue},
+};
+
 pub fn into_cstring<T: Into<String>>(value: T) -> CString {
     let string = value.into();
     unsafe { CString::from_vec_with_nul_unchecked((string + "\0").into_bytes()) }
@@ -47,5 +52,19 @@ impl Drop for ErrorMessageHolder {
                 LLVMDisposeErrorMessage(self.0);
             }
         }
+    }
+}
+
+pub fn match_types(
+    lhs: &InstructionValue,
+    rhs: &InstructionValue,
+    builder: &Builder,
+) -> Result<Type, ()> {
+    let lhs_type = lhs.get_type(&builder);
+    let rhs_type = rhs.get_type(&builder);
+    if let (Ok(lhs_t), Ok(rhs_t)) = (lhs_type, rhs_type) {
+        if lhs_t == rhs_t { Ok(lhs_t) } else { Err(()) }
+    } else {
+        Err(())
     }
 }

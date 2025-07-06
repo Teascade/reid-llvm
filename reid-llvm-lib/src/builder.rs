@@ -1,8 +1,9 @@
 use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
-use crate::test::{ConstValue, InstructionKind, TerminatorKind, Type};
-
-use super::{BlockData, FunctionData, InstructionData, ModuleData, util::match_types};
+use crate::{
+    BlockData, ConstValue, FunctionData, InstructionData, InstructionKind, ModuleData,
+    TerminatorKind, Type, util::match_types,
+};
 
 #[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
 pub struct ModuleValue(usize);
@@ -14,7 +15,7 @@ pub struct FunctionValue(ModuleValue, usize);
 pub struct BlockValue(FunctionValue, usize);
 
 #[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct InstructionValue(BlockValue, usize);
+pub struct InstructionValue(pub(crate) BlockValue, usize);
 
 #[derive(Debug, Clone)]
 pub struct ModuleHolder {
@@ -265,6 +266,15 @@ impl Builder {
                     }
                     Ok(())
                 }
+                Phi(vals) => {
+                    let mut iter = vals.iter();
+                    // TODO error: Phi must contain at least one item
+                    let first = iter.next().ok_or(())?;
+                    for item in iter {
+                        match_types(first, item, &self)?;
+                    }
+                    Ok(())
+                }
             }
         }
     }
@@ -287,6 +297,7 @@ impl InstructionValue {
                 Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
                 ICmp(pred, lhs, rhs) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
+                Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
             }
         }
     }
@@ -297,6 +308,7 @@ impl ConstValue {
         use Type::*;
         match self {
             ConstValue::I32(_) => I32,
+            ConstValue::I16(_) => I16,
             ConstValue::U32(_) => U32,
         }
     }
@@ -306,6 +318,7 @@ impl Type {
     pub fn comparable(&self) -> bool {
         match self {
             Type::I32 => true,
+            Type::I16 => true,
             Type::U32 => true,
             Type::Bool => true,
             Type::Void => false,
@@ -315,6 +328,7 @@ impl Type {
     pub fn signed(&self) -> bool {
         match self {
             Type::I32 => true,
+            Type::I16 => true,
             Type::U32 => false,
             Type::Bool => false,
             Type::Void => false,

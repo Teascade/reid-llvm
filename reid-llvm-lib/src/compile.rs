@@ -289,6 +289,26 @@ impl InstructionHolder {
                         c"call".as_ptr(),
                     )
                 }
+                Phi(values) => {
+                    let mut inc_values = Vec::new();
+                    let mut inc_blocks = Vec::new();
+                    for item in values {
+                        inc_values.push(module.values.get(&item).unwrap().value_ref);
+                        inc_blocks.push(*module.blocks.get(&item.0).unwrap());
+                    }
+                    let phi = LLVMBuildPhi(
+                        module.builder_ref,
+                        ty.as_llvm(module.context_ref),
+                        c"phi".as_ptr(),
+                    );
+                    LLVMAddIncoming(
+                        phi,
+                        inc_values.as_mut_ptr(),
+                        inc_blocks.as_mut_ptr(),
+                        values.len() as u32,
+                    );
+                    phi
+                }
             }
         };
         LLVMValue { ty, value_ref: val }
@@ -344,7 +364,8 @@ impl ConstValue {
             let t = self.get_type().as_llvm(context);
             match *self {
                 ConstValue::I32(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U32(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::I16(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U32(val) => LLVMConstInt(t, val as u64, 0),
             }
         }
     }
@@ -355,6 +376,7 @@ impl Type {
         unsafe {
             match self {
                 Type::I32 => LLVMInt32TypeInContext(context),
+                Type::I16 => LLVMInt16TypeInContext(context),
                 Type::U32 => LLVMInt32TypeInContext(context),
                 Type::Bool => LLVMInt1TypeInContext(context),
                 Type::Void => LLVMVoidType(),
