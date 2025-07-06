@@ -29,6 +29,12 @@ pub enum TypeKind {
     I32,
     I16,
     Void,
+    Vague(VagueType),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VagueType {
+    Unknown,
 }
 
 impl TypeKind {

@@ -86,7 +86,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             function: self.function,
             context: self.context,
             module: self.module,
-            functions: self.functions.clone(),
+            functions: self.functions,
             stack_values: self.stack_values.clone(),
         }
     }
@@ -295,6 +295,7 @@ impl TypeKind {
             TypeKind::I32 => Type::I32,
             TypeKind::I16 => Type::I16,
             TypeKind::Void => panic!("Void not a supported type"),
+            TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
         }
     }
 }

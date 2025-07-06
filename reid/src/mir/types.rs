@@ -54,13 +54,13 @@ impl ReturnType for IfExpression {
 
 impl ReturnType for VariableReference {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
-        Ok(self.0)
+        Ok(self.0.clone())
     }
 }
 
 impl ReturnType for FunctionCall {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
-        Ok(self.return_type)
+        Ok(self.return_type.clone())
     }
 }
 
@@ -68,7 +68,7 @@ impl ReturnType for FunctionDefinition {
     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
         match &self.kind {
             FunctionDefinitionKind::Local(block, _) => block.return_type(),
-            FunctionDefinitionKind::Extern(type_kind) => Ok(*type_kind),
+            FunctionDefinitionKind::Extern(type_kind) => Ok(type_kind.clone()),
         }
     }
 }
