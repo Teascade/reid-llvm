@@ -53,6 +53,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     dbg!(&mir_module);
 
     let state = mir_module.typecheck();
+    dbg!(&mir_module);
     dbg!(&state);
     if !state.errors.is_empty() {
         return Err(ReidError::TypeCheckErrors(state.errors));

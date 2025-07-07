@@ -175,7 +175,9 @@ impl FunctionDefinition {
 
         let return_type = self.return_type.clone();
         let inferred = match &mut self.kind {
-            FunctionDefinitionKind::Local(block, _) => block.typecheck(state, scope),
+            FunctionDefinitionKind::Local(block, _) => {
+                block.typecheck(state, scope, Some(return_type), Some(return_type))
+            }
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
 
@@ -188,13 +190,24 @@ impl FunctionDefinition {
 }
 
 impl Block {
-    fn typecheck(&mut self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
+    fn typecheck(
+        &mut self,
+        state: &mut State,
+        scope: &mut Scope,
+        soft_hint: Option<TypeKind>,
+        hard_hint: Option<TypeKind>,
+    ) -> Result<TypeKind, ErrorKind> {
         let mut scope = scope.inner();
 
         for statement in &mut self.statements {
             match &mut statement.0 {
                 StmtKind::Let(variable_reference, expression) => {
-                    let res = expression.typecheck(state, &mut scope);
+                    let res = expression.typecheck(
+                        state,
+                        &mut scope,
+                        Some(variable_reference.0),
+                        hard_hint,
+                    );
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown.
@@ -224,14 +237,14 @@ impl Block {
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
-                    let res = expression.typecheck(state, &mut scope);
+                    let res = expression.typecheck(state, &mut scope, soft_hint, hard_hint);
                     state.ok(res, expression.1);
                 }
             }
         }
 
         if let Some((_, expr)) = &mut self.return_expression {
-            let res = expr.typecheck(state, &mut scope);
+            let res = expr.typecheck(state, &mut scope, hard_hint, hard_hint);
             Ok(state.or_else(res, Vague(Unknown), expr.1))
         } else {
             Ok(Void)
@@ -240,7 +253,13 @@ impl Block {
 }
 
 impl Expression {
-    fn typecheck(&mut self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
+    fn typecheck(
+        &mut self,
+        state: &mut State,
+        scope: &mut Scope,
+        soft_hint: Option<TypeKind>,
+        hard_hint: Option<TypeKind>,
+    ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var_ref) => {
                 let existing = state.or_else(
@@ -262,15 +281,19 @@ impl Expression {
 
                 Ok(var_ref.0)
             }
-            ExprKind::Literal(literal) => Ok(literal.as_type()),
+            ExprKind::Literal(literal) => {
+                *literal = literal.try_coerce(soft_hint)?;
+                Ok(literal.as_type())
+            }
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, scope);
-                let rhs_res = rhs.typecheck(state, scope);
+                let lhs_res = lhs.typecheck(state, scope, soft_hint, hard_hint); // TODO
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
+                let rhs_res = rhs.typecheck(state, scope, Some(lhs_type), hard_hint); // TODO
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
-                lhs_type.binop_type(&op, &rhs_type)
+                let res = lhs_type.binop_type(&op, &rhs_type)?;
+                Ok(res)
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = scope
@@ -289,7 +312,8 @@ impl Expression {
                     for (param, true_param_t) in
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
-                        let param_res = param.typecheck(state, scope);
+                        let param_res =
+                            param.typecheck(state, scope, Some(true_param_t), hard_hint);
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
                     }
@@ -306,21 +330,39 @@ impl Expression {
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
                 // TODO make sure cond_res is Boolean here
-                let cond_res = cond.typecheck(state, scope);
+                let cond_res = cond.typecheck(state, scope, Some(Bool), hard_hint);
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
 
-                let lhs_res = lhs.typecheck(state, scope);
+                let lhs_res = lhs.typecheck(state, scope, soft_hint, hard_hint);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.meta);
                 let rhs_type = if let Some(rhs) = rhs {
-                    let res = rhs.typecheck(state, scope);
+                    let res = rhs.typecheck(state, scope, soft_hint, hard_hint);
                     state.or_else(res, Vague(Unknown), rhs.meta)
                 } else {
                     Vague(Unknown)
                 };
                 lhs_type.collapse_into(&rhs_type)
             }
-            ExprKind::Block(block) => block.typecheck(state, scope),
+            ExprKind::Block(block) => block.typecheck(state, scope, soft_hint, hard_hint),
+        }
+    }
+}
+
+impl Literal {
+    fn try_coerce(self, hint: Option<TypeKind>) -> Result<Self, ErrorKind> {
+        if let Some(hint) = hint {
+            use Literal as L;
+            use VagueLiteral as VagueL;
+            Ok(match (self, hint) {
+                (L::I32(_), I32) => self,
+                (L::I16(_), I16) => self,
+                (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
+                (L::Vague(VagueL::Number(v)), I16) => L::I16(v as i16),
+                _ => Err(ErrorKind::TypesIncompatible(self.as_type(), hint))?,
+            })
+        } else {
+            Ok(self)
         }
     }
 }

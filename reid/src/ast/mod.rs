@@ -13,7 +13,7 @@ pub enum TypeKind {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    I32(i32),
+    Number(u64),
 }
 
 #[derive(Debug, Clone)]

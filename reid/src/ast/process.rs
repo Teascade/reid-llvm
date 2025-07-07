@@ -240,7 +240,7 @@ impl ast::BinaryOperator {
 impl ast::Literal {
     fn mir(&self) -> mir::Literal {
         match *self {
-            ast::Literal::I32(v) => mir::Literal::I32(v),
+            ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(v)),
         }
     }
 }

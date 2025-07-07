@@ -297,6 +297,7 @@ impl mir::Literal {
         InstructionKind::Constant(match *self {
             mir::Literal::I32(val) => ConstValue::I32(val),
             mir::Literal::I16(val) => ConstValue::I16(val),
+            mir::Literal::Vague(_) => panic!("Got vague literal!"),
         })
     }
 }

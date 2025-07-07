@@ -51,6 +51,8 @@ pub enum TypeKind {
 pub enum VagueType {
     #[error("Unknown")]
     Unknown,
+    #[error("Number")]
+    Number,
 }
 
 impl TypeKind {
@@ -88,6 +90,12 @@ impl TypeKind {
 pub enum Literal {
     I32(i32),
     I16(i16),
+    Vague(VagueLiteral),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum VagueLiteral {
+    Number(u64),
 }
 
 impl Literal {
@@ -95,6 +103,7 @@ impl Literal {
         match self {
             Literal::I32(_) => TypeKind::I32,
             Literal::I16(_) => TypeKind::I16,
+            Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
         }
     }
 }

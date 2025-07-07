@@ -58,7 +58,7 @@ impl Parse for PrimaryExpression {
                     Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                 }
                 Token::DecimalValue(v) => Expression(
-                    Kind::Literal(Literal::I32(v.parse().unwrap())),
+                    Kind::Literal(Literal::Number(v.parse().unwrap())),
                     stream.get_range().unwrap(),
                 ),
                 Token::ParenOpen => {
