@@ -48,7 +48,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     };
 
     dbg!(&ast_module);
-    let mir_module = ast_module.process();
+    let mut mir_module = ast_module.process();
 
     dbg!(&mir_module);
 

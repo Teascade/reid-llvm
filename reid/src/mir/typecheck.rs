@@ -137,7 +137,7 @@ pub enum Inferred {
 }
 
 impl Module {
-    pub fn typecheck(&self) -> State {
+    pub fn typecheck(&mut self) -> State {
         let mut state = State::new();
         let mut scope = Scope::default();
 
@@ -154,7 +154,7 @@ impl Module {
             );
         }
 
-        for function in &self.functions {
+        for function in &mut self.functions {
             let res = function.typecheck(&mut state, &mut scope);
             state.ok(res, function.block_meta());
         }
@@ -164,7 +164,7 @@ impl Module {
 }
 
 impl FunctionDefinition {
-    fn typecheck(&self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
+    fn typecheck(&mut self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
             let param_t = state.or_else(param.1.assert_known(), Vague(Unknown), self.signature());
             state.ok(
@@ -174,7 +174,7 @@ impl FunctionDefinition {
         }
 
         let return_type = self.return_type.clone();
-        let inferred = match &self.kind {
+        let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => block.typecheck(state, scope),
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
@@ -188,11 +188,11 @@ impl FunctionDefinition {
 }
 
 impl Block {
-    fn typecheck(&self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
+    fn typecheck(&mut self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
         let mut scope = scope.inner();
 
-        for statement in &self.statements {
-            match &statement.0 {
+        for statement in &mut self.statements {
+            match &mut statement.0 {
                 StmtKind::Let(variable_reference, expression) => {
                     let res = expression.typecheck(state, &mut scope);
 
@@ -201,12 +201,18 @@ impl Block {
                     let res = state.or_else(res, Vague(Unknown), expression.1);
 
                     // Make sure the expression and variable type really is the same
-                    state.ok(
+                    let res_t = state.or_else(
                         res.collapse_into(&variable_reference.0),
+                        Vague(Unknown),
                         variable_reference.2 + expression.1,
                     );
 
-                    // TODO make sure expression/variable type is NOT vague anymore
+                    // Make sure expression/variable type is NOT vague anymore
+                    let res_t =
+                        state.or_else(res_t.assert_known(), Vague(Unknown), variable_reference.2);
+
+                    // Update typing to be more accurate
+                    variable_reference.0 = res_t;
 
                     // Variable might already be defined, note error
                     state.ok(
@@ -224,7 +230,7 @@ impl Block {
             }
         }
 
-        if let Some((_, expr)) = &self.return_expression {
+        if let Some((_, expr)) = &mut self.return_expression {
             let res = expr.typecheck(state, &mut scope);
             Ok(state.or_else(res, Vague(Unknown), expr.1))
         } else {
@@ -234,8 +240,8 @@ impl Block {
 }
 
 impl Expression {
-    fn typecheck(&self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
-        match &self.0 {
+    fn typecheck(&mut self, state: &mut State, scope: &mut Scope) -> Result<TypeKind, ErrorKind> {
+        match &mut self.0 {
             ExprKind::Variable(var_ref) => {
                 let existing = state.or_else(
                     scope
@@ -247,11 +253,14 @@ impl Expression {
                     var_ref.2,
                 );
 
-                Ok(state.or_else(
+                // Update typing to be more accurate
+                var_ref.0 = state.or_else(
                     var_ref.0.collapse_into(&existing),
                     Vague(Unknown),
                     var_ref.2,
-                ))
+                );
+
+                Ok(var_ref.0)
             }
             ExprKind::Literal(literal) => Ok(literal.as_type()),
             ExprKind::BinOp(op, lhs, rhs) => {
@@ -261,7 +270,7 @@ impl Expression {
                 let rhs_res = rhs.typecheck(state, scope);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
-                lhs_type.binop_type(op, &rhs_type)
+                lhs_type.binop_type(&op, &rhs_type)
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = scope
@@ -278,7 +287,7 @@ impl Expression {
                     let true_params_iter = f.params.into_iter().chain(iter::repeat(Vague(Unknown)));
 
                     for (param, true_param_t) in
-                        function_call.parameters.iter().zip(true_params_iter)
+                        function_call.parameters.iter_mut().zip(true_params_iter)
                     {
                         let param_res = param.typecheck(state, scope);
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
@@ -287,8 +296,10 @@ impl Expression {
 
                     // Make sure function return type is the same as the claimed
                     // return type
-                    // TODO: Set return type here actually
-                    try_collapse(&f.ret, &function_call.return_type)
+                    let ret_t = try_collapse(&f.ret, &function_call.return_type)?;
+                    // Update typing to be more accurate
+                    function_call.return_type = ret_t;
+                    Ok(ret_t)
                 } else {
                     Ok(function_call.return_type)
                 }

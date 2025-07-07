@@ -1,6 +1,7 @@
 // Main
 fn main() -> i32 {
-    return fibonacci(3);
+    let a = fibonacci(3);
+    return a;
 }
 
 // Fibonacci
