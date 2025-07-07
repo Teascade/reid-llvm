@@ -1,6 +1,6 @@
 // Main
 fn main() -> i32 {
-    return fibonacci(3);
+    return (fibonacci(3) < 5) + 5;
 }
 
 // Fibonacci

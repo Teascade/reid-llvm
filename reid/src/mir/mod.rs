@@ -39,6 +39,8 @@ pub enum TypeKind {
     I32,
     #[error("i16")]
     I16,
+    #[error("bool")]
+    Bool,
     #[error("void")]
     Void,
     #[error(transparent)]
@@ -52,9 +54,32 @@ pub enum VagueType {
 }
 
 impl TypeKind {
+    pub fn is_known(&self) -> Result<TypeKind, VagueType> {
+        if let TypeKind::Vague(vague) = self {
+            Err(*vague)
+        } else {
+            Ok(*self)
+        }
+    }
+}
+
+impl TypeKind {
     pub fn signed(&self) -> bool {
         match self {
+            TypeKind::Void => false,
+            TypeKind::Vague(_) => false,
             _ => true,
+        }
+    }
+
+    pub fn is_maths(&self) -> bool {
+        use TypeKind::*;
+        match &self {
+            I32 => true,
+            I16 => true,
+            Bool => true,
+            Vague(_) => false,
+            Void => false,
         }
     }
 }

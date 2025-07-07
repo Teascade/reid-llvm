@@ -183,6 +183,7 @@ impl mir::Expression {
     pub fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
             mir::ExprKind::Variable(varref) => {
+                varref.0.is_known().expect("variable type unknown");
                 let v = scope
                     .stack_values
                     .get(&varref.1)
@@ -191,6 +192,17 @@ impl mir::Expression {
             }
             mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
+                lhs_exp
+                    .return_type()
+                    .expect("No ret type in lhs?")
+                    .is_known()
+                    .expect("lhs ret type is unknown");
+                rhs_exp
+                    .return_type()
+                    .expect("No ret type in rhs?")
+                    .is_known()
+                    .expect("rhs ret type is unknown");
+
                 let lhs = lhs_exp.codegen(scope).expect("lhs has no return value");
                 let rhs = rhs_exp.codegen(scope).expect("rhs has no return value");
                 Some(match binop {
@@ -202,16 +214,17 @@ impl mir::Expression {
                     }
                     mir::BinaryOperator::Mult => todo!(),
                     mir::BinaryOperator::And => todo!(),
-                    mir::BinaryOperator::Logic(l) => {
-                        let ret_type = lhs_exp.return_type().expect("No ret type in lhs?");
-                        scope
-                            .block
-                            .build(InstructionKind::ICmp(l.int_predicate(), lhs, rhs))
-                            .unwrap()
-                    }
+                    mir::BinaryOperator::Logic(l) => scope
+                        .block
+                        .build(InstructionKind::ICmp(l.int_predicate(), lhs, rhs))
+                        .unwrap(),
                 })
             }
             mir::ExprKind::FunctionCall(call) => {
+                call.return_type
+                    .is_known()
+                    .expect("function return type unknown");
+
                 let params = call
                     .parameters
                     .iter()
@@ -293,6 +306,7 @@ impl TypeKind {
         match &self {
             TypeKind::I32 => Type::I32,
             TypeKind::I16 => Type::I16,
+            TypeKind::Bool => Type::Bool,
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
         }

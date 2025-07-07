@@ -171,12 +171,10 @@ impl FunctionDefinition {
         }
 
         let return_type = self.return_type.clone();
-        dbg!(&return_type);
         let inferred = match &self.kind {
             FunctionDefinitionKind::Local(block, _) => block.typecheck(state, scope),
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
-        dbg!(&inferred);
 
         match inferred {
             Ok(t) => try_collapse(&return_type, &t)
@@ -295,7 +293,8 @@ impl Expression {
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
                 // TODO make sure cond_res is Boolean here
                 let cond_res = cond.typecheck(state, scope);
-                state.ok(cond_res, cond.1);
+                let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
+                state.ok(cond_t.collapse_into(&Bool), cond.1);
 
                 let lhs_res = lhs.typecheck(state, scope);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.meta);
@@ -314,11 +313,7 @@ impl Expression {
 
 impl TypeKind {
     fn assert_known(&self) -> Result<TypeKind, ErrorKind> {
-        if let Vague(vague) = self {
-            Err(ErrorKind::TypeIsVague(*vague))
-        } else {
-            Ok(*self)
-        }
+        self.is_known().map_err(ErrorKind::TypeIsVague)
     }
 }
 
