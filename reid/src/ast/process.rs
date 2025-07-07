@@ -12,54 +12,32 @@ pub enum InferredType {
     Static(mir::TypeKind),
     OneOf(Vec<InferredType>),
     Void,
+    Unknown,
 }
 
 impl InferredType {
-    fn collapse(&self, scope: &VirtualScope) -> mir::TypeKind {
+    fn collapse(&self) -> mir::TypeKind {
         match self {
-            InferredType::FromVariable(name) => {
-                if let Some(inferred) = scope.get_var(name) {
-                    inferred.collapse(scope)
-                } else {
-                    mir::TypeKind::Vague(mir::VagueType::Unknown)
-                }
-            }
-            InferredType::FunctionReturn(name) => {
-                if let Some(type_kind) = scope.get_return_type(name) {
-                    type_kind.clone()
-                } else {
-                    mir::TypeKind::Vague(mir::VagueType::Unknown)
-                }
-            }
+            InferredType::FromVariable(_) => mir::TypeKind::Vague(mir::VagueType::Unknown),
+            InferredType::FunctionReturn(_) => mir::TypeKind::Vague(mir::VagueType::Unknown),
             InferredType::Static(type_kind) => type_kind.clone(),
             InferredType::OneOf(inferred_types) => {
                 let list: Vec<mir::TypeKind> =
-                    inferred_types.iter().map(|t| t.collapse(scope)).collect();
+                    inferred_types.iter().map(|t| t.collapse()).collect();
                 if let Some(first) = list.first() {
                     if list.iter().all(|i| i == first) {
                         first.clone().into()
                     } else {
-                        // IntoMIRError::ConflictingType(self.get_range())
-                        mir::TypeKind::Void
+                        mir::TypeKind::Vague(mir::VagueType::Unknown)
                     }
                 } else {
                     mir::TypeKind::Void
                 }
             }
             InferredType::Void => mir::TypeKind::Void,
+            InferredType::Unknown => mir::TypeKind::Vague(mir::VagueType::Unknown),
         }
     }
-}
-
-pub struct VirtualVariable {
-    name: String,
-    inferred: InferredType,
-}
-
-pub struct VirtualFunctionSignature {
-    name: String,
-    return_type: mir::TypeKind,
-    parameter_types: Vec<mir::TypeKind>,
 }
 
 pub struct VirtualStorage<T> {
@@ -88,73 +66,8 @@ impl<T> Default for VirtualStorage<T> {
     }
 }
 
-pub struct VirtualScope {
-    variables: VirtualStorage<VirtualVariable>,
-    functions: VirtualStorage<VirtualFunctionSignature>,
-}
-
-impl VirtualScope {
-    pub fn set_var(&mut self, variable: VirtualVariable) {
-        self.variables.set(variable.name.clone(), variable);
-    }
-
-    pub fn set_fun(&mut self, function: VirtualFunctionSignature) {
-        self.functions.set(function.name.clone(), function)
-    }
-
-    pub fn get_var(&self, name: &String) -> Option<InferredType> {
-        self.variables.get(name).and_then(|v| {
-            if v.len() > 1 {
-                Some(InferredType::OneOf(
-                    v.iter().map(|v| v.inferred.clone()).collect(),
-                ))
-            } else if let Some(v) = v.first() {
-                Some(v.inferred.clone())
-            } else {
-                None
-            }
-        })
-    }
-
-    pub fn get_return_type(&self, name: &String) -> Option<mir::TypeKind> {
-        self.functions.get(name).and_then(|v| {
-            if v.len() > 1 {
-                Some(mir::TypeKind::Vague(mir::VagueType::Unknown))
-            } else if let Some(v) = v.first() {
-                Some(v.return_type.clone())
-            } else {
-                None
-            }
-        })
-    }
-}
-
-impl Default for VirtualScope {
-    fn default() -> Self {
-        Self {
-            variables: Default::default(),
-            functions: Default::default(),
-        }
-    }
-}
-
 impl ast::Module {
     pub fn process(&self) -> mir::Module {
-        let mut scope = VirtualScope::default();
-
-        for stmt in &self.top_level_statements {
-            match stmt {
-                FunctionDefinition(ast::FunctionDefinition(signature, _, _)) => {
-                    scope.set_fun(VirtualFunctionSignature {
-                        name: signature.name.clone(),
-                        return_type: signature.return_type.into(),
-                        parameter_types: signature.args.iter().map(|p| p.1.into()).collect(),
-                    });
-                }
-                _ => {}
-            }
-        }
-
         let mut imports = Vec::new();
         let mut functions = Vec::new();
 
@@ -167,13 +80,6 @@ impl ast::Module {
                     }
                 }
                 FunctionDefinition(ast::FunctionDefinition(signature, block, range)) => {
-                    for (name, ptype) in &signature.args {
-                        scope.set_var(VirtualVariable {
-                            name: name.clone(),
-                            inferred: InferredType::Static((*ptype).into()),
-                        });
-                    }
-
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         return_type: signature
@@ -186,10 +92,7 @@ impl ast::Module {
                             .cloned()
                             .map(|p| (p.0, p.1.into()))
                             .collect(),
-                        kind: mir::FunctionDefinitionKind::Local(
-                            block.into_mir(&mut scope),
-                            (*range).into(),
-                        ),
+                        kind: mir::FunctionDefinitionKind::Local(block.into_mir(), (*range).into()),
                     };
                     functions.push(def);
                 }
@@ -207,41 +110,33 @@ impl ast::Module {
 }
 
 impl ast::Block {
-    pub fn into_mir(&self, scope: &mut VirtualScope) -> mir::Block {
+    pub fn into_mir(&self) -> mir::Block {
         let mut mir_statements = Vec::new();
 
         for statement in &self.0 {
             let (kind, range) = match statement {
                 ast::BlockLevelStatement::Let(s_let) => {
-                    let t = s_let.1.infer_return_type().collapse(scope);
+                    let t = s_let.1.infer_return_type().collapse();
                     let inferred = InferredType::Static(t.clone());
-                    scope.set_var(VirtualVariable {
-                        name: s_let.0.clone(),
-                        inferred,
-                    });
 
                     (
                         mir::StmtKind::Let(
                             mir::VariableReference(t, s_let.0.clone(), s_let.2.into()),
-                            s_let.1.process(scope),
+                            s_let.1.process(),
                         ),
                         s_let.2,
                     )
                 }
                 ast::BlockLevelStatement::Import(_) => todo!(),
-                ast::BlockLevelStatement::Expression(e) => {
-                    (StmtKind::Expression(e.process(scope)), e.1)
-                }
-                ast::BlockLevelStatement::Return(_, e) => {
-                    (StmtKind::Expression(e.process(scope)), e.1)
-                }
+                ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process()), e.1),
+                ast::BlockLevelStatement::Return(_, e) => (StmtKind::Expression(e.process()), e.1),
             };
 
             mir_statements.push(mir::Statement(kind, range.into()));
         }
 
         let return_expression = if let Some(r) = &self.1 {
-            Some((r.0.into(), Box::new(r.1.process(scope))))
+            Some((r.0.into(), Box::new(r.1.process())))
         } else {
             None
         };
@@ -271,40 +166,32 @@ impl From<ast::ReturnType> for mir::ReturnKind {
 }
 
 impl ast::Expression {
-    fn process(&self, scope: &mut VirtualScope) -> mir::Expression {
+    fn process(&self) -> mir::Expression {
         let kind = match &self.0 {
             ast::ExpressionKind::VariableName(name) => mir::ExprKind::Variable(VariableReference(
-                if let Some(ty) = scope.get_var(name) {
-                    ty.collapse(scope)
-                } else {
-                    mir::TypeKind::Vague(mir::VagueType::Unknown)
-                },
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
                 self.1.into(),
             )),
             ast::ExpressionKind::Literal(literal) => mir::ExprKind::Literal(literal.mir()),
             ast::ExpressionKind::Binop(binary_operator, lhs, rhs) => mir::ExprKind::BinOp(
                 binary_operator.mir(),
-                Box::new(lhs.process(scope)),
-                Box::new(rhs.process(scope)),
+                Box::new(lhs.process()),
+                Box::new(rhs.process()),
             ),
             ast::ExpressionKind::FunctionCall(fn_call_expr) => {
                 mir::ExprKind::FunctionCall(mir::FunctionCall {
                     name: fn_call_expr.0.clone(),
-                    return_type: if let Some(r_type) = scope.get_return_type(&fn_call_expr.0) {
-                        r_type
-                    } else {
-                        mir::TypeKind::Vague(mir::VagueType::Unknown)
-                    },
-                    parameters: fn_call_expr.1.iter().map(|e| e.process(scope)).collect(),
+                    return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
+                    parameters: fn_call_expr.1.iter().map(|e| e.process()).collect(),
                 })
             }
-            ast::ExpressionKind::BlockExpr(block) => mir::ExprKind::Block(block.into_mir(scope)),
+            ast::ExpressionKind::BlockExpr(block) => mir::ExprKind::Block(block.into_mir()),
             ast::ExpressionKind::IfExpr(if_expression) => {
-                let cond = if_expression.0.process(scope);
-                let then_block = if_expression.1.into_mir(scope);
+                let cond = if_expression.0.process();
+                let then_block = if_expression.1.into_mir();
                 let else_block = if let Some(el) = &if_expression.2 {
-                    Some(el.into_mir(scope))
+                    Some(el.into_mir())
                 } else {
                     None
                 };
@@ -369,14 +256,5 @@ impl From<ast::TypeKind> for mir::TypeKind {
 impl From<ast::Type> for mir::TypeKind {
     fn from(value: ast::Type) -> Self {
         value.0.into()
-    }
-}
-
-impl From<Option<ast::Type>> for mir::TypeKind {
-    fn from(value: Option<ast::Type>) -> Self {
-        match value {
-            Some(v) => v.into(),
-            None => mir::TypeKind::Void,
-        }
     }
 }

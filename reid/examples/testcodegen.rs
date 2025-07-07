@@ -7,6 +7,7 @@ fn main() {
 
     let fibonacci = FunctionDefinition {
         name: fibonacci_name.clone(),
+        return_type: TypeKind::I32,
         parameters: vec![(fibonacci_n.clone(), TypeKind::I32)],
         kind: FunctionDefinitionKind::Local(
             Block {
@@ -126,6 +127,7 @@ fn main() {
 
     let main = FunctionDefinition {
         name: "main".to_owned(),
+        return_type: TypeKind::I32,
         parameters: vec![],
         kind: FunctionDefinitionKind::Local(
             Block {

@@ -7,6 +7,7 @@ mod codegen;
 mod lexer;
 pub mod mir;
 mod token_stream;
+mod util;
 
 // TODO:
 // 1. Make it so that TopLevelStatement can only be import or function def
@@ -20,6 +21,8 @@ pub enum ReidError {
     LexerError(#[from] lexer::Error),
     #[error(transparent)]
     ParserError(#[from] token_stream::Error),
+    #[error("Errors during typecheck: {0:?}")]
+    TypeCheckErrors(Vec<mir::typecheck::Error>),
     // #[error(transparent)]
     // CodegenError(#[from] codegen::Error),
 }
@@ -46,6 +49,14 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
 
     dbg!(&ast_module);
     let mir_module = ast_module.process();
+
+    dbg!(&mir_module);
+
+    let state = mir_module.typecheck();
+    dbg!(&state);
+    if !state.errors.is_empty() {
+        return Err(ReidError::TypeCheckErrors(state.errors));
+    }
 
     dbg!(&mir_module);
 

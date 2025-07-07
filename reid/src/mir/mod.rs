@@ -3,11 +3,28 @@
 /// type-checked beforehand.
 use crate::token_stream::TokenRange;
 
+pub mod typecheck;
 pub mod types;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Metadata {
     pub range: TokenRange,
+}
+
+impl std::fmt::Display for Metadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.range)
+    }
+}
+
+impl std::ops::Add for Metadata {
+    type Output = Metadata;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Metadata {
+            range: self.range + rhs.range,
+        }
+    }
 }
 
 impl From<TokenRange> for Metadata {
@@ -16,24 +33,21 @@ impl From<TokenRange> for Metadata {
     }
 }
 
-impl Default for Metadata {
-    fn default() -> Self {
-        Metadata {
-            range: Default::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TypeKind {
+    #[error("i32")]
     I32,
+    #[error("i16")]
     I16,
+    #[error("void")]
     Void,
-    Vague(VagueType),
+    #[error(transparent)]
+    Vague(#[from] VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum VagueType {
+    #[error("Unknown")]
     Unknown,
 }
 
@@ -124,6 +138,22 @@ pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range
     Local(Block, Metadata),
     Extern,
+}
+
+impl FunctionDefinition {
+    fn block_meta(&self) -> Metadata {
+        match &self.kind {
+            FunctionDefinitionKind::Local(block, _) => block.meta,
+            FunctionDefinitionKind::Extern => Metadata::default(),
+        }
+    }
+
+    fn signature(&self) -> Metadata {
+        match &self.kind {
+            FunctionDefinitionKind::Local(_, metadata) => *metadata,
+            FunctionDefinitionKind::Extern => Metadata::default(),
+        }
+    }
 }
 
 #[derive(Debug)]

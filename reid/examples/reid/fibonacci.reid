@@ -1,5 +1,5 @@
 // Main
-fn main() {
+fn main() -> i32 {
     return fibonacci(3);
 }
 
