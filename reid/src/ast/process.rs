@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast,
+    ast::{self, TypeKind},
     mir::{self, StmtKind, VariableReference},
 };
 
@@ -176,6 +176,10 @@ impl ast::Module {
 
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
+                        return_type: signature
+                            .return_type
+                            .map(|r| r.0.into())
+                            .unwrap_or(mir::TypeKind::Void),
                         parameters: signature
                             .args
                             .iter()

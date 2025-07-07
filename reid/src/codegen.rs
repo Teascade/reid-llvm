@@ -20,7 +20,6 @@ impl mir::Module {
         let mut functions = HashMap::new();
 
         for function in &self.functions {
-            let ret_type = function.return_type().unwrap().get_type();
             let param_types: Vec<Type> = function
                 .parameters
                 .iter()
@@ -29,9 +28,9 @@ impl mir::Module {
 
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => {
-                    module.function(&function.name, ret_type, param_types)
+                    module.function(&function.name, function.return_type.get_type(), param_types)
                 }
-                mir::FunctionDefinitionKind::Extern(_) => todo!(),
+                mir::FunctionDefinitionKind::Extern => todo!(),
             };
             functions.insert(function.name.clone(), func);
         }
@@ -62,7 +61,7 @@ impl mir::Module {
                         scope.block.terminate(TerminatorKind::Ret(ret)).unwrap();
                     }
                 }
-                mir::FunctionDefinitionKind::Extern(_) => {}
+                mir::FunctionDefinitionKind::Extern => {}
             }
         }
 

@@ -64,11 +64,11 @@ impl ReturnType for FunctionCall {
     }
 }
 
-impl ReturnType for FunctionDefinition {
-    fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
-        match &self.kind {
-            FunctionDefinitionKind::Local(block, _) => block.return_type(),
-            FunctionDefinitionKind::Extern(type_kind) => Ok(type_kind.clone()),
-        }
-    }
-}
+// impl ReturnType for FunctionDefinition {
+//     fn return_type(&self) -> Result<TypeKind, ReturnTypeOther> {
+//         match &self.kind {
+//             FunctionDefinitionKind::Local(block, _) => block.return_type(),
+//             FunctionDefinitionKind::Extern(type_kind) => Ok(type_kind.clone()),
+//         }
+//     }
+// }

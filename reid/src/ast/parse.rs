@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::{
     lexer::Token,
-    token_stream::{Error, TokenRange, TokenStream},
+    token_stream::{Error, TokenStream},
 };
 
 pub trait Parse

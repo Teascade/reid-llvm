@@ -114,6 +114,7 @@ pub struct FunctionCall {
 #[derive(Debug)]
 pub struct FunctionDefinition {
     pub name: String,
+    pub return_type: TypeKind,
     pub parameters: Vec<(String, TypeKind)>,
     pub kind: FunctionDefinitionKind,
 }
@@ -122,8 +123,7 @@ pub struct FunctionDefinition {
 pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range
     Local(Block, Metadata),
-    /// Return Type
-    Extern(TypeKind),
+    Extern,
 }
 
 #[derive(Debug)]
