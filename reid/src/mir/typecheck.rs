@@ -142,12 +142,15 @@ impl Module {
         let mut scope = Scope::default();
 
         for function in &self.functions {
-            let r = scope.function_returns.set(
-                function.name.clone(),
-                ScopeFunction {
-                    ret: function.return_type,
-                    params: function.parameters.iter().map(|v| v.1).collect(),
-                },
+            state.ok(
+                scope.function_returns.set(
+                    function.name.clone(),
+                    ScopeFunction {
+                        ret: function.return_type,
+                        params: function.parameters.iter().map(|v| v.1).collect(),
+                    },
+                ),
+                function.signature(),
             );
         }
 
@@ -251,14 +254,14 @@ impl Expression {
                 ))
             }
             ExprKind::Literal(literal) => Ok(literal.as_type()),
-            ExprKind::BinOp(_, lhs, rhs) => {
+            ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
                 let lhs_res = lhs.typecheck(state, scope);
                 let rhs_res = rhs.typecheck(state, scope);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
-                lhs_type.collapse_into(&rhs_type)
+                lhs_type.binop_type(op, &rhs_type)
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = scope
@@ -315,6 +318,17 @@ impl TypeKind {
     fn assert_known(&self) -> Result<TypeKind, ErrorKind> {
         self.is_known().map_err(ErrorKind::TypeIsVague)
     }
+
+    fn binop_type(&self, op: &BinaryOperator, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
+        let res = self.collapse_into(other)?;
+        Ok(match op {
+            BinaryOperator::Add => res,
+            BinaryOperator::Minus => res,
+            BinaryOperator::Mult => res,
+            BinaryOperator::And => res,
+            BinaryOperator::Logic(_) => Bool,
+        })
+    }
 }
 
 fn try_collapse(lhs: &TypeKind, rhs: &TypeKind) -> Result<TypeKind, ErrorKind> {
@@ -323,7 +337,7 @@ fn try_collapse(lhs: &TypeKind, rhs: &TypeKind) -> Result<TypeKind, ErrorKind> {
         .or(Err(ErrorKind::TypesIncompatible(*lhs, *rhs)))
 }
 
-trait Collapsable: Sized + Clone {
+pub trait Collapsable: Sized + Clone {
     fn collapse_into(&self, other: &Self) -> Result<Self, ErrorKind>;
 }
 
