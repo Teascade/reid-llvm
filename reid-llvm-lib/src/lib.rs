@@ -4,6 +4,7 @@ use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue}
 
 pub mod builder;
 pub mod compile;
+mod debug;
 mod util;
 
 // pub struct InstructionValue(BlockValue, usize);
@@ -130,18 +131,18 @@ impl<'builder> Block<'builder> {
     }
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Clone, Hash)]
 pub struct InstructionData {
     kind: InstructionKind,
 }
 
-#[derive(Debug, Clone, Copy, Hash)]
+#[derive(Clone, Copy, Hash)]
 pub enum IntPredicate {
     LessThan,
     GreaterThan,
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Clone, Hash)]
 pub enum InstructionKind {
     Param(usize),
     Constant(ConstValue),
@@ -171,7 +172,7 @@ pub enum ConstValue {
     U32(u32),
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Clone, Hash)]
 pub enum TerminatorKind {
     Ret(InstructionValue),
     Branch(BlockValue),

@@ -5,40 +5,40 @@ use crate::{
     TerminatorKind, Type, util::match_types,
 };
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct ModuleValue(usize);
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct ModuleValue(pub(crate) usize);
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct FunctionValue(ModuleValue, usize);
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct FunctionValue(pub(crate) ModuleValue, pub(crate) usize);
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct BlockValue(FunctionValue, usize);
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct BlockValue(pub(crate) FunctionValue, pub(crate) usize);
 
-#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct InstructionValue(pub(crate) BlockValue, usize);
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct InstructionValue(pub(crate) BlockValue, pub(crate) usize);
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ModuleHolder {
     pub(crate) value: ModuleValue,
     pub(crate) data: ModuleData,
     pub(crate) functions: Vec<FunctionHolder>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FunctionHolder {
     pub(crate) value: FunctionValue,
     pub(crate) data: FunctionData,
     pub(crate) blocks: Vec<BlockHolder>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BlockHolder {
     pub(crate) value: BlockValue,
     pub(crate) data: BlockData,
     pub(crate) instructions: Vec<InstructionHolder>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InstructionHolder {
     pub(crate) value: InstructionValue,
     pub(crate) data: InstructionData,
@@ -189,54 +189,6 @@ impl Builder {
     pub(crate) fn get_modules(&self) -> Rc<RefCell<Vec<ModuleHolder>>> {
         self.modules.clone()
     }
-
-    // pub(crate) fn get_functions(&self, module: ModuleValue) -> Vec<(FunctionValue, FunctionData)> {
-    //     unsafe {
-    //         self.modules
-    //             .borrow()
-    //             .get_unchecked(module.0)
-    //             .2
-    //             .iter()
-    //             .map(|h| (h.0, h.1.clone()))
-    //             .collect()
-    //     }
-    // }
-
-    // pub(crate) fn get_blocks(&self, function: FunctionValue) -> Vec<(BlockValue, BlockData)> {
-    //     unsafe {
-    //         self.modules
-    //             .borrow()
-    //             .get_unchecked(function.0.0)
-    //             .2
-    //             .get_unchecked(function.1)
-    //             .2
-    //             .iter()
-    //             .map(|h| (h.0, h.1.clone()))
-    //             .collect()
-    //     }
-    // }
-
-    // pub(crate) fn get_instructions(
-    //     &self,
-    //     block: BlockValue,
-    // ) -> (
-    //     Vec<(InstructionValue, InstructionData)>,
-    //     Option<TerminatorKind>,
-    // ) {
-    //     unsafe {
-    //         let modules = self.modules.borrow();
-    //         let block = modules
-    //             .get_unchecked(block.0.0.0)
-    //             .2
-    //             .get_unchecked(block.0.1)
-    //             .2
-    //             .get_unchecked(block.1);
-    //         (
-    //             block.2.iter().map(|h| (h.0, h.1.clone())).collect(),
-    //             block.1.terminator.clone(),
-    //         )
-    //     }
-    // }
 
     pub fn check_instruction(&self, instruction: &InstructionValue) -> Result<(), ()> {
         use super::InstructionKind::*;
