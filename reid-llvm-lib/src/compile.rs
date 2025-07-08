@@ -264,12 +264,13 @@ impl InstructionHolder {
                     LLVMBuildSub(module.builder_ref, lhs_val, rhs_val, c"sub".as_ptr())
                 }
                 ICmp(pred, lhs, rhs) => {
-                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let lhs = module.values.get(&lhs).unwrap();
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildICmp(
                         module.builder_ref,
-                        pred.as_llvm(_ty.signed()),
-                        lhs_val,
+                        // Signedness from LHS
+                        pred.as_llvm(lhs._ty.signed()),
+                        lhs.value_ref,
                         rhs_val,
                         c"icmp".as_ptr(),
                     )
@@ -370,9 +371,17 @@ impl ConstValue {
         unsafe {
             let t = self.get_type().as_llvm(context);
             match *self {
-                ConstValue::I32(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::Bool(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::I8(val) => LLVMConstInt(t, val as u64, 1),
                 ConstValue::I16(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U32(val) => LLVMConstInt(t, val as u64, 0),
+                ConstValue::I32(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::I64(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::I128(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U8(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U16(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U32(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U64(val) => LLVMConstInt(t, val as u64, 1),
+                ConstValue::U128(val) => LLVMConstInt(t, val as u64, 1),
             }
         }
     }
@@ -380,13 +389,16 @@ impl ConstValue {
 
 impl Type {
     fn as_llvm(&self, context: LLVMContextRef) -> LLVMTypeRef {
+        use Type::*;
         unsafe {
             match self {
-                Type::I32 => LLVMInt32TypeInContext(context),
-                Type::I16 => LLVMInt16TypeInContext(context),
-                Type::U32 => LLVMInt32TypeInContext(context),
-                Type::Bool => LLVMInt1TypeInContext(context),
-                Type::Void => LLVMVoidType(),
+                I8 | U8 => LLVMInt8TypeInContext(context),
+                I16 | U16 => LLVMInt16TypeInContext(context),
+                I32 | U32 => LLVMInt32TypeInContext(context),
+                I64 | U64 => LLVMInt64TypeInContext(context),
+                I128 | U128 => LLVMInt128TypeInContext(context),
+                Bool => LLVMInt1TypeInContext(context),
+                Void => LLVMVoidType(),
             }
         }
     }

@@ -244,10 +244,26 @@ impl Literal {
             use Literal as L;
             use VagueLiteral as VagueL;
             Ok(match (self, hint) {
-                (L::I32(_), I32) => self,
+                (L::I8(_), I8) => self,
                 (L::I16(_), I16) => self,
-                (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
+                (L::I32(_), I32) => self,
+                (L::I64(_), I64) => self,
+                (L::I128(_), I128) => self,
+                (L::U8(_), U8) => self,
+                (L::U16(_), U16) => self,
+                (L::U32(_), U32) => self,
+                (L::U64(_), U64) => self,
+                (L::U128(_), U128) => self,
+                (L::Vague(VagueL::Number(v)), I8) => L::I8(v as i8),
                 (L::Vague(VagueL::Number(v)), I16) => L::I16(v as i16),
+                (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
+                (L::Vague(VagueL::Number(v)), I64) => L::I64(v as i64),
+                (L::Vague(VagueL::Number(v)), I128) => L::I128(v as i128),
+                (L::Vague(VagueL::Number(v)), U8) => L::U8(v as u8),
+                (L::Vague(VagueL::Number(v)), U16) => L::U16(v as u16),
+                (L::Vague(VagueL::Number(v)), U32) => L::U32(v as u32),
+                (L::Vague(VagueL::Number(v)), U64) => L::U64(v as u64),
+                (L::Vague(VagueL::Number(v)), U128) => L::U128(v as u128),
                 // Default type for number literal if unable to find true type.
                 (L::Vague(VagueL::Number(v)), Vague(Number)) => L::I32(v as i32),
                 (_, Vague(_)) => self,
@@ -310,8 +326,7 @@ impl Collapsable for TypeKind {
             (Vague(Number), other) | (other, Vague(Number)) => match other {
                 Vague(Unknown) => Ok(Vague(Number)),
                 Vague(Number) => Ok(Vague(Number)),
-                I32 => Ok(I32),
-                I16 => Ok(I16),
+                I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 => Ok(*other),
                 _ => Err(ErrorKind::TypesIncompatible(*self, *other)),
             },
             (Vague(Unknown), other) | (other, Vague(Unknown)) => Ok(other.clone()),

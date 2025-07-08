@@ -260,9 +260,17 @@ impl ConstValue {
     pub fn get_type(&self) -> Type {
         use Type::*;
         match self {
-            ConstValue::I32(_) => I32,
+            ConstValue::I8(_) => I8,
             ConstValue::I16(_) => I16,
+            ConstValue::I32(_) => I32,
+            ConstValue::I64(_) => I64,
+            ConstValue::I128(_) => I128,
+            ConstValue::U8(_) => U8,
+            ConstValue::U16(_) => U16,
             ConstValue::U32(_) => U32,
+            ConstValue::U64(_) => U64,
+            ConstValue::U128(_) => U128,
+            ConstValue::Bool(_) => Bool,
         }
     }
 }
@@ -270,9 +278,16 @@ impl ConstValue {
 impl Type {
     pub fn comparable(&self) -> bool {
         match self {
-            Type::I32 => true,
+            Type::I8 => true,
             Type::I16 => true,
+            Type::I32 => true,
+            Type::I64 => true,
+            Type::I128 => true,
+            Type::U8 => true,
+            Type::U16 => true,
             Type::U32 => true,
+            Type::U64 => true,
+            Type::U128 => true,
             Type::Bool => true,
             Type::Void => false,
         }
@@ -280,9 +295,16 @@ impl Type {
 
     pub fn signed(&self) -> bool {
         match self {
-            Type::I32 => true,
+            Type::I8 => true,
             Type::I16 => true,
+            Type::I32 => true,
+            Type::I64 => true,
+            Type::I128 => true,
+            Type::U8 => false,
+            Type::U16 => false,
             Type::U32 => false,
+            Type::U64 => false,
+            Type::U128 => false,
             Type::Bool => false,
             Type::Void => false,
         }

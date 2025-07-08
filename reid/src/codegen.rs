@@ -323,8 +323,16 @@ impl mir::Literal {
 
     pub fn as_const_kind(&self) -> InstructionKind {
         InstructionKind::Constant(match *self {
-            mir::Literal::I32(val) => ConstValue::I32(val),
+            mir::Literal::I8(val) => ConstValue::I8(val),
             mir::Literal::I16(val) => ConstValue::I16(val),
+            mir::Literal::I32(val) => ConstValue::I32(val),
+            mir::Literal::I64(val) => ConstValue::I64(val),
+            mir::Literal::I128(val) => ConstValue::I128(val),
+            mir::Literal::U8(val) => ConstValue::U8(val),
+            mir::Literal::U16(val) => ConstValue::U16(val),
+            mir::Literal::U32(val) => ConstValue::U32(val),
+            mir::Literal::U64(val) => ConstValue::U64(val),
+            mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Vague(_) => panic!("Got vague literal!"),
         })
     }
@@ -333,8 +341,16 @@ impl mir::Literal {
 impl TypeKind {
     fn get_type(&self) -> Type {
         match &self {
-            TypeKind::I32 => Type::I32,
+            TypeKind::I8 => Type::I8,
             TypeKind::I16 => Type::I16,
+            TypeKind::I32 => Type::I32,
+            TypeKind::I64 => Type::I64,
+            TypeKind::I128 => Type::I128,
+            TypeKind::U8 => Type::U8,
+            TypeKind::U16 => Type::U16,
+            TypeKind::U32 => Type::U32,
+            TypeKind::U64 => Type::U64,
+            TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),

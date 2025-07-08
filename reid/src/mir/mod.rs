@@ -36,12 +36,28 @@ impl From<TokenRange> for Metadata {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TypeKind {
-    #[error("i32")]
-    I32,
-    #[error("i16")]
-    I16,
     #[error("bool")]
     Bool,
+    #[error("i8")]
+    I8,
+    #[error("i16")]
+    I16,
+    #[error("i32")]
+    I32,
+    #[error("i64")]
+    I64,
+    #[error("i128")]
+    I128,
+    #[error("u8")]
+    U8,
+    #[error("u16")]
+    U16,
+    #[error("u32")]
+    U32,
+    #[error("u64")]
+    U64,
+    #[error("u128")]
+    U128,
     #[error("void")]
     Void,
     #[error(transparent)]
@@ -71,15 +87,33 @@ impl TypeKind {
         match self {
             TypeKind::Void => false,
             TypeKind::Vague(_) => false,
-            _ => true,
+            TypeKind::Bool => false,
+            TypeKind::I8 => false,
+            TypeKind::I16 => false,
+            TypeKind::I32 => false,
+            TypeKind::I64 => false,
+            TypeKind::I128 => false,
+            TypeKind::U8 => false,
+            TypeKind::U16 => false,
+            TypeKind::U32 => false,
+            TypeKind::U64 => false,
+            TypeKind::U128 => false,
         }
     }
 
     pub fn is_maths(&self) -> bool {
         use TypeKind::*;
         match &self {
-            I32 => true,
+            I8 => true,
             I16 => true,
+            I32 => true,
+            I64 => true,
+            I128 => true,
+            U8 => true,
+            U16 => true,
+            U32 => true,
+            U64 => true,
+            U128 => true,
             Bool => true,
             Vague(_) => false,
             Void => false,
@@ -89,8 +123,16 @@ impl TypeKind {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Literal {
-    I32(i32),
+    I8(i8),
     I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
     Vague(VagueLiteral),
 }
 
@@ -102,8 +144,16 @@ pub enum VagueLiteral {
 impl Literal {
     pub fn as_type(self: &Literal) -> TypeKind {
         match self {
-            Literal::I32(_) => TypeKind::I32,
+            Literal::I8(_) => TypeKind::I8,
             Literal::I16(_) => TypeKind::I16,
+            Literal::I32(_) => TypeKind::I32,
+            Literal::I64(_) => TypeKind::I64,
+            Literal::I128(_) => TypeKind::I128,
+            Literal::U8(_) => TypeKind::U8,
+            Literal::U16(_) => TypeKind::U16,
+            Literal::U32(_) => TypeKind::U32,
+            Literal::U64(_) => TypeKind::U64,
+            Literal::U128(_) => TypeKind::U128,
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
         }
     }

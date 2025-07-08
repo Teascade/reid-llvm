@@ -15,7 +15,17 @@ impl Parse for Type {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let kind = if let Some(Token::Identifier(ident)) = stream.next() {
             Ok(match &*ident {
+                "bool" => TypeKind::Bool,
+                "i8" => TypeKind::I8,
+                "i16" => TypeKind::I16,
                 "i32" => TypeKind::I32,
+                "i64" => TypeKind::I64,
+                "i128" => TypeKind::I128,
+                "u8" => TypeKind::U8,
+                "u16" => TypeKind::U16,
+                "u32" => TypeKind::U32,
+                "u64" => TypeKind::U64,
+                "u128" => TypeKind::U128,
                 _ => panic!("asd"),
             })
         } else {

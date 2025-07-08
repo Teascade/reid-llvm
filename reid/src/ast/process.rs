@@ -168,7 +168,17 @@ impl ast::Literal {
 impl From<ast::TypeKind> for mir::TypeKind {
     fn from(value: ast::TypeKind) -> Self {
         match value {
+            ast::TypeKind::Bool => mir::TypeKind::Bool,
+            ast::TypeKind::I8 => mir::TypeKind::I8,
+            ast::TypeKind::I16 => mir::TypeKind::I16,
             ast::TypeKind::I32 => mir::TypeKind::I32,
+            ast::TypeKind::I64 => mir::TypeKind::I64,
+            ast::TypeKind::I128 => mir::TypeKind::I128,
+            ast::TypeKind::U8 => mir::TypeKind::U8,
+            ast::TypeKind::U16 => mir::TypeKind::U16,
+            ast::TypeKind::U32 => mir::TypeKind::U32,
+            ast::TypeKind::U64 => mir::TypeKind::U64,
+            ast::TypeKind::U128 => mir::TypeKind::U128,
         }
     }
 }
