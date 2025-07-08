@@ -188,6 +188,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Semi)?;
             Ok(LetStatement(
                 variable,
+                None, // TODO add possibility to name type
                 expression,
                 stream.get_range().unwrap(),
             ))

@@ -40,32 +40,6 @@ impl InferredType {
     }
 }
 
-pub struct VirtualStorage<T> {
-    storage: HashMap<String, Vec<T>>,
-}
-
-impl<T> VirtualStorage<T> {
-    fn set(&mut self, name: String, value: T) {
-        if let Some(list) = self.storage.get_mut(&name) {
-            list.push(value);
-        } else {
-            self.storage.insert(name, vec![value]);
-        };
-    }
-
-    fn get(&self, name: &String) -> Option<&Vec<T>> {
-        self.storage.get(name)
-    }
-}
-
-impl<T> Default for VirtualStorage<T> {
-    fn default() -> Self {
-        Self {
-            storage: Default::default(),
-        }
-    }
-}
-
 impl ast::Module {
     pub fn process(&self) -> mir::Module {
         let mut imports = Vec::new();
@@ -115,18 +89,20 @@ impl ast::Block {
 
         for statement in &self.0 {
             let (kind, range) = match statement {
-                ast::BlockLevelStatement::Let(s_let) => {
-                    let t = s_let.1.infer_return_type().collapse();
-                    let inferred = InferredType::Static(t.clone());
-
-                    (
-                        mir::StmtKind::Let(
-                            mir::VariableReference(t, s_let.0.clone(), s_let.2.into()),
-                            s_let.1.process(),
+                ast::BlockLevelStatement::Let(s_let) => (
+                    mir::StmtKind::Let(
+                        mir::VariableReference(
+                            s_let
+                                .1
+                                .map(|t| t.0.into())
+                                .unwrap_or(mir::TypeKind::Vague(mir::VagueType::Unknown)),
+                            s_let.0.clone(),
+                            s_let.3.into(),
                         ),
-                        s_let.2,
-                    )
-                }
+                        s_let.2.process(),
+                    ),
+                    s_let.3,
+                ),
                 ast::BlockLevelStatement::Import(_) => todo!(),
                 ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process()), e.1),
                 ast::BlockLevelStatement::Return(_, e) => (StmtKind::Expression(e.process()), e.1),
@@ -146,13 +122,6 @@ impl ast::Block {
             return_expression,
             meta: self.2.into(),
         }
-    }
-
-    fn infer_return_type(&self) -> InferredType {
-        self.1
-            .as_ref()
-            .map(|(_, expr)| expr.infer_return_type())
-            .unwrap_or(InferredType::Void)
     }
 }
 
@@ -200,26 +169,6 @@ impl ast::Expression {
         };
 
         mir::Expression(kind, self.1.into())
-    }
-
-    fn infer_return_type(&self) -> InferredType {
-        use ast::ExpressionKind::*;
-        match &self.0 {
-            VariableName(name) => InferredType::FromVariable(name.clone()),
-            Literal(lit) => InferredType::Static(lit.mir().as_type()),
-            Binop(_, lhs, rhs) => {
-                InferredType::OneOf(vec![lhs.infer_return_type(), rhs.infer_return_type()])
-            }
-            FunctionCall(fncall) => InferredType::FunctionReturn(fncall.0.clone()),
-            BlockExpr(block) => block.infer_return_type(),
-            IfExpr(exp) => {
-                let mut types = vec![exp.1.infer_return_type()];
-                if let Some(e) = &exp.2 {
-                    types.push(e.infer_return_type())
-                }
-                InferredType::OneOf(types)
-            }
-        }
     }
 }
 

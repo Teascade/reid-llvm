@@ -59,7 +59,7 @@ pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRang
 pub struct IfExpression(pub Expression, pub Block, pub Option<Block>, pub TokenRange);
 
 #[derive(Debug, Clone)]
-pub struct LetStatement(pub String, pub Expression, pub TokenRange);
+pub struct LetStatement(pub String, pub Option<Type>, pub Expression, pub TokenRange);
 
 #[derive(Debug, Clone)]
 pub struct ImportStatement(Vec<String>, pub TokenRange);
