@@ -7,13 +7,42 @@ use reid_lib::{
 
 use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
 
+#[derive(Debug)]
+pub struct CodegenContext<'ctx> {
+    pub modules: Vec<ModuleCodegen<'ctx>>,
+}
+
+impl<'ctx> CodegenContext<'ctx> {
+    pub fn compile(&self) {
+        for module in &self.modules {
+            module.context.compile();
+        }
+    }
+}
+
+impl mir::Context {
+    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
+        let mut modules = Vec::new();
+        for module in &self.modules {
+            modules.push(module.codegen(context));
+        }
+        CodegenContext { modules }
+    }
+}
+
 pub struct ModuleCodegen<'ctx> {
     pub context: &'ctx Context,
     pub module: Module<'ctx>,
 }
 
+impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.context.fmt(f)
+    }
+}
+
 impl mir::Module {
-    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
+    fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name);
 
         let mut functions = HashMap::new();

@@ -1,3 +1,4 @@
+use mir::typecheck::TypeCheck;
 use reid_lib::Context;
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
@@ -22,7 +23,7 @@ pub enum ReidError {
     #[error(transparent)]
     ParserError(#[from] token_stream::Error),
     #[error("Errors during typecheck: {0:?}")]
-    TypeCheckErrors(Vec<mir::typecheck::Error>),
+    TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
     // #[error(transparent)]
     // CodegenError(#[from] codegen::Error),
 }
@@ -48,24 +49,24 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     };
 
     dbg!(&ast_module);
-    let mut mir_module = ast_module.process();
+    let mut mir_context = mir::Context::from(vec![ast_module]);
 
-    dbg!(&mir_module);
+    dbg!(&mir_context);
 
-    let state = mir_module.typecheck();
-    dbg!(&mir_module);
+    let state = mir_context.pass(&mut TypeCheck {});
+    dbg!(&mir_context);
     dbg!(&state);
     if !state.errors.is_empty() {
         return Err(ReidError::TypeCheckErrors(state.errors));
     }
 
-    dbg!(&mir_module);
+    dbg!(&mir_context);
 
     let mut context = Context::new();
-    let codegen_module = mir_module.codegen(&mut context);
+    let codegen_modules = mir_context.codegen(&mut context);
 
-    dbg!(&codegen_module.context);
-    codegen_module.context.compile();
+    dbg!(&codegen_modules);
+    codegen_modules.compile();
 
     Ok(String::new())
 

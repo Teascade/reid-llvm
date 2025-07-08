@@ -3,8 +3,16 @@ use crate::{
     mir::{self, StmtKind, VariableReference},
 };
 
+impl mir::Context {
+    pub fn from(modules: Vec<ast::Module>) -> mir::Context {
+        mir::Context {
+            modules: modules.iter().map(|m| m.process()).collect(),
+        }
+    }
+}
+
 impl ast::Module {
-    pub fn process(&self) -> mir::Module {
+    fn process(&self) -> mir::Module {
         let mut imports = Vec::new();
         let mut functions = Vec::new();
 

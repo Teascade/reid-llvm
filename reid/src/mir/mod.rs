@@ -3,6 +3,7 @@
 /// type-checked beforehand.
 use crate::token_stream::TokenRange;
 
+pub mod pass;
 pub mod typecheck;
 pub mod types;
 
@@ -214,4 +215,9 @@ pub struct Module {
     pub name: String,
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionDefinition>,
+}
+
+#[derive(Debug)]
+pub struct Context {
+    pub modules: Vec<Module>,
 }

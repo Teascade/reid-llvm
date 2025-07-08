@@ -1,4 +1,4 @@
-use reid::mir::*;
+use reid::mir::{self, *};
 use reid_lib::Context;
 
 fn main() {
@@ -152,21 +152,22 @@ fn main() {
         ),
     };
 
+    let mir_context = mir::Context {
+        modules: vec![Module {
+            name: "test module".to_owned(),
+            imports: vec![],
+            functions: vec![fibonacci, main],
+        }],
+    };
     println!("test1");
 
-    let module = Module {
-        name: "test module".to_owned(),
-        imports: vec![],
-        functions: vec![fibonacci, main],
-    };
-
-    println!("test2");
     let context = Context::new();
-    let codegen_module = module.codegen(&context);
+    let codegen = mir_context.codegen(&context);
+    println!("test2");
 
+    codegen.compile();
     println!("test3");
 
-    codegen_module.context.compile();
     // match codegen_module.module.print_to_string() {
     //     Ok(v) => println!("{}", v),
     //     Err(e) => println!("Err: {:?}", e),
