@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::Infallible, iter};
 
 /// This module contains code relevant to doing a type checking pass on the MIR.
-use crate::{mir::*, util::try_all};
+use crate::{ast::Type, mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
 
@@ -113,6 +113,8 @@ impl State {
 pub struct Scope {
     function_returns: TypeStorage<ScopeFunction>,
     variables: TypeStorage<TypeKind>,
+    /// Hard Return type of this scope, if inside a function
+    return_type_hint: Option<TypeKind>,
 }
 
 #[derive(Clone)]
@@ -126,6 +128,7 @@ impl Scope {
         Scope {
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
+            return_type_hint: self.return_type_hint,
         }
     }
 }
@@ -176,7 +179,8 @@ impl FunctionDefinition {
         let return_type = self.return_type.clone();
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
-                block.typecheck(state, scope, Some(return_type), Some(return_type))
+                scope.return_type_hint = Some(self.return_type);
+                block.typecheck(state, scope, Some(return_type))
             }
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
@@ -194,20 +198,14 @@ impl Block {
         &mut self,
         state: &mut State,
         scope: &mut Scope,
-        soft_hint: Option<TypeKind>,
-        hard_hint: Option<TypeKind>,
+        hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         let mut scope = scope.inner();
 
         for statement in &mut self.statements {
             match &mut statement.0 {
                 StmtKind::Let(variable_reference, expression) => {
-                    let res = expression.typecheck(
-                        state,
-                        &mut scope,
-                        Some(variable_reference.0),
-                        hard_hint,
-                    );
+                    let res = expression.typecheck(state, &mut scope, Some(variable_reference.0));
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown.
@@ -237,14 +235,18 @@ impl Block {
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
-                    let res = expression.typecheck(state, &mut scope, soft_hint, hard_hint);
+                    let res = expression.typecheck(state, &mut scope, hint_t);
                     state.ok(res, expression.1);
                 }
             }
         }
 
-        if let Some((_, expr)) = &mut self.return_expression {
-            let res = expr.typecheck(state, &mut scope, hard_hint, hard_hint);
+        if let Some((return_kind, expr)) = &mut self.return_expression {
+            let ret_hint_t = match return_kind {
+                ReturnKind::Hard => scope.return_type_hint,
+                ReturnKind::Soft => hint_t,
+            };
+            let res = expr.typecheck(state, &mut scope, ret_hint_t);
             Ok(state.or_else(res, Vague(Unknown), expr.1))
         } else {
             Ok(Void)
@@ -257,8 +259,7 @@ impl Expression {
         &mut self,
         state: &mut State,
         scope: &mut Scope,
-        soft_hint: Option<TypeKind>,
-        hard_hint: Option<TypeKind>,
+        hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var_ref) => {
@@ -282,15 +283,15 @@ impl Expression {
                 Ok(var_ref.0)
             }
             ExprKind::Literal(literal) => {
-                *literal = literal.try_coerce(soft_hint)?;
+                *literal = literal.try_coerce(hint_t)?;
                 Ok(literal.as_type())
             }
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, scope, soft_hint, hard_hint); // TODO
+                let lhs_res = lhs.typecheck(state, scope, None); // TODO
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, scope, Some(lhs_type), hard_hint); // TODO
+                let rhs_res = rhs.typecheck(state, scope, Some(lhs_type)); // TODO
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
                 let res = lhs_type.binop_type(&op, &rhs_type)?;
                 Ok(res)
@@ -312,8 +313,7 @@ impl Expression {
                     for (param, true_param_t) in
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
-                        let param_res =
-                            param.typecheck(state, scope, Some(true_param_t), hard_hint);
+                        let param_res = param.typecheck(state, scope, Some(true_param_t));
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
                     }
@@ -330,21 +330,21 @@ impl Expression {
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
                 // TODO make sure cond_res is Boolean here
-                let cond_res = cond.typecheck(state, scope, Some(Bool), hard_hint);
+                let cond_res = cond.typecheck(state, scope, Some(Bool));
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
 
-                let lhs_res = lhs.typecheck(state, scope, soft_hint, hard_hint);
+                let lhs_res = lhs.typecheck(state, scope, hint_t);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.meta);
                 let rhs_type = if let Some(rhs) = rhs {
-                    let res = rhs.typecheck(state, scope, soft_hint, hard_hint);
+                    let res = rhs.typecheck(state, scope, hint_t);
                     state.or_else(res, Vague(Unknown), rhs.meta)
                 } else {
                     Vague(Unknown)
                 };
                 lhs_type.collapse_into(&rhs_type)
             }
-            ExprKind::Block(block) => block.typecheck(state, scope, soft_hint, hard_hint),
+            ExprKind::Block(block) => block.typecheck(state, scope, hint_t),
         }
     }
 }
