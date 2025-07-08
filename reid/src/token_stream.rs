@@ -76,6 +76,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     /// Parse the next item with Parse-trait, also mapping it with the given
     /// function. The token-stream is only consumed, if the inner function
     /// retuns an Ok.
+    #[allow(dead_code)]
     pub fn parse_map<T: Parse + std::fmt::Debug, F, O>(&mut self, inner: F) -> Result<O, Error>
     where
         F: Fn(T) -> Result<O, Error>,

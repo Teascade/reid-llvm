@@ -1,9 +1,8 @@
-use std::{collections::HashMap, mem, ops::Deref};
+use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::{FunctionValue, InstructionValue},
-    Block, ConstValue, Context, Function, InstructionKind, IntPredicate, Module, TerminatorKind,
-    Type,
+    builder::InstructionValue, Block, ConstValue, Context, Function, InstructionKind, IntPredicate,
+    Module, TerminatorKind, Type,
 };
 
 use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
@@ -40,7 +39,7 @@ impl mir::Module {
             let mut entry = function.block("entry");
 
             let mut stack_values = HashMap::new();
-            for (i, (p_name, p_type)) in mir_function.parameters.iter().enumerate() {
+            for (i, (p_name, _)) in mir_function.parameters.iter().enumerate() {
                 stack_values.insert(
                     p_name.clone(),
                     entry.build(InstructionKind::Param(i)).unwrap(),

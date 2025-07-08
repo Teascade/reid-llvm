@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CString, hash::Hash, process::Termination, ptr::null_mut};
+use std::{collections::HashMap, ffi::CString, ptr::null_mut};
 
 use llvm_sys::{
     LLVMIntPredicate,
@@ -18,7 +18,7 @@ use llvm_sys::{
 use crate::util::{ErrorMessageHolder, from_cstring, into_cstring};
 
 use super::{
-    ConstValue, Context, Function, IntPredicate, Module, TerminatorKind, Type,
+    ConstValue, Context, IntPredicate, TerminatorKind, Type,
     builder::{
         BlockHolder, BlockValue, Builder, FunctionHolder, FunctionValue, InstructionHolder,
         InstructionValue, ModuleHolder,
@@ -54,6 +54,7 @@ pub struct LLVMModule<'a> {
     builder: &'a Builder,
     context_ref: LLVMContextRef,
     builder_ref: LLVMBuilderRef,
+    #[allow(dead_code)]
     module_ref: LLVMModuleRef,
     functions: HashMap<FunctionValue, LLVMFunction>,
     blocks: HashMap<BlockValue, LLVMBasicBlockRef>,
@@ -67,7 +68,7 @@ pub struct LLVMFunction {
 }
 
 pub struct LLVMValue {
-    ty: Type,
+    _ty: Type,
     value_ref: LLVMValueRef,
 }
 
@@ -244,9 +245,9 @@ impl InstructionHolder {
         &self,
         module: &LLVMModule,
         function: &LLVMFunction,
-        block: LLVMBasicBlockRef,
+        _block: LLVMBasicBlockRef,
     ) -> LLVMValue {
-        let ty = self.value.get_type(module.builder).unwrap();
+        let _ty = self.value.get_type(module.builder).unwrap();
         let val = unsafe {
             use super::InstructionKind::*;
             match &self.data.kind {
@@ -267,7 +268,7 @@ impl InstructionHolder {
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildICmp(
                         module.builder_ref,
-                        pred.as_llvm(ty.signed()),
+                        pred.as_llvm(_ty.signed()),
                         lhs_val,
                         rhs_val,
                         c"icmp".as_ptr(),
@@ -298,7 +299,7 @@ impl InstructionHolder {
                     }
                     let phi = LLVMBuildPhi(
                         module.builder_ref,
-                        ty.as_llvm(module.context_ref),
+                        _ty.as_llvm(module.context_ref),
                         c"phi".as_ptr(),
                     );
                     LLVMAddIncoming(
@@ -311,7 +312,10 @@ impl InstructionHolder {
                 }
             }
         };
-        LLVMValue { ty, value_ref: val }
+        LLVMValue {
+            _ty,
+            value_ref: val,
+        }
     }
 }
 
@@ -319,10 +323,10 @@ impl TerminatorKind {
     fn compile(
         &self,
         module: &LLVMModule,
-        function: &LLVMFunction,
-        block: LLVMBasicBlockRef,
+        _function: &LLVMFunction,
+        _block: LLVMBasicBlockRef,
     ) -> LLVMValue {
-        let ty = self.get_type(module.builder).unwrap();
+        let _ty = self.get_type(module.builder).unwrap();
         let val = unsafe {
             match self {
                 TerminatorKind::Ret(val) => {
@@ -341,7 +345,10 @@ impl TerminatorKind {
                 }
             }
         };
-        LLVMValue { ty, value_ref: val }
+        LLVMValue {
+            _ty,
+            value_ref: val,
+        }
     }
 }
 

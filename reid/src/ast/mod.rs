@@ -53,10 +53,19 @@ impl BinaryOperator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRange);
+pub struct FunctionCallExpression(
+    pub String,
+    pub Vec<Expression>,
+    #[allow(dead_code)] pub TokenRange,
+);
 
 #[derive(Debug, Clone)]
-pub struct IfExpression(pub Expression, pub Block, pub Option<Block>, pub TokenRange);
+pub struct IfExpression(
+    pub Expression,
+    pub Block,
+    pub Option<Block>,
+    #[allow(dead_code)] pub TokenRange,
+);
 
 #[derive(Debug, Clone)]
 pub struct LetStatement(pub String, pub Option<Type>, pub Expression, pub TokenRange);
@@ -72,6 +81,7 @@ pub struct FunctionSignature {
     pub name: String,
     pub args: Vec<(String, Type)>,
     pub return_type: Option<Type>,
+    #[allow(dead_code)]
     pub range: TokenRange,
 }
 
@@ -91,7 +101,7 @@ pub struct Block(
 #[derive(Debug, Clone)]
 pub enum BlockLevelStatement {
     Let(LetStatement),
-    Import(ImportStatement),
+    Import { _i: ImportStatement },
     Expression(Expression),
     Return(ReturnType, Expression),
 }

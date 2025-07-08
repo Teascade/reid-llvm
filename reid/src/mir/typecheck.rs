@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::Infallible, iter};
 
 /// This module contains code relevant to doing a type checking pass on the MIR.
-use crate::{ast::Type, mir::*, util::try_all};
+use crate::{mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
 

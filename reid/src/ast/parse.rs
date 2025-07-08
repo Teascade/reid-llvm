@@ -308,7 +308,9 @@ impl Parse for BlockLevelStatement {
         use BlockLevelStatement as Stmt;
         Ok(match stream.peek() {
             Some(Token::LetKeyword) => Stmt::Let(stream.parse()?),
-            Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
+            Some(Token::ImportKeyword) => Stmt::Import {
+                _i: stream.parse()?,
+            },
             Some(Token::ReturnKeyword) => {
                 stream.next();
                 let exp = stream.parse()?;

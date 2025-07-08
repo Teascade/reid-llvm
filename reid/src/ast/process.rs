@@ -1,44 +1,7 @@
-use std::collections::HashMap;
-
 use crate::{
-    ast::{self, TypeKind},
+    ast::{self},
     mir::{self, StmtKind, VariableReference},
 };
-
-#[derive(Clone)]
-pub enum InferredType {
-    FromVariable(String),
-    FunctionReturn(String),
-    Static(mir::TypeKind),
-    OneOf(Vec<InferredType>),
-    Void,
-    Unknown,
-}
-
-impl InferredType {
-    fn collapse(&self) -> mir::TypeKind {
-        match self {
-            InferredType::FromVariable(_) => mir::TypeKind::Vague(mir::VagueType::Unknown),
-            InferredType::FunctionReturn(_) => mir::TypeKind::Vague(mir::VagueType::Unknown),
-            InferredType::Static(type_kind) => type_kind.clone(),
-            InferredType::OneOf(inferred_types) => {
-                let list: Vec<mir::TypeKind> =
-                    inferred_types.iter().map(|t| t.collapse()).collect();
-                if let Some(first) = list.first() {
-                    if list.iter().all(|i| i == first) {
-                        first.clone().into()
-                    } else {
-                        mir::TypeKind::Vague(mir::VagueType::Unknown)
-                    }
-                } else {
-                    mir::TypeKind::Void
-                }
-            }
-            InferredType::Void => mir::TypeKind::Void,
-            InferredType::Unknown => mir::TypeKind::Vague(mir::VagueType::Unknown),
-        }
-    }
-}
 
 impl ast::Module {
     pub fn process(&self) -> mir::Module {
@@ -103,7 +66,7 @@ impl ast::Block {
                     ),
                     s_let.3,
                 ),
-                ast::BlockLevelStatement::Import(_) => todo!(),
+                ast::BlockLevelStatement::Import { _i } => todo!(),
                 ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process()), e.1),
                 ast::BlockLevelStatement::Return(_, e) => (StmtKind::Expression(e.process()), e.1),
             };

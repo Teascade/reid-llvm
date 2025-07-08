@@ -1,4 +1,4 @@
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     BlockData, ConstValue, FunctionData, InstructionData, InstructionKind, ModuleData,
@@ -140,6 +140,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) unsafe fn module_data(&self, value: &ModuleValue) -> ModuleData {
         unsafe { self.modules.borrow().get_unchecked(value.0).data.clone() }
     }
@@ -156,6 +157,7 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) unsafe fn block_data(&self, value: &BlockValue) -> BlockData {
         unsafe {
             self.modules
@@ -235,7 +237,6 @@ impl Builder {
 impl InstructionValue {
     pub fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
         use InstructionKind::*;
-        use Type::*;
         unsafe {
             match &builder.instr_data(self).kind {
                 Param(nth) => builder
@@ -247,7 +248,7 @@ impl InstructionValue {
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
                 Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
-                ICmp(pred, lhs, rhs) => Ok(Type::Bool),
+                ICmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
             }
