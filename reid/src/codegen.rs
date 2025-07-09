@@ -240,8 +240,12 @@ impl mir::Expression {
                     mir::BinaryOperator::Minus => {
                         scope.block.build(InstructionKind::Sub(lhs, rhs)).unwrap()
                     }
-                    mir::BinaryOperator::Mult => todo!(),
-                    mir::BinaryOperator::And => todo!(),
+                    mir::BinaryOperator::Mult => {
+                        scope.block.build(InstructionKind::Mult(lhs, rhs)).unwrap()
+                    }
+                    mir::BinaryOperator::And => {
+                        scope.block.build(InstructionKind::And(lhs, rhs)).unwrap()
+                    }
                     mir::BinaryOperator::Logic(l) => scope
                         .block
                         .build(InstructionKind::ICmp(l.int_predicate(), lhs, rhs))

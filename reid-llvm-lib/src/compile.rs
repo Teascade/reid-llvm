@@ -263,6 +263,16 @@ impl InstructionHolder {
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildSub(module.builder_ref, lhs_val, rhs_val, c"sub".as_ptr())
                 }
+                Mult(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildMul(module.builder_ref, lhs_val, rhs_val, c"mul".as_ptr())
+                }
+                And(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildAnd(module.builder_ref, lhs_val, rhs_val, c"and".as_ptr())
+                }
                 ICmp(pred, lhs, rhs) => {
                     let lhs = module.values.get(&lhs).unwrap();
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;

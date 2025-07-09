@@ -103,7 +103,10 @@ impl Display for StmtKind {
 
 impl Display for Expression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
+        f.write_char('(')?;
+        Display::fmt(&self.0, f)?;
+        f.write_char(')')?;
+        Ok(())
     }
 }
 

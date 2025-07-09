@@ -86,6 +86,8 @@ impl Debug for InstructionKind {
             Self::Constant(c) => c.fmt(f),
             Self::Add(lhs, rhs) => fmt_binop(f, lhs, &"+", rhs),
             Self::Sub(lhs, rhs) => fmt_binop(f, lhs, &"-", rhs),
+            Self::Mult(lhs, rhs) => fmt_binop(f, lhs, &"*", rhs),
+            Self::And(lhs, rhs) => fmt_binop(f, lhs, &"&&", rhs),
             Self::Phi(val) => fmt_call(f, &"Phi", &val),
             Self::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
             Self::FunctionCall(fun, params) => fmt_call(f, fun, params),

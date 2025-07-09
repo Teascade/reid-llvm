@@ -152,6 +152,8 @@ pub enum InstructionKind {
     Constant(ConstValue),
     Add(InstructionValue, InstructionValue),
     Sub(InstructionValue, InstructionValue),
+    Mult(InstructionValue, InstructionValue),
+    And(InstructionValue, InstructionValue),
     Phi(Vec<InstructionValue>),
 
     /// Integer Comparison

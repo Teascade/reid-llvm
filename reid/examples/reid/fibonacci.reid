@@ -1,6 +1,6 @@
 // Main
 fn main() -> bool {
-    return 2 == fibonacci(3);
+    return (5 == fibonacci(5)) && (2 == fibonacci(3));
 }
 
 // Fibonacci

@@ -200,6 +200,8 @@ impl Builder {
                 Constant(_) => Ok(()),
                 Add(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Sub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Mult(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 ICmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
                     if t.comparable() {
@@ -248,6 +250,8 @@ impl InstructionValue {
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
                 Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Mult(lhs, rhs) => match_types(lhs, rhs, &builder),
+                And(lhs, rhs) => match_types(lhs, rhs, &builder),
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
