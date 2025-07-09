@@ -44,7 +44,7 @@ pub struct InstructionHolder {
     pub(crate) data: InstructionData,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Builder {
     modules: Rc<RefCell<Vec<ModuleHolder>>>,
 }

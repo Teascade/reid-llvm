@@ -1,0 +1,200 @@
+use std::fmt::{write, Debug, Display, Write};
+
+use crate::pad_adapter::PadAdapter;
+
+use super::*;
+
+impl Display for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for module in &self.modules {
+            Display::fmt(&module, f)?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for Module {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Module({}) {{", self.name)?;
+
+        let mut state = Default::default();
+        let mut inner_f = PadAdapter::wrap(f, &mut state);
+
+        for import in &self.imports {
+            writeln!(inner_f, "{}", import)?;
+        }
+        for fun in &self.functions {
+            writeln!(inner_f, "{}", fun)?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl Display for Import {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "import {}", self.0)
+    }
+}
+
+impl Display for FunctionDefinition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "fn {}({}) -> {} ",
+            self.name,
+            self.parameters
+                .iter()
+                .map(|(n, t)| format!("{}: {}", n, t))
+                .collect::<Vec<_>>()
+                .join(", "),
+            self.return_type
+        )?;
+        Display::fmt(&self.kind, f)
+    }
+}
+
+impl Display for FunctionDefinitionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Local(block, _) => {
+                write!(f, "{}", block)?;
+                Ok(())
+            }
+            Self::Extern => write!(f, "<External>"),
+        }
+    }
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{{")?;
+        let mut state = Default::default();
+        let mut inner_f = PadAdapter::wrap(f, &mut state);
+        for statement in &self.statements {
+            write!(inner_f, "{}", statement)?;
+        }
+        if let Some(ret) = &self.return_expression {
+            match ret.0 {
+                ReturnKind::Hard => writeln!(inner_f, "Return(Hard): {}", ret.1),
+                ReturnKind::Soft => writeln!(inner_f, "Return(Hard): {}", ret.1),
+            }?;
+        } else {
+            writeln!(inner_f, "No Return")?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
+impl Display for Statement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}", self.0)
+    }
+}
+
+impl Display for StmtKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Let(var, block) => write!(f, "let {} = {}", var, block),
+            Self::Import(n) => write!(f, "import {}", n),
+            Self::Expression(exp) => Display::fmt(exp, f),
+        }
+    }
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
+    }
+}
+
+impl Display for ExprKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable(var) => Display::fmt(var, f),
+            Self::Literal(lit) => Display::fmt(lit, f),
+            Self::BinOp(op, lhs, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
+            Self::FunctionCall(fc) => Display::fmt(fc, f),
+            Self::If(if_exp) => Display::fmt(&if_exp, f),
+            Self::Block(block) => Display::fmt(block, f),
+        }
+    }
+}
+
+impl Display for IfExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "if {} ", self.0)?;
+        Display::fmt(&self.1, f)?;
+        if let Some(e) = &self.2 {
+            Display::fmt(&e, f)?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for FunctionCall {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}<{}>(", self.name, self.return_type)?;
+        for (i, param) in self.parameters.iter().enumerate() {
+            Display::fmt(param, f)?;
+            if i < (self.parameters.len() - 1) {
+                write!(f, ", ")?;
+            }
+        }
+        write!(f, ")")
+    }
+}
+
+impl Display for VariableReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "v(\"{}\", {})", &self.1, &self.0)
+    }
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::I8(val) => write!(f, "{}i8", val),
+            Self::I16(val) => write!(f, "{}i16", val),
+            Self::I32(val) => write!(f, "{}i32", val),
+            Self::I64(val) => write!(f, "{}i64", val),
+            Self::I128(val) => write!(f, "{}i128", val),
+            Self::U8(val) => write!(f, "{}u8", val),
+            Self::U16(val) => write!(f, "{}u16", val),
+            Self::U32(val) => write!(f, "{}u32", val),
+            Self::U64(val) => write!(f, "{}u64", val),
+            Self::U128(val) => write!(f, "{}u128", val),
+            Self::Vague(val) => val.fmt(f),
+        }
+    }
+}
+
+impl Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BinaryOperator::Add => write!(f, "+"),
+            BinaryOperator::Minus => write!(f, "-"),
+            BinaryOperator::Mult => write!(f, "*"),
+            BinaryOperator::And => write!(f, "&&"),
+            BinaryOperator::Logic(op) => Display::fmt(op, f),
+        }
+    }
+}
+
+impl Display for LogicOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogicOperator::LT => write!(f, "<"),
+            LogicOperator::LE => write!(f, "<="),
+            LogicOperator::GT => write!(f, ">"),
+            LogicOperator::GE => write!(f, ">="),
+            LogicOperator::EQ => write!(f, "=="),
+            LogicOperator::NE => write!(f, "!="),
+        }
+    }
+}
+
+impl Display for Metadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.range)
+    }
+}

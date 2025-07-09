@@ -1,11 +1,17 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Write};
 
 use crate::{CmpPredicate, InstructionData, InstructionKind, TerminatorKind, builder::*};
 
+impl Debug for Builder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.get_modules().borrow().iter());
+        Ok(())
+    }
+}
+
 impl Debug for ModuleHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple(&format!("Module({})", self.data.name))
-            .field(&self.value)
+        f.debug_tuple(&format!("{}({:#?}) ", self.data.name, self.value))
             .field(&self.functions)
             .finish()
     }
@@ -14,7 +20,7 @@ impl Debug for ModuleHolder {
 impl Debug for FunctionHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!(
-            "{}({:?}) -> {:?}",
+            "{}({:?}) -> {:?} ",
             self.data.name, self.data.params, self.data.ret
         ))
         .field(&self.blocks)
@@ -24,8 +30,7 @@ impl Debug for FunctionHolder {
 
 impl Debug for BlockHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple(&format!("Block({})", self.data.name))
-            .field(&self.value)
+        f.debug_tuple(&format!("{}[{:?}]", &self.data.name, &self.value))
             .field(&self.instructions)
             .field(&self.data.terminator)
             .finish()
@@ -34,7 +39,9 @@ impl Debug for BlockHolder {
 
 impl Debug for InstructionHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?} = {:?}", &self.value, &self.data)
+        self.value.fmt(f)?;
+        f.write_str(" = ")?;
+        self.data.fmt(f)
     }
 }
 
@@ -46,19 +53,19 @@ impl Debug for InstructionData {
 
 impl Debug for ModuleValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "M[{}]", &self.0)
+        write!(f, "M[{:0>2}]", self.0)
     }
 }
 
 impl Debug for FunctionValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "F[{}, {}]", &self.0.0, &self.1,)
+        write!(f, "F[{:0>2}-{:0>2}]", &self.0.0, self.1)
     }
 }
 
 impl Debug for BlockValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "B[{}, {}, {}]", &self.0.0.0, &self.0.1, self.1)
+        write!(f, "B[{:0>2}-{:0>2}-{:0>2}]", &self.0.0.0, &self.0.1, self.1)
     }
 }
 
@@ -66,7 +73,7 @@ impl Debug for InstructionValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "I<{}-{}-{}-{}>",
+            "I[{:0>2}-{:0>2}-{:0>2}-{:0>2}]",
             &self.0.0.0.0, &self.0.0.1, &self.0.1, self.1
         )
     }
@@ -75,15 +82,39 @@ impl Debug for InstructionValue {
 impl Debug for InstructionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Param(nth) => write!(f, "Param({})", &nth),
-            Self::Constant(c) => write!(f, "{:?}", &c),
-            Self::Add(lhs, rhs) => write!(f, "{:?} + {:?}", &lhs, &rhs),
-            Self::Sub(lhs, rhs) => write!(f, "{:?} + {:?}", &lhs, &rhs),
-            Self::Phi(val) => write!(f, "Phi: {:?}", &val),
-            Self::ICmp(cmp, lhs, rhs) => write!(f, "{:?} {:?} {:?}", &lhs, &cmp, &rhs),
-            Self::FunctionCall(fun, params) => write!(f, "{:?}({:?})", &fun, &params),
+            Self::Param(nth) => fmt_call(f, &"Param", &nth),
+            Self::Constant(c) => c.fmt(f),
+            Self::Add(lhs, rhs) => fmt_binop(f, lhs, &"+", rhs),
+            Self::Sub(lhs, rhs) => fmt_binop(f, lhs, &"-", rhs),
+            Self::Phi(val) => fmt_call(f, &"Phi", &val),
+            Self::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
+            Self::FunctionCall(fun, params) => fmt_call(f, fun, params),
         }
     }
+}
+
+fn fmt_binop(
+    f: &mut std::fmt::Formatter<'_>,
+    lhs: &impl std::fmt::Debug,
+    op: &impl std::fmt::Debug,
+    rhs: &impl std::fmt::Debug,
+) -> std::fmt::Result {
+    lhs.fmt(f)?;
+    f.write_char(' ')?;
+    op.fmt(f)?;
+    f.write_char(' ')?;
+    rhs.fmt(f)
+}
+
+fn fmt_call(
+    f: &mut std::fmt::Formatter<'_>,
+    fun: &impl std::fmt::Debug,
+    params: &impl std::fmt::Debug,
+) -> std::fmt::Result {
+    fun.fmt(f)?;
+    f.write_char('(')?;
+    params.fmt(f)?;
+    f.write_char(')')
 }
 
 impl Debug for CmpPredicate {
@@ -102,9 +133,23 @@ impl Debug for CmpPredicate {
 impl Debug for TerminatorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Ret(val) => write!(f, "Ret {:?}", &val),
-            Self::Branch(val) => write!(f, "Br {:?}", &val),
-            Self::CondBr(cond, b1, b2) => write!(f, "CondBr {:?} ? {:?} : {:?}", &cond, &b1, &b2),
+            Self::Ret(val) => {
+                write!(f, "Ret ")?;
+                val.fmt(f)
+            }
+            Self::Branch(val) => {
+                write!(f, "Br ")?;
+                val.fmt(f)
+            }
+            Self::CondBr(cond, b1, b2) => {
+                write!(f, "CondBr ")?;
+                cond.fmt(f)?;
+                write!(f, " ? ")?;
+                b1.fmt(f)?;
+                write!(f, " : ")?;
+                b2.fmt(f)?;
+                Ok(())
+            }
         }
     }
 }

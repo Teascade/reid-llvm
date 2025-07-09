@@ -91,7 +91,7 @@ pub struct IfExpression(
 pub struct LetStatement(pub String, pub Option<Type>, pub Expression, pub TokenRange);
 
 #[derive(Debug, Clone)]
-pub struct ImportStatement(Vec<String>, pub TokenRange);
+pub struct ImportStatement(pub Vec<String>, pub TokenRange);
 
 #[derive(Debug)]
 pub struct FunctionDefinition(pub FunctionSignature, pub Block, pub TokenRange);

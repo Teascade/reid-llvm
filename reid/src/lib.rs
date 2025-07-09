@@ -7,6 +7,7 @@ mod ast;
 mod codegen;
 mod lexer;
 pub mod mir;
+mod pad_adapter;
 mod token_stream;
 mod util;
 
@@ -39,7 +40,6 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
 
     while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
         let statement = token_stream.parse::<TopLevelStatement>()?;
-        dbg!(&statement);
         statements.push(statement);
     }
 
@@ -51,16 +51,14 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     dbg!(&ast_module);
     let mut mir_context = mir::Context::from(vec![ast_module]);
 
-    dbg!(&mir_context);
-
     let state = mir_context.pass(&mut TypeCheck {});
-    dbg!(&mir_context);
     dbg!(&state);
+
+    println!("{}", &mir_context);
+
     if !state.errors.is_empty() {
         return Err(ReidError::TypeCheckErrors(state.errors));
     }
-
-    dbg!(&mir_context);
 
     let mut context = Context::new();
     let codegen_modules = mir_context.codegen(&mut context);

@@ -3,19 +3,14 @@
 /// type-checked beforehand.
 use crate::token_stream::TokenRange;
 
+mod display;
 pub mod pass;
 pub mod typecheck;
 pub mod types;
 
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Metadata {
     pub range: TokenRange,
-}
-
-impl std::fmt::Display for Metadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.range)
-    }
 }
 
 impl std::ops::Add for Metadata {

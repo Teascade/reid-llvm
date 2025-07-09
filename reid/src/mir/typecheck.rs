@@ -141,8 +141,6 @@ impl Expression {
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var_ref) => {
-                dbg!(&state.scope);
-
                 let existing = state.or_else(
                     state
                         .scope
