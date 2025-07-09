@@ -359,12 +359,12 @@ impl CmpPredicate {
         use LLVMIntPredicate::*;
         match (self, signed) {
             (LT, true) => LLVMIntSLT,
-            (GT, true) => LLVMIntSGT,
             (LE, true) => LLVMIntSLE,
+            (GT, true) => LLVMIntSGT,
             (GE, true) => LLVMIntSGE,
             (LT, false) => LLVMIntULT,
-            (GT, false) => LLVMIntUGT,
             (LE, false) => LLVMIntULE,
+            (GT, false) => LLVMIntUGT,
             (GE, false) => LLVMIntUGE,
             (EQ, _) => LLVMIntEQ,
             (NE, _) => LLVMIntNE,

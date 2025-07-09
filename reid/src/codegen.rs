@@ -291,7 +291,7 @@ impl mir::LogicOperator {
         match self {
             mir::LogicOperator::LT => CmpPredicate::LT,
             mir::LogicOperator::GT => CmpPredicate::GT,
-            mir::LogicOperator::LE => CmpPredicate::LT,
+            mir::LogicOperator::LE => CmpPredicate::LE,
             mir::LogicOperator::GE => CmpPredicate::GE,
             mir::LogicOperator::EQ => CmpPredicate::EQ,
             mir::LogicOperator::NE => CmpPredicate::NE,

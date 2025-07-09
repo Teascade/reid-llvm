@@ -1,12 +1,12 @@
 // Main
 fn main() -> bool {
-    return 1 == fibonacci(3);
+    return 2 == fibonacci(3);
 }
 
 // Fibonacci
 fn fibonacci(value: u16) -> u16 {
-    if value < 3 {
+    if value <= 2 {
         return 1;
     }
-    return 5 + fibonacci(value - 2);
+    return fibonacci(value - 1) + fibonacci(value - 2);
 }
