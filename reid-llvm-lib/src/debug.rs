@@ -145,6 +145,7 @@ impl Debug for TerminatorKind {
                 write!(f, "Ret ")?;
                 val.fmt(f)
             }
+            Self::RetVoid => write!(f, "Void Ret"),
             Self::Br(val) => {
                 write!(f, "Br ")?;
                 val.fmt(f)

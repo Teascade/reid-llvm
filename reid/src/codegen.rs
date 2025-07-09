@@ -90,7 +90,11 @@ impl mir::Module {
                     if let Some(ret) = block.codegen(&mut scope) {
                         scope.block.terminate(Term::Ret(ret)).unwrap();
                     } else {
-                        scope.block.delete_if_unused().unwrap();
+                        if !scope.block.delete_if_unused().unwrap() {
+                            // Add a void return just in case if the block
+                            // wasn't unused but didn't have a terminator yet
+                            scope.block.terminate(Term::RetVoid).unwrap();
+                        }
                     }
                 }
                 mir::FunctionDefinitionKind::Extern => {}

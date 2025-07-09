@@ -269,6 +269,7 @@ impl Builder {
                 if let Some(term) = &other.data.terminator {
                     match term {
                         TerminatorKind::Ret(_) => {}
+                        TerminatorKind::RetVoid => {}
                         TerminatorKind::Br(other_val) => {
                             if other_val == &block_v {
                                 return true;
@@ -372,6 +373,7 @@ impl TerminatorKind {
         use TerminatorKind::*;
         match self {
             Ret(instr_val) => instr_val.get_type(builder),
+            RetVoid => Ok(Type::Void),
             Br(_) => Ok(Type::Void),
             CondBr(_, _, _) => Ok(Type::Void),
         }

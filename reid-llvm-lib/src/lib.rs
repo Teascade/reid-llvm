@@ -132,12 +132,14 @@ impl<'builder> Block<'builder> {
         unsafe { self.builder.terminate(&self.value, instruction) }
     }
 
-    pub fn delete_if_unused(&mut self) -> Result<(), ()> {
+    /// Delete block if it is unused. Return true if deleted, false if not.
+    pub fn delete_if_unused(&mut self) -> Result<bool, ()> {
         unsafe {
             if !self.builder.is_block_used(self.value()) {
-                self.builder.delete_block(&self.value)
+                self.builder.delete_block(&self.value)?;
+                Ok(true)
             } else {
-                Ok(())
+                Ok(false)
             }
         }
     }
@@ -212,6 +214,7 @@ pub enum ConstValue {
 #[derive(Clone, Hash)]
 pub enum TerminatorKind {
     Ret(InstructionValue),
+    RetVoid,
     Br(BlockValue),
     CondBr(InstructionValue, BlockValue, BlockValue),
 }

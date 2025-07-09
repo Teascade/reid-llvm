@@ -356,6 +356,7 @@ impl TerminatorKind {
                     let value = module.values.get(val).unwrap();
                     LLVMBuildRet(module.builder_ref, value.value_ref)
                 }
+                TerminatorKind::RetVoid => LLVMBuildRetVoid(module.builder_ref),
                 TerminatorKind::Br(block_value) => {
                     let dest = *module.blocks.get(block_value).unwrap();
                     LLVMBuildBr(module.builder_ref, dest)
