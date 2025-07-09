@@ -128,7 +128,7 @@ impl Block {
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, None);
-                    let res_t = state.or_else(res, Void, expression.1);
+                    state.or_else(res, Void, expression.1);
                     if let Ok((kind, _)) = expression.return_type() {
                         Some((kind, expression))
                     } else {
