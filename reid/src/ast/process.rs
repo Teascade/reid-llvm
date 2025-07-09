@@ -150,9 +150,12 @@ impl ast::BinaryOperator {
             ast::BinaryOperator::Minus => mir::BinaryOperator::Minus,
             ast::BinaryOperator::Mult => mir::BinaryOperator::Mult,
             ast::BinaryOperator::And => mir::BinaryOperator::And,
-            ast::BinaryOperator::LessThan => {
-                mir::BinaryOperator::Logic(mir::LogicOperator::LessThan)
-            }
+            ast::BinaryOperator::LT => mir::BinaryOperator::Logic(mir::LogicOperator::LT),
+            ast::BinaryOperator::LE => mir::BinaryOperator::Logic(mir::LogicOperator::LE),
+            ast::BinaryOperator::GT => mir::BinaryOperator::Logic(mir::LogicOperator::GT),
+            ast::BinaryOperator::GE => mir::BinaryOperator::Logic(mir::LogicOperator::GE),
+            ast::BinaryOperator::EQ => mir::BinaryOperator::Logic(mir::LogicOperator::EQ),
+            ast::BinaryOperator::NE => mir::BinaryOperator::Logic(mir::LogicOperator::NE),
         }
     }
 }

@@ -137,9 +137,13 @@ pub struct InstructionData {
 }
 
 #[derive(Clone, Copy, Hash)]
-pub enum IntPredicate {
-    LessThan,
-    GreaterThan,
+pub enum CmpPredicate {
+    LT,
+    LE,
+    GT,
+    GE,
+    EQ,
+    NE,
 }
 
 #[derive(Clone, Hash)]
@@ -151,7 +155,7 @@ pub enum InstructionKind {
     Phi(Vec<InstructionValue>),
 
     /// Integer Comparison
-    ICmp(IntPredicate, InstructionValue, InstructionValue),
+    ICmp(CmpPredicate, InstructionValue, InstructionValue),
 
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }

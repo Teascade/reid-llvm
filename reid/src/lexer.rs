@@ -43,6 +43,8 @@ pub enum Token {
     LessThan,
     /// `&`
     Et,
+    /// `!`
+    Exclamation,
 
     /// `(`
     ParenOpen,
@@ -190,6 +192,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '>' => Token::GreaterThan,
             '<' => Token::LessThan,
             '&' => Token::Et,
+            '!' => Token::Exclamation,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
             '{' => Token::BraceOpen,

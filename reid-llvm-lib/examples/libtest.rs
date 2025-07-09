@@ -1,4 +1,4 @@
-use reid_lib::{ConstValue, Context, InstructionKind, IntPredicate, TerminatorKind, Type};
+use reid_lib::{ConstValue, Context, InstructionKind, CmpPredicate, TerminatorKind, Type};
 
 fn main() {
     use ConstValue::*;
@@ -26,7 +26,7 @@ fn main() {
     let num_3 = f_entry.build(Constant(I32(3))).unwrap();
     let param_n = f_entry.build(Param(0)).unwrap();
     let cond = f_entry
-        .build(ICmp(IntPredicate::LessThan, param_n, num_3))
+        .build(ICmp(CmpPredicate::LT, param_n, num_3))
         .unwrap();
 
     let mut then_b = fibonacci.block("then");

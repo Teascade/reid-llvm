@@ -1,11 +1,10 @@
 // Main
-fn main() -> u8 {
-    let a = fibonacci(3);
-    return a;
+fn main() -> bool {
+    return 1 == fibonacci(3);
 }
 
 // Fibonacci
-fn fibonacci(value: u8) -> u8 {
+fn fibonacci(value: u16) -> u16 {
     if value < 3 {
         return 1;
     }

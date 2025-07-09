@@ -46,7 +46,12 @@ pub enum BinaryOperator {
     Mult,
 
     And,
-    LessThan,
+    LT,
+    LE,
+    GT,
+    GE,
+    EQ,
+    NE,
 }
 
 impl BinaryOperator {
@@ -57,7 +62,12 @@ impl BinaryOperator {
             Minus => 10,
             Mult => 20,
             And => 100,
-            LessThan => 100,
+            LT => 100,
+            LE => 100,
+            GT => 100,
+            GE => 100,
+            EQ => 100,
+            NE => 100,
         }
     }
 }

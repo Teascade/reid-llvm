@@ -170,8 +170,12 @@ pub enum BinaryOperator {
 
 #[derive(Debug, Clone, Copy)]
 pub enum LogicOperator {
-    LessThan,
-    GreaterThan,
+    LT,
+    LE,
+    GT,
+    GE,
+    EQ,
+    NE,
 }
 
 #[derive(Debug, Clone, Copy)]

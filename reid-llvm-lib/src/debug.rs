@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use crate::{InstructionData, InstructionKind, IntPredicate, TerminatorKind, builder::*};
+use crate::{CmpPredicate, InstructionData, InstructionKind, TerminatorKind, builder::*};
 
 impl Debug for ModuleHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -86,11 +86,15 @@ impl Debug for InstructionKind {
     }
 }
 
-impl Debug for IntPredicate {
+impl Debug for CmpPredicate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::LessThan => write!(f, "<"),
-            Self::GreaterThan => write!(f, ">"),
+            Self::LT => write!(f, "<"),
+            Self::GT => write!(f, ">"),
+            Self::LE => write!(f, "<="),
+            Self::GE => write!(f, ">="),
+            Self::EQ => write!(f, "=="),
+            Self::NE => write!(f, "!="),
         }
     }
 }

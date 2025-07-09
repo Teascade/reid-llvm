@@ -1,7 +1,7 @@
 use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::InstructionValue, Block, ConstValue, Context, Function, InstructionKind, IntPredicate,
+    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, InstructionKind,
     Module, TerminatorKind, Type,
 };
 
@@ -287,10 +287,14 @@ impl mir::Expression {
 }
 
 impl mir::LogicOperator {
-    fn int_predicate(&self) -> IntPredicate {
+    fn int_predicate(&self) -> CmpPredicate {
         match self {
-            mir::LogicOperator::LessThan => IntPredicate::LessThan,
-            mir::LogicOperator::GreaterThan => IntPredicate::GreaterThan,
+            mir::LogicOperator::LT => CmpPredicate::LT,
+            mir::LogicOperator::GT => CmpPredicate::GT,
+            mir::LogicOperator::LE => CmpPredicate::LT,
+            mir::LogicOperator::GE => CmpPredicate::GE,
+            mir::LogicOperator::EQ => CmpPredicate::EQ,
+            mir::LogicOperator::NE => CmpPredicate::NE,
         }
     }
 }

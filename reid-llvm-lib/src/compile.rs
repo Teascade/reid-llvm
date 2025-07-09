@@ -18,7 +18,7 @@ use llvm_sys::{
 use crate::util::{ErrorMessageHolder, from_cstring, into_cstring};
 
 use super::{
-    ConstValue, Context, IntPredicate, TerminatorKind, Type,
+    CmpPredicate, ConstValue, Context, TerminatorKind, Type,
     builder::{
         BlockHolder, BlockValue, Builder, FunctionHolder, FunctionValue, InstructionHolder,
         InstructionValue, ModuleHolder,
@@ -269,7 +269,7 @@ impl InstructionHolder {
                     LLVMBuildICmp(
                         module.builder_ref,
                         // Signedness from LHS
-                        pred.as_llvm(lhs._ty.signed()),
+                        pred.as_llvm_int(lhs._ty.signed()),
                         lhs.value_ref,
                         rhs_val,
                         c"icmp".as_ptr(),
@@ -353,15 +353,21 @@ impl TerminatorKind {
     }
 }
 
-impl IntPredicate {
-    fn as_llvm(&self, signed: bool) -> LLVMIntPredicate {
-        use IntPredicate::*;
+impl CmpPredicate {
+    fn as_llvm_int(&self, signed: bool) -> LLVMIntPredicate {
+        use CmpPredicate::*;
         use LLVMIntPredicate::*;
         match (self, signed) {
-            (LessThan, true) => LLVMIntSLT,
-            (GreaterThan, true) => LLVMIntSGT,
-            (LessThan, false) => LLVMIntULT,
-            (GreaterThan, false) => LLVMIntUGT,
+            (LT, true) => LLVMIntSLT,
+            (GT, true) => LLVMIntSGT,
+            (LE, true) => LLVMIntSLE,
+            (GE, true) => LLVMIntSGE,
+            (LT, false) => LLVMIntULT,
+            (GT, false) => LLVMIntUGT,
+            (LE, false) => LLVMIntULE,
+            (GE, false) => LLVMIntUGE,
+            (EQ, _) => LLVMIntEQ,
+            (NE, _) => LLVMIntNE,
         }
     }
 }
