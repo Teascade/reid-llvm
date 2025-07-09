@@ -95,6 +95,7 @@ impl<'ctx> Function<'ctx> {
                     BlockData {
                         name: name.to_owned(),
                         terminator: None,
+                        deleted: false,
                     },
                 ),
             }
@@ -110,6 +111,7 @@ impl<'ctx> Function<'ctx> {
 pub struct BlockData {
     name: String,
     terminator: Option<TerminatorKind>,
+    deleted: bool,
 }
 
 pub struct Block<'builder> {
@@ -128,6 +130,16 @@ impl<'builder> Block<'builder> {
 
     pub fn terminate(&mut self, instruction: TerminatorKind) -> Result<(), ()> {
         unsafe { self.builder.terminate(&self.value, instruction) }
+    }
+
+    pub fn delete_if_unused(&mut self) -> Result<(), ()> {
+        unsafe {
+            if !self.builder.is_block_used(self.value()) {
+                self.builder.delete_block(&self.value)
+            } else {
+                Ok(())
+            }
+        }
     }
 
     pub fn value(&self) -> BlockValue {

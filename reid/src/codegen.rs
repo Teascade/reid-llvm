@@ -89,6 +89,8 @@ impl mir::Module {
                 mir::FunctionDefinitionKind::Local(block, _) => {
                     if let Some(ret) = block.codegen(&mut scope) {
                         scope.block.terminate(Term::Ret(ret)).unwrap();
+                    } else {
+                        scope.block.delete_if_unused().unwrap();
                     }
                 }
                 mir::FunctionDefinitionKind::Extern => {}
@@ -298,13 +300,16 @@ impl mir::Block {
         }
 
         if let Some((kind, expr)) = &self.return_expression {
-            let ret = expr.codegen(&mut scope).unwrap();
-            match kind {
-                mir::ReturnKind::Hard => {
-                    scope.block.terminate(Term::Ret(ret)).unwrap();
-                    None
+            if let Some(ret) = expr.codegen(&mut scope) {
+                match kind {
+                    mir::ReturnKind::Hard => {
+                        scope.block.terminate(Term::Ret(ret)).unwrap();
+                        None
+                    }
+                    mir::ReturnKind::Soft => Some(ret),
                 }
-                mir::ReturnKind::Soft => Some(ret),
+            } else {
+                None
             }
         } else {
             None

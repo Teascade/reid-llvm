@@ -1,14 +1,13 @@
 // Main
 fn main() -> bool {
-    return (5 == fibonacci(5)) && false;
+    return 5 == fibonacci(5);
 }
 
 // Fibonacci
 fn fibonacci(value: u16) -> u16 {
-    let ret = if value <= 2 {
-        1
+    if value <= 2 {
+        return 1;
     } else {
-        fibonacci(value - 1) + fibonacci(value - 2)
-    };
-    ret
+        return fibonacci(value - 1) + fibonacci(value - 2);
+    }
 }

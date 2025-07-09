@@ -143,6 +143,17 @@ impl Builder {
         }
     }
 
+    pub(crate) unsafe fn delete_block(&self, block: &BlockValue) -> Result<(), ()> {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(block.0.0.0);
+            let function = module.functions.get_unchecked_mut(block.0.1);
+            let block = function.blocks.get_unchecked_mut(block.1);
+            block.data.deleted = true;
+            Ok(())
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) unsafe fn module_data(&self, value: &ModuleValue) -> ModuleData {
         unsafe { self.modules.borrow().get_unchecked(value.0).data.clone() }
@@ -240,6 +251,39 @@ impl Builder {
                     Ok(())
                 }
             }
+        }
+    }
+
+    pub fn is_block_used(&self, block_v: BlockValue) -> bool {
+        unsafe {
+            let modules = self.modules.borrow();
+            let module = modules.get_unchecked(block_v.0.0.0);
+            let function = module.functions.get_unchecked(block_v.0.1);
+            let block = function.blocks.get_unchecked(block_v.1);
+
+            if block.instructions.len() > 0 || block.data.terminator.is_some() {
+                return true;
+            }
+
+            for other in &function.blocks {
+                if let Some(term) = &other.data.terminator {
+                    match term {
+                        TerminatorKind::Ret(_) => {}
+                        TerminatorKind::Br(other_val) => {
+                            if other_val == &block_v {
+                                return true;
+                            }
+                        }
+                        TerminatorKind::CondBr(_, then_other_v, else_other_v) => {
+                            if then_other_v == &block_v || else_other_v == &block_v {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            false
         }
     }
 }

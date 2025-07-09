@@ -32,10 +32,14 @@ impl Debug for FunctionHolder {
 
 impl Debug for BlockHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple(&format!("{}[{:?}]", &self.data.name, &self.value))
-            .field(&self.instructions)
-            .field(&self.data.terminator)
-            .finish()
+        let deleted = if self.data.deleted { " (deleted)" } else { "" };
+        f.debug_tuple(&format!(
+            "{}[{:?}]{} ",
+            &self.data.name, &self.value, deleted
+        ))
+        .field(&self.instructions)
+        .field(&self.data.terminator)
+        .finish()
     }
 }
 

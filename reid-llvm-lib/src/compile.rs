@@ -205,6 +205,10 @@ impl FunctionHolder {
             let own_function = *module.functions.get(&self.value).unwrap();
 
             for block in &self.blocks {
+                if block.data.deleted {
+                    continue;
+                }
+
                 let block_ref = LLVMCreateBasicBlockInContext(
                     module.context_ref,
                     into_cstring(&self.data.name).as_ptr(),
@@ -223,6 +227,10 @@ impl FunctionHolder {
 impl BlockHolder {
     unsafe fn compile(&self, module: &mut LLVMModule, function: &LLVMFunction) {
         unsafe {
+            if self.data.deleted {
+                return;
+            }
+
             let block_ref = *module.blocks.get(&self.value).unwrap();
             LLVMPositionBuilderAtEnd(module.builder_ref, block_ref);
 
