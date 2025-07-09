@@ -134,6 +134,9 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
     let mut tokens = Vec::new();
 
     while let Some(character) = &cursor.next() {
+        // Save "current" token first character position
+        let position = (cursor.position.0 - 1, cursor.position.1);
+
         let variant = match character {
             // Whitespace
             w if w.is_whitespace() => continue,
@@ -204,7 +207,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
 
         tokens.push(FullToken {
             token: variant,
-            position: cursor.position,
+            position,
         });
     }
 
