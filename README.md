@@ -1,5 +1,59 @@
 # Reid-LLVM
-Attempt at re-creating Reid, this time using LLVM.
+Reid is a toy-language compiler I'm working on to learn LLVM (and compiler
+development).
+
+Reid only uses [llvm-sys](https://gitlab.com/taricorp/llvm-sys.rs), which
+provide very minimal bindings from the LLVM C-API to Rust. `reid_llvm`-crate
+contains the relevant abstraction to produce a more Rust'y API from that.
+
+Much of the syntax in Reid is directly inspired by rust, but mostly it is driven
+by simplicity.
+
+Reid is currently able to (non-exhaustively):
+- Do basic algebra (e.g. Add, Sub, Mult)
+- Resolve complex one-liners correctly using PEDMAS (e.g. `5 + 2 * 5 - 5 *
+  5` is calculated correctly)
+- Declare and call functions with varying parameters and return types
+- Perform type-checking and type-inference such that return-types and
+  parameter types must always match.
+- Do simple logic-operations (e.g. If/And/Or)
+
+An example program of Reid, that calculates the 5th fibonacci number (and uses
+Rust for highlighting) is:
+```rust
+fn main() -> u16 {
+    return fibonacci(5);
+}
+fn fibonacci(n: u16) -> u16 {
+    if n <= 2 {
+        return 1;
+    }
+    return fibonacci(n-1) + fibonacci(n-2);
+}
+```
+
+Currently missing relevant features (TODOs) are:
+- Arrays
+- Structs (and custom types as such)
+- Extern functions
+- Strings
+- Loops
+
+### Why "Reid"
+
+[ᚱ is an Elder Futhark rune](https://en.wikipedia.org/wiki/Raido) which means
+"ride" or **"journey"**. As this language is meant for me to primarily learn
+language design and compiler development, it is more about the *journey* rather
+than the destination. ᚱ is written as "Reið" in Icelandic, which is the
+inspiration behind "Reid" here.
+
+### Why "Reid-LLVM"?
+
+Because I have another project also called Reid, which only compiles to a
+Virtual Instruction Set Architecture (V-ISA) that is executed via a custom-made
+Virtual Machine. It is still hosted
+[here](https://git.teascade.net/teascade/reid), but do note that it is very old
+and not as representative of my skills as a programmer today as this one.
 
 ## What is currently being tested?
 

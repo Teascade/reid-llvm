@@ -17,13 +17,6 @@
 //!   parameter types must always match.
 //! - Do simple logic-operations (e.g. If/And/Or)
 //!
-//! Currently missing relevant features (TODOs) are:
-//! - Arrays
-//! - Structs (and custom types as such)
-//! - Extern functions
-//! - Strings
-//! - Loops
-//!
 //! An example program of Reid, that calculates the 5th fibonacci number (and
 //! uses Rust for highlighting) is:
 //! ```rust
@@ -37,6 +30,13 @@
 //!     }
 //!     return fibonacci(n-1) + fibonacci(n-2);
 //! }
+//!
+//! Currently missing relevant features (TODOs) are:
+//! - Arrays
+//! - Structs (and custom types as such)
+//! - Extern functions
+//! - Strings
+//! - Loops
 //! ```
 
 use mir::typecheck::TypeCheck;
