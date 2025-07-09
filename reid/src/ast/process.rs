@@ -164,6 +164,7 @@ impl ast::Literal {
     fn mir(&self) -> mir::Literal {
         match *self {
             ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(v)),
+            ast::Literal::Bool(v) => mir::Literal::Bool(v),
         }
     }
 }

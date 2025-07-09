@@ -15,6 +15,8 @@ pub enum ErrorKind {
     TypeIsVague(VagueType),
     #[error("Can not coerce {0} to vague type {1}")]
     HintIsVague(TypeKind, VagueType),
+    #[error("Literal {0} can not be coerced to type {1}")]
+    LiteralIncompatible(Literal, TypeKind),
     #[error("Types {0} and {1} are incompatible")]
     TypesIncompatible(TypeKind, TypeKind),
     #[error("Variable not defined: {0}")]
@@ -252,6 +254,7 @@ impl Literal {
                 (L::U32(_), U32) => self,
                 (L::U64(_), U64) => self,
                 (L::U128(_), U128) => self,
+                (L::Bool(_), Bool) => self,
                 (L::Vague(VagueL::Number(v)), I8) => L::I8(v as i8),
                 (L::Vague(VagueL::Number(v)), I16) => L::I16(v as i16),
                 (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
@@ -265,7 +268,7 @@ impl Literal {
                 // Default type for number literal if unable to find true type.
                 (L::Vague(VagueL::Number(v)), Vague(Number)) => L::I32(v as i32),
                 (_, Vague(_)) => self,
-                _ => Err(ErrorKind::TypesIncompatible(self.as_type(), hint))?,
+                _ => Err(ErrorKind::LiteralIncompatible(self, hint))?,
             })
         } else {
             Ok(self)

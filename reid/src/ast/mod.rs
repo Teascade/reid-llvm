@@ -24,6 +24,7 @@ pub enum TypeKind {
 #[derive(Debug, Clone)]
 pub enum Literal {
     Number(u64),
+    Bool(bool),
 }
 
 #[derive(Debug, Clone)]

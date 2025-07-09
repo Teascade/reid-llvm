@@ -22,6 +22,10 @@ pub enum Token {
     Arrow,
     /// `if`
     If,
+    /// `true`
+    True,
+    /// `false`
+    False,
 
     // Symbols
     /// `;`
@@ -165,6 +169,8 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "return" => Token::ReturnKeyword,
                     "fn" => Token::FnKeyword,
                     "if" => Token::If,
+                    "true" => Token::True,
+                    "false" => Token::False,
                     _ => Token::Identifier(value),
                 };
                 variant

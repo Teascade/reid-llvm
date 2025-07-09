@@ -128,6 +128,7 @@ pub enum Literal {
     U32(u32),
     U64(u64),
     U128(u128),
+    Bool(bool),
     Vague(VagueLiteral),
 }
 
@@ -149,6 +150,7 @@ impl Literal {
             Literal::U32(_) => TypeKind::U32,
             Literal::U64(_) => TypeKind::U64,
             Literal::U128(_) => TypeKind::U128,
+            Literal::Bool(_) => TypeKind::Bool,
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
         }
     }

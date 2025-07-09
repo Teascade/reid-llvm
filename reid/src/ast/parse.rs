@@ -71,6 +71,14 @@ impl Parse for PrimaryExpression {
                     Kind::Literal(Literal::Number(v.parse().unwrap())),
                     stream.get_range().unwrap(),
                 ),
+                Token::True => Expression(
+                    Kind::Literal(Literal::Bool(true)),
+                    stream.get_range().unwrap(),
+                ),
+                Token::False => Expression(
+                    Kind::Literal(Literal::Bool(false)),
+                    stream.get_range().unwrap(),
+                ),
                 Token::ParenOpen => {
                     let exp = stream.parse()?;
                     stream.expect(Token::ParenClose)?;

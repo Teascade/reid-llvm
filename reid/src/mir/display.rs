@@ -166,6 +166,7 @@ impl Display for Literal {
             Self::U32(val) => write!(f, "{}u32", val),
             Self::U64(val) => write!(f, "{}u64", val),
             Self::U128(val) => write!(f, "{}u128", val),
+            Self::Bool(val) => write!(f, "{}", val),
             Self::Vague(val) => val.fmt(f),
         }
     }
