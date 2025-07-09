@@ -1,4 +1,4 @@
-use std::fmt::{write, Debug, Display, Write};
+use std::fmt::{Debug, Display, Write};
 
 use crate::pad_adapter::PadAdapter;
 

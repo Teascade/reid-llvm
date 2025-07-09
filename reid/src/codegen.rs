@@ -7,12 +7,16 @@ use reid_lib::{
 
 use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
 
+/// Context that contains all of the given modules as complete codegenerated
+/// LLIR that can then be finally compiled into LLVM IR.
 #[derive(Debug)]
 pub struct CodegenContext<'ctx> {
-    pub modules: Vec<ModuleCodegen<'ctx>>,
+    modules: Vec<ModuleCodegen<'ctx>>,
 }
 
 impl<'ctx> CodegenContext<'ctx> {
+    /// Compile contained LLIR into LLVM IR and produce `hello.o` and
+    /// `hello.asm`
     pub fn compile(&self) {
         for module in &self.modules {
             module.context.compile();
@@ -21,6 +25,7 @@ impl<'ctx> CodegenContext<'ctx> {
 }
 
 impl mir::Context {
+    /// Compile MIR [`Context`] into [`CodegenContext`] containing LLIR.
     pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
         let mut modules = Vec::new();
         for module in &self.modules {
@@ -30,9 +35,9 @@ impl mir::Context {
     }
 }
 
-pub struct ModuleCodegen<'ctx> {
+struct ModuleCodegen<'ctx> {
     pub context: &'ctx Context,
-    pub module: Module<'ctx>,
+    _module: Module<'ctx>,
 }
 
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
@@ -93,7 +98,10 @@ impl mir::Module {
             }
         }
 
-        ModuleCodegen { context, module }
+        ModuleCodegen {
+            context,
+            _module: module,
+        }
     }
 }
 
@@ -107,7 +115,7 @@ pub struct Scope<'ctx, 'a> {
 }
 
 impl<'ctx, 'a> Scope<'ctx, 'a> {
-    pub fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
+    fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
         Scope {
             block,
             function: self.function,
@@ -120,7 +128,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
     /// Takes the block out from this scope, swaps the given block in it's place
     /// and returns the old block.
-    pub fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
+    fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
         let mut old_block = block;
         mem::swap(&mut self.block, &mut old_block);
         old_block
@@ -128,7 +136,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 }
 
 impl mir::Statement {
-    pub fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
             mir::StmtKind::Let(VariableReference(_, name, _), expression) => {
                 let value = expression.codegen(scope).unwrap();
@@ -143,7 +151,7 @@ impl mir::Statement {
 }
 
 impl mir::IfExpression {
-    pub fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         let condition = self.0.codegen(scope).unwrap();
 
         // Create blocks
@@ -208,7 +216,7 @@ impl mir::IfExpression {
 }
 
 impl mir::Expression {
-    pub fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
             mir::ExprKind::Variable(varref) => {
                 varref.0.is_known().expect("variable type unknown");
@@ -304,7 +312,7 @@ impl mir::CmpOperator {
 }
 
 impl mir::Block {
-    pub fn codegen<'ctx, 'a>(&self, mut scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+    fn codegen<'ctx, 'a>(&self, mut scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         for stmt in &self.statements {
             stmt.codegen(&mut scope);
         }
@@ -325,11 +333,11 @@ impl mir::Block {
 }
 
 impl mir::Literal {
-    pub fn as_const(&self, block: &mut Block) -> InstructionValue {
+    fn as_const(&self, block: &mut Block) -> InstructionValue {
         block.build(self.as_const_kind()).unwrap()
     }
 
-    pub fn as_const_kind(&self) -> InstructionKind {
+    fn as_const_kind(&self) -> InstructionKind {
         InstructionKind::Constant(match *self {
             mir::Literal::I8(val) => ConstValue::I8(val),
             mir::Literal::I16(val) => ConstValue::I16(val),

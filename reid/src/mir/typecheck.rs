@@ -1,6 +1,7 @@
+/// This module contains code relevant to doing a type checking pass on the MIR.
+/// During typechecking relevant types are also coerced if possible.
 use std::{convert::Infallible, iter};
 
-/// This module contains code relevant to doing a type checking pass on the MIR.
 use crate::{mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
@@ -29,9 +30,13 @@ pub enum ErrorKind {
     FunctionAlreadyDefined(String),
     #[error("Variable not defined: {0}")]
     VariableAlreadyDefined(String),
+    #[error("Function {0} was given {1} parameters, but {2} were expected")]
+    InvalidAmountParameters(String, usize, usize),
 }
 
-pub struct TypeCheck {}
+/// Struct used to implement a type-checking pass that can be performed on the
+/// MIR.
+pub struct TypeCheck;
 
 impl Pass for TypeCheck {
     type TError = ErrorKind;
@@ -123,6 +128,7 @@ impl Block {
         }
 
         if let Some((return_kind, expr)) = &mut self.return_expression {
+            // Use function return type as hint if return is hard.
             let ret_hint_t = match return_kind {
                 ReturnKind::Hard => state.scope.return_type_hint,
                 ReturnKind::Soft => hint_t,
@@ -193,8 +199,20 @@ impl Expression {
                     .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
 
                 if let Ok(f) = true_function {
-                    if function_call.parameters.len() != f.params.len() {
-                        state.ok::<_, Infallible>(Err(ErrorKind::Null), self.1);
+                    let param_len_given = function_call.parameters.len();
+                    let param_len_expected = f.params.len();
+
+                    // Check that there are the same number of parameters given
+                    // as expected
+                    if param_len_given != param_len_expected {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::InvalidAmountParameters(
+                                function_call.name.clone(),
+                                param_len_given,
+                                param_len_expected,
+                            )),
+                            self.1,
+                        );
                     }
 
                     let true_params_iter = f.params.into_iter().chain(iter::repeat(Vague(Unknown)));
@@ -202,6 +220,7 @@ impl Expression {
                     for (param, true_param_t) in
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
+                        // Typecheck every param separately
                         let param_res = param.typecheck(state, Some(true_param_t));
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
@@ -223,15 +242,17 @@ impl Expression {
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
 
-                let lhs_res = lhs.typecheck(state, hint_t);
-                let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.meta);
-                let rhs_type = if let Some(rhs) = rhs {
-                    let res = rhs.typecheck(state, hint_t);
-                    state.or_else(res, Vague(Unknown), rhs.meta)
+                // Typecheck then/else return types and make sure they are the
+                // same, if else exists.
+                let then_res = lhs.typecheck(state, hint_t);
+                let then_ret_t = state.or_else(then_res, Vague(Unknown), lhs.meta);
+                let else_ret_t = if let Some(else_block) = rhs {
+                    let res = else_block.typecheck(state, hint_t);
+                    state.or_else(res, Vague(Unknown), else_block.meta)
                 } else {
                     Vague(Unknown)
                 };
-                lhs_type.collapse_into(&rhs_type)
+                then_ret_t.collapse_into(&else_ret_t)
             }
             ExprKind::Block(block) => block.typecheck(state, hint_t),
         }
@@ -239,6 +260,8 @@ impl Expression {
 }
 
 impl Literal {
+    /// Try to coerce this literal, ie. convert it to a more specific type in
+    /// regards to the given hint if any.
     fn try_coerce(self, hint: Option<TypeKind>) -> Result<Self, ErrorKind> {
         if let Some(hint) = hint {
             use Literal as L;
@@ -314,6 +337,8 @@ fn try_collapse(lhs: &TypeKind, rhs: &TypeKind) -> Result<TypeKind, ErrorKind> {
 }
 
 pub trait Collapsable: Sized + Clone {
+    /// Try to narrow two types into one singular type. E.g. Vague(Number) and
+    /// I32 could be narrowed to just I32.
     fn collapse_into(&self, other: &Self) -> Result<Self, ErrorKind>;
 }
 

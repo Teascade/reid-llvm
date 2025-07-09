@@ -1,3 +1,5 @@
+/// This module contains simply [`Builder`] and it's related utility Values.
+/// Builder is the actual struct being modified when building the LLIR.
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
@@ -45,7 +47,7 @@ pub struct InstructionHolder {
 }
 
 #[derive(Clone)]
-pub struct Builder {
+pub(crate) struct Builder {
     modules: Rc<RefCell<Vec<ModuleHolder>>>,
 }
 
@@ -237,7 +239,7 @@ impl Builder {
 }
 
 impl InstructionValue {
-    pub fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
         use InstructionKind::*;
         unsafe {
             match &builder.instr_data(self).kind {
@@ -316,7 +318,7 @@ impl Type {
 }
 
 impl TerminatorKind {
-    pub fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
         use TerminatorKind::*;
         match self {
             Ret(instr_val) => instr_val.get_type(builder),

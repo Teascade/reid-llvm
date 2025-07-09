@@ -1,3 +1,6 @@
+/// Reid LLVM Lib is an ergonomic Rust'y API which is used to produce a
+/// Low-Level IR (LLIR) using [`Context`] and [`Builder`]. This Builder can then
+/// be used at the end to compile said LLIR into LLVM IR.
 use std::marker::PhantomData;
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue};

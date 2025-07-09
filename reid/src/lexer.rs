@@ -81,6 +81,7 @@ impl From<Token> for String {
     }
 }
 
+/// A token with a position
 #[derive(Clone)]
 pub struct FullToken {
     pub token: Token,
@@ -98,7 +99,7 @@ impl Debug for FullToken {
 
 pub type Position = (u32, u32);
 
-pub struct Cursor<'a> {
+struct Cursor<'a> {
     pub position: Position,
     char_stream: Chars<'a>,
 }
@@ -128,6 +129,8 @@ impl<'a> Cursor<'a> {
     }
 }
 
+/// Take source text and produce a list of [`FullToken`]s from it, ie.
+/// tokenizing it.
 pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error> {
     let to_tokenize = to_tokenize.into();
     let mut cursor = Cursor {

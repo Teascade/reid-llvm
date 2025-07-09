@@ -1,8 +1,13 @@
+/// Contains relevant code for parsing tokens received from
+/// Lexing/Tokenizing-stage.
 use crate::{
     ast::parse::Parse,
     lexer::{FullToken, Position, Token},
 };
 
+/// Utility struct that is able to parse [`FullToken`]s while being
+/// failure-resistance in that it can backtrack easily, and is able to keep
+/// track of parsed Token-ranges easily.
 pub struct TokenStream<'a, 'b> {
     ref_position: Option<&'b mut usize>,
     tokens: &'a [FullToken],
@@ -157,6 +162,8 @@ impl Drop for TokenStream<'_, '_> {
     }
 }
 
+/// Index-range that can be used with the original array of [`FullToken`]s to
+/// retrieve the precise location of a failure.
 #[derive(Default, Clone, Copy)]
 pub struct TokenRange {
     pub start: usize,

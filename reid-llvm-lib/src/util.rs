@@ -29,6 +29,8 @@ fn cstring_to_err(value: *mut c_char) -> Result<(), String> {
         .map_or(Ok(()), |s| Err(s))
 }
 
+/// Utility struct for LLVM's Error Messages, which need to be disposed
+/// manually.
 pub struct ErrorMessageHolder(*mut c_char);
 
 impl ErrorMessageHolder {
@@ -55,6 +57,8 @@ impl Drop for ErrorMessageHolder {
     }
 }
 
+/// Make sure types for given instructions match. Return Ok(type) if they do,
+/// and error otherwise.
 pub fn match_types(
     lhs: &InstructionValue,
     rhs: &InstructionValue,

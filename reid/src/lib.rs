@@ -11,11 +11,12 @@ mod pad_adapter;
 mod token_stream;
 mod util;
 
-// TODO:
-// 1. Make it so that TopLevelStatement can only be import or function def
-// 2. Make BlockLevelStatement, that has everything TopLevelStatement has now
-// 3. Make it so all codegen is done with a Block-struct, that represents a
-//    single proper block
+// TODO (Missing Relevant Features):
+// - Arrays
+// - Structs (and custom types as such)
+// - Extern functions
+// - Strings
+// - Loops
 
 #[derive(thiserror::Error, Debug)]
 pub enum ReidError {
@@ -25,10 +26,11 @@ pub enum ReidError {
     ParserError(#[from] token_stream::Error),
     #[error("Errors during typecheck: {0:?}")]
     TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
-    // #[error(transparent)]
-    // CodegenError(#[from] codegen::Error),
 }
 
+/// Takes in a bit of source code, parses and compiles it and produces `hello.o`
+/// and `hello.asm` from it, which can be linked using `ld` to produce an
+/// executable file.
 pub fn compile(source: &str) -> Result<String, ReidError> {
     let tokens = lexer::tokenize(source)?;
 
@@ -51,7 +53,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     dbg!(&ast_module);
     let mut mir_context = mir::Context::from(vec![ast_module]);
 
-    let state = mir_context.pass(&mut TypeCheck {});
+    let state = mir_context.pass(&mut TypeCheck);
     dbg!(&state);
 
     println!("{}", &mir_context);
@@ -67,9 +69,4 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     codegen_modules.compile();
 
     Ok(String::new())
-
-    // Ok(match cogegen_module.module.print_to_string() {
-    //     Ok(v) => v,
-    //     Err(e) => panic!("Err: {:?}", e),
-    // })
 }

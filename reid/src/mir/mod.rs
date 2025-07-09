@@ -1,6 +1,5 @@
 /// In this module are defined structs that are used for performing passes on
-/// Reid. It contains a simplified version of Reid which must already be
-/// type-checked beforehand.
+/// Reid. It contains a simplified version of Reid which can be e.g. typechecked.
 use crate::token_stream::TokenRange;
 
 mod display;
