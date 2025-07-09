@@ -252,7 +252,18 @@ impl Expression {
                 } else {
                     Vague(Unknown)
                 };
-                then_ret_t.collapse_into(&else_ret_t)
+
+                let collapsed = then_ret_t.collapse_into(&else_ret_t)?;
+                if let Some(rhs) = rhs {
+                    // If rhs existed, typecheck both sides to perform type
+                    // coercion.
+                    let lhs_res = lhs.typecheck(state, Some(collapsed));
+                    let rhs_res = rhs.typecheck(state, Some(collapsed));
+                    state.ok(lhs_res, lhs.meta);
+                    state.ok(rhs_res, rhs.meta);
+                }
+
+                Ok(collapsed)
             }
             ExprKind::Block(block) => block.typecheck(state, hint_t),
         }

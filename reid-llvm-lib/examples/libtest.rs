@@ -1,8 +1,8 @@
-use reid_lib::{ConstValue, Context, InstructionKind, CmpPredicate, TerminatorKind, Type};
+use reid_lib::{ConstValue, Context, Instr, CmpPredicate, TerminatorKind, Type};
 
 fn main() {
     use ConstValue::*;
-    use InstructionKind::*;
+    use Instr::*;
 
     let context = Context::new();
 

@@ -253,7 +253,7 @@ impl InstructionHolder {
     ) -> LLVMValue {
         let _ty = self.value.get_type(module.builder).unwrap();
         let val = unsafe {
-            use super::InstructionKind::*;
+            use super::Instr::*;
             match &self.data.kind {
                 Param(nth) => LLVMGetParam(function.value_ref, *nth as u32),
                 Constant(val) => val.as_llvm(module.context_ref),
@@ -348,7 +348,7 @@ impl TerminatorKind {
                     let value = module.values.get(val).unwrap();
                     LLVMBuildRet(module.builder_ref, value.value_ref)
                 }
-                TerminatorKind::Branch(block_value) => {
+                TerminatorKind::Br(block_value) => {
                     let dest = *module.blocks.get(block_value).unwrap();
                     LLVMBuildBr(module.builder_ref, dest)
                 }

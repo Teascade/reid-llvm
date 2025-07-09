@@ -204,10 +204,17 @@ impl Parse for FunctionCallExpression {
 impl Parse for IfExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::If)?;
+        let cond = stream.parse()?;
+        let then_b = stream.parse()?;
+        let else_b = if let Ok(_) = stream.expect(Token::Else) {
+            Some(stream.parse()?)
+        } else {
+            None
+        };
         Ok(IfExpression(
-            stream.parse()?,
-            stream.parse()?,
-            None,
+            cond,
+            then_b,
+            else_b,
             stream.get_range().unwrap(),
         ))
     }
@@ -324,7 +331,7 @@ impl Parse for Block {
                     ReturnType::Hard => {
                         return_stmt = Some((*r_type, e.clone()));
                         break; // Return has to be the last statement
-                               // TODO: Make a mechanism that "can" parse even after this
+                        // TODO: Make a mechanism that "can" parse even after this
                     }
                     ReturnType::Soft => {
                         return_stmt = Some((*r_type, e.clone()));

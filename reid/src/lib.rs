@@ -87,6 +87,8 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     dbg!(&ast_module);
     let mut mir_context = mir::Context::from(vec![ast_module]);
 
+    println!("{}", &mir_context);
+
     let state = mir_context.pass(&mut TypeCheck);
     dbg!(&state);
 

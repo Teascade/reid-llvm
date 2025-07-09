@@ -76,7 +76,7 @@ impl Display for Block {
         if let Some(ret) = &self.return_expression {
             match ret.0 {
                 ReturnKind::Hard => writeln!(inner_f, "Return(Hard): {}", ret.1),
-                ReturnKind::Soft => writeln!(inner_f, "Return(Hard): {}", ret.1),
+                ReturnKind::Soft => writeln!(inner_f, "Return(Soft): {}", ret.1),
             }?;
         } else {
             writeln!(inner_f, "No Return")?;

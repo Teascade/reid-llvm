@@ -1,3 +1,6 @@
+//! This is the module that contains relevant code to parsing Reid, that is to
+//! say transforming a Vec of FullTokens into a loose parsed AST that can be
+//! used for unwrapping syntax sugar, and then be transformed into Reid MIR.
 use crate::token_stream::TokenRange;
 
 pub mod parse;

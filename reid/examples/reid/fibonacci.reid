@@ -5,8 +5,10 @@ fn main() -> bool {
 
 // Fibonacci
 fn fibonacci(value: u16) -> u16 {
-    if value <= 2 {
-        return 1;
-    }
-    return fibonacci(value - 1) + fibonacci(value - 2);
+    let ret = if value <= 2 {
+        1
+    } else {
+        fibonacci(value - 1) + fibonacci(value - 2)
+    };
+    ret
 }

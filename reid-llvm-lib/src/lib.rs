@@ -119,7 +119,7 @@ pub struct Block<'builder> {
 }
 
 impl<'builder> Block<'builder> {
-    pub fn build(&mut self, instruction: InstructionKind) -> Result<InstructionValue, ()> {
+    pub fn build(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
         unsafe {
             self.builder
                 .add_instruction(&self.value, InstructionData { kind: instruction })
@@ -137,7 +137,7 @@ impl<'builder> Block<'builder> {
 
 #[derive(Clone, Hash)]
 pub struct InstructionData {
-    kind: InstructionKind,
+    kind: Instr,
 }
 
 #[derive(Clone, Copy, Hash)]
@@ -151,7 +151,7 @@ pub enum CmpPredicate {
 }
 
 #[derive(Clone, Hash)]
-pub enum InstructionKind {
+pub enum Instr {
     Param(usize),
     Constant(ConstValue),
     Add(InstructionValue, InstructionValue),
@@ -200,6 +200,6 @@ pub enum ConstValue {
 #[derive(Clone, Hash)]
 pub enum TerminatorKind {
     Ret(InstructionValue),
-    Branch(BlockValue),
+    Br(BlockValue),
     CondBr(InstructionValue, BlockValue, BlockValue),
 }

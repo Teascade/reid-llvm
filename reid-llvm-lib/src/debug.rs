@@ -2,7 +2,7 @@
 
 use std::fmt::{Debug, Write};
 
-use crate::{CmpPredicate, InstructionData, InstructionKind, TerminatorKind, builder::*};
+use crate::{CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*};
 
 impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -81,7 +81,7 @@ impl Debug for InstructionValue {
     }
 }
 
-impl Debug for InstructionKind {
+impl Debug for Instr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Param(nth) => fmt_call(f, &"Param", &nth),
@@ -141,7 +141,7 @@ impl Debug for TerminatorKind {
                 write!(f, "Ret ")?;
                 val.fmt(f)
             }
-            Self::Branch(val) => {
+            Self::Br(val) => {
                 write!(f, "Br ")?;
                 val.fmt(f)
             }

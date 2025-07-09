@@ -1,11 +1,11 @@
 use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, InstructionKind,
-    Module, TerminatorKind, Type,
+    Block, CmpPredicate, ConstValue, Context, Function, Instr, Module, TerminatorKind as Term,
+    Type, builder::InstructionValue,
 };
 
-use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
+use crate::mir::{self, TypeKind, VariableReference, types::ReturnType};
 
 /// Context that contains all of the given modules as complete codegenerated
 /// LLIR that can then be finally compiled into LLVM IR.
@@ -74,10 +74,7 @@ impl mir::Module {
 
             let mut stack_values = HashMap::new();
             for (i, (p_name, _)) in mir_function.parameters.iter().enumerate() {
-                stack_values.insert(
-                    p_name.clone(),
-                    entry.build(InstructionKind::Param(i)).unwrap(),
-                );
+                stack_values.insert(p_name.clone(), entry.build(Instr::Param(i)).unwrap());
             }
 
             let mut scope = Scope {
@@ -91,7 +88,7 @@ impl mir::Module {
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
                     if let Some(ret) = block.codegen(&mut scope) {
-                        scope.block.terminate(TerminatorKind::Ret(ret)).unwrap();
+                        scope.block.terminate(Term::Ret(ret)).unwrap();
                     }
                 }
                 mir::FunctionDefinitionKind::Extern => {}
@@ -155,62 +152,53 @@ impl mir::IfExpression {
         let condition = self.0.codegen(scope).unwrap();
 
         // Create blocks
-        let then_bb = scope.function.block("then");
-        let after_bb = scope.function.block("after");
-        let mut before_bb = scope.swap_block(after_bb);
+        let then_b = scope.function.block("then");
+        let mut else_b = scope.function.block("else");
+        let after_b = scope.function.block("after");
 
-        let mut then_scope = scope.with_block(then_bb);
+        // Store for convenience
+        let then_bb = then_b.value();
+        let else_bb = else_b.value();
+        let after_bb = after_b.value();
+
+        // Generate then-block content
+        let mut then_scope = scope.with_block(then_b);
         let then_res = self.1.codegen(&mut then_scope);
-        then_scope
-            .block
-            .terminate(TerminatorKind::Branch(scope.block.value()))
-            .ok();
-
-        let else_bb = scope.function.block("else");
-        let mut else_scope = scope.with_block(else_bb);
+        then_scope.block.terminate(Term::Br(after_bb)).ok();
 
         let else_res = if let Some(else_block) = &self.2 {
-            before_bb
-                .terminate(TerminatorKind::CondBr(
-                    condition,
-                    then_scope.block.value(),
-                    else_scope.block.value(),
-                ))
+            let mut else_scope = scope.with_block(else_b);
+            scope
+                .block
+                .terminate(Term::CondBr(condition, then_bb, else_bb))
                 .unwrap();
 
             let opt = else_block.codegen(&mut else_scope);
 
             if let Some(ret) = opt {
-                else_scope
-                    .block
-                    .terminate(TerminatorKind::Branch(scope.block.value()))
-                    .ok();
+                else_scope.block.terminate(Term::Br(after_bb)).ok();
                 Some(ret)
             } else {
                 None
             }
         } else {
-            else_scope
+            else_b.terminate(Term::Br(after_bb)).unwrap();
+            scope
                 .block
-                .terminate(TerminatorKind::Branch(scope.block.value()))
-                .unwrap();
-            before_bb
-                .terminate(TerminatorKind::CondBr(
-                    condition,
-                    then_scope.block.value(),
-                    scope.block.value(),
-                ))
+                .terminate(Term::CondBr(condition, then_bb, after_bb))
                 .unwrap();
             None
         };
 
+        // Swap block to the after-block so that construction can continue correctly
+        scope.swap_block(after_b);
+
         if then_res.is_none() && else_res.is_none() {
             None
         } else {
-            let mut inc = Vec::from(then_res.as_slice());
-            inc.extend(else_res);
-
-            Some(scope.block.build(InstructionKind::Phi(vec![])).unwrap())
+            let mut incoming = Vec::from(then_res.as_slice());
+            incoming.extend(else_res);
+            Some(scope.block.build(Instr::Phi(incoming)).unwrap())
         }
     }
 }
@@ -242,21 +230,13 @@ impl mir::Expression {
                 let lhs = lhs_exp.codegen(scope).expect("lhs has no return value");
                 let rhs = rhs_exp.codegen(scope).expect("rhs has no return value");
                 Some(match binop {
-                    mir::BinaryOperator::Add => {
-                        scope.block.build(InstructionKind::Add(lhs, rhs)).unwrap()
-                    }
-                    mir::BinaryOperator::Minus => {
-                        scope.block.build(InstructionKind::Sub(lhs, rhs)).unwrap()
-                    }
-                    mir::BinaryOperator::Mult => {
-                        scope.block.build(InstructionKind::Mult(lhs, rhs)).unwrap()
-                    }
-                    mir::BinaryOperator::And => {
-                        scope.block.build(InstructionKind::And(lhs, rhs)).unwrap()
-                    }
+                    mir::BinaryOperator::Add => scope.block.build(Instr::Add(lhs, rhs)).unwrap(),
+                    mir::BinaryOperator::Minus => scope.block.build(Instr::Sub(lhs, rhs)).unwrap(),
+                    mir::BinaryOperator::Mult => scope.block.build(Instr::Mult(lhs, rhs)).unwrap(),
+                    mir::BinaryOperator::And => scope.block.build(Instr::And(lhs, rhs)).unwrap(),
                     mir::BinaryOperator::Cmp(l) => scope
                         .block
-                        .build(InstructionKind::ICmp(l.int_predicate(), lhs, rhs))
+                        .build(Instr::ICmp(l.int_predicate(), lhs, rhs))
                         .unwrap(),
                 })
             }
@@ -277,7 +257,7 @@ impl mir::Expression {
                 Some(
                     scope
                         .block
-                        .build(InstructionKind::FunctionCall(callee.value(), params))
+                        .build(Instr::FunctionCall(callee.value(), params))
                         .unwrap(),
                 )
             }
@@ -287,7 +267,7 @@ impl mir::Expression {
                 if let Some(ret) = block.codegen(&mut inner_scope) {
                     inner_scope
                         .block
-                        .terminate(TerminatorKind::Branch(scope.block.value()))
+                        .terminate(Term::Br(scope.block.value()))
                         .unwrap();
                     Some(ret)
                 } else {
@@ -321,7 +301,7 @@ impl mir::Block {
             let ret = expr.codegen(&mut scope).unwrap();
             match kind {
                 mir::ReturnKind::Hard => {
-                    scope.block.terminate(TerminatorKind::Ret(ret)).unwrap();
+                    scope.block.terminate(Term::Ret(ret)).unwrap();
                     None
                 }
                 mir::ReturnKind::Soft => Some(ret),
@@ -337,8 +317,8 @@ impl mir::Literal {
         block.build(self.as_const_kind()).unwrap()
     }
 
-    fn as_const_kind(&self) -> InstructionKind {
-        InstructionKind::Constant(match *self {
+    fn as_const_kind(&self) -> Instr {
+        Instr::Constant(match *self {
             mir::Literal::I8(val) => ConstValue::I8(val),
             mir::Literal::I16(val) => ConstValue::I16(val),
             mir::Literal::I32(val) => ConstValue::I32(val),

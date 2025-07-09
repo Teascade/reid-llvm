@@ -4,8 +4,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    BlockData, ConstValue, FunctionData, InstructionData, InstructionKind, ModuleData,
-    TerminatorKind, Type, util::match_types,
+    BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
+    util::match_types,
 };
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
@@ -196,7 +196,7 @@ impl Builder {
     }
 
     pub fn check_instruction(&self, instruction: &InstructionValue) -> Result<(), ()> {
-        use super::InstructionKind::*;
+        use super::Instr::*;
         unsafe {
             match self.instr_data(&instruction).kind {
                 Param(_) => Ok(()),
@@ -228,6 +228,11 @@ impl Builder {
                 Phi(vals) => {
                     let mut iter = vals.iter();
                     // TODO error: Phi must contain at least one item
+
+                    // TODO error: compile can actually crash here if any of the
+                    // incoming values come from blocks that are added later
+                    // than the one where this one exists.
+
                     let first = iter.next().ok_or(())?;
                     for item in iter {
                         match_types(first, item, &self)?;
@@ -241,7 +246,7 @@ impl Builder {
 
 impl InstructionValue {
     pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
-        use InstructionKind::*;
+        use Instr::*;
         unsafe {
             match &builder.instr_data(self).kind {
                 Param(nth) => builder
@@ -323,7 +328,7 @@ impl TerminatorKind {
         use TerminatorKind::*;
         match self {
             Ret(instr_val) => instr_val.get_type(builder),
-            Branch(_) => Ok(Type::Void),
+            Br(_) => Ok(Type::Void),
             CondBr(_, _, _) => Ok(Type::Void),
         }
     }
