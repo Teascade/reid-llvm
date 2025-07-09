@@ -1,4 +1,5 @@
-/// Debug implementations for relevant types
+//! Debug implementations for relevant types
+
 use std::fmt::{Debug, Write};
 
 use crate::{CmpPredicate, InstructionData, InstructionKind, TerminatorKind, builder::*};

@@ -1,5 +1,6 @@
-/// This module contains simply [`Builder`] and it's related utility Values.
-/// Builder is the actual struct being modified when building the LLIR.
+//! This module contains simply [`Builder`] and it's related utility Values.
+//! Builder is the actual struct being modified when building the LLIR.
+
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{

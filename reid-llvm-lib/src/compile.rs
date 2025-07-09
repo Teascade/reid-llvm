@@ -1,6 +1,7 @@
-/// This module contains all of the relevant code that is needed to compile the
-/// LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
-/// with the LLVM API.
+//! This module contains all of the relevant code that is needed to compile the
+//! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
+//! with the LLVM API.
+
 use std::{collections::HashMap, ffi::CString, ptr::null_mut};
 
 use llvm_sys::{

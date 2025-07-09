@@ -1,5 +1,5 @@
-/// This module contains code relevant to doing a type checking pass on the MIR.
-/// During typechecking relevant types are also coerced if possible.
+//! This module contains code relevant to doing a type checking pass on the MIR.
+//! During typechecking relevant types are also coerced if possible.
 use std::{convert::Infallible, iter};
 
 use crate::{mir::*, util::try_all};

@@ -1,5 +1,6 @@
-/// Contains relevant code for parsing tokens received from
-/// Lexing/Tokenizing-stage.
+//! Contains relevant code for parsing tokens received from
+//! Lexing/Tokenizing-stage.
+
 use crate::{
     ast::parse::Parse,
     lexer::{FullToken, Position, Token},
