@@ -40,11 +40,12 @@ impl ReturnType for Expression {
             Variable(var) => var.return_type(),
             BinOp(_, then_e, else_e) => {
                 let then_r = then_e.return_type()?;
-                let else_e = else_e.return_type()?;
-                let kind = if then_r.0 == ReturnKind::Hard && else_e.0 == ReturnKind::Hard {
+                let else_r = else_e.return_type()?;
+
+                let kind = if then_r.0 == ReturnKind::Hard && else_r.0 == ReturnKind::Hard {
                     ReturnKind::Hard
                 } else {
-                    ReturnKind::Hard
+                    ReturnKind::Soft
                 };
                 Ok((kind, then_r.1))
             }
@@ -57,7 +58,20 @@ impl ReturnType for Expression {
 
 impl ReturnType for IfExpression {
     fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
-        self.1.return_type()
+        let then_r = self.1.return_type()?;
+        if let Some(else_b) = &self.2 {
+            let else_r = else_b.return_type()?;
+            dbg!(&then_r, &else_r);
+
+            let kind = if then_r.0 == ReturnKind::Hard && else_r.0 == ReturnKind::Hard {
+                ReturnKind::Hard
+            } else {
+                ReturnKind::Soft
+            };
+            Ok((kind, then_r.1))
+        } else {
+            Ok((ReturnKind::Soft, then_r.1))
+        }
     }
 }
 

@@ -7,7 +7,6 @@ fn main() -> bool {
 fn fibonacci(value: u16) -> u16 {
     if value <= 2 {
         return 1;
-    } else {
-        return fibonacci(value - 1) + fibonacci(value - 2);
-    };
+    }
+    fibonacci(value - 1) + fibonacci(value - 2)
 }

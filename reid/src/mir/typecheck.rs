@@ -271,6 +271,7 @@ impl Expression {
                     let res = else_block.typecheck(state, hint_t);
                     state.or_else(res, Vague(Unknown), else_block.meta)
                 } else {
+                    // TODO assert that then_ret_t is Void
                     Vague(Unknown)
                 };
 
