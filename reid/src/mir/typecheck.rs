@@ -142,6 +142,9 @@ impl Block {
             }
         }
 
+        // TODO should actually probably prune all instructions after this one
+        // as to not cause problems in codegen later (when unable to delete the
+        // block)
         if let Some((ReturnKind::Hard, expr)) = early_return {
             let hint = state.scope.return_type_hint;
             let res = expr.typecheck(&mut state, hint);
@@ -197,9 +200,9 @@ impl Expression {
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, None); // TODO
+                let lhs_res = lhs.typecheck(state, None);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, Some(lhs_type)); // TODO
+                let rhs_res = rhs.typecheck(state, Some(lhs_type));
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
 
                 if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
