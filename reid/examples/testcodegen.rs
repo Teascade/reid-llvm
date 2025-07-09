@@ -17,7 +17,7 @@ fn main() {
                             // If N < 3
                             Box::new(Expression(
                                 ExprKind::BinOp(
-                                    BinaryOperator::Logic(LogicOperator::GT),
+                                    BinaryOperator::Cmp(CmpOperator::GT),
                                     Box::new(Expression(
                                         ExprKind::Variable(VariableReference(
                                             TypeKind::I32,

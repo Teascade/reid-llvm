@@ -302,7 +302,7 @@ impl TypeKind {
             BinaryOperator::Minus => res,
             BinaryOperator::Mult => res,
             BinaryOperator::And => res,
-            BinaryOperator::Logic(_) => Bool,
+            BinaryOperator::Cmp(_) => Bool,
         })
     }
 }

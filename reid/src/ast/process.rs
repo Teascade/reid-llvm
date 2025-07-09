@@ -150,12 +150,12 @@ impl ast::BinaryOperator {
             ast::BinaryOperator::Minus => mir::BinaryOperator::Minus,
             ast::BinaryOperator::Mult => mir::BinaryOperator::Mult,
             ast::BinaryOperator::And => mir::BinaryOperator::And,
-            ast::BinaryOperator::LT => mir::BinaryOperator::Logic(mir::LogicOperator::LT),
-            ast::BinaryOperator::LE => mir::BinaryOperator::Logic(mir::LogicOperator::LE),
-            ast::BinaryOperator::GT => mir::BinaryOperator::Logic(mir::LogicOperator::GT),
-            ast::BinaryOperator::GE => mir::BinaryOperator::Logic(mir::LogicOperator::GE),
-            ast::BinaryOperator::EQ => mir::BinaryOperator::Logic(mir::LogicOperator::EQ),
-            ast::BinaryOperator::NE => mir::BinaryOperator::Logic(mir::LogicOperator::NE),
+            ast::BinaryOperator::LT => mir::BinaryOperator::Cmp(mir::CmpOperator::LT),
+            ast::BinaryOperator::LE => mir::BinaryOperator::Cmp(mir::CmpOperator::LE),
+            ast::BinaryOperator::GT => mir::BinaryOperator::Cmp(mir::CmpOperator::GT),
+            ast::BinaryOperator::GE => mir::BinaryOperator::Cmp(mir::CmpOperator::GE),
+            ast::BinaryOperator::EQ => mir::BinaryOperator::Cmp(mir::CmpOperator::EQ),
+            ast::BinaryOperator::NE => mir::BinaryOperator::Cmp(mir::CmpOperator::NE),
         }
     }
 }

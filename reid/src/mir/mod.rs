@@ -162,11 +162,12 @@ pub enum BinaryOperator {
     Minus,
     Mult,
     And,
-    Logic(LogicOperator),
+    Cmp(CmpOperator),
 }
 
+/// Specifically the operators that LLVM likes to take in as "icmp" parameters
 #[derive(Debug, Clone, Copy)]
-pub enum LogicOperator {
+pub enum CmpOperator {
     LT,
     LE,
     GT,

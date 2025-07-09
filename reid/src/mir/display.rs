@@ -179,20 +179,20 @@ impl Display for BinaryOperator {
             BinaryOperator::Minus => write!(f, "-"),
             BinaryOperator::Mult => write!(f, "*"),
             BinaryOperator::And => write!(f, "&&"),
-            BinaryOperator::Logic(op) => Display::fmt(op, f),
+            BinaryOperator::Cmp(op) => Display::fmt(op, f),
         }
     }
 }
 
-impl Display for LogicOperator {
+impl Display for CmpOperator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogicOperator::LT => write!(f, "<"),
-            LogicOperator::LE => write!(f, "<="),
-            LogicOperator::GT => write!(f, ">"),
-            LogicOperator::GE => write!(f, ">="),
-            LogicOperator::EQ => write!(f, "=="),
-            LogicOperator::NE => write!(f, "!="),
+            CmpOperator::LT => write!(f, "<"),
+            CmpOperator::LE => write!(f, "<="),
+            CmpOperator::GT => write!(f, ">"),
+            CmpOperator::GE => write!(f, ">="),
+            CmpOperator::EQ => write!(f, "=="),
+            CmpOperator::NE => write!(f, "!="),
         }
     }
 }

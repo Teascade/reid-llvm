@@ -246,7 +246,7 @@ impl mir::Expression {
                     mir::BinaryOperator::And => {
                         scope.block.build(InstructionKind::And(lhs, rhs)).unwrap()
                     }
-                    mir::BinaryOperator::Logic(l) => scope
+                    mir::BinaryOperator::Cmp(l) => scope
                         .block
                         .build(InstructionKind::ICmp(l.int_predicate(), lhs, rhs))
                         .unwrap(),
@@ -290,15 +290,15 @@ impl mir::Expression {
     }
 }
 
-impl mir::LogicOperator {
+impl mir::CmpOperator {
     fn int_predicate(&self) -> CmpPredicate {
         match self {
-            mir::LogicOperator::LT => CmpPredicate::LT,
-            mir::LogicOperator::GT => CmpPredicate::GT,
-            mir::LogicOperator::LE => CmpPredicate::LE,
-            mir::LogicOperator::GE => CmpPredicate::GE,
-            mir::LogicOperator::EQ => CmpPredicate::EQ,
-            mir::LogicOperator::NE => CmpPredicate::NE,
+            mir::CmpOperator::LT => CmpPredicate::LT,
+            mir::CmpOperator::GT => CmpPredicate::GT,
+            mir::CmpOperator::LE => CmpPredicate::LE,
+            mir::CmpOperator::GE => CmpPredicate::GE,
+            mir::CmpOperator::EQ => CmpPredicate::EQ,
+            mir::CmpOperator::NE => CmpPredicate::NE,
         }
     }
 }
