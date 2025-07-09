@@ -8,6 +8,15 @@
 //! Much of the syntax in Reid is directly inspired by rust, but mostly it is
 //! driven by simplicity.
 //!
+//! Reid is currently able to (non-exhaustively):
+//! - Do basic algebra (e.g. Add, Sub, Mult)
+//! - Resolve complex one-liners correctly using PEDMAS (e.g. `5 + 2 * 5 - 5 *
+//!   5` is calculated correctly)
+//! - Declare and call functions with varying parameters and return types
+//! - Perform type-checking and type-inference such that return-types and
+//!   parameter types must always match.
+//! - Do simple logic-operations (e.g. If/And/Or)
+//!
 //! Currently missing relevant features (TODOs) are:
 //! - Arrays
 //! - Structs (and custom types as such)
