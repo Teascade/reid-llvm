@@ -177,7 +177,7 @@ pub enum CmpOperator {
     NE,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReturnKind {
     Hard,
     Soft,

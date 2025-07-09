@@ -6,7 +6,10 @@ use crate::{mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
 
-use super::pass::{Pass, PassState, ScopeFunction};
+use super::{
+    pass::{Pass, PassState, ScopeFunction},
+    types::ReturnType,
+};
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ErrorKind {
@@ -86,8 +89,10 @@ impl Block {
     ) -> Result<TypeKind, ErrorKind> {
         let mut state = state.inner();
 
+        let mut early_return = None;
+
         for statement in &mut self.statements {
-            match &mut statement.0 {
+            let ret = match &mut statement.0 {
                 StmtKind::Let(variable_reference, expression) => {
                     let res = expression.typecheck(&mut state, Some(variable_reference.0));
 
@@ -118,13 +123,29 @@ impl Block {
                             variable_reference.1.clone(),
                         )));
                     state.ok(res, variable_reference.2);
+                    None
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, None);
-                    state.ok(res, expression.1);
+                    let res_t = state.or_else(res, Void, expression.1);
+                    if let Ok((kind, _)) = expression.return_type() {
+                        Some((kind, expression))
+                    } else {
+                        None
+                    }
                 }
+            };
+
+            if let Some((ReturnKind::Hard, _)) = ret {
+                early_return = early_return.or(ret);
             }
+        }
+
+        if let Some((ReturnKind::Hard, expr)) = early_return {
+            let hint = state.scope.return_type_hint;
+            let res = expr.typecheck(&mut state, hint);
+            return Ok(state.or_else(res, Vague(Unknown), expr.1));
         }
 
         if let Some((return_kind, expr)) = &mut self.return_expression {

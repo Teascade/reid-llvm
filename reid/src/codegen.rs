@@ -93,7 +93,7 @@ impl mir::Module {
                         if !scope.block.delete_if_unused().unwrap() {
                             // Add a void return just in case if the block
                             // wasn't unused but didn't have a terminator yet
-                            scope.block.terminate(Term::RetVoid).unwrap();
+                            scope.block.terminate(Term::RetVoid).ok();
                         }
                     }
                 }
@@ -225,11 +225,13 @@ impl mir::Expression {
                 lhs_exp
                     .return_type()
                     .expect("No ret type in lhs?")
+                    .1
                     .is_known()
                     .expect("lhs ret type is unknown");
                 rhs_exp
                     .return_type()
                     .expect("No ret type in rhs?")
+                    .1
                     .is_known()
                     .expect("rhs ret type is unknown");
 
