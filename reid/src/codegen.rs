@@ -1,11 +1,12 @@
 use std::{collections::HashMap, mem};
 
+use llvm_sys::core::LLVMBuildStore;
 use reid_lib::{
-    Block, CmpPredicate, ConstValue, Context, Function, Instr, Module, TerminatorKind as Term,
-    Type, builder::InstructionValue,
+    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, Instr, Module,
+    TerminatorKind as Term, Type,
 };
 
-use crate::mir::{self, TypeKind, VariableReference, types::ReturnType};
+use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
 
 /// Context that contains all of the given modules as complete codegenerated
 /// LLIR that can then be finally compiled into LLVM IR.
@@ -73,8 +74,14 @@ impl mir::Module {
             let mut entry = function.block("entry");
 
             let mut stack_values = HashMap::new();
-            for (i, (p_name, _)) in mir_function.parameters.iter().enumerate() {
-                stack_values.insert(p_name.clone(), entry.build(Instr::Param(i)).unwrap());
+            for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
+                stack_values.insert(
+                    p_name.clone(),
+                    StackValue(
+                        StackValueKind::Immutable(entry.build(Instr::Param(i)).unwrap()),
+                        p_ty.get_type(),
+                    ),
+                );
             }
 
             let mut scope = Scope {
@@ -114,7 +121,16 @@ pub struct Scope<'ctx, 'a> {
     function: &'ctx Function<'ctx>,
     block: Block<'ctx>,
     functions: &'a HashMap<String, Function<'ctx>>,
-    stack_values: HashMap<String, InstructionValue>,
+    stack_values: HashMap<String, StackValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StackValue(StackValueKind, Type);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StackValueKind {
+    Immutable(InstructionValue),
+    Mutable(InstructionValue),
 }
 
 impl<'ctx, 'a> Scope<'ctx, 'a> {
@@ -141,10 +157,32 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
-            mir::StmtKind::Let(VariableReference(_, name, _), expression) => {
+            mir::StmtKind::Let(VariableReference(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope).unwrap();
-                scope.stack_values.insert(name.clone(), value);
+                scope.stack_values.insert(
+                    name.clone(),
+                    StackValue(
+                        match mutable {
+                            true => StackValueKind::Mutable(value),
+                            false => StackValueKind::Immutable(value),
+                        },
+                        ty.get_type(),
+                    ),
+                );
                 None
+            }
+            mir::StmtKind::Set(var, val) => {
+                if let Some(StackValue(kind, ty)) = scope.stack_values.get(&var.1).cloned() {
+                    match kind {
+                        StackValueKind::Immutable(ptr) => {
+                            let expression = val.codegen(scope).unwrap();
+                            Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
+                        }
+                        StackValueKind::Mutable(_) => panic!(""),
+                    }
+                } else {
+                    panic!("")
+                }
             }
             // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),
@@ -218,7 +256,12 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
-                Some(v.clone())
+                Some(match v.0 {
+                    StackValueKind::Immutable(val) => val.clone(),
+                    StackValueKind::Mutable(val) => {
+                        scope.block.build(Instr::Load(val, v.1.clone())).unwrap()
+                    }
+                })
             }
             mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {

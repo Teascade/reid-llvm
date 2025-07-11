@@ -133,7 +133,7 @@ pub struct Block(
 pub enum BlockLevelStatement {
     Let(LetStatement),
     /// Try to set a variable to a specified expression value
-    Set(String, Expression),
+    Set(String, Expression, TokenRange),
     Import {
         _i: ImportStatement,
     },

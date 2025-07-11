@@ -253,9 +253,10 @@ impl Block {
 impl Statement {
     fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
         match &mut self.0 {
-            StmtKind::Let(_, expression) => {
+            StmtKind::Let(_, mutable, expression) => {
                 expression.pass(pass, state, scope);
             }
+            StmtKind::Set(variable_reference, expression) => {} // TODO
             StmtKind::Import(_) => todo!(),
             StmtKind::Expression(expression) => {
                 expression.pass(pass, state, scope);
@@ -265,10 +266,11 @@ impl Statement {
         pass.stmt(self, PassState::from(state, scope));
 
         match &mut self.0 {
-            StmtKind::Let(variable_reference, _) => scope
+            StmtKind::Let(variable_reference, mutable, _) => scope
                 .variables
                 .set(variable_reference.1.clone(), variable_reference.0)
                 .ok(),
+            StmtKind::Set(variable_reference, expression) => None, // TODO
             StmtKind::Import(_) => todo!(),
             StmtKind::Expression(_) => None,
         };

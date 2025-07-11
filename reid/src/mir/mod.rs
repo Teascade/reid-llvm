@@ -257,8 +257,9 @@ pub struct Statement(pub StmtKind, pub Metadata);
 
 #[derive(Debug)]
 pub enum StmtKind {
-    /// Variable name+type, evaluation
-    Let(VariableReference, Expression),
+    /// Variable name++mutability+type, evaluation
+    Let(VariableReference, bool, Expression),
+    Set(VariableReference, Expression),
     Import(Import),
     Expression(Expression),
 }

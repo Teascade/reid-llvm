@@ -363,8 +363,8 @@ impl Parse for BlockLevelStatement {
                 Stmt::Return(ReturnType::Hard, exp)
             }
             _ => {
-                if let Ok(SetStatement(ident, expr)) = stream.parse() {
-                    Stmt::Set(ident, expr)
+                if let Ok(SetStatement(ident, expr, range)) = stream.parse() {
+                    Stmt::Set(ident, expr, range)
                 } else {
                     if let Ok(e) = stream.parse() {
                         if stream.expect(Token::Semi).is_ok() {
@@ -382,7 +382,7 @@ impl Parse for BlockLevelStatement {
 }
 
 #[derive(Debug)]
-pub struct SetStatement(String, Expression);
+pub struct SetStatement(String, Expression, TokenRange);
 
 impl Parse for SetStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -390,7 +390,7 @@ impl Parse for SetStatement {
             stream.expect(Token::Equals)?;
             let expr = stream.parse()?;
             stream.expect(Token::Semi)?;
-            Ok(Self(ident, expr))
+            Ok(Self(ident, expr, stream.get_range().unwrap()))
         } else {
             Err(stream.expected_err("identifier")?)?
         }

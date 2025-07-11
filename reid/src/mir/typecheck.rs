@@ -93,7 +93,8 @@ impl Block {
 
         for statement in &mut self.statements {
             let ret = match &mut statement.0 {
-                StmtKind::Let(variable_reference, expression) => {
+                // TODO
+                StmtKind::Let(variable_reference, mutable, expression) => {
                     let res = expression.typecheck(&mut state, Some(variable_reference.0));
 
                     // If expression resolution itself was erronous, resolve as
@@ -125,6 +126,7 @@ impl Block {
                     state.ok(res, variable_reference.2);
                     None
                 }
+                StmtKind::Set(variable_reference, expression) => None, // TODO
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, None);

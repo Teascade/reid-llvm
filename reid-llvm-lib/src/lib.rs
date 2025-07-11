@@ -174,13 +174,17 @@ pub enum Instr {
     And(InstructionValue, InstructionValue),
     Phi(Vec<InstructionValue>),
 
+    Alloca(String, Type),
+    Load(InstructionValue, Type),
+    Store(InstructionValue, InstructionValue),
+
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
 
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Type {
     I8,
     I16,
@@ -194,6 +198,7 @@ pub enum Type {
     U128,
     Bool,
     Void,
+    Ptr(Box<Type>),
 }
 
 #[derive(Debug, Clone, Hash)]

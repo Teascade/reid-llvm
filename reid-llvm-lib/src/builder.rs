@@ -3,6 +3,8 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildStore};
+
 use crate::{
     BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
     util::match_types,
@@ -250,6 +252,29 @@ impl Builder {
                     }
                     Ok(())
                 }
+                Alloca(_, _) => Ok(()),
+                Load(ptr, _) => {
+                    if let Ok(ty) = ptr.get_type(&self) {
+                        if let Type::Ptr(_) = ty {
+                            Ok(())
+                        } else {
+                            Err(())
+                        }
+                    } else {
+                        Err(())
+                    }
+                }
+                Store(ptr, _) => {
+                    if let Ok(ty) = ptr.get_type(&self) {
+                        if let Type::Ptr(_) = ty {
+                            Ok(())
+                        } else {
+                            Err(())
+                        }
+                    } else {
+                        Err(())
+                    }
+                }
             }
         }
     }
@@ -298,7 +323,7 @@ impl InstructionValue {
                     .function_data(&self.0.0)
                     .params
                     .get(*nth)
-                    .copied()
+                    .cloned()
                     .ok_or(()),
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
@@ -308,6 +333,9 @@ impl InstructionValue {
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
+                Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Load(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Store(_, value) => value.get_type(builder),
             }
         }
     }
@@ -347,6 +375,7 @@ impl Type {
             Type::U128 => true,
             Type::Bool => true,
             Type::Void => false,
+            Type::Ptr(_) => false,
         }
     }
 
@@ -364,6 +393,7 @@ impl Type {
             Type::U128 => false,
             Type::Bool => false,
             Type::Void => false,
+            Type::Ptr(_) => false,
         }
     }
 }

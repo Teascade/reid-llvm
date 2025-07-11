@@ -26,8 +26,9 @@ impl ReturnType for Statement {
         use StmtKind::*;
         match &self.0 {
             Expression(e) => e.return_type(),
+            Set(_, _) => todo!(),
             Import(_) => Err(ReturnTypeOther::Import(self.1.range)),
-            Let(_, _) => Err(ReturnTypeOther::Let(self.1.range)),
+            Let(_, _, _) => Err(ReturnTypeOther::Let(self.1.range)),
         }
     }
 }

@@ -94,7 +94,16 @@ impl Display for Statement {
 impl Display for StmtKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Let(var, block) => write!(f, "let {} = {}", var, block),
+            Self::Let(var, mutable, block) => {
+                write!(
+                    f,
+                    "let{} {} = {}",
+                    if *mutable { " mut" } else { "" },
+                    var,
+                    block
+                )
+            }
+            Self::Set(var, expr) => write!(f, "{} = {}", var, expr),
             Self::Import(n) => write!(f, "import {}", n),
             Self::Expression(exp) => Display::fmt(exp, f),
         }

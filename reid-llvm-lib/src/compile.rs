@@ -333,6 +333,22 @@ impl InstructionHolder {
                     );
                     phi
                 }
+                Alloca(name, ty) => LLVMBuildAlloca(
+                    module.builder_ref,
+                    ty.as_llvm(module.context_ref),
+                    into_cstring(name).as_ptr(),
+                ),
+                Load(ptr, ty) => LLVMBuildLoad2(
+                    module.builder_ref,
+                    ty.as_llvm(module.context_ref),
+                    module.values.get(&ptr).unwrap().value_ref,
+                    c"load".as_ptr(),
+                ),
+                Store(ptr, val) => LLVMBuildStore(
+                    module.builder_ref,
+                    module.values.get(&val).unwrap().value_ref,
+                    module.values.get(&ptr).unwrap().value_ref,
+                ),
             }
         };
         LLVMValue {
@@ -428,6 +444,7 @@ impl Type {
                 I128 | U128 => LLVMInt128TypeInContext(context),
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
+                Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
             }
         }
     }

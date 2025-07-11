@@ -70,11 +70,22 @@ impl ast::Block {
                             s_let.0.clone(),
                             s_let.4.into(),
                         ),
+                        s_let.2,
                         s_let.3.process(),
                     ),
                     s_let.4,
                 ),
-                ast::BlockLevelStatement::Set(_, expression) => todo!(),
+                ast::BlockLevelStatement::Set(name, expression, range) => (
+                    StmtKind::Set(
+                        VariableReference(
+                            mir::TypeKind::Vague(mir::VagueType::Unknown),
+                            name.clone(),
+                            (*range).into(),
+                        ),
+                        expression.process(),
+                    ),
+                    *range,
+                ),
                 ast::BlockLevelStatement::Import { _i } => todo!(),
                 ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process()), e.1),
                 ast::BlockLevelStatement::Return(_, e) => (StmtKind::Expression(e.process()), e.1),

@@ -97,6 +97,9 @@ impl Debug for Instr {
             Self::Phi(val) => fmt_call(f, &"Phi", &val),
             Self::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
             Self::FunctionCall(fun, params) => fmt_call(f, fun, params),
+            Instr::Alloca(name, ty) => write!(f, "alloca<{:?}>({})", ty, name),
+            Instr::Load(val, ty) => write!(f, "load<{:?}>({:?})", ty, val),
+            Instr::Store(ptr, val) => write!(f, "store({:?} = {:?})", ptr, val),
         }
     }
 }
