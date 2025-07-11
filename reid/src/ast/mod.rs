@@ -92,7 +92,14 @@ pub struct IfExpression(
 );
 
 #[derive(Debug, Clone)]
-pub struct LetStatement(pub String, pub Option<Type>, pub Expression, pub TokenRange);
+pub struct LetStatement(
+    pub String,
+    pub Option<Type>,
+    /// Mutability
+    pub bool,
+    pub Expression,
+    pub TokenRange,
+);
 
 #[derive(Debug, Clone)]
 pub struct ImportStatement(pub Vec<String>, pub TokenRange);
@@ -125,7 +132,11 @@ pub struct Block(
 #[derive(Debug, Clone)]
 pub enum BlockLevelStatement {
     Let(LetStatement),
-    Import { _i: ImportStatement },
+    /// Try to set a variable to a specified expression value
+    Set(String, Expression),
+    Import {
+        _i: ImportStatement,
+    },
     Expression(Expression),
     Return(ReturnType, Expression),
 }

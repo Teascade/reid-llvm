@@ -12,6 +12,8 @@ pub enum Token {
     // Keywords
     /// `let`
     LetKeyword,
+    /// `mut`
+    MutKeyword,
     /// `import`
     ImportKeyword,
     /// `return`
@@ -170,6 +172,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 // Check for keywords
                 let variant = match value.as_str() {
                     "let" => Token::LetKeyword,
+                    "mut" => Token::MutKeyword,
                     "import" => Token::ImportKeyword,
                     "return" => Token::ReturnKeyword,
                     "fn" => Token::FnKeyword,

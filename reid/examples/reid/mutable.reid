@@ -1,0 +1,15 @@
+// Arithmetic, function calls and imports!
+
+fn indirection() -> bool {
+    return true;
+}
+
+fn main() -> u16 {
+    let mut test = 5;
+
+    if indirection() {
+        test = 11;
+    }
+
+    return test;
+}

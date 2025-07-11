@@ -223,6 +223,7 @@ impl Parse for IfExpression {
 impl Parse for LetStatement {
     fn parse(mut stream: TokenStream) -> Result<LetStatement, Error> {
         stream.expect(Token::LetKeyword)?;
+        let mutability = stream.expect(Token::MutKeyword).is_ok();
 
         if let Some(Token::Identifier(variable)) = stream.next() {
             stream.expect(Token::Equals)?;
@@ -232,6 +233,7 @@ impl Parse for LetStatement {
             Ok(LetStatement(
                 variable,
                 None, // TODO add possibility to name type
+                mutability,
                 expression,
                 stream.get_range().unwrap(),
             ))
@@ -331,7 +333,7 @@ impl Parse for Block {
                     ReturnType::Hard => {
                         return_stmt = Some((*r_type, e.clone()));
                         break; // Return has to be the last statement
-                        // TODO: Make a mechanism that "can" parse even after this
+                               // TODO: Make a mechanism that "can" parse even after this
                     }
                     ReturnType::Soft => {
                         return_stmt = Some((*r_type, e.clone()));
@@ -361,17 +363,37 @@ impl Parse for BlockLevelStatement {
                 Stmt::Return(ReturnType::Hard, exp)
             }
             _ => {
-                if let Ok(e) = stream.parse() {
-                    if stream.expect(Token::Semi).is_ok() {
-                        Stmt::Expression(e)
-                    } else {
-                        Stmt::Return(ReturnType::Soft, e)
-                    }
+                if let Ok(SetStatement(ident, expr)) = stream.parse() {
+                    Stmt::Set(ident, expr)
                 } else {
-                    Err(stream.expected_err("expression")?)?
+                    if let Ok(e) = stream.parse() {
+                        if stream.expect(Token::Semi).is_ok() {
+                            Stmt::Expression(e)
+                        } else {
+                            Stmt::Return(ReturnType::Soft, e)
+                        }
+                    } else {
+                        Err(stream.expected_err("expression")?)?
+                    }
                 }
             }
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct SetStatement(String, Expression);
+
+impl Parse for SetStatement {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        if let Some(Token::Identifier(ident)) = stream.next() {
+            stream.expect(Token::Equals)?;
+            let expr = stream.parse()?;
+            stream.expect(Token::Semi)?;
+            Ok(Self(ident, expr))
+        } else {
+            Err(stream.expected_err("identifier")?)?
+        }
     }
 }
 
