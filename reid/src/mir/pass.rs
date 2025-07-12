@@ -107,7 +107,7 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
 #[derive(Clone, Default, Debug)]
 pub struct Scope {
     pub function_returns: Storage<ScopeFunction>,
-    pub variables: Storage<TypeKind>,
+    pub variables: Storage<ScopeVariable>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
 }
@@ -116,6 +116,12 @@ pub struct Scope {
 pub struct ScopeFunction {
     pub ret: TypeKind,
     pub params: Vec<TypeKind>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ScopeVariable {
+    pub ty: TypeKind,
+    pub mutable: bool,
 }
 
 impl Scope {
@@ -223,7 +229,16 @@ impl Module {
 impl FunctionDefinition {
     fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
         for param in &self.parameters {
-            scope.variables.set(param.0.clone(), param.1).ok();
+            scope
+                .variables
+                .set(
+                    param.0.clone(),
+                    ScopeVariable {
+                        ty: param.1,
+                        mutable: false,
+                    },
+                )
+                .ok();
         }
 
         pass.function(self, PassState::from(state, scope));
@@ -268,7 +283,13 @@ impl Statement {
         match &mut self.0 {
             StmtKind::Let(variable_reference, mutable, _) => scope
                 .variables
-                .set(variable_reference.1.clone(), variable_reference.0)
+                .set(
+                    variable_reference.1.clone(),
+                    ScopeVariable {
+                        ty: variable_reference.0,
+                        mutable: *mutable,
+                    },
+                )
                 .ok(),
             StmtKind::Set(variable_reference, expression) => None, // TODO
             StmtKind::Import(_) => todo!(),

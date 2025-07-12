@@ -7,7 +7,7 @@ use TypeKind::*;
 use VagueType::*;
 
 use super::{
-    pass::{Pass, PassState, ScopeFunction},
+    pass::{Pass, PassState, ScopeFunction, ScopeVariable},
     types::ReturnType,
 };
 
@@ -33,6 +33,8 @@ pub enum ErrorKind {
     FunctionAlreadyDefined(String),
     #[error("Variable not defined: {0}")]
     VariableAlreadyDefined(String),
+    #[error("Variable not mutable: {0}")]
+    VariableNotMutable(String),
     #[error("Function {0} was given {1} parameters, but {2} were expected")]
     InvalidAmountParameters(String, usize, usize),
 }
@@ -59,7 +61,13 @@ impl FunctionDefinition {
             let res = state
                 .scope
                 .variables
-                .set(param.0.clone(), param_t)
+                .set(
+                    param.0.clone(),
+                    ScopeVariable {
+                        ty: param_t,
+                        mutable: false,
+                    },
+                )
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
             state.ok(res, self.signature());
         }
@@ -108,9 +116,19 @@ impl Block {
                         variable_reference.2 + expression.1,
                     );
 
-                    // Make sure expression/variable type is NOT vague anymore
-                    let res_t =
-                        state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
+                    let res_t = if res_t.known().is_err() {
+                        // Unable to infer variable type even from expression! Default it
+                        let res_t =
+                            state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
+
+                        // Re-typecheck and coerce expression to default type
+                        let expr_res = expression.typecheck(&mut state, Some(res_t));
+                        state.ok(expr_res, expression.1);
+
+                        res_t
+                    } else {
+                        res_t
+                    };
 
                     // Update typing to be more accurate
                     variable_reference.0 = res_t;
@@ -119,15 +137,56 @@ impl Block {
                     let res = state
                         .scope
                         .variables
-                        .set(variable_reference.1.clone(), variable_reference.0)
+                        .set(
+                            variable_reference.1.clone(),
+                            ScopeVariable {
+                                ty: variable_reference.0,
+                                mutable: *mutable,
+                            },
+                        )
                         .or(Err(ErrorKind::VariableAlreadyDefined(
                             variable_reference.1.clone(),
                         )));
                     state.ok(res, variable_reference.2);
                     None
                 }
-                StmtKind::Set(variable_reference, expression) => None, // TODO
-                StmtKind::Import(_) => todo!(),
+                StmtKind::Set(variable_reference, expression) => {
+                    if let Some(var) = state.scope.variables.get(&variable_reference.1).cloned() {
+                        // Typecheck expression and coerce to variable type
+                        let res = expression.typecheck(&mut state, Some(var.ty));
+
+                        // If expression resolution itself was erronous, resolve as
+                        // Unknown.
+                        let expr_ty = state.or_else(res, Vague(Unknown), expression.1);
+
+                        // Make sure the expression and variable type to really
+                        // be the same
+                        let res_t = state.or_else(
+                            expr_ty.collapse_into(&variable_reference.0),
+                            Vague(Unknown),
+                            variable_reference.2 + expression.1,
+                        );
+
+                        // Update typing to be more accurate
+                        variable_reference.0 = res_t;
+
+                        if !var.mutable {
+                            state.ok::<_, Infallible>(
+                                Err(ErrorKind::VariableNotMutable(variable_reference.1.clone())),
+                                variable_reference.2,
+                            );
+                        }
+
+                        None
+                    } else {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::VariableNotDefined(variable_reference.1.clone())),
+                            variable_reference.2,
+                        );
+                        None
+                    }
+                }
+                StmtKind::Import(_) => todo!(), // TODO
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, None);
                     state.or_else(res, Void, expression.1);
@@ -180,7 +239,8 @@ impl Expression {
                         .scope
                         .variables
                         .get(&var_ref.1)
-                        .copied()
+                        .map(|var| &var.ty)
+                        .cloned()
                         .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
                     Vague(Unknown),
                     var_ref.2,
@@ -341,7 +401,7 @@ impl TypeKind {
     /// Assert that a type is already known and not vague. Return said type or
     /// error.
     fn assert_known(&self) -> Result<TypeKind, ErrorKind> {
-        self.is_known().map_err(ErrorKind::TypeIsVague)
+        self.known().map_err(ErrorKind::TypeIsVague)
     }
 
     /// Try to collapse a type on itself producing a default type if one exists,

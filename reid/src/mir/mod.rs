@@ -69,7 +69,7 @@ pub enum VagueType {
 }
 
 impl TypeKind {
-    pub fn is_known(&self) -> Result<TypeKind, VagueType> {
+    pub fn known(&self) -> Result<TypeKind, VagueType> {
         if let TypeKind::Vague(vague) = self {
             Err(*vague)
         } else {

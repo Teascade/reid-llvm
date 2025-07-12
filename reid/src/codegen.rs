@@ -163,8 +163,15 @@ impl mir::Statement {
                     name.clone(),
                     StackValue(
                         match mutable {
-                            true => StackValueKind::Mutable(value),
                             false => StackValueKind::Immutable(value),
+                            true => StackValueKind::Mutable({
+                                let alloca = scope
+                                    .block
+                                    .build(Instr::Alloca(name.clone(), ty.get_type()))
+                                    .unwrap();
+                                scope.block.build(Instr::Store(alloca, value)).unwrap();
+                                alloca
+                            }),
                         },
                         ty.get_type(),
                     ),
@@ -172,13 +179,15 @@ impl mir::Statement {
                 None
             }
             mir::StmtKind::Set(var, val) => {
-                if let Some(StackValue(kind, ty)) = scope.stack_values.get(&var.1).cloned() {
+                if let Some(StackValue(kind, _)) = scope.stack_values.get(&var.1).cloned() {
                     match kind {
-                        StackValueKind::Immutable(ptr) => {
+                        StackValueKind::Immutable(_) => {
+                            panic!("Tried to mutate an immutable variable")
+                        }
+                        StackValueKind::Mutable(ptr) => {
                             let expression = val.codegen(scope).unwrap();
                             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
                         }
-                        StackValueKind::Mutable(_) => panic!(""),
                     }
                 } else {
                     panic!("")
@@ -251,7 +260,7 @@ impl mir::Expression {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
             mir::ExprKind::Variable(varref) => {
-                varref.0.is_known().expect("variable type unknown");
+                varref.0.known().expect("variable type unknown");
                 let v = scope
                     .stack_values
                     .get(&varref.1)
@@ -269,13 +278,13 @@ impl mir::Expression {
                     .return_type()
                     .expect("No ret type in lhs?")
                     .1
-                    .is_known()
+                    .known()
                     .expect("lhs ret type is unknown");
                 rhs_exp
                     .return_type()
                     .expect("No ret type in rhs?")
                     .1
-                    .is_known()
+                    .known()
                     .expect("rhs ret type is unknown");
 
                 let lhs = lhs_exp.codegen(scope).expect("lhs has no return value");
@@ -293,7 +302,7 @@ impl mir::Expression {
             }
             mir::ExprKind::FunctionCall(call) => {
                 call.return_type
-                    .is_known()
+                    .known()
                     .expect("function return type unknown");
 
                 let params = call
