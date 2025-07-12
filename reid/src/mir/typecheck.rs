@@ -1,16 +1,13 @@
 //! This module contains code relevant to doing a type checking pass on the MIR.
 //! During typechecking relevant types are also coerced if possible.
-use std::{
-    cell::RefCell, collections::HashMap, convert::Infallible, iter, marker::PhantomData,
-    thread::scope,
-};
+use std::{convert::Infallible, iter};
 
 use crate::{mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
 
 use super::{
-    pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
+    pass::{Pass, PassState, ScopeFunction, ScopeVariable},
     scopehints::{ScopeHints, TypeHints, TypeRef},
     types::{pick_return, ReturnType},
 };

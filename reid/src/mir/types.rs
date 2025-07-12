@@ -1,5 +1,3 @@
-use crate::mir::typecheck::Collapsable;
-
 use super::*;
 
 #[derive(Debug, Clone)]

@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
-    BinaryOperator, Literal, TypeKind, VagueLiteral, VagueType,
+    BinaryOperator, Literal, TypeKind, VagueType,
 };
 
 #[derive(Clone)]
