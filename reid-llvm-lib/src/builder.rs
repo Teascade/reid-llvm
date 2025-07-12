@@ -251,10 +251,14 @@ impl Builder {
                     Ok(())
                 }
                 Alloca(_, _) => Ok(()),
-                Load(ptr, _) => {
-                    if let Ok(ty) = ptr.get_type(&self) {
-                        if let Type::Ptr(_) = ty {
-                            Ok(())
+                Load(ptr, load_ty) => {
+                    if let Ok(ptr_ty) = ptr.get_type(&self) {
+                        if let Type::Ptr(ptr_ty_inner) = ptr_ty {
+                            if *ptr_ty_inner == load_ty {
+                                Ok(())
+                            } else {
+                                Err(())
+                            }
                         } else {
                             Err(())
                         }
@@ -332,7 +336,7 @@ impl InstructionValue {
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
                 Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
-                Load(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
             }
         }

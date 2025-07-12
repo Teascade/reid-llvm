@@ -38,6 +38,8 @@ pub enum ErrorKind {
     VariableNotMutable(String),
     #[error("Function {0} was given {1} parameters, but {2} were expected")]
     InvalidAmountParameters(String, usize, usize),
+    #[error("Unable to infer type {0}")]
+    TypeNotInferrable(TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -194,6 +196,10 @@ impl Block {
                     );
 
                     let res_t = if res_t.known().is_err() {
+                        // state.ok::<_, Infallible>(
+                        //     Err(ErrorKind::TypeNotInferrable(res_t)),
+                        //     variable_reference.2 + expression.1,
+                        // );
                         // Unable to infer variable type even from expression! Default it
                         let res_t =
                             state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
@@ -552,8 +558,6 @@ impl Literal {
                 (L::Vague(VagueL::Number(v)), U32) => L::U32(v as u32),
                 (L::Vague(VagueL::Number(v)), U64) => L::U64(v as u64),
                 (L::Vague(VagueL::Number(v)), U128) => L::U128(v as u128),
-                // Default type for number literal if unable to find true type.
-                (L::Vague(VagueL::Number(v)), Vague(Number)) => L::I32(v as i32),
                 (_, Vague(_)) => self,
                 _ => Err(ErrorKind::LiteralIncompatible(self, hint))?,
             })
