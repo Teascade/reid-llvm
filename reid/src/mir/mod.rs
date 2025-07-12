@@ -6,6 +6,7 @@ use crate::token_stream::TokenRange;
 
 mod display;
 pub mod pass;
+mod scopehints;
 pub mod typecheck;
 pub mod types;
 

@@ -8,6 +8,7 @@ use VagueType::*;
 
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
+    scopehints::ScopeHints,
     types::ReturnType,
 };
 
@@ -42,78 +43,6 @@ pub enum ErrorKind {
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct TypeCheck;
-
-#[derive(Debug, Clone)]
-pub struct ScopeHint<'scope>(usize, &'scope ScopeHints<'scope>);
-
-impl<'scope> ScopeHint<'scope> {
-    fn resolve(&self) -> TypeKind {
-        let mut scope = self.1;
-        while !scope.type_hints.borrow().contains_key(&self.0) {
-            scope = scope.outer.as_ref().unwrap();
-        }
-        scope.type_hints.borrow().get(&self.0).unwrap().clone()
-    }
-}
-
-#[derive(Debug, Default)]
-struct ScopeHints<'outer> {
-    outer: Option<&'outer ScopeHints<'outer>>,
-    /// Mapping of what types variables point to
-    variables: RefCell<HashMap<String, usize>>,
-    /// Simple list of types that variables can refrence
-    type_hints: RefCell<HashMap<usize, TypeKind>>,
-}
-
-impl<'outer> ScopeHints<'outer> {
-    fn get_idx(&self) -> usize {
-        self.type_hints.borrow().len() + self.outer.as_ref().map(|o| o.get_idx()).unwrap_or(0)
-    }
-
-    fn new_var(&'outer self, name: String, initial_ty: TypeKind) -> ScopeHint<'outer> {
-        if self.variables.borrow().contains_key(&name) {
-            panic!("Variable was already defined!")
-        }
-        let idx = self.get_idx();
-        self.variables.borrow_mut().insert(name, idx);
-        self.type_hints.borrow_mut().insert(idx, initial_ty);
-        ScopeHint(idx, self)
-    }
-
-    fn narrow_hint(
-        &'outer self,
-        hint: &ScopeHint,
-        ty: &TypeKind,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
-        let mut hints = self.type_hints.borrow_mut();
-        let existing = hints.get_mut(&hint.0).unwrap();
-        *existing = existing.collapse_into(&ty)?;
-        Ok(ScopeHint(hint.0, self))
-    }
-
-    fn combine_vars(
-        &'outer self,
-        hint1: &ScopeHint,
-        hint2: &ScopeHint,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
-        let ty = self.type_hints.borrow().get(&hint2.0).unwrap().clone();
-        self.narrow_hint(&hint1, &ty)?;
-        for (_, val) in self.variables.borrow_mut().iter_mut() {
-            if *val == hint2.0 {
-                *val = hint1.0;
-            }
-        }
-        Ok(ScopeHint(hint1.0, self))
-    }
-
-    fn inner(&'outer self) -> ScopeHints<'outer> {
-        ScopeHints {
-            outer: Some(self),
-            variables: Default::default(),
-            type_hints: Default::default(),
-        }
-    }
-}
 
 impl Pass for TypeCheck {
     type TError = ErrorKind;
@@ -154,7 +83,8 @@ impl FunctionDefinition {
         };
 
         match inferred {
-            Ok(t) => try_collapse(&return_type, &t)
+            Ok(t) => return_type
+                .collapse_into(&t)
                 .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t))),
             Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
         }
@@ -388,7 +318,7 @@ impl Expression {
 
                     // Make sure function return type is the same as the claimed
                     // return type
-                    let ret_t = try_collapse(&f.ret, &function_call.return_type)?;
+                    let ret_t = f.ret.collapse_into(&function_call.return_type)?;
                     // Update typing to be more accurate
                     function_call.return_type = ret_t;
                     Ok(ret_t)
@@ -500,12 +430,6 @@ impl TypeKind {
             BinaryOperator::Cmp(_) => Bool,
         })
     }
-}
-
-fn try_collapse(lhs: &TypeKind, rhs: &TypeKind) -> Result<TypeKind, ErrorKind> {
-    lhs.collapse_into(rhs)
-        .or(rhs.collapse_into(lhs))
-        .or(Err(ErrorKind::TypesIncompatible(*lhs, *rhs)))
 }
 
 pub trait Collapsable: Sized + Clone {
