@@ -40,14 +40,15 @@ type TypeIdRef = Rc<RefCell<usize>>;
 pub struct TypeHints {
     /// Simple list of types that variables can refrence
     hints: RefCell<Vec<TypeKind>>,
-    types: RefCell<Vec<TypeIdRef>>,
+    /// Indirect ID-references, referring to hints-vec
+    type_refs: RefCell<Vec<TypeIdRef>>,
 }
 
 impl TypeHints {
     pub fn new(&self, ty: TypeKind) -> TypeIdRef {
         let idx = self.hints.borrow().len();
         let typecell = Rc::new(RefCell::new(idx));
-        self.types.borrow_mut().push(typecell.clone());
+        self.type_refs.borrow_mut().push(typecell.clone());
         self.hints.borrow_mut().push(ty);
         typecell
     }
@@ -70,19 +71,13 @@ impl<'outer> ScopeHints<'outer> {
         }
     }
 
-    pub fn retrieve_type(&self, mut idx: usize) -> Option<TypeKind> {
-        // Just make sure we have the correct idx
-        let mut inner_idx = self.types.types.borrow().get(idx).map(|i| *i.borrow())?;
-        let mut limit = 50;
-        while inner_idx != idx {
-            idx = inner_idx;
-            inner_idx = self.types.types.borrow().get(idx).map(|i| *i.borrow())?;
-            limit -= 1;
-            if limit < 0 {
-                // Should never happen, but just to avoid infinite loops
-                panic!("Limit reached!");
-            }
-        }
+    pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
+        let inner_idx = self
+            .types
+            .type_refs
+            .borrow()
+            .get(idx)
+            .map(|i| *i.borrow())?;
         self.types.hints.borrow().get(inner_idx).copied()
     }
 
@@ -133,7 +128,7 @@ impl<'outer> ScopeHints<'outer> {
                 .get_unchecked(*hint2.0.borrow())
                 .clone();
             self.narrow_to_type(&hint1, &ty)?;
-            for idx in self.types.types.borrow_mut().iter_mut() {
+            for idx in self.types.type_refs.borrow_mut().iter_mut() {
                 if *idx == hint2.0 {
                     *idx.borrow_mut() = *hint1.0.borrow();
                 }
@@ -198,7 +193,7 @@ impl<'scope> TypeRef<'scope> {
             Ok(ty) => TypeRef::Literal(*ty),
             Err(vague) => match &vague {
                 super::VagueType::Hinted(idx) => TypeRef::Hint(ScopeHint(
-                    unsafe { hints.types.types.borrow().get_unchecked(*idx).clone() },
+                    unsafe { hints.types.type_refs.borrow().get_unchecked(*idx).clone() },
                     hints,
                 )),
                 _ => TypeRef::Hint(hints.new_vague(vague)),
