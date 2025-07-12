@@ -4,7 +4,7 @@ fn indirection() -> bool {
     return true;
 }
 
-fn main() -> i32 {
+fn main() -> u16 {
     let mut test = 5;
 
     if indirection() {

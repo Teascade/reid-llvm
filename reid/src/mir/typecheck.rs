@@ -1,13 +1,13 @@
 //! This module contains code relevant to doing a type checking pass on the MIR.
 //! During typechecking relevant types are also coerced if possible.
-use std::{convert::Infallible, iter};
+use std::{cell::RefCell, collections::HashMap, convert::Infallible, iter, marker::PhantomData};
 
 use crate::{mir::*, util::try_all};
 use TypeKind::*;
 use VagueType::*;
 
 use super::{
-    pass::{Pass, PassState, ScopeFunction, ScopeVariable},
+    pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
     types::ReturnType,
 };
 
@@ -43,6 +43,78 @@ pub enum ErrorKind {
 /// MIR.
 pub struct TypeCheck;
 
+#[derive(Debug, Clone)]
+pub struct ScopeHint<'scope>(usize, &'scope ScopeHints<'scope>);
+
+impl<'scope> ScopeHint<'scope> {
+    fn resolve(&self) -> TypeKind {
+        let mut scope = self.1;
+        while !scope.type_hints.borrow().contains_key(&self.0) {
+            scope = scope.outer.as_ref().unwrap();
+        }
+        scope.type_hints.borrow().get(&self.0).unwrap().clone()
+    }
+}
+
+#[derive(Debug, Default)]
+struct ScopeHints<'outer> {
+    outer: Option<&'outer ScopeHints<'outer>>,
+    /// Mapping of what types variables point to
+    variables: RefCell<HashMap<String, usize>>,
+    /// Simple list of types that variables can refrence
+    type_hints: RefCell<HashMap<usize, TypeKind>>,
+}
+
+impl<'outer> ScopeHints<'outer> {
+    fn get_idx(&self) -> usize {
+        self.type_hints.borrow().len() + self.outer.as_ref().map(|o| o.get_idx()).unwrap_or(0)
+    }
+
+    fn new_var(&'outer self, name: String, initial_ty: TypeKind) -> ScopeHint<'outer> {
+        if self.variables.borrow().contains_key(&name) {
+            panic!("Variable was already defined!")
+        }
+        let idx = self.get_idx();
+        self.variables.borrow_mut().insert(name, idx);
+        self.type_hints.borrow_mut().insert(idx, initial_ty);
+        ScopeHint(idx, self)
+    }
+
+    fn narrow_hint(
+        &'outer self,
+        hint: &ScopeHint,
+        ty: &TypeKind,
+    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+        let mut hints = self.type_hints.borrow_mut();
+        let existing = hints.get_mut(&hint.0).unwrap();
+        *existing = existing.collapse_into(&ty)?;
+        Ok(ScopeHint(hint.0, self))
+    }
+
+    fn combine_vars(
+        &'outer self,
+        hint1: &ScopeHint,
+        hint2: &ScopeHint,
+    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+        let ty = self.type_hints.borrow().get(&hint2.0).unwrap().clone();
+        self.narrow_hint(&hint1, &ty)?;
+        for (_, val) in self.variables.borrow_mut().iter_mut() {
+            if *val == hint2.0 {
+                *val = hint1.0;
+            }
+        }
+        Ok(ScopeHint(hint1.0, self))
+    }
+
+    fn inner(&'outer self) -> ScopeHints<'outer> {
+        ScopeHints {
+            outer: Some(self),
+            variables: Default::default(),
+            type_hints: Default::default(),
+        }
+    }
+}
+
 impl Pass for TypeCheck {
     type TError = ErrorKind;
 
@@ -76,7 +148,7 @@ impl FunctionDefinition {
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 state.scope.return_type_hint = Some(self.return_type);
-                block.typecheck(state, Some(return_type))
+                block.typecheck(state, &ScopeHints::default(), Some(return_type))
             }
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
@@ -93,16 +165,18 @@ impl Block {
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
+        hints: &ScopeHints,
         hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         let mut state = state.inner();
+        let hints = hints.inner();
 
         let mut early_return = None;
 
         for statement in &mut self.statements {
             let ret = match &mut statement.0 {
                 StmtKind::Let(variable_reference, mutable, expression) => {
-                    let res = expression.typecheck(&mut state, Some(variable_reference.0));
+                    let res = expression.typecheck(&mut state, &hints, Some(variable_reference.0));
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown.
@@ -121,7 +195,7 @@ impl Block {
                             state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
 
                         // Re-typecheck and coerce expression to default type
-                        let expr_res = expression.typecheck(&mut state, Some(res_t));
+                        let expr_res = expression.typecheck(&mut state, &hints, Some(res_t));
                         state.ok(expr_res, expression.1);
 
                         res_t
@@ -152,7 +226,7 @@ impl Block {
                 StmtKind::Set(variable_reference, expression) => {
                     if let Some(var) = state.scope.variables.get(&variable_reference.1).cloned() {
                         // Typecheck expression and coerce to variable type
-                        let res = expression.typecheck(&mut state, Some(var.ty));
+                        let res = expression.typecheck(&mut state, &hints, Some(var.ty));
 
                         // If expression resolution itself was erronous, resolve as
                         // Unknown.
@@ -187,7 +261,7 @@ impl Block {
                 }
                 StmtKind::Import(_) => todo!(), // TODO
                 StmtKind::Expression(expression) => {
-                    let res = expression.typecheck(&mut state, None);
+                    let res = expression.typecheck(&mut state, &hints, None);
                     state.or_else(res, Void, expression.1);
                     if let Ok((kind, _)) = expression.return_type() {
                         Some((kind, expression))
@@ -207,7 +281,7 @@ impl Block {
         // block)
         if let Some((ReturnKind::Hard, expr)) = early_return {
             let hint = state.scope.return_type_hint;
-            let res = expr.typecheck(&mut state, hint);
+            let res = expr.typecheck(&mut state, &hints, hint);
             return Ok(state.or_else(res, Vague(Unknown), expr.1));
         }
 
@@ -217,7 +291,7 @@ impl Block {
                 ReturnKind::Hard => state.scope.return_type_hint,
                 ReturnKind::Soft => hint_t,
             };
-            let res = expr.typecheck(&mut state, ret_hint_t);
+            let res = expr.typecheck(&mut state, &hints, ret_hint_t);
             Ok(state.or_else(res, Vague(Unknown), expr.1))
         } else {
             Ok(Void)
@@ -229,6 +303,7 @@ impl Expression {
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
+        hints: &ScopeHints,
         hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
@@ -261,15 +336,15 @@ impl Expression {
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, None);
+                let lhs_res = lhs.typecheck(state, &hints, None);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, Some(lhs_type));
+                let rhs_res = rhs.typecheck(state, &hints, Some(lhs_type));
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
 
                 if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
                     // Try to coerce both sides again with collapsed type
-                    lhs.typecheck(state, Some(collapsed)).ok();
-                    rhs.typecheck(state, Some(collapsed)).ok();
+                    lhs.typecheck(state, &hints, Some(collapsed)).ok();
+                    rhs.typecheck(state, &hints, Some(collapsed)).ok();
                 }
 
                 let res = lhs_type.binop_type(&op, &rhs_type)?;
@@ -306,7 +381,7 @@ impl Expression {
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
                         // Typecheck every param separately
-                        let param_res = param.typecheck(state, Some(true_param_t));
+                        let param_res = param.typecheck(state, &hints, Some(true_param_t));
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
                     }
@@ -323,16 +398,16 @@ impl Expression {
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
                 // TODO make sure cond_res is Boolean here
-                let cond_res = cond.typecheck(state, Some(Bool));
+                let cond_res = cond.typecheck(state, &hints, Some(Bool));
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
 
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
-                let then_res = lhs.typecheck(state, hint_t);
+                let then_res = lhs.typecheck(state, &hints, hint_t);
                 let then_ret_t = state.or_else(then_res, Vague(Unknown), lhs.meta);
                 let else_ret_t = if let Some(else_block) = rhs {
-                    let res = else_block.typecheck(state, hint_t);
+                    let res = else_block.typecheck(state, &hints, hint_t);
                     state.or_else(res, Vague(Unknown), else_block.meta)
                 } else {
                     // TODO assert that then_ret_t is Void
@@ -343,15 +418,15 @@ impl Expression {
                 if let Some(rhs) = rhs {
                     // If rhs existed, typecheck both sides to perform type
                     // coercion.
-                    let lhs_res = lhs.typecheck(state, Some(collapsed));
-                    let rhs_res = rhs.typecheck(state, Some(collapsed));
+                    let lhs_res = lhs.typecheck(state, &hints, Some(collapsed));
+                    let rhs_res = rhs.typecheck(state, &hints, Some(collapsed));
                     state.ok(lhs_res, lhs.meta);
                     state.ok(rhs_res, rhs.meta);
                 }
 
                 Ok(collapsed)
             }
-            ExprKind::Block(block) => block.typecheck(state, hint_t),
+            ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
         }
     }
 }
