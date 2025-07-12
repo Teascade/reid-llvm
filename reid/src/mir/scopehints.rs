@@ -1,46 +1,77 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, fmt::Error, rc::Rc};
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
-    TypeKind,
+    BinaryOperator, Literal, TypeKind, VagueLiteral, VagueType,
 };
 
-#[derive(Debug, Clone)]
-pub struct ScopeHint<'scope>(usize, &'scope ScopeHints<'scope>);
+#[derive(Clone)]
+pub struct ScopeHint<'scope>(TypeIdRef, &'scope ScopeHints<'scope>);
 
 impl<'scope> ScopeHint<'scope> {
-    pub fn resolve(&self) -> TypeRef {
-        let mut scope = self.1;
-        while !scope.type_hints.borrow().contains_key(&self.0) {
-            scope = scope.outer.as_ref().unwrap();
-        }
-        let ty = scope.type_hints.borrow().get(&self.0).unwrap().clone();
-        match ty.known() {
-            Ok(narrow) => TypeRef::Literal(narrow),
-            Err(_) => TypeRef::Hint(self.clone()),
+    pub unsafe fn raw_type(&self) -> TypeKind {
+        if let Some(ty) = self.1.types.hints.borrow().get(*self.0.borrow()) {
+            *ty
+        } else {
+            panic!("TODO")
         }
     }
 
-    pub fn narrow(&self, ty_ref: &TypeRef) -> Result<ScopeHint, ErrorKind> {
+    pub fn narrow(&mut self, ty_ref: &TypeRef) -> Result<ScopeHint<'scope>, ErrorKind> {
         match ty_ref {
             TypeRef::Hint(other) => self.1.combine_vars(self, other),
             TypeRef::Literal(ty) => self.1.narrow_to_type(self, ty),
         }
     }
+
+    pub fn as_type(&self) -> TypeKind {
+        TypeKind::Vague(super::VagueType::Hinted(*self.0.borrow()))
+    }
 }
 
+impl<'scope> std::fmt::Debug for ScopeHint<'scope> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Hint")
+            .field(&self.0)
+            .field(unsafe { &self.raw_type() })
+            .finish()
+    }
+}
+
+type TypeIdRef = Rc<RefCell<usize>>;
+
 #[derive(Debug, Default)]
+pub struct TypeHints {
+    /// Simple list of types that variables can refrence
+    hints: RefCell<Vec<TypeKind>>,
+    types: RefCell<Vec<TypeIdRef>>,
+}
+
+impl TypeHints {
+    pub fn new(&self, ty: TypeKind) -> TypeIdRef {
+        let idx = self.hints.borrow().len();
+        let typecell = Rc::new(RefCell::new(idx));
+        self.types.borrow_mut().push(typecell.clone());
+        self.hints.borrow_mut().push(ty);
+        typecell
+    }
+}
+
+#[derive(Debug)]
 pub struct ScopeHints<'outer> {
+    types: &'outer TypeHints,
     outer: Option<&'outer ScopeHints<'outer>>,
     /// Mapping of what types variables point to
-    variables: RefCell<HashMap<String, (bool, usize)>>,
-    /// Simple list of types that variables can refrence
-    type_hints: RefCell<HashMap<usize, TypeKind>>,
+    variables: RefCell<HashMap<String, (bool, TypeIdRef)>>,
 }
 
 impl<'outer> ScopeHints<'outer> {
-    fn get_idx(&self) -> usize {
-        self.type_hints.borrow().len() + self.outer.as_ref().map(|o| o.get_idx()).unwrap_or(0)
+    pub fn from(types: &'outer TypeHints) -> ScopeHints<'outer> {
+        ScopeHints {
+            types,
+            outer: Default::default(),
+            variables: Default::default(),
+        }
     }
 
     pub fn new_var(
@@ -52,10 +83,16 @@ impl<'outer> ScopeHints<'outer> {
         if self.variables.borrow().contains_key(&name) {
             return Err(ErrorKind::VariableAlreadyDefined(name));
         }
-        let idx = self.get_idx();
-        self.variables.borrow_mut().insert(name, (mutable, idx));
-        self.type_hints.borrow_mut().insert(idx, initial_ty);
+        let idx = self.types.new(initial_ty);
+        self.variables
+            .borrow_mut()
+            .insert(name, (mutable, idx.clone()));
         Ok(ScopeHint(idx, self))
+    }
+
+    fn new_vague(&'outer self, vague: &VagueType) -> ScopeHint<'outer> {
+        let idx = self.types.new(TypeKind::Vague(*vague));
+        ScopeHint(idx, self)
     }
 
     fn narrow_to_type(
@@ -63,10 +100,12 @@ impl<'outer> ScopeHints<'outer> {
         hint: &ScopeHint,
         ty: &TypeKind,
     ) -> Result<ScopeHint<'outer>, ErrorKind> {
-        let mut hints = self.type_hints.borrow_mut();
-        let existing = hints.get_mut(&hint.0).unwrap();
-        *existing = existing.collapse_into(&ty)?;
-        Ok(ScopeHint(hint.0, self))
+        unsafe {
+            let mut hints = self.types.hints.borrow_mut();
+            let existing = hints.get_unchecked_mut(*hint.0.borrow());
+            *existing = existing.collapse_into(&ty)?;
+            Ok(ScopeHint(hint.0.clone(), self))
+        }
     }
 
     fn combine_vars(
@@ -74,21 +113,28 @@ impl<'outer> ScopeHints<'outer> {
         hint1: &ScopeHint,
         hint2: &ScopeHint,
     ) -> Result<ScopeHint<'outer>, ErrorKind> {
-        let ty = self.type_hints.borrow().get(&hint2.0).unwrap().clone();
-        self.narrow_to_type(&hint1, &ty)?;
-        for (_, (_, idx)) in self.variables.borrow_mut().iter_mut() {
-            if *idx == hint2.0 {
-                *idx = hint1.0;
+        unsafe {
+            let ty = self
+                .types
+                .hints
+                .borrow()
+                .get_unchecked(*hint2.0.borrow())
+                .clone();
+            self.narrow_to_type(&hint1, &ty)?;
+            for idx in self.types.types.borrow_mut().iter_mut() {
+                if *idx == hint2.0 {
+                    *idx.borrow_mut() = *hint1.0.borrow();
+                }
             }
+            Ok(ScopeHint(hint1.0.clone(), self))
         }
-        Ok(ScopeHint(hint1.0, self))
     }
 
     pub fn inner(&'outer self) -> ScopeHints<'outer> {
         ScopeHints {
+            types: self.types,
             outer: Some(self),
             variables: Default::default(),
-            type_hints: Default::default(),
         }
     }
 
@@ -96,20 +142,35 @@ impl<'outer> ScopeHints<'outer> {
         self.variables
             .borrow()
             .get(name)
-            .map(|(mutable, idx)| (*mutable, ScopeHint(*idx, self)))
+            .map(|(mutable, idx)| (*mutable, ScopeHint(idx.clone(), self)))
+            .or(self.outer.map(|o| o.find_hint(name)).flatten())
+    }
+
+    pub fn binop(
+        &'outer self,
+        op: &BinaryOperator,
+        lhs: &mut TypeRef<'outer>,
+        rhs: &mut TypeRef<'outer>,
+    ) -> Result<TypeRef<'outer>, ErrorKind> {
+        let ty = lhs.narrow(rhs)?;
+        Ok(match op {
+            BinaryOperator::Add => ty,
+            BinaryOperator::Minus => ty,
+            BinaryOperator::Mult => ty,
+            BinaryOperator::And => TypeRef::Literal(TypeKind::Bool),
+            BinaryOperator::Cmp(_) => TypeRef::Literal(TypeKind::Bool),
+        })
     }
 }
 
+#[derive(Debug)]
 pub enum TypeRef<'scope> {
     Hint(ScopeHint<'scope>),
     Literal(TypeKind),
 }
 
 impl<'scope> TypeRef<'scope> {
-    pub fn narrow(
-        &'scope self,
-        other: &'scope TypeRef<'scope>,
-    ) -> Result<TypeRef<'scope>, ErrorKind> {
+    pub fn narrow(&mut self, other: &mut TypeRef<'scope>) -> Result<TypeRef<'scope>, ErrorKind> {
         match (self, other) {
             (TypeRef::Hint(hint), unk) | (unk, TypeRef::Hint(hint)) => {
                 Ok(TypeRef::Hint(hint.narrow(unk)?))
@@ -118,5 +179,28 @@ impl<'scope> TypeRef<'scope> {
                 Ok(TypeRef::Literal(lit1.collapse_into(lit2)?))
             }
         }
+    }
+
+    pub fn from_type(hints: &'scope ScopeHints<'scope>, ty: TypeKind) -> TypeRef<'scope> {
+        match &ty.known() {
+            Ok(ty) => TypeRef::Literal(*ty),
+            Err(vague) => match &vague {
+                super::VagueType::Hinted(idx) => TypeRef::Hint(ScopeHint(
+                    unsafe { hints.types.types.borrow().get_unchecked(*idx).clone() },
+                    hints,
+                )),
+                _ => TypeRef::Hint(hints.new_vague(vague)),
+            },
+        }
+    }
+
+    pub fn from_literal(
+        hints: &'scope ScopeHints<'scope>,
+        lit: Literal,
+    ) -> Result<TypeRef<'scope>, ErrorKind> {
+        Ok(match lit {
+            Literal::Vague(vague) => TypeRef::Hint(hints.new_vague(&vague.as_type())),
+            _ => TypeRef::Literal(lit.as_type()),
+        })
     }
 }

@@ -67,6 +67,8 @@ pub enum VagueType {
     Unknown,
     #[error("Number")]
     Number,
+    #[error("Hinted({0})")]
+    Hinted(usize),
 }
 
 impl TypeKind {
@@ -154,6 +156,14 @@ impl Literal {
             Literal::U128(_) => TypeKind::U128,
             Literal::Bool(_) => TypeKind::Bool,
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
+        }
+    }
+}
+
+impl VagueLiteral {
+    pub fn as_type(self: &VagueLiteral) -> VagueType {
+        match self {
+            VagueLiteral::Number(_) => VagueType::Number,
         }
     }
 }

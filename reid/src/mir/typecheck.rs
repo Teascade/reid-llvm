@@ -1,6 +1,9 @@
 //! This module contains code relevant to doing a type checking pass on the MIR.
 //! During typechecking relevant types are also coerced if possible.
-use std::{cell::RefCell, collections::HashMap, convert::Infallible, iter, marker::PhantomData};
+use std::{
+    cell::RefCell, collections::HashMap, convert::Infallible, iter, marker::PhantomData,
+    thread::scope,
+};
 
 use crate::{mir::*, util::try_all};
 use TypeKind::*;
@@ -8,8 +11,8 @@ use VagueType::*;
 
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
-    scopehints::ScopeHints,
-    types::ReturnType,
+    scopehints::{ScopeHints, TypeHints, TypeRef},
+    types::{pick_return, ReturnType},
 };
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -77,7 +80,16 @@ impl FunctionDefinition {
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 state.scope.return_type_hint = Some(self.return_type);
-                block.typecheck(state, &ScopeHints::default(), Some(return_type))
+
+                let types = TypeHints::default();
+                let hints = ScopeHints::from(&types);
+                if let Ok(_) = block.infer_hints(state, &hints) {
+                    dbg!(&block, &hints);
+                    // block.typecheck(state, &hints, Some(return_type))
+                    Ok(Vague(Unknown))
+                } else {
+                    Ok(Vague(Unknown))
+                }
             }
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
@@ -92,6 +104,69 @@ impl FunctionDefinition {
 }
 
 impl Block {
+    fn infer_hints<'s>(
+        &mut self,
+        state: &mut PassState<ErrorKind>,
+        outer_hints: &'s ScopeHints,
+    ) -> Result<(ReturnKind, TypeRef<'s>), ErrorKind> {
+        let mut state = state.inner();
+        let inner_hints = outer_hints.inner();
+
+        for statement in &mut self.statements {
+            match &mut statement.0 {
+                StmtKind::Let(var, mutable, expr) => {
+                    let mut var_ref =
+                        state.ok(inner_hints.new_var(var.1.clone(), *mutable, var.0), var.2);
+                    if let Some(var_ref) = &var_ref {
+                        var.0 = var_ref.as_type();
+                    }
+                    let inferred = expr.infer_hints(&mut state, &inner_hints);
+                    let mut expr_ty_ref = state.ok(inferred, expr.1);
+                    if let (Some(var_ref), Some(expr_ty_ref)) =
+                        (var_ref.as_mut(), expr_ty_ref.as_mut())
+                    {
+                        state.ok(var_ref.narrow(&expr_ty_ref), var.2 + expr.1);
+                    }
+                }
+                StmtKind::Set(var, expr) => {
+                    let var_ref = inner_hints.find_hint(&var.1);
+                    dbg!(&var_ref);
+                    if let Some((_, var_ref)) = &var_ref {
+                        var.0 = var_ref.as_type()
+                    }
+                    let inferred = expr.infer_hints(&mut state, &inner_hints);
+                    let expr_ty_ref = state.ok(inferred, expr.1);
+                    if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
+                        state.ok(var_ref.narrow(&expr_ty_ref), var.2 + expr.1);
+                    }
+                }
+                StmtKind::Import(_) => todo!(),
+                StmtKind::Expression(expr) => {
+                    let expr_res = expr.infer_hints(&mut state, &inner_hints);
+                    state.ok(expr_res, expr.1);
+                }
+            };
+        }
+
+        if let Some(ret_expr) = &mut self.return_expression {
+            let ret_res = ret_expr.1.infer_hints(&mut state, &inner_hints);
+            state.ok(ret_res, ret_expr.1 .1);
+        }
+
+        let (kind, ty) = self.return_type().ok().unwrap_or((ReturnKind::Soft, Void));
+        let mut ret_type_ref = TypeRef::from_type(&outer_hints, ty);
+
+        if kind == ReturnKind::Hard {
+            if let Some(hint) = state.scope.return_type_hint {
+                state.ok(
+                    ret_type_ref.narrow(&mut TypeRef::from_type(outer_hints, hint)),
+                    self.meta,
+                );
+            }
+        }
+        Ok((kind, ret_type_ref))
+    }
+
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
@@ -230,6 +305,92 @@ impl Block {
 }
 
 impl Expression {
+    fn infer_hints<'s>(
+        &mut self,
+        state: &mut PassState<ErrorKind>,
+        hints: &'s ScopeHints<'s>,
+    ) -> Result<TypeRef<'s>, ErrorKind> {
+        match &mut self.0 {
+            ExprKind::Variable(var) => {
+                let hint = hints
+                    .find_hint(&var.1)
+                    .map(|(_, hint)| hint)
+                    .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
+                if let Ok(hint) = &hint {
+                    var.0 = hint.as_type()
+                }
+                Ok(TypeRef::Hint(hint?))
+            }
+            ExprKind::Literal(literal) => TypeRef::from_literal(hints, *literal),
+            ExprKind::BinOp(op, lhs, rhs) => {
+                let mut lhs_ref = lhs.infer_hints(state, hints)?;
+                let mut rhs_ref = rhs.infer_hints(state, hints)?;
+                hints.binop(op, &mut lhs_ref, &mut rhs_ref)
+            }
+            ExprKind::FunctionCall(function_call) => {
+                let fn_call = state
+                    .scope
+                    .function_returns
+                    .get(&function_call.name)
+                    .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()))?
+                    .clone();
+
+                let true_params_iter = fn_call.params.iter().chain(iter::repeat(&Vague(Unknown)));
+
+                for (param_expr, param_t) in
+                    function_call.parameters.iter_mut().zip(true_params_iter)
+                {
+                    let expr_res = param_expr.infer_hints(state, hints);
+                    if let Some(mut param_ref) = state.ok(expr_res, param_expr.1) {
+                        state.ok(
+                            param_ref.narrow(&mut TypeRef::from_type(hints, *param_t)),
+                            param_expr.1,
+                        );
+                    }
+                }
+
+                Ok(TypeRef::from_type(hints, fn_call.ret))
+            }
+            ExprKind::If(IfExpression(cond, lhs, rhs)) => {
+                let cond_res = cond.infer_hints(state, hints);
+                let cond_hints = state.ok(cond_res, cond.1);
+
+                if let Some(mut cond_hints) = cond_hints {
+                    state.ok(cond_hints.narrow(&mut TypeRef::Literal(Bool)), cond.1);
+                }
+
+                let lhs_res = lhs.infer_hints(state, hints);
+                let lhs_hints = state.ok(lhs_res, cond.1);
+
+                if let Some(rhs) = rhs {
+                    let rhs_res = rhs.infer_hints(state, hints);
+                    let rhs_hints = state.ok(rhs_res, cond.1);
+
+                    if let (Some(mut lhs_hints), Some(mut rhs_hints)) = (lhs_hints, rhs_hints) {
+                        state.ok(lhs_hints.1.narrow(&mut rhs_hints.1), self.1);
+                        Ok(pick_return(lhs_hints, rhs_hints).1)
+                    } else {
+                        // Failed to retrieve types from either
+                        Ok(TypeRef::from_type(hints, Vague(Unknown)))
+                    }
+                } else {
+                    if let Some((_, type_ref)) = lhs_hints {
+                        Ok(type_ref)
+                    } else {
+                        Ok(TypeRef::from_type(hints, Vague(Unknown)))
+                    }
+                }
+            }
+            ExprKind::Block(block) => {
+                let block_ref = block.infer_hints(state, hints)?;
+                match block_ref.0 {
+                    ReturnKind::Hard => Ok(TypeRef::from_type(hints, Void)),
+                    ReturnKind::Soft => Ok(block_ref.1),
+                }
+            }
+        }
+    }
+
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
@@ -415,6 +576,7 @@ impl TypeKind {
             Vague(vague_type) => match vague_type {
                 Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
                 Number => Ok(TypeKind::I32),
+                Hinted(_) => panic!("Hinted default!"),
             },
             _ => Ok(*self),
         }
