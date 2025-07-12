@@ -84,9 +84,8 @@ impl FunctionDefinition {
                 let types = TypeHints::default();
                 let hints = ScopeHints::from(&types);
                 if let Ok(_) = block.infer_hints(state, &hints) {
-                    dbg!(&block, &hints);
-                    // block.typecheck(state, &hints, Some(return_type))
-                    Ok(Vague(Unknown))
+                    print!("{}", block);
+                    block.typecheck(state, &hints, Some(return_type))
                 } else {
                     Ok(Vague(Unknown))
                 }
@@ -130,7 +129,6 @@ impl Block {
                 }
                 StmtKind::Set(var, expr) => {
                     let var_ref = inner_hints.find_hint(&var.1);
-                    dbg!(&var_ref);
                     if let Some((_, var_ref)) = &var_ref {
                         var.0 = var_ref.as_type()
                     }
@@ -181,7 +179,11 @@ impl Block {
         for statement in &mut self.statements {
             let ret = match &mut statement.0 {
                 StmtKind::Let(variable_reference, mutable, expression) => {
-                    let res = expression.typecheck(&mut state, &hints, Some(variable_reference.0));
+                    // Resolve possible hint in var reference
+                    let var_t_resolved = variable_reference.0.resolve_hinted(&hints);
+
+                    // Typecheck (and coerce) expression with said type
+                    let res = expression.typecheck(&mut state, &hints, Some(var_t_resolved));
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown.
@@ -189,7 +191,7 @@ impl Block {
 
                     // Make sure the expression and variable type really is the same
                     let res_t = state.or_else(
-                        res.collapse_into(&variable_reference.0),
+                        res.collapse_into(&var_t_resolved),
                         Vague(Unknown),
                         variable_reference.2 + expression.1,
                     );
@@ -240,7 +242,7 @@ impl Block {
                         // Make sure the expression and variable type to really
                         // be the same
                         let res_t = state.or_else(
-                            expr_ty.collapse_into(&variable_reference.0),
+                            expr_ty.collapse_into(&variable_reference.0.resolve_hinted(&hints)),
                             Vague(Unknown),
                             variable_reference.2 + expression.1,
                         );
@@ -413,7 +415,7 @@ impl Expression {
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
-                    var_ref.0.collapse_into(&existing),
+                    var_ref.0.resolve_hinted(hints).collapse_into(&existing),
                     Vague(Unknown),
                     var_ref.2,
                 );
@@ -479,7 +481,9 @@ impl Expression {
 
                     // Make sure function return type is the same as the claimed
                     // return type
-                    let ret_t = f.ret.collapse_into(&function_call.return_type)?;
+                    let ret_t = f
+                        .ret
+                        .collapse_into(&function_call.return_type.resolve_hinted(hints))?;
                     // Update typing to be more accurate
                     function_call.return_type = ret_t;
                     Ok(ret_t)
@@ -591,6 +595,13 @@ impl TypeKind {
             BinaryOperator::And => res,
             BinaryOperator::Cmp(_) => Bool,
         })
+    }
+
+    fn resolve_hinted(&self, hints: &ScopeHints) -> TypeKind {
+        match self {
+            Vague(Hinted(idx)) => hints.retrieve_type(*idx).unwrap(),
+            _ => *self,
+        }
     }
 }
 

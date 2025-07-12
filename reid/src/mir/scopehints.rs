@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Error, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
@@ -9,12 +9,8 @@ use super::{
 pub struct ScopeHint<'scope>(TypeIdRef, &'scope ScopeHints<'scope>);
 
 impl<'scope> ScopeHint<'scope> {
-    pub unsafe fn raw_type(&self) -> TypeKind {
-        if let Some(ty) = self.1.types.hints.borrow().get(*self.0.borrow()) {
-            *ty
-        } else {
-            panic!("TODO")
-        }
+    pub unsafe fn resolve_type(&self) -> TypeKind {
+        unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
     }
 
     pub fn narrow(&mut self, ty_ref: &TypeRef) -> Result<ScopeHint<'scope>, ErrorKind> {
@@ -33,7 +29,7 @@ impl<'scope> std::fmt::Debug for ScopeHint<'scope> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Hint")
             .field(&self.0)
-            .field(unsafe { &self.raw_type() })
+            .field(unsafe { &self.resolve_type() })
             .finish()
     }
 }
@@ -72,6 +68,22 @@ impl<'outer> ScopeHints<'outer> {
             outer: Default::default(),
             variables: Default::default(),
         }
+    }
+
+    pub fn retrieve_type(&self, mut idx: usize) -> Option<TypeKind> {
+        // Just make sure we have the correct idx
+        let mut inner_idx = self.types.types.borrow().get(idx).map(|i| *i.borrow())?;
+        let mut limit = 50;
+        while inner_idx != idx {
+            idx = inner_idx;
+            inner_idx = self.types.types.borrow().get(idx).map(|i| *i.borrow())?;
+            limit -= 1;
+            if limit < 0 {
+                // Should never happen, but just to avoid infinite loops
+                panic!("Limit reached!");
+            }
+        }
+        self.types.hints.borrow().get(inner_idx).copied()
     }
 
     pub fn new_var(

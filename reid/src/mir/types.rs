@@ -82,7 +82,6 @@ impl ReturnType for IfExpression {
         let then_r = self.1.return_type()?;
         if let Some(else_b) = &self.2 {
             let else_r = else_b.return_type()?;
-            dbg!(&then_r, &else_r);
 
             let kind = if then_r.0 == ReturnKind::Hard && else_r.0 == ReturnKind::Hard {
                 ReturnKind::Hard
