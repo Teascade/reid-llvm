@@ -1,6 +1,5 @@
 use std::{collections::HashMap, mem};
 
-use llvm_sys::core::LLVMBuildStore;
 use reid_lib::{
     builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, Instr, Module,
     TerminatorKind as Term, Type,

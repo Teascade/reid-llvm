@@ -101,7 +101,6 @@ impl Block {
 
         for statement in &mut self.statements {
             let ret = match &mut statement.0 {
-                // TODO
                 StmtKind::Let(variable_reference, mutable, expression) => {
                     let res = expression.typecheck(&mut state, Some(variable_reference.0));
 

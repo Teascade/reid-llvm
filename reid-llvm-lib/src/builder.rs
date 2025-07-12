@@ -3,8 +3,6 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use llvm_sys::core::{LLVMBuildAlloca, LLVMBuildLoad2, LLVMBuildStore};
-
 use crate::{
     BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
     util::match_types,
