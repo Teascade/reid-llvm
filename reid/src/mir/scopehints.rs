@@ -1,8 +1,14 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    any::TypeId,
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    hint::black_box,
+    rc::Rc,
+};
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
-    BinaryOperator, Literal, TypeKind, VagueType,
+    BinaryOperator, TypeKind,
 };
 
 #[derive(Clone)]
@@ -13,11 +19,8 @@ impl<'scope> ScopeHint<'scope> {
         unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
     }
 
-    pub fn narrow(&mut self, ty_ref: &TypeRef) -> Result<ScopeHint<'scope>, ErrorKind> {
-        match ty_ref {
-            TypeRef::Hint(other) => self.1.combine_vars(self, other),
-            TypeRef::Literal(ty) => self.1.narrow_to_type(self, ty),
-        }
+    pub fn narrow(&mut self, other: &ScopeHint) -> Result<ScopeHint<'scope>, ErrorKind> {
+        self.1.combine_vars(self, other)
     }
 
     pub fn as_type(&self) -> TypeKind {
@@ -52,6 +55,39 @@ impl TypeHints {
         self.hints.borrow_mut().push(ty);
         typecell
     }
+
+    pub fn find(&self, ty: TypeKind) -> Option<TypeIdRef> {
+        if ty.known().is_err() {
+            // Only do this for non-vague types that can not be further narrowed
+            // down.
+            return None;
+        }
+
+        if let Some(idx) = self
+            .hints
+            .borrow_mut()
+            .iter()
+            .enumerate()
+            .find(|(_, t)| **t == ty)
+            .map(|(i, _)| i)
+        {
+            Some(Rc::new(RefCell::new(idx)))
+        } else {
+            None
+        }
+    }
+
+    unsafe fn recurse_type_ref(&self, mut idx: usize) -> TypeIdRef {
+        let refs = self.type_refs.borrow();
+        let mut inner_idx = refs.get_unchecked(idx);
+        let mut seen = HashSet::new();
+        while (*inner_idx.borrow()) != idx && !seen.contains(&idx) {
+            seen.insert(idx);
+            idx = *inner_idx.borrow();
+            inner_idx = refs.get_unchecked(idx);
+        }
+        return refs.get_unchecked(idx).clone();
+    }
 }
 
 #[derive(Debug)]
@@ -72,12 +108,7 @@ impl<'outer> ScopeHints<'outer> {
     }
 
     pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
-        let inner_idx = self
-            .types
-            .type_refs
-            .borrow()
-            .get(idx)
-            .map(|i| *i.borrow())?;
+        let inner_idx = unsafe { *self.types.recurse_type_ref(idx).borrow() };
         self.types.hints.borrow().get(inner_idx).copied()
     }
 
@@ -97,9 +128,22 @@ impl<'outer> ScopeHints<'outer> {
         Ok(ScopeHint(idx, self))
     }
 
-    fn new_vague(&'outer self, vague: &VagueType) -> ScopeHint<'outer> {
-        let idx = self.types.new(TypeKind::Vague(*vague));
-        ScopeHint(idx, self)
+    pub fn from_type(&'outer self, ty: &TypeKind) -> Option<ScopeHint<'outer>> {
+        let idx = match ty {
+            TypeKind::Vague(super::VagueType::Hinted(idx)) => {
+                let inner_idx = unsafe { *self.types.recurse_type_ref(*idx).borrow() };
+                self.types.type_refs.borrow().get(inner_idx).cloned()?
+            }
+            TypeKind::Vague(_) => self.types.new(*ty),
+            _ => {
+                if let Some(ty_ref) = self.types.find(*ty) {
+                    ty_ref
+                } else {
+                    self.types.new(*ty)
+                }
+            }
+        };
+        Some(ScopeHint(idx, self))
     }
 
     fn narrow_to_type(
@@ -129,7 +173,7 @@ impl<'outer> ScopeHints<'outer> {
                 .clone();
             self.narrow_to_type(&hint1, &ty)?;
             for idx in self.types.type_refs.borrow_mut().iter_mut() {
-                if *idx == hint2.0 {
+                if *idx == hint2.0 && idx != &hint1.0 {
                     *idx.borrow_mut() = *hint1.0.borrow();
                 }
             }
@@ -156,58 +200,16 @@ impl<'outer> ScopeHints<'outer> {
     pub fn binop(
         &'outer self,
         op: &BinaryOperator,
-        lhs: &mut TypeRef<'outer>,
-        rhs: &mut TypeRef<'outer>,
-    ) -> Result<TypeRef<'outer>, ErrorKind> {
+        lhs: &mut ScopeHint<'outer>,
+        rhs: &mut ScopeHint<'outer>,
+    ) -> Result<ScopeHint<'outer>, ErrorKind> {
         let ty = lhs.narrow(rhs)?;
         Ok(match op {
             BinaryOperator::Add => ty,
             BinaryOperator::Minus => ty,
             BinaryOperator::Mult => ty,
-            BinaryOperator::And => TypeRef::Literal(TypeKind::Bool),
-            BinaryOperator::Cmp(_) => TypeRef::Literal(TypeKind::Bool),
-        })
-    }
-}
-
-#[derive(Debug)]
-pub enum TypeRef<'scope> {
-    Hint(ScopeHint<'scope>),
-    Literal(TypeKind),
-}
-
-impl<'scope> TypeRef<'scope> {
-    pub fn narrow(&mut self, other: &mut TypeRef<'scope>) -> Result<TypeRef<'scope>, ErrorKind> {
-        match (self, other) {
-            (TypeRef::Hint(hint), unk) | (unk, TypeRef::Hint(hint)) => {
-                Ok(TypeRef::Hint(hint.narrow(unk)?))
-            }
-            (TypeRef::Literal(lit1), TypeRef::Literal(lit2)) => {
-                Ok(TypeRef::Literal(lit1.collapse_into(lit2)?))
-            }
-        }
-    }
-
-    pub fn from_type(hints: &'scope ScopeHints<'scope>, ty: TypeKind) -> TypeRef<'scope> {
-        match &ty.known() {
-            Ok(ty) => TypeRef::Literal(*ty),
-            Err(vague) => match &vague {
-                super::VagueType::Hinted(idx) => TypeRef::Hint(ScopeHint(
-                    unsafe { hints.types.type_refs.borrow().get_unchecked(*idx).clone() },
-                    hints,
-                )),
-                _ => TypeRef::Hint(hints.new_vague(vague)),
-            },
-        }
-    }
-
-    pub fn from_literal(
-        hints: &'scope ScopeHints<'scope>,
-        lit: Literal,
-    ) -> Result<TypeRef<'scope>, ErrorKind> {
-        Ok(match lit {
-            Literal::Vague(vague) => TypeRef::Hint(hints.new_vague(&vague.as_type())),
-            _ => TypeRef::Literal(lit.as_type()),
+            BinaryOperator::And => self.from_type(&TypeKind::Bool).unwrap(),
+            BinaryOperator::Cmp(_) => self.from_type(&TypeKind::Bool).unwrap(),
         })
     }
 }
