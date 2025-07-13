@@ -140,6 +140,11 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 self.types.type_refs.borrow().get(inner_idx).cloned()?
             }
             TypeKind::Vague(_) => self.types.new(ty),
+            TypeKind::Array(elem_ty, length) => {
+                let elem_ty = self.from_type(elem_ty)?;
+                self.types
+                    .new(&TypeKind::Array(Box::new(elem_ty.as_type()), *length))
+            }
             _ => {
                 if let Some(ty_ref) = self.types.find(ty) {
                     ty_ref

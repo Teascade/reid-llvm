@@ -40,6 +40,8 @@ pub enum ErrorKind {
     TypeNotInferrable(TypeKind),
     #[error("Expected branch type to be {0}, found {1} instead")]
     BranchTypesDiffer(TypeKind, TypeKind),
+    #[error("Attempted to index a non-array type of {0}")]
+    TriedIndexingNonArray(TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the

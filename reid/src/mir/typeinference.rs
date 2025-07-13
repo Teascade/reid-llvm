@@ -4,7 +4,9 @@
 //! must then be passed through TypeCheck with the same [`TypeRefs`] in order to
 //! place the correct types from the IDs and check that there are no issues.
 
-use std::iter;
+use std::{convert::Infallible, iter};
+
+use crate::util::try_all;
 
 use super::{
     pass::{Pass, PassState, ScopeVariable},
@@ -261,8 +263,47 @@ impl Expression {
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
-            ExprKind::Index(expression, _) => todo!("type inference for index expression"),
-            ExprKind::Array(expressions) => todo!("type inference for array expression"),
+            ExprKind::Index(expression, _) => {
+                let expr_ty = expression.infer_types(state, type_refs)?;
+                let kind = unsafe { expr_ty.resolve_type() };
+                match kind {
+                    Array(type_kind, _) => Ok(type_refs.from_type(&type_kind).unwrap()),
+                    _ => Err(ErrorKind::TriedIndexingNonArray(kind)),
+                }
+            }
+            ExprKind::Array(expressions) => {
+                let mut expr_types_result = try_all(
+                    expressions
+                        .iter_mut()
+                        .map(|e| (*e).infer_types(state, type_refs))
+                        .collect(),
+                );
+                match &mut expr_types_result {
+                    Ok(expr_types) => {
+                        let mut iter = expr_types.iter_mut();
+                        if let Some(first) = iter.next() {
+                            while let Some(other) = iter.next() {
+                                first.narrow(other);
+                            }
+
+                            Ok(type_refs
+                                .from_type(&Array(
+                                    Box::new(first.as_type()),
+                                    expressions.len() as u64,
+                                ))
+                                .unwrap())
+                        } else {
+                            todo!();
+                        }
+                    }
+                    Err(errors) => {
+                        for error in errors {
+                            state.ok::<_, Infallible>(Err(error.clone()), self.1);
+                        }
+                        todo!();
+                    }
+                }
+            }
         }
     }
 }
