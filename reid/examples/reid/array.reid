@@ -9,7 +9,7 @@ fn main() -> u16 {
 
     let mut list = array();
 
-    list[1] = 5;
+    // list[1] = 5;
 
     return list[0];
 }

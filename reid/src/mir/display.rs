@@ -134,13 +134,18 @@ impl Display for ExprKind {
             }
             ExprKind::Array(expressions) => {
                 f.write_char('[')?;
+
+                let mut state = Default::default();
+                let mut inner_f = PadAdapter::wrap(f, &mut state);
+
                 let mut iter = expressions.iter();
                 if let Some(item) = iter.next() {
-                    Display::fmt(item, f);
+                    write!(inner_f, "\n{}", item)?;
                     while let Some(item) = iter.next() {
-                        f.write_str(", ")?;
-                        Display::fmt(item, f)?;
+                        writeln!(inner_f, ",")?;
+                        write!(inner_f, "{}", item)?;
                     }
+                    writeln!(inner_f, "")?;
                 }
                 f.write_char(']')
             }
