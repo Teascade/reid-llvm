@@ -1,6 +1,6 @@
 use crate::{
     ast::{self},
-    mir::{self, StmtKind, VariableReference},
+    mir::{self, NamedVariableRef, StmtKind},
 };
 
 impl mir::Context {
@@ -61,7 +61,7 @@ impl ast::Block {
             let (kind, range) = match statement {
                 ast::BlockLevelStatement::Let(s_let) => (
                     mir::StmtKind::Let(
-                        mir::VariableReference(
+                        mir::NamedVariableRef(
                             s_let
                                 .1
                                 .clone()
@@ -75,9 +75,9 @@ impl ast::Block {
                     ),
                     s_let.4,
                 ),
-                ast::BlockLevelStatement::Set(name, expression, range) => (
+                ast::BlockLevelStatement::Set(var_ref, expression, range) => (
                     StmtKind::Set(
-                        VariableReference(
+                        NamedVariableRef(
                             mir::TypeKind::Vague(mir::VagueType::Unknown),
                             todo!(), // was name.clone()
                             (*range).into(),
@@ -117,10 +117,27 @@ impl From<ast::ReturnType> for mir::ReturnKind {
     }
 }
 
+impl ast::VariableReference {
+    fn process(&self) -> mir::IndexedVariableReference {
+        match &self.0 {
+            ast::VariableReferenceKind::Name(name) => {
+                mir::IndexedVariableReference::Named(NamedVariableRef(
+                    mir::TypeKind::Vague(mir::VagueType::Unknown),
+                    name.clone(),
+                    self.1.into(),
+                ))
+            }
+            ast::VariableReferenceKind::Index(var_ref, idx) => {
+                mir::IndexedVariableReference::Index(Box::new(var_ref.process()), *idx)
+            }
+        }
+    }
+}
+
 impl ast::Expression {
     fn process(&self) -> mir::Expression {
         let kind = match &self.0 {
-            ast::ExpressionKind::VariableName(name) => mir::ExprKind::Variable(VariableReference(
+            ast::ExpressionKind::VariableName(name) => mir::ExprKind::Variable(NamedVariableRef(
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
                 self.1.into(),
@@ -149,8 +166,10 @@ impl ast::Expression {
                 };
                 mir::ExprKind::If(mir::IfExpression(Box::new(cond), then_block, else_block))
             }
-            ast::ExpressionKind::Array(expressions) => todo!(),
-            ast::ExpressionKind::Index(expression, _) => todo!(),
+            ast::ExpressionKind::Array(expressions) => todo!("process for array expression"),
+            ast::ExpressionKind::Index(expression, idx) => {
+                mir::ExprKind::Index(Box::new(expression.process()), *idx)
+            }
         };
 
         mir::Expression(kind, self.1.into())
@@ -197,7 +216,9 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::U32 => mir::TypeKind::U32,
             ast::TypeKind::U64 => mir::TypeKind::U64,
             ast::TypeKind::U128 => mir::TypeKind::U128,
-            ast::TypeKind::Array(type_kind, length) => todo!(),
+            ast::TypeKind::Array(type_kind, length) => {
+                mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
+            }
         }
     }
 }

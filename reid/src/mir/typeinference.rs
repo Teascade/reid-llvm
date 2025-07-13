@@ -59,7 +59,7 @@ impl FunctionDefinition {
 
         match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
-                state.scope.return_type_hint = Some(self.return_type);
+                state.scope.return_type_hint = Some(self.return_type.clone());
                 let scope_hints = ScopeTypeRefs::from(type_refs);
 
                 // Infer block return type
@@ -91,7 +91,7 @@ impl Block {
                 StmtKind::Let(var, mutable, expr) => {
                     // Get the TypeRef for this variable declaration
                     let mut var_ref =
-                        state.ok(inner_hints.new_var(var.1.clone(), *mutable, var.0), var.2);
+                        state.ok(inner_hints.new_var(var.1.clone(), *mutable, &var.0), var.2);
 
                     // If ok, update the MIR type to this TypeRef
                     if let Some(var_ref) = &var_ref {
@@ -149,7 +149,7 @@ impl Block {
 
         // Narow return type to declared type if hard return
         if kind == ReturnKind::Hard {
-            if let Some(hint) = state.scope.return_type_hint {
+            if let Some(hint) = &state.scope.return_type_hint {
                 ret_type_ref.narrow(&mut outer_hints.from_type(&hint).unwrap());
             }
         }
@@ -260,6 +260,7 @@ impl Expression {
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
+            ExprKind::Index(expression, _) => todo!("type inference for index expression"),
         }
     }
 }

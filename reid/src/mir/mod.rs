@@ -32,7 +32,7 @@ impl From<TokenRange> for Metadata {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum TypeKind {
     #[error("bool")]
     Bool,
@@ -58,6 +58,8 @@ pub enum TypeKind {
     U128,
     #[error("void")]
     Void,
+    #[error("[{0}; {1}]")]
+    Array(Box<TypeKind>, u64),
     #[error(transparent)]
     Vague(#[from] VagueType),
 }
@@ -77,7 +79,7 @@ impl TypeKind {
         if let TypeKind::Vague(vague) = self {
             Err(*vague)
         } else {
-            Ok(*self)
+            Ok(self.clone())
         }
     }
 }
@@ -98,6 +100,7 @@ impl TypeKind {
             TypeKind::U32 => false,
             TypeKind::U64 => false,
             TypeKind::U128 => false,
+            TypeKind::Array(_, _) => false,
         }
     }
 
@@ -117,6 +120,7 @@ impl TypeKind {
             Bool => true,
             Vague(_) => false,
             Void => false,
+            Array(_, _) => false,
         }
     }
 }
@@ -196,14 +200,15 @@ pub enum ReturnKind {
 }
 
 #[derive(Debug)]
-pub struct VariableReference(pub TypeKind, pub String, pub Metadata);
+pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 
 #[derive(Debug)]
 pub struct Import(pub String, pub Metadata);
 
 #[derive(Debug)]
 pub enum ExprKind {
-    Variable(VariableReference),
+    Variable(NamedVariableRef),
+    Index(Box<Expression>, u64),
     Literal(Literal),
     BinOp(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(FunctionCall),
@@ -267,11 +272,16 @@ pub struct Block {
 #[derive(Debug)]
 pub struct Statement(pub StmtKind, pub Metadata);
 
+pub enum IndexedVariableReference {
+    Named(NamedVariableRef),
+    Index(Box<IndexedVariableReference>, u64),
+}
+
 #[derive(Debug)]
 pub enum StmtKind {
     /// Variable name++mutability+type, evaluation
-    Let(VariableReference, bool, Expression),
-    Set(VariableReference, Expression),
+    Let(NamedVariableRef, bool, Expression),
+    Set(NamedVariableRef, Expression),
     Import(Import),
     Expression(Expression),
 }

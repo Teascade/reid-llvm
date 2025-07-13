@@ -129,7 +129,7 @@ impl Scope {
         Scope {
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
-            return_type_hint: self.return_type_hint,
+            return_type_hint: self.return_type_hint.clone(),
         }
     }
 }
@@ -211,8 +211,8 @@ impl Module {
                 .set(
                     function.name.clone(),
                     ScopeFunction {
-                        ret: function.return_type,
-                        params: function.parameters.iter().map(|v| v.1).collect(),
+                        ret: function.return_type.clone(),
+                        params: function.parameters.iter().cloned().map(|v| v.1).collect(),
                     },
                 )
                 .ok();
@@ -234,7 +234,7 @@ impl FunctionDefinition {
                 .set(
                     param.0.clone(),
                     ScopeVariable {
-                        ty: param.1,
+                        ty: param.1.clone(),
                         mutable: false,
                     },
                 )
@@ -245,7 +245,7 @@ impl FunctionDefinition {
 
         match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
-                scope.return_type_hint = Some(self.return_type);
+                scope.return_type_hint = Some(self.return_type.clone());
                 block.pass(pass, state, scope);
             }
             FunctionDefinitionKind::Extern => {}
@@ -289,7 +289,7 @@ impl Statement {
                     .set(
                         variable_reference.1.clone(),
                         ScopeVariable {
-                            ty: variable_reference.0,
+                            ty: variable_reference.0.clone(),
                             mutable: *mutable,
                         },
                     )

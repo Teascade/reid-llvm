@@ -122,12 +122,16 @@ impl Display for Expression {
 impl Display for ExprKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Variable(var) => Display::fmt(var, f),
-            Self::Literal(lit) => Display::fmt(lit, f),
-            Self::BinOp(op, lhs, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
-            Self::FunctionCall(fc) => Display::fmt(fc, f),
-            Self::If(if_exp) => Display::fmt(&if_exp, f),
-            Self::Block(block) => Display::fmt(block, f),
+            ExprKind::Variable(var) => Display::fmt(var, f),
+            ExprKind::Literal(lit) => Display::fmt(lit, f),
+            ExprKind::BinOp(op, lhs, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
+            ExprKind::FunctionCall(fc) => Display::fmt(fc, f),
+            ExprKind::If(if_exp) => Display::fmt(&if_exp, f),
+            ExprKind::Block(block) => Display::fmt(block, f),
+            ExprKind::Index(expression, idx) => {
+                Display::fmt(&expression, f)?;
+                write_index(f, *idx)
+            }
         }
     }
 }
@@ -156,9 +160,21 @@ impl Display for FunctionCall {
     }
 }
 
-impl Display for VariableReference {
+impl Display for NamedVariableRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "v(\"{}\", {})", &self.1, &self.0)
+    }
+}
+
+impl Display for IndexedVariableReference {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IndexedVariableReference::Named(name) => Display::fmt(name, f),
+            IndexedVariableReference::Index(variable_reference_kind, idx) => {
+                Display::fmt(&variable_reference_kind, f)?;
+                write_index(f, *idx)
+            }
+        }
     }
 }
 
@@ -210,4 +226,10 @@ impl Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.range)
     }
+}
+
+fn write_index(f: &mut std::fmt::Formatter<'_>, idx: u64) -> std::fmt::Result {
+    f.write_char('[')?;
+    Display::fmt(&idx, f)?;
+    f.write_char(']')
 }

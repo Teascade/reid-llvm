@@ -19,7 +19,7 @@ fn main() {
                                 ExprKind::BinOp(
                                     BinaryOperator::Cmp(CmpOperator::GT),
                                     Box::new(Expression(
-                                        ExprKind::Variable(VariableReference(
+                                        ExprKind::Variable(NamedVariableRef(
                                             TypeKind::I32,
                                             "N".to_string(),
                                             Default::default(),
@@ -52,7 +52,7 @@ fn main() {
                                                             BinaryOperator::Minus,
                                                             Box::new(Expression(
                                                                 ExprKind::Variable(
-                                                                    VariableReference(
+                                                                    NamedVariableRef(
                                                                         TypeKind::I32,
                                                                         fibonacci_n.clone(),
                                                                         Default::default(),
@@ -80,7 +80,7 @@ fn main() {
                                                             BinaryOperator::Minus,
                                                             Box::new(Expression(
                                                                 ExprKind::Variable(
-                                                                    VariableReference(
+                                                                    NamedVariableRef(
                                                                         TypeKind::I32,
                                                                         fibonacci_n.clone(),
                                                                         Default::default(),

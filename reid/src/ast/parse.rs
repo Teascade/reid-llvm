@@ -350,7 +350,7 @@ impl Parse for Block {
         stream.expect(Token::BraceOpen)?;
 
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
-            if let Some((r_type, e)) = return_stmt.take() {
+            if let Some((_, e)) = return_stmt.take() {
                 // Special list of expressions that are simply not warned about,
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
@@ -383,12 +383,18 @@ impl Parse for Block {
 impl Parse for VariableReference {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(ident)) = stream.next() {
-            let mut var_ref = VariableReference::Name(ident);
+            let mut var_ref = VariableReference(
+                VariableReferenceKind::Name(ident),
+                stream.get_range().unwrap(),
+            );
 
             dbg!(&var_ref);
             while let Ok(ValueIndex(idx)) = stream.parse() {
                 dbg!(idx);
-                var_ref = VariableReference::Index(Box::new(var_ref), idx);
+                var_ref = VariableReference(
+                    VariableReferenceKind::Index(Box::new(var_ref), idx),
+                    stream.get_range().unwrap(),
+                );
             }
 
             Ok(var_ref)

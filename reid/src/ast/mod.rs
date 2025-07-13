@@ -133,7 +133,10 @@ pub struct Block(
 );
 
 #[derive(Debug, Clone)]
-pub enum VariableReference {
+pub struct VariableReference(VariableReferenceKind, TokenRange);
+
+#[derive(Debug, Clone)]
+pub enum VariableReferenceKind {
     Name(String),
     Index(Box<VariableReference>, u64),
 }

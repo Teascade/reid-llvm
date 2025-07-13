@@ -5,7 +5,7 @@ use reid_lib::{
     TerminatorKind as Term, Type,
 };
 
-use crate::mir::{self, types::ReturnType, TypeKind, VariableReference};
+use crate::mir::{self, types::ReturnType, NamedVariableRef, TypeKind};
 
 /// Context that contains all of the given modules as complete codegenerated
 /// LLIR that can then be finally compiled into LLVM IR.
@@ -156,7 +156,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
-            mir::StmtKind::Let(VariableReference(ty, name, _), mutable, expression) => {
+            mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope).unwrap();
                 scope.stack_values.insert(
                     name.clone(),
@@ -333,6 +333,7 @@ impl mir::Expression {
                     None
                 }
             }
+            mir::ExprKind::Index(expression, _) => todo!("codegen for index expression"),
         }
     }
 }
@@ -413,6 +414,7 @@ impl TypeKind {
             TypeKind::Bool => Type::Bool,
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
+            TypeKind::Array(_, _) => todo!("codegen for array type"),
         }
     }
 }

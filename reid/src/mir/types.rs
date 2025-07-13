@@ -15,10 +15,11 @@ impl TypeKind {
     pub fn binop_type(&self, op: &BinaryOperator) -> TypeKind {
         // TODO make some type of mechanism that allows to binop two values of
         // differing types..
+        // TODO Return None for arrays later
         match op {
-            BinaryOperator::Add => *self,
-            BinaryOperator::Minus => *self,
-            BinaryOperator::Mult => *self,
+            BinaryOperator::Add => self.clone(),
+            BinaryOperator::Minus => self.clone(),
+            BinaryOperator::Mult => self.clone(),
             BinaryOperator::And => TypeKind::Bool,
             BinaryOperator::Cmp(_) => TypeKind::Bool,
         }
@@ -85,6 +86,7 @@ impl ReturnType for Expression {
             Block(block) => block.return_type(),
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
+            Index(expression, _) => todo!("return type for index"),
         }
     }
 }
@@ -107,7 +109,7 @@ impl ReturnType for IfExpression {
     }
 }
 
-impl ReturnType for VariableReference {
+impl ReturnType for NamedVariableRef {
     fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         Ok((ReturnKind::Soft, self.0.clone()))
     }

@@ -84,8 +84,8 @@ impl FunctionDefinition {
         let return_type = self.return_type.clone();
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
-                state.scope.return_type_hint = Some(self.return_type);
-                block.typecheck(state, &hints, Some(return_type))
+                state.scope.return_type_hint = Some(self.return_type.clone());
+                block.typecheck(state, &hints, Some(&return_type))
             }
             FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
         };
@@ -104,7 +104,7 @@ impl Block {
         &mut self,
         state: &mut PassState<ErrorKind>,
         hints: &TypeRefs,
-        hint_t: Option<TypeKind>,
+        hint_t: Option<&TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         let mut state = state.inner();
 
@@ -117,7 +117,7 @@ impl Block {
                     let var_t_resolved = variable_reference.0.resolve_hinted(&hints);
 
                     // Typecheck (and coerce) expression with said type
-                    let res = expression.typecheck(&mut state, &hints, Some(var_t_resolved));
+                    let res = expression.typecheck(&mut state, &hints, Some(&var_t_resolved));
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown and note error.
@@ -136,7 +136,7 @@ impl Block {
                             state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
 
                         // Re-typecheck and coerce expression to default type
-                        let expr_res = expression.typecheck(&mut state, &hints, Some(res_t));
+                        let expr_res = expression.typecheck(&mut state, &hints, Some(&res_t));
                         state.ok(expr_res, expression.1);
 
                         res_t
@@ -154,7 +154,7 @@ impl Block {
                         .set(
                             variable_reference.1.clone(),
                             ScopeVariable {
-                                ty: variable_reference.0,
+                                ty: variable_reference.0.clone(),
                                 mutable: *mutable,
                             },
                         )
@@ -167,7 +167,7 @@ impl Block {
                 StmtKind::Set(variable_reference, expression) => {
                     if let Some(var) = state.scope.variables.get(&variable_reference.1).cloned() {
                         // Typecheck expression and coerce to variable type
-                        let res = expression.typecheck(&mut state, &hints, Some(var.ty));
+                        let res = expression.typecheck(&mut state, &hints, Some(&var.ty));
 
                         // If expression resolution itself was erronous, resolve as
                         // Unknown.
@@ -221,18 +221,18 @@ impl Block {
         // as to not cause problems in codegen later (when unable to delete the
         // block)
         if let Some((ReturnKind::Hard, expr)) = early_return {
-            let hint = state.scope.return_type_hint;
-            let res = expr.typecheck(&mut state, &hints, hint);
+            let hint = state.scope.return_type_hint.clone();
+            let res = expr.typecheck(&mut state, &hints, hint.as_ref());
             return Ok(state.or_else(res, Vague(Unknown), expr.1));
         }
 
         if let Some((return_kind, expr)) = &mut self.return_expression {
             // Use function return type as hint if return is hard.
             let ret_hint_t = match return_kind {
-                ReturnKind::Hard => state.scope.return_type_hint,
-                ReturnKind::Soft => hint_t,
+                ReturnKind::Hard => state.scope.return_type_hint.clone(),
+                ReturnKind::Soft => hint_t.cloned(),
             };
-            let res = expr.typecheck(&mut state, &hints, ret_hint_t);
+            let res = expr.typecheck(&mut state, &hints, ret_hint_t.as_ref());
             Ok(state.or_else(res, Vague(Unknown), expr.1))
         } else {
             Ok(Void)
@@ -245,7 +245,7 @@ impl Expression {
         &mut self,
         state: &mut PassState<ErrorKind>,
         hints: &TypeRefs,
-        hint_t: Option<TypeKind>,
+        hint_t: Option<&TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var_ref) => {
@@ -268,10 +268,10 @@ impl Expression {
                     var_ref.2,
                 );
 
-                Ok(var_ref.0)
+                Ok(var_ref.0.clone())
             }
             ExprKind::Literal(literal) => {
-                *literal = literal.try_coerce(hint_t)?;
+                *literal = literal.try_coerce(hint_t.cloned())?;
                 Ok(literal.as_type())
             }
             ExprKind::BinOp(op, lhs, rhs) => {
@@ -279,13 +279,13 @@ impl Expression {
                 // operation once relevant
                 let lhs_res = lhs.typecheck(state, &hints, None);
                 let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, &hints, Some(lhs_type));
+                let rhs_res = rhs.typecheck(state, &hints, Some(&lhs_type));
                 let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
 
                 if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
                     // Try to coerce both sides again with collapsed type
-                    lhs.typecheck(state, &hints, Some(collapsed)).ok();
-                    rhs.typecheck(state, &hints, Some(collapsed)).ok();
+                    lhs.typecheck(state, &hints, Some(&collapsed)).ok();
+                    rhs.typecheck(state, &hints, Some(&collapsed)).ok();
                 }
 
                 let both_t = lhs_type.collapse_into(&rhs_type)?;
@@ -322,7 +322,7 @@ impl Expression {
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
                         // Typecheck every param separately
-                        let param_res = param.typecheck(state, &hints, Some(true_param_t));
+                        let param_res = param.typecheck(state, &hints, Some(&true_param_t));
                         let param_t = state.or_else(param_res, Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
                     }
@@ -333,14 +333,14 @@ impl Expression {
                         .ret
                         .collapse_into(&function_call.return_type.resolve_hinted(hints))?;
                     // Update typing to be more accurate
-                    function_call.return_type = ret_t;
+                    function_call.return_type = ret_t.clone();
                     Ok(ret_t)
                 } else {
-                    Ok(function_call.return_type)
+                    Ok(function_call.return_type.clone())
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                let cond_res = cond.typecheck(state, &hints, Some(Bool));
+                let cond_res = cond.typecheck(state, &hints, Some(&Bool));
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
 
@@ -364,8 +364,8 @@ impl Expression {
                 if let Some(rhs) = rhs {
                     // If rhs existed, typecheck both sides to perform type
                     // coercion.
-                    let lhs_res = lhs.typecheck(state, &hints, Some(collapsed));
-                    let rhs_res = rhs.typecheck(state, &hints, Some(collapsed));
+                    let lhs_res = lhs.typecheck(state, &hints, Some(&collapsed));
+                    let rhs_res = rhs.typecheck(state, &hints, Some(&collapsed));
                     state.ok(lhs_res, lhs.meta);
                     state.ok(rhs_res, rhs.meta);
                 }
@@ -373,6 +373,7 @@ impl Expression {
                 Ok(collapsed)
             }
             ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
+            ExprKind::Index(expression, _) => todo!("typechecking for index expression"),
         }
     }
 }
@@ -381,7 +382,7 @@ impl Literal {
     /// Try to coerce this literal, ie. convert it to a more specific type in
     /// regards to the given hint if any.
     fn try_coerce(self, hint: Option<TypeKind>) -> Result<Self, ErrorKind> {
-        if let Some(hint) = hint {
+        if let Some(hint) = &hint {
             use Literal as L;
             use VagueLiteral as VagueL;
             Ok(match (self, hint) {
@@ -409,7 +410,7 @@ impl Literal {
                 (L::Vague(VagueL::Number(v)), U64) => L::U64(v as u64),
                 (L::Vague(VagueL::Number(v)), U128) => L::U128(v as u128),
                 (_, Vague(_)) => self,
-                _ => Err(ErrorKind::LiteralIncompatible(self, hint))?,
+                _ => Err(ErrorKind::LiteralIncompatible(self, hint.clone()))?,
             })
         } else {
             Ok(self)
@@ -428,19 +429,19 @@ impl TypeKind {
     /// Error if not.
     fn or_default(&self) -> Result<TypeKind, ErrorKind> {
         match self {
-            Vague(vague_type) => match vague_type {
+            Vague(vague_type) => match &vague_type {
                 Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
                 Number => Ok(TypeKind::I32),
                 TypeRef(_) => panic!("Hinted default!"),
             },
-            _ => Ok(*self),
+            _ => Ok(self.clone()),
         }
     }
 
     fn resolve_hinted(&self, hints: &TypeRefs) -> TypeKind {
         match self {
             Vague(TypeRef(idx)) => hints.retrieve_type(*idx).unwrap(),
-            _ => *self,
+            _ => self.clone(),
         }
     }
 }
@@ -461,11 +462,11 @@ impl Collapsable for TypeKind {
             (Vague(Number), other) | (other, Vague(Number)) => match other {
                 Vague(Unknown) => Ok(Vague(Number)),
                 Vague(Number) => Ok(Vague(Number)),
-                I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 => Ok(*other),
-                _ => Err(ErrorKind::TypesIncompatible(*self, *other)),
+                I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 => Ok(other.clone()),
+                _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
             },
             (Vague(Unknown), other) | (other, Vague(Unknown)) => Ok(other.clone()),
-            _ => Err(ErrorKind::TypesIncompatible(*self, *other)),
+            _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }
 }

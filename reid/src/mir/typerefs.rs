@@ -14,7 +14,14 @@ pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);
 
 impl<'scope> TypeRef<'scope> {
     pub unsafe fn resolve_type(&self) -> TypeKind {
-        unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
+        unsafe {
+            self.1
+                .types
+                .hints
+                .borrow()
+                .get_unchecked(*self.0.borrow())
+                .clone()
+        }
     }
 
     pub fn narrow(&mut self, other: &TypeRef) -> Option<TypeRef<'scope>> {
@@ -46,15 +53,15 @@ pub struct TypeRefs {
 }
 
 impl TypeRefs {
-    pub fn new(&self, ty: TypeKind) -> TypeIdRef {
+    pub fn new(&self, ty: &TypeKind) -> TypeIdRef {
         let idx = self.hints.borrow().len();
         let typecell = Rc::new(RefCell::new(idx));
         self.type_refs.borrow_mut().push(typecell.clone());
-        self.hints.borrow_mut().push(ty);
+        self.hints.borrow_mut().push(ty.clone());
         typecell
     }
 
-    pub fn find(&self, ty: TypeKind) -> Option<TypeIdRef> {
+    pub fn find(&self, ty: &TypeKind) -> Option<TypeIdRef> {
         if ty.known().is_err() {
             // Only do this for non-vague types that can not be further narrowed
             // down.
@@ -66,7 +73,7 @@ impl TypeRefs {
             .borrow_mut()
             .iter()
             .enumerate()
-            .find(|(_, t)| **t == ty)
+            .find(|(_, t)| *t == ty)
             .map(|(i, _)| i)
         {
             Some(Rc::new(RefCell::new(idx)))
@@ -89,7 +96,7 @@ impl TypeRefs {
 
     pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
         let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
-        self.hints.borrow().get(inner_idx).copied()
+        self.hints.borrow().get(inner_idx).cloned()
     }
 }
 
@@ -114,7 +121,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
         &'outer self,
         name: String,
         mutable: bool,
-        initial_ty: TypeKind,
+        initial_ty: &TypeKind,
     ) -> Result<TypeRef<'outer>, ErrorKind> {
         if self.variables.borrow().contains_key(&name) {
             return Err(ErrorKind::VariableAlreadyDefined(name));
@@ -132,12 +139,12 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 let inner_idx = unsafe { *self.types.recurse_type_ref(*idx).borrow() };
                 self.types.type_refs.borrow().get(inner_idx).cloned()?
             }
-            TypeKind::Vague(_) => self.types.new(*ty),
+            TypeKind::Vague(_) => self.types.new(ty),
             _ => {
-                if let Some(ty_ref) = self.types.find(*ty) {
+                if let Some(ty_ref) = self.types.find(ty) {
                     ty_ref
                 } else {
-                    self.types.new(*ty)
+                    self.types.new(ty)
                 }
             }
         };
