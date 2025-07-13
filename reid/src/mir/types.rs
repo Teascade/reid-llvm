@@ -1,5 +1,3 @@
-use crate::ast::VariableReference;
-
 use super::*;
 
 #[derive(Debug, Clone)]
