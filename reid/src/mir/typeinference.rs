@@ -6,7 +6,7 @@
 
 use std::{convert::Infallible, iter};
 
-use crate::util::try_all;
+use crate::{mir::TypeKind, util::try_all};
 
 use super::{
     pass::{Pass, PassState, ScopeVariable},
@@ -293,14 +293,19 @@ impl Expression {
                                 ))
                                 .unwrap())
                         } else {
-                            todo!();
+                            Ok(type_refs
+                                .from_type(&Array(Box::new(TypeKind::Void), 0))
+                                .unwrap())
                         }
                     }
                     Err(errors) => {
-                        for error in errors {
-                            state.ok::<_, Infallible>(Err(error.clone()), self.1);
-                        }
-                        todo!();
+                        state.note_errors(errors, self.1);
+                        Ok(type_refs
+                            .from_type(&TypeKind::Array(
+                                Box::new(TypeKind::Vague(Unknown)),
+                                expressions.len() as u64,
+                            ))
+                            .unwrap())
                     }
                 }
             }

@@ -42,6 +42,8 @@ pub enum ErrorKind {
     BranchTypesDiffer(TypeKind, TypeKind),
     #[error("Attempted to index a non-array type of {0}")]
     TriedIndexingNonArray(TypeKind),
+    #[error("Index {0} out of bounds ({1})")]
+    IndexOutOfBounds(u64, u64),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -376,8 +378,42 @@ impl Expression {
                 Ok(collapsed)
             }
             ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
-            ExprKind::Index(expression, _) => todo!("typechecking for index expression"),
-            ExprKind::Array(expressions) => todo!("typechecking for array expression"),
+            ExprKind::Index(expression, idx) => {
+                let expr_t = expression.typecheck(state, hints, hint_t)?;
+                if let TypeKind::Array(elem_t, len) = expr_t {
+                    if len >= *idx {
+                        return Err(ErrorKind::IndexOutOfBounds(*idx, len));
+                    }
+                    Ok(*elem_t)
+                } else {
+                    Err(ErrorKind::TriedIndexingNonArray(expr_t))
+                }
+            }
+            ExprKind::Array(expressions) => {
+                let mut expr_result = try_all(
+                    expressions
+                        .iter_mut()
+                        .map(|e| e.typecheck(state, hints, hint_t))
+                        .collect(),
+                );
+                match &mut expr_result {
+                    Ok(expr_types) => {
+                        let mut iter = expr_types.iter_mut();
+                        if let Some(first) = iter.next() {
+                            for other in iter {
+                                state.ok(first.collapse_into(other), self.1);
+                            }
+                            Ok(first.clone())
+                        } else {
+                            Ok(Array(Box::new(Void), 0))
+                        }
+                    }
+                    Err(errors) => {
+                        state.note_errors(errors, self.1);
+                        Ok(Array(Box::new(Vague(Unknown)), expressions.len() as u64))
+                    }
+                }
+            }
         }
     }
 }

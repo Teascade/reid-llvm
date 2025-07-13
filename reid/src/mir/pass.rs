@@ -2,6 +2,7 @@
 //! passes. Passes can be performed on Reid MIR to e.g. typecheck the code.
 
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::error::Error as STDError;
 
 use super::*;
@@ -164,6 +165,16 @@ impl<'st, 'sc, TError: STDError + Clone> PassState<'st, 'sc, TError> {
         meta: TMeta,
     ) -> Option<U> {
         self.state.ok(result, meta)
+    }
+
+    pub fn note_errors<TMeta: Into<Metadata> + Clone>(
+        &mut self,
+        errors: &Vec<TError>,
+        meta: TMeta,
+    ) {
+        for error in errors {
+            self.ok::<_, Infallible>(Err(error.clone()), meta.clone().into());
+        }
     }
 
     pub fn inner(&mut self) -> PassState<TError> {
