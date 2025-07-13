@@ -273,7 +273,14 @@ pub struct Block {
 #[derive(Debug)]
 pub struct Statement(pub StmtKind, pub Metadata);
 
-pub enum IndexedVariableReference {
+#[derive(Debug)]
+pub struct IndexedVariableReference {
+    pub kind: IndexedVariableReferenceKind,
+    pub meta: Metadata,
+}
+
+#[derive(Debug)]
+pub enum IndexedVariableReferenceKind {
     Named(NamedVariableRef),
     Index(Box<IndexedVariableReference>, u64),
 }
@@ -282,7 +289,7 @@ pub enum IndexedVariableReference {
 pub enum StmtKind {
     /// Variable name++mutability+type, evaluation
     Let(NamedVariableRef, bool, Expression),
-    Set(NamedVariableRef, Expression),
+    Set(IndexedVariableReference, Expression),
     Import(Import),
     Expression(Expression),
 }

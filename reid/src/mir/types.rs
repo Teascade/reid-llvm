@@ -1,3 +1,5 @@
+use crate::ast::VariableReference;
+
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -64,7 +66,7 @@ impl ReturnType for Statement {
             ),
             Set(var, expr) => if_hard(
                 expr.return_type()?,
-                Err(ReturnTypeOther::Set(var.2 + expr.1)),
+                Err(ReturnTypeOther::Set(var.meta + expr.1)),
             ),
             Import(_) => todo!(),
             Expression(expression) => expression.return_type(),

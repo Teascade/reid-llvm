@@ -180,9 +180,9 @@ impl Display for NamedVariableRef {
 
 impl Display for IndexedVariableReference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IndexedVariableReference::Named(name) => Display::fmt(name, f),
-            IndexedVariableReference::Index(variable_reference_kind, idx) => {
+        match &self.kind {
+            IndexedVariableReferenceKind::Named(name) => Display::fmt(name, f),
+            IndexedVariableReferenceKind::Index(variable_reference_kind, idx) => {
                 Display::fmt(&variable_reference_kind, f)?;
                 write_index(f, *idx)
             }

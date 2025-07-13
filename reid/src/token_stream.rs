@@ -153,6 +153,13 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             end: self.position,
         })
     }
+
+    pub fn get_one_token_range(&self) -> TokenRange {
+        TokenRange {
+            start: self.position - 1,
+            end: self.position,
+        }
+    }
 }
 
 impl Drop for TokenStream<'_, '_> {

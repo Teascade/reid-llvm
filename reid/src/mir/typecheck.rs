@@ -165,40 +165,41 @@ impl Block {
                     None
                 }
                 StmtKind::Set(variable_reference, expression) => {
-                    if let Some(var) = state.scope.variables.get(&variable_reference.1).cloned() {
-                        // Typecheck expression and coerce to variable type
-                        let res = expression.typecheck(&mut state, &hints, Some(&var.ty));
+                    todo!("Re-think how set needs to work with arrays")
+                    // if let Some(var) = state.scope.variables.get(&variable_reference.1).cloned() {
+                    //     // Typecheck expression and coerce to variable type
+                    //     let res = expression.typecheck(&mut state, &hints, Some(&var.ty));
 
-                        // If expression resolution itself was erronous, resolve as
-                        // Unknown.
-                        let expr_ty = state.or_else(res, Vague(Unknown), expression.1);
+                    //     // If expression resolution itself was erronous, resolve as
+                    //     // Unknown.
+                    //     let expr_ty = state.or_else(res, Vague(Unknown), expression.1);
 
-                        // Make sure the expression and variable type to really
-                        // be the same
-                        let res_t = state.or_else(
-                            expr_ty.collapse_into(&variable_reference.0.resolve_hinted(&hints)),
-                            Vague(Unknown),
-                            variable_reference.2 + expression.1,
-                        );
+                    //     // Make sure the expression and variable type to really
+                    //     // be the same
+                    //     let res_t = state.or_else(
+                    //         expr_ty.collapse_into(&variable_reference.0.resolve_hinted(&hints)),
+                    //         Vague(Unknown),
+                    //         variable_reference.2 + expression.1,
+                    //     );
 
-                        // Update typing to be more accurate
-                        variable_reference.0 = res_t;
+                    //     // Update typing to be more accurate
+                    //     variable_reference.0 = res_t;
 
-                        if !var.mutable {
-                            state.ok::<_, Infallible>(
-                                Err(ErrorKind::VariableNotMutable(variable_reference.1.clone())),
-                                variable_reference.2,
-                            );
-                        }
+                    //     if !var.mutable {
+                    //         state.ok::<_, Infallible>(
+                    //             Err(ErrorKind::VariableNotMutable(variable_reference.1.clone())),
+                    //             variable_reference.2,
+                    //         );
+                    //     }
 
-                        None
-                    } else {
-                        state.ok::<_, Infallible>(
-                            Err(ErrorKind::VariableNotDefined(variable_reference.1.clone())),
-                            variable_reference.2,
-                        );
-                        None
-                    }
+                    //     None
+                    // } else {
+                    //     state.ok::<_, Infallible>(
+                    //         Err(ErrorKind::VariableNotDefined(variable_reference.1.clone())),
+                    //         variable_reference.2,
+                    //     );
+                    //     None
+                    // }
                 }
                 StmtKind::Import(_) => todo!(), // TODO
                 StmtKind::Expression(expression) => {

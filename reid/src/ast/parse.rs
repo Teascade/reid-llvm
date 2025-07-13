@@ -384,7 +384,7 @@ impl Parse for VariableReference {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(ident)) = stream.next() {
             let mut var_ref = VariableReference(
-                VariableReferenceKind::Name(ident),
+                VariableReferenceKind::Name(ident, stream.get_one_token_range()),
                 stream.get_range().unwrap(),
             );
 

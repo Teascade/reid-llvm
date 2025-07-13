@@ -76,14 +76,7 @@ impl ast::Block {
                     s_let.4,
                 ),
                 ast::BlockLevelStatement::Set(var_ref, expression, range) => (
-                    StmtKind::Set(
-                        NamedVariableRef(
-                            mir::TypeKind::Vague(mir::VagueType::Unknown),
-                            todo!(), // was name.clone()
-                            (*range).into(),
-                        ),
-                        expression.process(),
-                    ),
+                    StmtKind::Set(var_ref.process(), expression.process()),
                     *range,
                 ),
                 ast::BlockLevelStatement::Import { _i } => todo!(),
@@ -119,16 +112,25 @@ impl From<ast::ReturnType> for mir::ReturnKind {
 
 impl ast::VariableReference {
     fn process(&self) -> mir::IndexedVariableReference {
-        match &self.0 {
-            ast::VariableReferenceKind::Name(name) => {
-                mir::IndexedVariableReference::Named(NamedVariableRef(
+        mir::IndexedVariableReference {
+            kind: self.0.process(),
+            meta: self.1.into(),
+        }
+    }
+}
+
+impl ast::VariableReferenceKind {
+    fn process(&self) -> mir::IndexedVariableReferenceKind {
+        match &self {
+            ast::VariableReferenceKind::Name(name, range) => {
+                mir::IndexedVariableReferenceKind::Named(NamedVariableRef(
                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                     name.clone(),
-                    self.1.into(),
+                    (*range).into(),
                 ))
             }
             ast::VariableReferenceKind::Index(var_ref, idx) => {
-                mir::IndexedVariableReference::Index(Box::new(var_ref.process()), *idx)
+                mir::IndexedVariableReferenceKind::Index(Box::new(var_ref.process()), *idx)
             }
         }
     }
@@ -166,7 +168,9 @@ impl ast::Expression {
                 };
                 mir::ExprKind::If(mir::IfExpression(Box::new(cond), then_block, else_block))
             }
-            ast::ExpressionKind::Array(expressions) => todo!("process for array expression"),
+            ast::ExpressionKind::Array(expressions) => {
+                mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
+            }
             ast::ExpressionKind::Index(expression, idx) => {
                 mir::ExprKind::Index(Box::new(expression.process()), *idx)
             }

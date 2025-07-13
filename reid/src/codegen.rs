@@ -178,19 +178,20 @@ impl mir::Statement {
                 None
             }
             mir::StmtKind::Set(var, val) => {
-                if let Some(StackValue(kind, _)) = scope.stack_values.get(&var.1).cloned() {
-                    match kind {
-                        StackValueKind::Immutable(_) => {
-                            panic!("Tried to mutate an immutable variable")
-                        }
-                        StackValueKind::Mutable(ptr) => {
-                            let expression = val.codegen(scope).unwrap();
-                            Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
-                        }
-                    }
-                } else {
-                    panic!("")
-                }
+                todo!("Re-think how set needs to work with arrays");
+                // if let Some(StackValue(kind, _)) = scope.stack_values.get(&var.1).cloned() {
+                //     match kind {
+                //         StackValueKind::Immutable(_) => {
+                //             panic!("Tried to mutate an immutable variable")
+                //         }
+                //         StackValueKind::Mutable(ptr) => {
+                //             let expression = val.codegen(scope).unwrap();
+                //             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
+                //         }
+                //     }
+                // } else {
+                //     panic!("")
+                // }
             }
             // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),

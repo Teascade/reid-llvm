@@ -111,23 +111,24 @@ impl Block {
                     }
                 }
                 StmtKind::Set(var, expr) => {
-                    // Get the TypeRef for this variable declaration
-                    let var_ref = inner_hints.find_hint(&var.1);
+                    todo!("Re-think how set needs to work with arrays")
+                    // // Get the TypeRef for this variable declaration
+                    // let var_ref = inner_hints.find_hint(&var.1);
 
-                    // If ok, update the MIR type to this TypeRef
-                    if let Some((_, var_ref)) = &var_ref {
-                        var.0 = var_ref.as_type()
-                    }
+                    // // If ok, update the MIR type to this TypeRef
+                    // if let Some((_, var_ref)) = &var_ref {
+                    //     var.0 = var_ref.as_type()
+                    // }
 
-                    // Infer hints for the expression itself
-                    let inferred = expr.infer_types(&mut state, &inner_hints);
-                    let expr_ty_ref = state.ok(inferred, expr.1);
+                    // // Infer hints for the expression itself
+                    // let inferred = expr.infer_types(&mut state, &inner_hints);
+                    // let expr_ty_ref = state.ok(inferred, expr.1);
 
-                    // Try to narrow the variable type declaration with the
-                    // expression
-                    if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
-                        var_ref.narrow(&expr_ty_ref);
-                    }
+                    // // Try to narrow the variable type declaration with the
+                    // // expression
+                    // if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
+                    //     var_ref.narrow(&expr_ty_ref);
+                    // }
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expr) => {
