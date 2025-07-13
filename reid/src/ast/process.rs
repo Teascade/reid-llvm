@@ -44,8 +44,6 @@ impl ast::Module {
             }
         }
 
-        // TODO do something with state here
-
         mir::Module {
             name: self.name.clone(),
             imports,

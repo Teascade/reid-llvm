@@ -9,7 +9,24 @@ pub enum ReturnTypeOther {
     NoBlockReturn(Metadata),
 }
 
+impl TypeKind {
+    /// Return the type that is the result of a binary operator between two
+    /// values of this type
+    pub fn binop_type(&self, op: &BinaryOperator) -> TypeKind {
+        // TODO make some type of mechanism that allows to binop two values of
+        // differing types..
+        match op {
+            BinaryOperator::Add => *self,
+            BinaryOperator::Minus => *self,
+            BinaryOperator::Mult => *self,
+            BinaryOperator::And => TypeKind::Bool,
+            BinaryOperator::Cmp(_) => TypeKind::Bool,
+        }
+    }
+}
+
 pub trait ReturnType {
+    /// Return the return type of this node
     fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther>;
 }
 
@@ -24,9 +41,6 @@ impl ReturnType for Block {
             }
         }
 
-        // TODO should actually probably prune all instructions after this one
-        // as to not cause problems in codegen later (when unable to delete the
-        // block)
         if let Some((ReturnKind::Hard, ret_ty)) = early_return {
             return Ok((ReturnKind::Hard, ret_ty));
         }

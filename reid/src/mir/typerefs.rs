@@ -194,12 +194,6 @@ impl<'outer> ScopeTypeRefs<'outer> {
         rhs: &mut TypeRef<'outer>,
     ) -> Option<TypeRef<'outer>> {
         let ty = lhs.narrow(rhs)?;
-        Some(match op {
-            BinaryOperator::Add => ty,
-            BinaryOperator::Minus => ty,
-            BinaryOperator::Mult => ty,
-            BinaryOperator::And => self.from_type(&TypeKind::Bool).unwrap(),
-            BinaryOperator::Cmp(_) => self.from_type(&TypeKind::Bool).unwrap(),
-        })
+        self.from_type(&ty.as_type().binop_type(op))
     }
 }

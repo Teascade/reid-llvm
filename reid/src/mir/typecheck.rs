@@ -38,6 +38,8 @@ pub enum ErrorKind {
     InvalidAmountParameters(String, usize, usize),
     #[error("Unable to infer type {0}")]
     TypeNotInferrable(TypeKind),
+    #[error("Expected branch type to be {0}, found {1} instead")]
+    BranchTypesDiffer(TypeKind, TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -118,7 +120,7 @@ impl Block {
                     let res = expression.typecheck(&mut state, &hints, Some(var_t_resolved));
 
                     // If expression resolution itself was erronous, resolve as
-                    // Unknown.
+                    // Unknown and note error.
                     let res = state.or_else(res, Vague(Unknown), expression.1);
 
                     // Make sure the expression and variable type really is the same
@@ -286,8 +288,8 @@ impl Expression {
                     rhs.typecheck(state, &hints, Some(collapsed)).ok();
                 }
 
-                let res = lhs_type.binop_type(&op, &rhs_type)?;
-                Ok(res)
+                let both_t = lhs_type.collapse_into(&rhs_type)?;
+                Ok(both_t.binop_type(op))
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = state
@@ -338,7 +340,6 @@ impl Expression {
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                // TODO make sure cond_res is Boolean here
                 let cond_res = cond.typecheck(state, &hints, Some(Bool));
                 let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&Bool), cond.1);
@@ -351,11 +352,15 @@ impl Expression {
                     let res = else_block.typecheck(state, &hints, hint_t);
                     state.or_else(res, Vague(Unknown), else_block.meta)
                 } else {
-                    // TODO assert that then_ret_t is Void
-                    Vague(Unknown)
+                    // Else return type is Void if it does not exist
+                    Void
                 };
 
-                let collapsed = then_ret_t.collapse_into(&else_ret_t)?;
+                // Make sure then and else -blocks have the same return type
+                let collapsed = then_ret_t
+                    .collapse_into(&else_ret_t)
+                    .or(Err(ErrorKind::BranchTypesDiffer(then_ret_t, else_ret_t)))?;
+
                 if let Some(rhs) = rhs {
                     // If rhs existed, typecheck both sides to perform type
                     // coercion.
@@ -391,6 +396,8 @@ impl Literal {
                 (L::U64(_), U64) => self,
                 (L::U128(_), U128) => self,
                 (L::Bool(_), Bool) => self,
+                // TODO make sure that v is actually able to fit in the
+                // requested type
                 (L::Vague(VagueL::Number(v)), I8) => L::I8(v as i8),
                 (L::Vague(VagueL::Number(v)), I16) => L::I16(v as i16),
                 (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
@@ -428,17 +435,6 @@ impl TypeKind {
             },
             _ => Ok(*self),
         }
-    }
-
-    fn binop_type(&self, op: &BinaryOperator, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        let res = self.collapse_into(other)?;
-        Ok(match op {
-            BinaryOperator::Add => res,
-            BinaryOperator::Minus => res,
-            BinaryOperator::Mult => res,
-            BinaryOperator::And => res,
-            BinaryOperator::Cmp(_) => Bool,
-        })
     }
 
     fn resolve_hinted(&self, hints: &TypeRefs) -> TypeKind {
