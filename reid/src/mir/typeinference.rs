@@ -261,6 +261,7 @@ impl Expression {
                 }
             }
             ExprKind::Index(expression, _) => todo!("type inference for index expression"),
+            ExprKind::Array(expressions) => todo!("type inference for array expression"),
         }
     }
 }

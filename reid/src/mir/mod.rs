@@ -209,6 +209,7 @@ pub struct Import(pub String, pub Metadata);
 pub enum ExprKind {
     Variable(NamedVariableRef),
     Index(Box<Expression>, u64),
+    Array(Vec<Expression>),
     Literal(Literal),
     BinOp(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(FunctionCall),

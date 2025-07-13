@@ -374,6 +374,7 @@ impl Expression {
             }
             ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
             ExprKind::Index(expression, _) => todo!("typechecking for index expression"),
+            ExprKind::Array(expressions) => todo!("typechecking for array expression"),
         }
     }
 }

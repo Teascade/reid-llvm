@@ -132,6 +132,18 @@ impl Display for ExprKind {
                 Display::fmt(&expression, f)?;
                 write_index(f, *idx)
             }
+            ExprKind::Array(expressions) => {
+                f.write_char('[')?;
+                let mut iter = expressions.iter();
+                if let Some(item) = iter.next() {
+                    Display::fmt(item, f);
+                    while let Some(item) = iter.next() {
+                        f.write_str(", ")?;
+                        Display::fmt(item, f)?;
+                    }
+                }
+                f.write_char(']')
+            }
         }
     }
 }

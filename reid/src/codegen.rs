@@ -334,6 +334,7 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Index(expression, _) => todo!("codegen for index expression"),
+            mir::ExprKind::Array(expressions) => todo!("codegen for array expression"),
         }
     }
 }

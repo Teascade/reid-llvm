@@ -87,6 +87,7 @@ impl ReturnType for Expression {
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
             Index(expression, _) => todo!("return type for index"),
+            Array(expressions) => todo!("return type for array expression"),
         }
     }
 }
