@@ -1,7 +1,7 @@
 // Arithmetic, function calls and imports!
 
-fn array() -> [u16; 4] {
-    return [10, 15, 7, 9];
+fn array() -> [[u16; 4]; 1] {
+    return [[10, 15, 7, 9]];
 }
 
 fn main() -> u16 {
@@ -9,7 +9,7 @@ fn main() -> u16 {
 
     let mut list = array();
 
-    list[3] = 5;
+    list[0][3] = 5;
 
-    return list[3];
+    return list[0][3];
 }

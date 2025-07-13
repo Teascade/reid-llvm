@@ -351,7 +351,7 @@ impl InstructionHolder {
                 ),
                 ArrayAlloca(ty, len) => {
                     let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
-                    let array_ty = Type::ArrayPtr(Box::new(ty.clone()), *len);
+                    let array_ty = Type::Ptr(Box::new(ty.clone()));
                     dbg!(
                         &ty.as_llvm(module.context_ref),
                         &array_ty.as_llvm(module.context_ref)
@@ -363,11 +363,9 @@ impl InstructionHolder {
                         c"array_alloca".as_ptr(),
                     )
                 }
-                ArrayGEP(arr, indices) => {
+                GetElemPtr(arr, indices) => {
                     let t = arr.get_type(module.builder).unwrap();
-                    let Type::ArrayPtr(elem_t, _) = t else {
-                        panic!()
-                    };
+                    let Type::Ptr(elem_t) = t else { panic!() };
 
                     let mut indices: Vec<_> = indices
                         .iter()
@@ -478,7 +476,6 @@ impl Type {
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
-                ArrayPtr(elem_t, _) => LLVMPointerType(elem_t.as_llvm(context), 0),
             }
         }
     }

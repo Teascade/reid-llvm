@@ -169,10 +169,10 @@ impl IndexedVariableReference {
                 };
 
                 match inner_val.1 {
-                    Type::ArrayPtr(inner_ty, _) => {
+                    Type::Ptr(inner_ty) => {
                         let gep_instr = scope
                             .block
-                            .build(Instr::ArrayGEP(inner_instr, vec![*idx as u32]))
+                            .build(Instr::GetElemPtr(inner_instr, vec![*idx as u32]))
                             .unwrap();
                         Some(StackValue(
                             match inner_val.0 {
@@ -306,7 +306,8 @@ impl mir::Expression {
                 Some(match v.0 {
                     StackValueKind::Immutable(val) => val.clone(),
                     StackValueKind::Mutable(val) => match v.1 {
-                        Type::ArrayPtr(_, _) => val,
+                        // TODO probably wrong ..?
+                        Type::Ptr(_) => val,
                         _ => scope.block.build(Instr::Load(val, v.1.clone())).unwrap(),
                     },
                 })
@@ -377,7 +378,7 @@ impl mir::Expression {
                 let array = expression.codegen(scope)?;
                 let ptr = scope
                     .block
-                    .build(Instr::ArrayGEP(array, vec![*idx as u32]))
+                    .build(Instr::GetElemPtr(array, vec![*idx as u32]))
                     .unwrap();
 
                 Some(
@@ -409,7 +410,7 @@ impl mir::Expression {
                 for (i, instr) in instr_list.iter().enumerate() {
                     let ptr = scope
                         .block
-                        .build(Instr::ArrayGEP(array, vec![i as u32]))
+                        .build(Instr::GetElemPtr(array, vec![i as u32]))
                         .unwrap();
                     scope.block.build(Instr::Store(ptr, *instr)).unwrap();
                 }
@@ -494,9 +495,7 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
-            TypeKind::Array(elem_t, len) => {
-                Type::ArrayPtr(Box::new(elem_t.get_type()), *len as u32)
-            }
+            TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type())),
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
         }

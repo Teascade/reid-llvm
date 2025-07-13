@@ -279,9 +279,9 @@ impl Builder {
                     }
                 }
                 ArrayAlloca(_, _) => Ok(()),
-                ArrayGEP(arr, _) => {
+                GetElemPtr(arr, _) => {
                     let arr_ty = arr.get_type(&self)?;
-                    if let Type::ArrayPtr(_, _) = arr_ty {
+                    if let Type::Ptr(_) = arr_ty {
                         Ok(())
                     } else {
                         Err(())
@@ -348,11 +348,9 @@ impl InstructionValue {
                 Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
-                ArrayAlloca(ty, len_value) => {
-                    Ok(Type::ArrayPtr(Box::new(ty.clone()), len_value.clone()))
-                }
-                ArrayGEP(arr, _) => match arr.get_type(builder) {
-                    Ok(Type::ArrayPtr(elem_t, _)) => Ok(Type::Ptr(Box::new(*elem_t))),
+                ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                GetElemPtr(arr, _) => match arr.get_type(builder) {
+                    Ok(Type::Ptr(elem_t)) => Ok(Type::Ptr(Box::new(*elem_t))),
                     Ok(_) => Err(()),
                     Err(_) => Err(()),
                 },
@@ -396,7 +394,6 @@ impl Type {
             Type::Bool => true,
             Type::Void => false,
             Type::Ptr(_) => false,
-            Type::ArrayPtr(_, _) => false,
         }
     }
 
@@ -415,7 +412,6 @@ impl Type {
             Type::Bool => false,
             Type::Void => false,
             Type::Ptr(_) => false,
-            Type::ArrayPtr(_, _) => false,
         }
     }
 }

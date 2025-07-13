@@ -103,7 +103,7 @@ impl Debug for Instr {
             Instr::ArrayAlloca(ty, instruction_value) => {
                 write!(f, "array_alloca<{:?}>({:?})", ty, instruction_value)
             }
-            Instr::ArrayGEP(instruction_value, items) => fmt_index(
+            Instr::GetElemPtr(instruction_value, items) => fmt_index(
                 f,
                 instruction_value,
                 &items
