@@ -29,6 +29,7 @@ impl ast::Module {
                         name: signature.name.clone(),
                         return_type: signature
                             .return_type
+                            .clone()
                             .map(|r| r.0.into())
                             .unwrap_or(mir::TypeKind::Void),
                         parameters: signature
@@ -63,6 +64,7 @@ impl ast::Block {
                         mir::VariableReference(
                             s_let
                                 .1
+                                .clone()
                                 .map(|t| t.0.into())
                                 .unwrap_or(mir::TypeKind::Vague(mir::VagueType::Unknown)),
                             s_let.0.clone(),
@@ -181,7 +183,7 @@ impl ast::Literal {
 
 impl From<ast::TypeKind> for mir::TypeKind {
     fn from(value: ast::TypeKind) -> Self {
-        match value {
+        match &value {
             ast::TypeKind::Bool => mir::TypeKind::Bool,
             ast::TypeKind::I8 => mir::TypeKind::I8,
             ast::TypeKind::I16 => mir::TypeKind::I16,
@@ -193,6 +195,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::U32 => mir::TypeKind::U32,
             ast::TypeKind::U64 => mir::TypeKind::U64,
             ast::TypeKind::U128 => mir::TypeKind::U128,
+            ast::TypeKind::Array(type_kind, length) => todo!(),
         }
     }
 }

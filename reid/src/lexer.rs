@@ -7,7 +7,7 @@ pub enum Token {
     // Values
     Identifier(String),
     /// Number with at most one decimal point
-    DecimalValue(String),
+    DecimalValue(u64),
 
     // Keywords
     /// `let`
@@ -62,6 +62,10 @@ pub enum Token {
     BraceOpen,
     /// `}`
     BraceClose,
+    /// `[`
+    BracketOpen,
+    /// `]`
+    BracketClose,
     /// `,`
     Comma,
 
@@ -194,7 +198,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     value += &c.to_string();
                     cursor.next();
                 }
-                Token::DecimalValue(value)
+                Token::DecimalValue(value.parse().expect("Decimal not parseable to u64"))
             }
             '-' if cursor.first() == Some('>') => {
                 cursor.next(); // Eat `>`
@@ -213,6 +217,8 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '!' => Token::Exclamation,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,
+            '[' => Token::BracketOpen,
+            ']' => Token::BracketClose,
             '{' => Token::BraceOpen,
             '}' => Token::BraceClose,
             ',' => Token::Comma,

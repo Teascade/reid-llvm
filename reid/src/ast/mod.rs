@@ -6,10 +6,10 @@ use crate::token_stream::TokenRange;
 pub mod parse;
 pub mod process;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Type(pub TypeKind, pub TokenRange);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum TypeKind {
     Bool,
     I8,
@@ -22,6 +22,7 @@ pub enum TypeKind {
     U32,
     U64,
     U128,
+    Array(Box<TypeKind>, u64),
 }
 
 #[derive(Debug, Clone)]

@@ -13,24 +13,37 @@ where
 
 impl Parse for Type {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
-        let kind = if let Some(Token::Identifier(ident)) = stream.next() {
-            Ok(match &*ident {
-                "bool" => TypeKind::Bool,
-                "i8" => TypeKind::I8,
-                "i16" => TypeKind::I16,
-                "i32" => TypeKind::I32,
-                "i64" => TypeKind::I64,
-                "i128" => TypeKind::I128,
-                "u8" => TypeKind::U8,
-                "u16" => TypeKind::U16,
-                "u32" => TypeKind::U32,
-                "u64" => TypeKind::U64,
-                "u128" => TypeKind::U128,
-                _ => panic!("asd"),
-            })
+        let kind = if let Some(Token::BracketOpen) = stream.peek() {
+            stream.expect(Token::BracketOpen)?;
+            let inner = stream.parse::<Type>()?;
+            stream.expect(Token::Semi)?;
+            let length = if let Some(Token::DecimalValue(length)) = stream.next() {
+                length
+            } else {
+                return Err(stream.expected_err("array length (number)")?);
+            };
+            stream.expect(Token::BracketClose)?;
+            TypeKind::Array(Box::new(inner.0), length)
         } else {
-            Err(stream.expected_err("type identifier")?)
-        }?;
+            if let Some(Token::Identifier(ident)) = stream.next() {
+                match &*ident {
+                    "bool" => TypeKind::Bool,
+                    "i8" => TypeKind::I8,
+                    "i16" => TypeKind::I16,
+                    "i32" => TypeKind::I32,
+                    "i64" => TypeKind::I64,
+                    "i128" => TypeKind::I128,
+                    "u8" => TypeKind::U8,
+                    "u16" => TypeKind::U16,
+                    "u32" => TypeKind::U32,
+                    "u64" => TypeKind::U64,
+                    "u128" => TypeKind::U128,
+                    _ => Err(stream.expected_err("known type identifier")?)?,
+                }
+            } else {
+                return Err(stream.expected_err("type identifier")?)?;
+            }
+        };
 
         Ok(Type(kind, stream.get_range().unwrap()))
     }
@@ -68,7 +81,7 @@ impl Parse for PrimaryExpression {
                     Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                 }
                 Token::DecimalValue(v) => Expression(
-                    Kind::Literal(Literal::Number(v.parse().unwrap())),
+                    Kind::Literal(Literal::Number(*v)),
                     stream.get_range().unwrap(),
                 ),
                 Token::True => Expression(
