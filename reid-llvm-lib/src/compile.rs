@@ -352,10 +352,6 @@ impl InstructionHolder {
                 ArrayAlloca(ty, len) => {
                     let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
                     let array_ty = Type::Ptr(Box::new(ty.clone()));
-                    dbg!(
-                        &ty.as_llvm(module.context_ref),
-                        &array_ty.as_llvm(module.context_ref)
-                    );
                     LLVMBuildArrayAlloca(
                         module.builder_ref,
                         ty.as_llvm(module.context_ref),
@@ -371,12 +367,13 @@ impl InstructionHolder {
                         .iter()
                         .map(|idx| ConstValue::U32(*idx).as_llvm(module.context_ref))
                         .collect();
+
                     LLVMBuildGEP2(
                         module.builder_ref,
                         elem_t.as_llvm(module.context_ref),
                         module.values.get(arr).unwrap().value_ref,
                         indices.as_mut_ptr(),
-                        1,
+                        indices.len() as u32,
                         c"array_gep".as_ptr(),
                     )
                 }

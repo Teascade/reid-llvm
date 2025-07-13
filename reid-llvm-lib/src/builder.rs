@@ -349,11 +349,7 @@ impl InstructionValue {
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
                 ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
-                GetElemPtr(arr, _) => match arr.get_type(builder) {
-                    Ok(Type::Ptr(elem_t)) => Ok(Type::Ptr(Box::new(*elem_t))),
-                    Ok(_) => Err(()),
-                    Err(_) => Err(()),
-                },
+                GetElemPtr(ptr, _) => ptr.get_type(builder),
             }
         }
     }

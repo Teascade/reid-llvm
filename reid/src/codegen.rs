@@ -154,33 +154,22 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 }
 
 impl IndexedVariableReference {
-    fn get_stack_value(&self, scope: &mut Scope) -> Option<StackValue> {
+    fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<u32>)> {
         use StackValueKind as Kind;
 
         match &self.kind {
-            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
-                scope.stack_values.get(name).cloned()
-            }
+            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => scope
+                .stack_values
+                .get(name)
+                .cloned()
+                .map(|v| (v, Vec::new())),
             mir::IndexedVariableReferenceKind::Index(inner, idx) => {
-                let inner_val = inner.get_stack_value(scope)?;
-                let inner_instr = match inner_val.0 {
-                    Kind::Immutable(val) => val,
-                    Kind::Mutable(val) => val,
-                };
+                let (inner_val, mut indices) = inner.get_stack_value(scope)?;
 
-                match inner_val.1 {
-                    Type::Ptr(inner_ty) => {
-                        let gep_instr = scope
-                            .block
-                            .build(Instr::GetElemPtr(inner_instr, vec![*idx as u32]))
-                            .unwrap();
-                        Some(StackValue(
-                            match inner_val.0 {
-                                Kind::Immutable(_) => Kind::Immutable(gep_instr),
-                                Kind::Mutable(_) => Kind::Mutable(gep_instr),
-                            },
-                            *inner_ty,
-                        ))
+                match &inner_val.1 {
+                    Type::Ptr(_) => {
+                        indices.push(*idx as u32);
+                        Some((inner_val, indices))
                     }
                     _ => panic!("Tried to codegen indexing a non-indexable value!"),
                 }
@@ -217,12 +206,24 @@ impl mir::Statement {
                 None
             }
             mir::StmtKind::Set(var, val) => {
-                if let Some(StackValue(kind, _)) = var.get_stack_value(scope) {
+                if let Some((StackValue(kind, mut ty), indices)) = var.get_stack_value(scope) {
                     match kind {
                         StackValueKind::Immutable(_) => {
                             panic!("Tried to mutate an immutable variable")
                         }
-                        StackValueKind::Mutable(ptr) => {
+                        StackValueKind::Mutable(mut ptr) => {
+                            for (i, idx) in indices.iter().enumerate() {
+                                let Type::Ptr(inner) = ty else { panic!() };
+                                ty = *inner;
+
+                                ptr = scope
+                                    .block
+                                    .build(Instr::GetElemPtr(ptr, vec![*idx]))
+                                    .unwrap();
+                                if i < (indices.len() - 1) {
+                                    ptr = scope.block.build(Instr::Load(ptr, ty.clone())).unwrap()
+                                }
+                            }
                             let expression = val.codegen(scope).unwrap();
                             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
                         }
