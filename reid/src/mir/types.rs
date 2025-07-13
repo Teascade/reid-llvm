@@ -7,6 +7,7 @@ pub enum ReturnTypeOther {
     Set(Metadata),
     EmptyBlock(Metadata),
     NoBlockReturn(Metadata),
+    IndexingNonArray(Metadata),
 }
 
 impl TypeKind {
@@ -86,8 +87,25 @@ impl ReturnType for Expression {
             Block(block) => block.return_type(),
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
-            Index(expression, _) => todo!("return type for index"),
-            Array(expressions) => todo!("return type for array expression"),
+            Index(expression, _) => {
+                let expr_type = expression.return_type()?;
+                if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
+                    Ok((ReturnKind::Soft, *elem_ty))
+                } else {
+                    Err(ReturnTypeOther::IndexingNonArray(expression.1))
+                }
+            }
+            Array(expressions) => {
+                let first = expressions
+                    .iter()
+                    .next()
+                    .map(|e| e.return_type())
+                    .unwrap_or(Ok((ReturnKind::Soft, TypeKind::Void)))?;
+                Ok((
+                    ReturnKind::Soft,
+                    TypeKind::Array(Box::new(first.1), expressions.len() as u64),
+                ))
+            }
         }
     }
 }
