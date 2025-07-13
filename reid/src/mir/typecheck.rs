@@ -254,17 +254,19 @@ impl Expression {
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var_ref) => {
-                let existing = state.or_else(
-                    state
-                        .scope
-                        .variables
-                        .get(&var_ref.1)
-                        .map(|var| &var.ty)
-                        .cloned()
-                        .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
-                    Vague(Unknown),
-                    var_ref.2,
-                );
+                let existing = state
+                    .or_else(
+                        state
+                            .scope
+                            .variables
+                            .get(&var_ref.1)
+                            .map(|var| &var.ty)
+                            .cloned()
+                            .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
+                        Vague(Unknown),
+                        var_ref.2,
+                    )
+                    .resolve_hinted(hints);
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
@@ -339,9 +341,9 @@ impl Expression {
                         .collapse_into(&function_call.return_type.resolve_hinted(hints))?;
                     // Update typing to be more accurate
                     function_call.return_type = ret_t.clone();
-                    Ok(ret_t)
+                    Ok(ret_t.resolve_hinted(hints))
                 } else {
-                    Ok(function_call.return_type.clone())
+                    Ok(function_call.return_type.clone().resolve_hinted(hints))
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
@@ -379,9 +381,15 @@ impl Expression {
             }
             ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
             ExprKind::Index(expression, idx) => {
+                // Try to unwrap hint type from array if possible
+                let hint_t = hint_t.map(|t| match t {
+                    Array(type_kind, _) => &type_kind,
+                    _ => t,
+                });
+
                 let expr_t = expression.typecheck(state, hints, hint_t)?;
                 if let TypeKind::Array(elem_t, len) = expr_t {
-                    if len >= *idx {
+                    if len < *idx {
                         return Err(ErrorKind::IndexOutOfBounds(*idx, len));
                     }
                     Ok(*elem_t)
@@ -390,6 +398,12 @@ impl Expression {
                 }
             }
             ExprKind::Array(expressions) => {
+                // Try to unwrap hint type from array if possible
+                let hint_t = hint_t.map(|t| match t {
+                    Array(type_kind, _) => &type_kind,
+                    _ => t,
+                });
+
                 let mut expr_result = try_all(
                     expressions
                         .iter_mut()
@@ -403,7 +417,7 @@ impl Expression {
                             for other in iter {
                                 state.ok(first.collapse_into(other), self.1);
                             }
-                            Ok(first.clone())
+                            Ok(Array(Box::new(first.clone()), expressions.len() as u64))
                         } else {
                             Ok(Array(Box::new(Void), 0))
                         }
@@ -479,9 +493,13 @@ impl TypeKind {
     }
 
     fn resolve_hinted(&self, hints: &TypeRefs) -> TypeKind {
-        match self {
+        let resolved = match self {
             Vague(TypeRef(idx)) => hints.retrieve_type(*idx).unwrap(),
             _ => self.clone(),
+        };
+        match resolved {
+            Array(t, len) => Array(Box::new(t.resolve_hinted(hints)), len),
+            _ => resolved,
         }
     }
 }

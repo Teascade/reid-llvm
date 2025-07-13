@@ -4,6 +4,8 @@ use std::{
     rc::Rc,
 };
 
+use crate::mir::VagueType;
+
 use super::{
     typecheck::{Collapsable, ErrorKind},
     BinaryOperator, TypeKind,
@@ -15,12 +17,22 @@ pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);
 impl<'scope> TypeRef<'scope> {
     pub unsafe fn resolve_type(&self) -> TypeKind {
         unsafe {
-            self.1
+            let resolved = self
+                .1
                 .types
                 .hints
                 .borrow()
                 .get_unchecked(*self.0.borrow())
-                .clone()
+                .clone();
+
+            match resolved {
+                TypeKind::Array(elem_ty, len) => {
+                    let resolved_elem_ty = self.1.from_type(&elem_ty).unwrap().resolve_type();
+                    dbg!(&elem_ty, &resolved_elem_ty);
+                    TypeKind::Array(Box::new(resolved_elem_ty), len)
+                }
+                _ => resolved,
+            }
         }
     }
 
@@ -96,7 +108,15 @@ impl TypeRefs {
 
     pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
         let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
-        self.hints.borrow().get(inner_idx).cloned()
+        self.hints
+            .borrow()
+            .get(inner_idx)
+            .cloned()
+            .map(|t| match t {
+                TypeKind::Vague(VagueType::TypeRef(id)) => self.retrieve_type(id),
+                _ => Some(t),
+            })
+            .flatten()
     }
 }
 

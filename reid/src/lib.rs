@@ -93,6 +93,7 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
 
     let state = mir_context.pass(&mut TypeInference { refs: &refs });
     dbg!(&state, &refs);
+    dbg!(&mir_context);
     println!("{}", &mir_context);
 
     let state = mir_context.pass(&mut TypeCheck { refs: &refs });
