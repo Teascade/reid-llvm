@@ -351,7 +351,6 @@ impl InstructionHolder {
                 ),
                 ArrayAlloca(ty, len) => {
                     let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
-                    let array_ty = Type::Ptr(Box::new(ty.clone()));
                     LLVMBuildArrayAlloca(
                         module.builder_ref,
                         ty.as_llvm(module.context_ref),

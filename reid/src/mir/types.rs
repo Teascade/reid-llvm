@@ -1,8 +1,4 @@
-use super::{
-    pass::{ScopeVariable, Storage},
-    typecheck::ErrorKind,
-    *,
-};
+use super::*;
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {

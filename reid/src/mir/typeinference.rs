@@ -4,7 +4,7 @@
 //! must then be passed through TypeCheck with the same [`TypeRefs`] in order to
 //! place the correct types from the IDs and check that there are no issues.
 
-use std::{convert::Infallible, iter};
+use std::iter;
 
 use crate::{mir::TypeKind, util::try_all};
 

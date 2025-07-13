@@ -155,8 +155,6 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
 impl IndexedVariableReference {
     fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<u32>)> {
-        use StackValueKind as Kind;
-
         match &self.kind {
             mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => scope
                 .stack_values
