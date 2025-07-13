@@ -18,8 +18,6 @@ pub enum ErrorKind {
     Null,
     #[error("Type is vague: {0}")]
     TypeIsVague(VagueType),
-    #[error("Can not coerce {0} to vague type {1}")]
-    HintIsVague(TypeKind, VagueType),
     #[error("Literal {0} can not be coerced to type {1}")]
     LiteralIncompatible(Literal, TypeKind),
     #[error("Types {0} and {1} are incompatible")]
@@ -28,7 +26,7 @@ pub enum ErrorKind {
     VariableNotDefined(String),
     #[error("Function not defined: {0}")]
     FunctionNotDefined(String),
-    #[error("Type is vague: {0}")]
+    #[error("Expected a return type of {0}, got {1} instead")]
     ReturnTypeMismatch(TypeKind, TypeKind),
     #[error("Function not defined: {0}")]
     FunctionAlreadyDefined(String),
