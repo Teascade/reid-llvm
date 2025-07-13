@@ -8,7 +8,7 @@ use VagueType::*;
 
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable},
-    scopehints::{ScopeHint, ScopeHints, TypeHints},
+    scopehints::{ScopeHints, TypeHint, TypeHints},
     types::{pick_return, ReturnType},
 };
 
@@ -105,7 +105,7 @@ impl Block {
         &mut self,
         state: &mut PassState<ErrorKind>,
         outer_hints: &'s ScopeHints,
-    ) -> Result<(ReturnKind, ScopeHint<'s>), ErrorKind> {
+    ) -> Result<(ReturnKind, TypeHint<'s>), ErrorKind> {
         let mut state = state.inner();
         let inner_hints = outer_hints.inner();
 
@@ -313,7 +313,7 @@ impl Expression {
         &mut self,
         state: &mut PassState<ErrorKind>,
         hints: &'s ScopeHints<'s>,
-    ) -> Result<ScopeHint<'s>, ErrorKind> {
+    ) -> Result<TypeHint<'s>, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var) => {
                 let hint = hints

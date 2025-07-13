@@ -1,8 +1,6 @@
 use std::{
-    any::TypeId,
     cell::RefCell,
     collections::{HashMap, HashSet},
-    hint::black_box,
     rc::Rc,
 };
 
@@ -12,14 +10,14 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct ScopeHint<'scope>(TypeIdRef, &'scope ScopeHints<'scope>);
+pub struct TypeHint<'scope>(TypeIdRef, &'scope ScopeHints<'scope>);
 
-impl<'scope> ScopeHint<'scope> {
+impl<'scope> TypeHint<'scope> {
     pub unsafe fn resolve_type(&self) -> TypeKind {
         unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
     }
 
-    pub fn narrow(&mut self, other: &ScopeHint) -> Result<ScopeHint<'scope>, ErrorKind> {
+    pub fn narrow(&mut self, other: &TypeHint) -> Result<TypeHint<'scope>, ErrorKind> {
         self.1.combine_vars(self, other)
     }
 
@@ -28,7 +26,7 @@ impl<'scope> ScopeHint<'scope> {
     }
 }
 
-impl<'scope> std::fmt::Debug for ScopeHint<'scope> {
+impl<'scope> std::fmt::Debug for TypeHint<'scope> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Hint")
             .field(&self.0)
@@ -117,7 +115,7 @@ impl<'outer> ScopeHints<'outer> {
         name: String,
         mutable: bool,
         initial_ty: TypeKind,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+    ) -> Result<TypeHint<'outer>, ErrorKind> {
         if self.variables.borrow().contains_key(&name) {
             return Err(ErrorKind::VariableAlreadyDefined(name));
         }
@@ -125,10 +123,10 @@ impl<'outer> ScopeHints<'outer> {
         self.variables
             .borrow_mut()
             .insert(name, (mutable, idx.clone()));
-        Ok(ScopeHint(idx, self))
+        Ok(TypeHint(idx, self))
     }
 
-    pub fn from_type(&'outer self, ty: &TypeKind) -> Option<ScopeHint<'outer>> {
+    pub fn from_type(&'outer self, ty: &TypeKind) -> Option<TypeHint<'outer>> {
         let idx = match ty {
             TypeKind::Vague(super::VagueType::Hinted(idx)) => {
                 let inner_idx = unsafe { *self.types.recurse_type_ref(*idx).borrow() };
@@ -143,27 +141,27 @@ impl<'outer> ScopeHints<'outer> {
                 }
             }
         };
-        Some(ScopeHint(idx, self))
+        Some(TypeHint(idx, self))
     }
 
     fn narrow_to_type(
         &'outer self,
-        hint: &ScopeHint,
+        hint: &TypeHint,
         ty: &TypeKind,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+    ) -> Result<TypeHint<'outer>, ErrorKind> {
         unsafe {
             let mut hints = self.types.hints.borrow_mut();
             let existing = hints.get_unchecked_mut(*hint.0.borrow());
             *existing = existing.collapse_into(&ty)?;
-            Ok(ScopeHint(hint.0.clone(), self))
+            Ok(TypeHint(hint.0.clone(), self))
         }
     }
 
     fn combine_vars(
         &'outer self,
-        hint1: &ScopeHint,
-        hint2: &ScopeHint,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+        hint1: &TypeHint,
+        hint2: &TypeHint,
+    ) -> Result<TypeHint<'outer>, ErrorKind> {
         unsafe {
             let ty = self
                 .types
@@ -177,7 +175,7 @@ impl<'outer> ScopeHints<'outer> {
                     *idx.borrow_mut() = *hint1.0.borrow();
                 }
             }
-            Ok(ScopeHint(hint1.0.clone(), self))
+            Ok(TypeHint(hint1.0.clone(), self))
         }
     }
 
@@ -189,20 +187,20 @@ impl<'outer> ScopeHints<'outer> {
         }
     }
 
-    pub fn find_hint(&'outer self, name: &String) -> Option<(bool, ScopeHint<'outer>)> {
+    pub fn find_hint(&'outer self, name: &String) -> Option<(bool, TypeHint<'outer>)> {
         self.variables
             .borrow()
             .get(name)
-            .map(|(mutable, idx)| (*mutable, ScopeHint(idx.clone(), self)))
+            .map(|(mutable, idx)| (*mutable, TypeHint(idx.clone(), self)))
             .or(self.outer.map(|o| o.find_hint(name)).flatten())
     }
 
     pub fn binop(
         &'outer self,
         op: &BinaryOperator,
-        lhs: &mut ScopeHint<'outer>,
-        rhs: &mut ScopeHint<'outer>,
-    ) -> Result<ScopeHint<'outer>, ErrorKind> {
+        lhs: &mut TypeHint<'outer>,
+        rhs: &mut TypeHint<'outer>,
+    ) -> Result<TypeHint<'outer>, ErrorKind> {
         let ty = lhs.narrow(rhs)?;
         Ok(match op {
             BinaryOperator::Add => ty,
