@@ -270,6 +270,7 @@ impl Builder {
                 }
                 Store(ptr, _) => {
                     if let Ok(ty) = ptr.get_type(&self) {
+                        dbg!(&ty);
                         if let Type::Ptr(_) = ty {
                             Ok(())
                         } else {
@@ -279,24 +280,11 @@ impl Builder {
                         Err(())
                     }
                 }
-                Extract(arr, idx) => {
-                    let arr_ty = arr.get_type(&self)?;
-                    if let Type::Array(_, len) = arr_ty {
-                        if len > idx { Ok(()) } else { Err(()) }
-                    } else {
-                        Err(())
-                    }
-                }
                 ArrayAlloca(_, _) => Ok(()),
-                Insert(arr, idx, val) => {
+                ArrayGEP(arr, _) => {
                     let arr_ty = arr.get_type(&self)?;
-                    let val_ty = val.get_type(&self)?;
-                    if let Type::Array(elem_ty, len) = arr_ty {
-                        if val_ty == *elem_ty && len > idx {
-                            Ok(())
-                        } else {
-                            Err(())
-                        }
+                    if let Type::ArrayPtr(_, _) = arr_ty {
+                        Ok(())
                     } else {
                         Err(())
                     }
@@ -362,15 +350,14 @@ impl InstructionValue {
                 Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
-                Extract(arr, _) => match arr.get_type(builder) {
-                    Ok(Type::Array(elem_t, _)) => Ok(*elem_t),
+                ArrayAlloca(ty, len_value) => {
+                    Ok(Type::ArrayPtr(Box::new(ty.clone()), len_value.clone()))
+                }
+                ArrayGEP(arr, _) => match arr.get_type(builder) {
+                    Ok(Type::ArrayPtr(elem_t, _)) => Ok(Type::Ptr(Box::new(*elem_t))),
                     Ok(_) => Err(()),
                     Err(_) => Err(()),
                 },
-                ArrayAlloca(ty, len_value) => {
-                    Ok(Type::Array(Box::new(ty.clone()), len_value.clone()))
-                }
-                Insert(_, _, val) => val.get_type(builder),
             }
         }
     }
@@ -391,15 +378,6 @@ impl ConstValue {
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
             ConstValue::Bool(_) => Bool,
-            // ConstValue::Array(arr) => Array(
-            //     Box::new(
-            //         arr.iter()
-            //             .map(|a| a.get_type(builder).unwrap())
-            //             .next()
-            //             .unwrap_or(Void),
-            //     ),
-            //     arr.len() as u32,
-            // ),
         }
     }
 }
@@ -420,7 +398,7 @@ impl Type {
             Type::Bool => true,
             Type::Void => false,
             Type::Ptr(_) => false,
-            Type::Array(_, _) => false,
+            Type::ArrayPtr(_, _) => false,
         }
     }
 
@@ -439,7 +417,7 @@ impl Type {
             Type::Bool => false,
             Type::Void => false,
             Type::Ptr(_) => false,
-            Type::Array(_, _) => false,
+            Type::ArrayPtr(_, _) => false,
         }
     }
 }

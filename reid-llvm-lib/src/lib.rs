@@ -178,8 +178,7 @@ pub enum Instr {
     Load(InstructionValue, Type),
     Store(InstructionValue, InstructionValue),
     ArrayAlloca(Type, u32),
-    Insert(InstructionValue, u32, InstructionValue),
-    Extract(InstructionValue, u32),
+    ArrayGEP(InstructionValue, Vec<u32>),
 
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
@@ -202,7 +201,7 @@ pub enum Type {
     Bool,
     Void,
     Ptr(Box<Type>),
-    Array(Box<Type>, u32),
+    ArrayPtr(Box<Type>, u32),
 }
 
 #[derive(Debug, Clone, Hash)]

@@ -349,29 +349,9 @@ impl InstructionHolder {
                     module.values.get(&val).unwrap().value_ref,
                     module.values.get(&ptr).unwrap().value_ref,
                 ),
-                Extract(arr, idx) => {
-                    let t = arr.get_type(module.builder).unwrap();
-                    let Type::Array(elem_t, _) = t else { panic!() };
-
-                    let indices = &mut [ConstValue::I32(*idx as i32).as_llvm(module.context_ref)];
-                    let ptr = LLVMBuildGEP2(
-                        module.builder_ref,
-                        elem_t.as_llvm(module.context_ref),
-                        module.values.get(arr).unwrap().value_ref,
-                        indices.as_mut_ptr(),
-                        1,
-                        c"insert_gep".as_ptr(),
-                    );
-                    LLVMBuildLoad2(
-                        module.builder_ref,
-                        elem_t.as_llvm(module.context_ref),
-                        ptr,
-                        c"load".as_ptr(),
-                    )
-                }
                 ArrayAlloca(ty, len) => {
                     let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
-                    let array_ty = Type::Array(Box::new(ty.clone()), *len);
+                    let array_ty = Type::ArrayPtr(Box::new(ty.clone()), *len);
                     dbg!(
                         &ty.as_llvm(module.context_ref),
                         &array_ty.as_llvm(module.context_ref)
@@ -383,31 +363,24 @@ impl InstructionHolder {
                         c"array_alloca".as_ptr(),
                     )
                 }
-                Insert(arr, idx, val) => {
-                    let indices = &mut [ConstValue::I32(*idx as i32).as_llvm(module.context_ref)];
-                    let ptr = LLVMBuildGEP2(
+                ArrayGEP(arr, indices) => {
+                    let t = arr.get_type(module.builder).unwrap();
+                    let Type::ArrayPtr(elem_t, _) = t else {
+                        panic!()
+                    };
+
+                    let mut indices: Vec<_> = indices
+                        .iter()
+                        .map(|idx| ConstValue::U32(*idx).as_llvm(module.context_ref))
+                        .collect();
+                    LLVMBuildGEP2(
                         module.builder_ref,
-                        val.get_type(module.builder)
-                            .unwrap()
-                            .as_llvm(module.context_ref),
+                        elem_t.as_llvm(module.context_ref),
                         module.values.get(arr).unwrap().value_ref,
                         indices.as_mut_ptr(),
                         1,
-                        c"insert_gep".as_ptr(),
-                    );
-                    LLVMBuildStore(
-                        module.builder_ref,
-                        module.values.get(val).unwrap().value_ref,
-                        ptr,
+                        c"array_gep".as_ptr(),
                     )
-
-                    // LLVMBuildInsertValue(
-                    //     module.builder_ref,
-                    //     ptr,
-                    //     module.values.get(val).unwrap().value_ref,
-                    //     *idx,
-                    //     c"insert".as_ptr(),
-                    // )
                 }
             }
         };
@@ -505,7 +478,7 @@ impl Type {
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
-                Array(elem_t, _) => LLVMPointerType(elem_t.as_llvm(context), 0),
+                ArrayPtr(elem_t, _) => LLVMPointerType(elem_t.as_llvm(context), 0),
             }
         }
     }

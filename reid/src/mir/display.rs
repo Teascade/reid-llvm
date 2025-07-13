@@ -128,8 +128,9 @@ impl Display for ExprKind {
             ExprKind::FunctionCall(fc) => Display::fmt(fc, f),
             ExprKind::If(if_exp) => Display::fmt(&if_exp, f),
             ExprKind::Block(block) => Display::fmt(block, f),
-            ExprKind::Index(expression, idx) => {
+            ExprKind::Index(expression, elem_ty, idx) => {
                 Display::fmt(&expression, f)?;
+                write!(f, "<{}>", elem_ty)?;
                 write_index(f, *idx)
             }
             ExprKind::Array(expressions) => {

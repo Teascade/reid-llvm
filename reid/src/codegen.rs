@@ -334,12 +334,17 @@ impl mir::Expression {
                     None
                 }
             }
-            mir::ExprKind::Index(expression, idx) => {
-                let expr = expression.codegen(scope)?;
+            mir::ExprKind::Index(expression, val_t, idx) => {
+                let array = expression.codegen(scope)?;
+                let ptr = scope
+                    .block
+                    .build(Instr::ArrayGEP(array, vec![*idx as u32]))
+                    .unwrap();
+
                 Some(
                     scope
                         .block
-                        .build(Instr::Extract(expr, *idx as u32))
+                        .build(Instr::Load(ptr, val_t.get_type()))
                         .unwrap(),
                 )
             }
@@ -354,7 +359,6 @@ impl mir::Expression {
                     .next()
                     .unwrap_or(TypeKind::Void);
 
-                dbg!(&instr_t);
                 let array = scope
                     .block
                     .build(Instr::ArrayAlloca(
@@ -364,10 +368,11 @@ impl mir::Expression {
                     .unwrap();
 
                 for (i, instr) in instr_list.iter().enumerate() {
-                    scope
+                    let ptr = scope
                         .block
-                        .build(Instr::Insert(array, i as u32, *instr))
+                        .build(Instr::ArrayGEP(array, vec![i as u32]))
                         .unwrap();
+                    scope.block.build(Instr::Store(ptr, *instr)).unwrap();
                 }
 
                 Some(array)
@@ -450,7 +455,9 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
-            TypeKind::Array(elem_t, len) => Type::Array(Box::new(elem_t.get_type()), *len as u32),
+            TypeKind::Array(elem_t, len) => {
+                Type::ArrayPtr(Box::new(elem_t.get_type()), *len as u32)
+            }
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
         }

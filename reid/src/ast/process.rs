@@ -171,9 +171,11 @@ impl ast::Expression {
             ast::ExpressionKind::Array(expressions) => {
                 mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
             }
-            ast::ExpressionKind::Index(expression, idx) => {
-                mir::ExprKind::Index(Box::new(expression.process()), *idx)
-            }
+            ast::ExpressionKind::Index(expression, idx) => mir::ExprKind::Index(
+                Box::new(expression.process()),
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
+                *idx,
+            ),
         };
 
         mir::Expression(kind, self.1.into())

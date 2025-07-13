@@ -263,11 +263,16 @@ impl Expression {
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
-            ExprKind::Index(expression, _) => {
+            ExprKind::Index(expression, index_ty, _) => {
                 let expr_ty = expression.infer_types(state, type_refs)?;
+
                 let kind = unsafe { expr_ty.resolve_type() };
                 match kind {
-                    Array(type_kind, _) => Ok(type_refs.from_type(&type_kind).unwrap()),
+                    Array(type_kind, _) => {
+                        let elem_ty = type_refs.from_type(&type_kind).unwrap();
+                        *index_ty = elem_ty.as_type().clone();
+                        Ok(elem_ty)
+                    }
                     _ => Err(ErrorKind::TriedIndexingNonArray(kind)),
                 }
             }

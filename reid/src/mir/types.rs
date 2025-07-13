@@ -89,7 +89,7 @@ impl ReturnType for Expression {
             Block(block) => block.return_type(),
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
-            Index(expression, _) => {
+            Index(expression, _, _) => {
                 let expr_type = expression.return_type()?;
                 if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
                     Ok((ReturnKind::Soft, *elem_ty))

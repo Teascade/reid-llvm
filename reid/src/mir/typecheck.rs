@@ -380,7 +380,7 @@ impl Expression {
                 Ok(collapsed)
             }
             ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
-            ExprKind::Index(expression, idx) => {
+            ExprKind::Index(expression, elem_ty, idx) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
                     Array(type_kind, _) => &type_kind,
@@ -388,11 +388,17 @@ impl Expression {
                 });
 
                 let expr_t = expression.typecheck(state, hints, hint_t)?;
-                if let TypeKind::Array(elem_t, len) = expr_t {
+                if let TypeKind::Array(inferred_ty, len) = expr_t {
                     if len < *idx {
                         return Err(ErrorKind::IndexOutOfBounds(*idx, len));
                     }
-                    Ok(*elem_t)
+                    let ty = state.or_else(
+                        elem_ty.resolve_hinted(hints).collapse_into(&inferred_ty),
+                        TypeKind::Vague(Unknown),
+                        self.1,
+                    );
+                    *elem_ty = ty.clone();
+                    Ok(ty)
                 } else {
                     Err(ErrorKind::TriedIndexingNonArray(expr_t))
                 }
