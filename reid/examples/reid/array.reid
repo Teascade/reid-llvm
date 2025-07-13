@@ -9,5 +9,5 @@ fn main() -> u16 {
 
     let list = array();
 
-    return heehoo;
+    return list[0];
 }

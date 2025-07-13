@@ -150,6 +150,7 @@ impl ast::Expression {
                 mir::ExprKind::If(mir::IfExpression(Box::new(cond), then_block, else_block))
             }
             ast::ExpressionKind::Array(expressions) => todo!(),
+            ast::ExpressionKind::Index(expression, _) => todo!(),
         };
 
         mir::Expression(kind, self.1.into())

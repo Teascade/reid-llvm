@@ -63,7 +63,7 @@ impl Parse for PrimaryExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         use ExpressionKind as Kind;
 
-        let expr = if let Ok(exp) = stream.parse() {
+        let mut expr = if let Ok(exp) = stream.parse() {
             Expression(
                 Kind::FunctionCall(Box::new(exp)),
                 stream.get_range().unwrap(),
@@ -114,6 +114,20 @@ impl Parse for PrimaryExpression {
         } else {
             Err(stream.expected_err("expression")?)?
         };
+
+        while let Some(Token::BracketOpen) = stream.peek() {
+            stream.next(); // Consume BracketOpen
+            if let Some(Token::DecimalValue(idx)) = stream.next() {
+                stream.expect(Token::BracketClose)?;
+                expr = Expression(
+                    ExpressionKind::Index(Box::new(expr), idx),
+                    stream.get_range().unwrap(),
+                );
+            } else {
+                return Err(stream.expected_err("array index (number)")?);
+            }
+        }
+
         Ok(PrimaryExpression(expr))
     }
 }
