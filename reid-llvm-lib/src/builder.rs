@@ -282,7 +282,7 @@ impl Builder {
                 Extract(arr, idx) => {
                     let arr_ty = arr.get_type(&self)?;
                     if let Type::Array(_, len) = arr_ty {
-                        if len < idx { Ok(()) } else { Err(()) }
+                        if len > idx { Ok(()) } else { Err(()) }
                     } else {
                         Err(())
                     }
@@ -292,7 +292,7 @@ impl Builder {
                     let arr_ty = arr.get_type(&self)?;
                     let val_ty = val.get_type(&self)?;
                     if let Type::Array(elem_ty, len) = arr_ty {
-                        if val_ty == *elem_ty && len < idx {
+                        if val_ty == *elem_ty && len > idx {
                             Ok(())
                         } else {
                             Err(())

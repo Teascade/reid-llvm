@@ -334,8 +334,44 @@ impl mir::Expression {
                     None
                 }
             }
-            mir::ExprKind::Index(expression, _) => todo!("codegen for index expression"),
-            mir::ExprKind::Array(expressions) => todo!("codegen for array expression"),
+            mir::ExprKind::Index(expression, idx) => {
+                let expr = expression.codegen(scope)?;
+                Some(
+                    scope
+                        .block
+                        .build(Instr::Extract(expr, *idx as u32))
+                        .unwrap(),
+                )
+            }
+            mir::ExprKind::Array(expressions) => {
+                let instr_list = expressions
+                    .iter()
+                    .map(|e| e.codegen(scope).unwrap())
+                    .collect::<Vec<_>>();
+                let instr_t = expressions
+                    .iter()
+                    .map(|e| e.return_type().unwrap().1)
+                    .next()
+                    .unwrap_or(TypeKind::Void);
+
+                dbg!(&instr_t);
+                let array = scope
+                    .block
+                    .build(Instr::ArrayAlloca(
+                        instr_t.get_type(),
+                        instr_list.len() as u32,
+                    ))
+                    .unwrap();
+
+                for (i, instr) in instr_list.iter().enumerate() {
+                    scope
+                        .block
+                        .build(Instr::Insert(array, i as u32, *instr))
+                        .unwrap();
+                }
+
+                Some(array)
+            }
         }
     }
 }
@@ -414,9 +450,9 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
+            TypeKind::Array(elem_t, len) => Type::Array(Box::new(elem_t.get_type()), *len as u32),
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
-            TypeKind::Array(_, _) => todo!("codegen for array type"),
         }
     }
 }
