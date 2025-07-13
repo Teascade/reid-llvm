@@ -7,7 +7,9 @@ fn array() -> [u16; 4] {
 fn main() -> u16 {
     let heehoo = 10;
 
-    let list = array();
+    let mut list = array();
+
+    list[1] = 5;
 
     return list[0];
 }

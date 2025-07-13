@@ -115,17 +115,11 @@ impl Parse for PrimaryExpression {
             Err(stream.expected_err("expression")?)?
         };
 
-        while let Some(Token::BracketOpen) = stream.peek() {
-            stream.next(); // Consume BracketOpen
-            if let Some(Token::DecimalValue(idx)) = stream.next() {
-                stream.expect(Token::BracketClose)?;
-                expr = Expression(
-                    ExpressionKind::Index(Box::new(expr), idx),
-                    stream.get_range().unwrap(),
-                );
-            } else {
-                return Err(stream.expected_err("array index (number)")?);
-            }
+        while let Ok(ValueIndex(idx)) = stream.parse() {
+            expr = Expression(
+                ExpressionKind::Index(Box::new(expr), idx),
+                stream.get_range().unwrap(),
+            );
         }
 
         Ok(PrimaryExpression(expr))
@@ -360,7 +354,6 @@ impl Parse for Block {
                 // Special list of expressions that are simply not warned about,
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
-                    dbg!(r_type, &e);
                     println!("Oh no, does this statement lack ;");
                 }
 
@@ -384,6 +377,39 @@ impl Parse for Block {
         }
         stream.expect(Token::BraceClose)?;
         Ok(Block(statements, return_stmt, stream.get_range().unwrap()))
+    }
+}
+
+impl Parse for VariableReference {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        if let Some(Token::Identifier(ident)) = stream.next() {
+            let mut var_ref = VariableReference::Name(ident);
+
+            dbg!(&var_ref);
+            while let Ok(ValueIndex(idx)) = stream.parse() {
+                dbg!(idx);
+                var_ref = VariableReference::Index(Box::new(var_ref), idx);
+            }
+
+            Ok(var_ref)
+        } else {
+            Err(stream.expected_err("identifier")?)?
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ValueIndex(u64);
+
+impl Parse for ValueIndex {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::BracketOpen)?;
+        if let Some(Token::DecimalValue(idx)) = stream.next() {
+            stream.expect(Token::BracketClose)?;
+            Ok(ValueIndex(idx))
+        } else {
+            return Err(stream.expected_err("array index (number)")?);
+        }
     }
 }
 
@@ -421,18 +447,15 @@ impl Parse for BlockLevelStatement {
 }
 
 #[derive(Debug)]
-pub struct SetStatement(String, Expression, TokenRange);
+pub struct SetStatement(VariableReference, Expression, TokenRange);
 
 impl Parse for SetStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
-        if let Some(Token::Identifier(ident)) = stream.next() {
-            stream.expect(Token::Equals)?;
-            let expr = stream.parse()?;
-            stream.expect(Token::Semi)?;
-            Ok(Self(ident, expr, stream.get_range().unwrap()))
-        } else {
-            Err(stream.expected_err("identifier")?)?
-        }
+        let var_ref = stream.parse()?;
+        stream.expect(Token::Equals)?;
+        let expr = stream.parse()?;
+        stream.expect(Token::Semi)?;
+        Ok(SetStatement(var_ref, expr, stream.get_range().unwrap()))
     }
 }
 

@@ -79,7 +79,7 @@ impl ast::Block {
                     StmtKind::Set(
                         VariableReference(
                             mir::TypeKind::Vague(mir::VagueType::Unknown),
-                            name.clone(),
+                            todo!(), // was name.clone()
                             (*range).into(),
                         ),
                         expression.process(),

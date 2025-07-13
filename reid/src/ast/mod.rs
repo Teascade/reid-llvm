@@ -133,10 +133,16 @@ pub struct Block(
 );
 
 #[derive(Debug, Clone)]
+pub enum VariableReference {
+    Name(String),
+    Index(Box<VariableReference>, u64),
+}
+
+#[derive(Debug, Clone)]
 pub enum BlockLevelStatement {
     Let(LetStatement),
     /// Try to set a variable to a specified expression value
-    Set(String, Expression, TokenRange),
+    Set(VariableReference, Expression, TokenRange),
     Import {
         _i: ImportStatement,
     },
