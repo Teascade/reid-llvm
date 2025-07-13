@@ -394,7 +394,7 @@ impl Expression {
 
                 let expr_t = expression.typecheck(state, hints, hint_t)?;
                 if let TypeKind::Array(inferred_ty, len) = expr_t {
-                    if len < *idx {
+                    if len <= *idx {
                         return Err(ErrorKind::IndexOutOfBounds(*idx, len));
                     }
                     let ty = state.or_else(
