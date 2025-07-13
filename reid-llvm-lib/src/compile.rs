@@ -349,6 +349,12 @@ impl InstructionHolder {
                     module.values.get(&val).unwrap().value_ref,
                     module.values.get(&ptr).unwrap().value_ref,
                 ),
+                Extract(instruction_value, idx) => LLVMBuildExtractValue(
+                    module.builder_ref,
+                    module.values.get(instruction_value).unwrap().value_ref,
+                    *idx as u32,
+                    c"extract".as_ptr(),
+                ),
             }
         };
         LLVMValue {
@@ -415,18 +421,36 @@ impl ConstValue {
     fn as_llvm(&self, context: LLVMContextRef) -> LLVMValueRef {
         unsafe {
             let t = self.get_type().as_llvm(context);
-            match *self {
-                ConstValue::Bool(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::I8(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::I16(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::I32(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::I64(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::I128(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U8(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U16(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U32(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U64(val) => LLVMConstInt(t, val as u64, 1),
-                ConstValue::U128(val) => LLVMConstInt(t, val as u64, 1),
+            match self {
+                ConstValue::Bool(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::I8(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::I16(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::I32(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::I64(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::I128(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::U8(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::U16(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::ConstArray(const_values) => {
+                    let elem_ty = const_values
+                        .iter()
+                        .map(|e| e.get_type())
+                        .next()
+                        .unwrap_or(Type::Void);
+
+                    let mut elems = const_values
+                        .iter()
+                        .map(|e| e.as_llvm(context))
+                        .collect::<Vec<_>>();
+
+                    LLVMConstArray(
+                        elem_ty.as_llvm(context),
+                        elems.as_mut_ptr(),
+                        elems.len() as u32,
+                    )
+                }
             }
         }
     }
@@ -445,6 +469,7 @@ impl Type {
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
+                Array(elem_t, len) => LLVMArrayType(elem_t.as_llvm(context), *len as u32),
             }
         }
     }

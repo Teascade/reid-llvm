@@ -277,6 +277,14 @@ impl Builder {
                         Err(())
                     }
                 }
+                Extract(list, idx) => {
+                    let list_ty = list.get_type(&self)?;
+                    if let Type::Array(_, len) = list_ty {
+                        if len < idx { Ok(()) } else { Err(()) }
+                    } else {
+                        Err(())
+                    }
+                }
             }
         }
     }
@@ -338,6 +346,11 @@ impl InstructionValue {
                 Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
+                Extract(arr, _) => match arr.get_type(builder) {
+                    Ok(Type::Array(elem_t, _)) => Ok(*elem_t),
+                    Ok(_) => Err(()),
+                    Err(_) => Err(()),
+                },
             }
         }
     }
@@ -358,6 +371,10 @@ impl ConstValue {
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
             ConstValue::Bool(_) => Bool,
+            ConstValue::ConstArray(arr) => Array(
+                Box::new(arr.iter().map(|a| a.get_type()).next().unwrap_or(Void)),
+                arr.len() as u32,
+            ),
         }
     }
 }
@@ -378,6 +395,7 @@ impl Type {
             Type::Bool => true,
             Type::Void => false,
             Type::Ptr(_) => false,
+            Type::Array(_, _) => false,
         }
     }
 
@@ -396,6 +414,7 @@ impl Type {
             Type::Bool => false,
             Type::Void => false,
             Type::Ptr(_) => false,
+            Type::Array(_, _) => false,
         }
     }
 }

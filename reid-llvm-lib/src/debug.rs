@@ -88,18 +88,19 @@ impl Debug for InstructionValue {
 impl Debug for Instr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Param(nth) => fmt_call(f, &"Param", &nth),
-            Self::Constant(c) => c.fmt(f),
-            Self::Add(lhs, rhs) => fmt_binop(f, lhs, &"+", rhs),
-            Self::Sub(lhs, rhs) => fmt_binop(f, lhs, &"-", rhs),
-            Self::Mult(lhs, rhs) => fmt_binop(f, lhs, &"*", rhs),
-            Self::And(lhs, rhs) => fmt_binop(f, lhs, &"&&", rhs),
-            Self::Phi(val) => fmt_call(f, &"Phi", &val),
-            Self::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
-            Self::FunctionCall(fun, params) => fmt_call(f, fun, params),
+            Instr::Param(nth) => fmt_call(f, &"Param", &nth),
+            Instr::Constant(c) => c.fmt(f),
+            Instr::Add(lhs, rhs) => fmt_binop(f, lhs, &"+", rhs),
+            Instr::Sub(lhs, rhs) => fmt_binop(f, lhs, &"-", rhs),
+            Instr::Mult(lhs, rhs) => fmt_binop(f, lhs, &"*", rhs),
+            Instr::And(lhs, rhs) => fmt_binop(f, lhs, &"&&", rhs),
+            Instr::Phi(val) => fmt_call(f, &"Phi", &val),
+            Instr::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
+            Instr::FunctionCall(fun, params) => fmt_call(f, fun, params),
             Instr::Alloca(name, ty) => write!(f, "alloca<{:?}>({})", ty, name),
             Instr::Load(val, ty) => write!(f, "load<{:?}>({:?})", ty, val),
             Instr::Store(ptr, val) => write!(f, "store({:?} = {:?})", ptr, val),
+            Instr::Extract(instruction_value, idx) => fmt_index(f, instruction_value, idx),
         }
     }
 }
@@ -126,6 +127,17 @@ fn fmt_call(
     f.write_char('(')?;
     params.fmt(f)?;
     f.write_char(')')
+}
+
+fn fmt_index(
+    f: &mut std::fmt::Formatter<'_>,
+    fun: &impl std::fmt::Debug,
+    params: &impl std::fmt::Debug,
+) -> std::fmt::Result {
+    fun.fmt(f)?;
+    f.write_char('[')?;
+    params.fmt(f)?;
+    f.write_char(']')
 }
 
 impl Debug for CmpPredicate {
