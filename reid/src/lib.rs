@@ -32,7 +32,7 @@
 //! }
 //!
 //! Currently missing relevant features (TODOs) are:
-//! - Arrays
+//! - ~~Arrays~~ (DONE)
 //! - Structs (and custom types as such)
 //! - Extern functions
 //! - Strings

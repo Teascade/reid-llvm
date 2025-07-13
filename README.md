@@ -33,7 +33,7 @@ fn fibonacci(n: u16) -> u16 {
 ```
 
 Currently missing relevant features (TODOs) are:
-- Arrays
+- ~~Arrays~~ (DONE)
 - Structs (and custom types as such)
 - Extern functions
 - Strings
