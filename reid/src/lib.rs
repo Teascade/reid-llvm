@@ -39,7 +39,7 @@
 //! - Loops
 //! ```
 
-use mir::typecheck::TypeCheck;
+use mir::{scopehints::TypeHints, typecheck::TypeCheck, typeinference::TypeInference};
 use reid_lib::Context;
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
@@ -89,9 +89,14 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
 
     println!("{}", &mir_context);
 
-    let state = mir_context.pass(&mut TypeCheck);
-    dbg!(&state);
+    let hints = TypeHints::default();
 
+    let state = mir_context.pass(&mut TypeInference { hints: &hints });
+    dbg!(&state, &hints);
+    println!("{}", &mir_context);
+
+    let state = mir_context.pass(&mut TypeCheck { hints: &hints });
+    dbg!(&state);
     println!("{}", &mir_context);
 
     if !state.errors.is_empty() {

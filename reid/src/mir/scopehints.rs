@@ -86,6 +86,11 @@ impl TypeHints {
         }
         return refs.get_unchecked(idx).clone();
     }
+
+    pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
+        let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
+        self.hints.borrow().get(inner_idx).copied()
+    }
 }
 
 #[derive(Debug)]
@@ -103,11 +108,6 @@ impl<'outer> ScopeHints<'outer> {
             outer: Default::default(),
             variables: Default::default(),
         }
-    }
-
-    pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
-        let inner_idx = unsafe { *self.types.recurse_type_ref(idx).borrow() };
-        self.types.hints.borrow().get(inner_idx).copied()
     }
 
     pub fn new_var(
