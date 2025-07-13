@@ -101,6 +101,10 @@ impl Debug for Instr {
             Instr::Load(val, ty) => write!(f, "load<{:?}>({:?})", ty, val),
             Instr::Store(ptr, val) => write!(f, "store({:?} = {:?})", ptr, val),
             Instr::Extract(instruction_value, idx) => fmt_index(f, instruction_value, idx),
+            Instr::ArrayAlloca(ty, instruction_value) => {
+                write!(f, "array_alloca<{:?}>({:?})", ty, instruction_value)
+            }
+            Instr::Insert(arr, idx, val) => write!(f, "{:?}[{}] = {:?}", arr, idx, val),
         }
     }
 }

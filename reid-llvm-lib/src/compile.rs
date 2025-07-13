@@ -355,6 +355,22 @@ impl InstructionHolder {
                     *idx as u32,
                     c"extract".as_ptr(),
                 ),
+                ArrayAlloca(ty, len) => {
+                    let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
+                    LLVMBuildArrayAlloca(
+                        module.builder_ref,
+                        ty.as_llvm(module.context_ref),
+                        array_len,
+                        c"array_alloca".as_ptr(),
+                    )
+                }
+                Insert(arr, idx, val) => LLVMBuildInsertValue(
+                    module.builder_ref,
+                    module.values.get(arr).unwrap().value_ref,
+                    module.values.get(val).unwrap().value_ref,
+                    *idx,
+                    c"insert".as_ptr(),
+                ),
             }
         };
         LLVMValue {
@@ -433,24 +449,26 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::ConstArray(const_values) => {
-                    let elem_ty = const_values
-                        .iter()
-                        .map(|e| e.get_type())
-                        .next()
-                        .unwrap_or(Type::Void);
+                //     ConstValue::Array(const_values) => {
+                //         let elem_ty = const_values
+                //             .iter()
+                //             .map(|e| e.get_type(builder))
+                //             .next()
+                //             .unwrap_or(Ok(Type::Void))
+                //             .unwrap();
 
-                    let mut elems = const_values
-                        .iter()
-                        .map(|e| e.as_llvm(context))
-                        .collect::<Vec<_>>();
+                //         let mut elems = const_values
+                //             .iter()
+                //             .map(|e| e.as_llvm(context))
+                //             .collect::<Vec<_>>();
 
-                    LLVMConstArray(
-                        elem_ty.as_llvm(context),
-                        elems.as_mut_ptr(),
-                        elems.len() as u32,
-                    )
-                }
+                //         LLVMConstArray(
+                //             elem_ty.as_llvm(context),
+                //             elems.as_mut_ptr(),
+                //             elems.len() as u32,
+                //         )
+                //     }
+                // }
             }
         }
     }

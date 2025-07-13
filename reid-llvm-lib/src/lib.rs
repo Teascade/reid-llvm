@@ -177,6 +177,8 @@ pub enum Instr {
     Alloca(String, Type),
     Load(InstructionValue, Type),
     Store(InstructionValue, InstructionValue),
+    ArrayAlloca(Type, u32),
+    Insert(InstructionValue, u32, InstructionValue),
     Extract(InstructionValue, u32),
 
     /// Integer Comparison
@@ -216,7 +218,6 @@ pub enum ConstValue {
     U64(u64),
     U128(u128),
     Bool(bool),
-    ConstArray(Vec<ConstValue>),
 }
 
 #[derive(Clone, Hash)]

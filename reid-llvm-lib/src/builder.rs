@@ -3,6 +3,8 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use llvm_sys::core::LLVMBuildArrayAlloca;
+
 use crate::{
     BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
     util::match_types,
@@ -277,10 +279,24 @@ impl Builder {
                         Err(())
                     }
                 }
-                Extract(list, idx) => {
-                    let list_ty = list.get_type(&self)?;
-                    if let Type::Array(_, len) = list_ty {
+                Extract(arr, idx) => {
+                    let arr_ty = arr.get_type(&self)?;
+                    if let Type::Array(_, len) = arr_ty {
                         if len < idx { Ok(()) } else { Err(()) }
+                    } else {
+                        Err(())
+                    }
+                }
+                ArrayAlloca(_, _) => Ok(()),
+                Insert(arr, idx, val) => {
+                    let arr_ty = arr.get_type(&self)?;
+                    let val_ty = val.get_type(&self)?;
+                    if let Type::Array(elem_ty, len) = arr_ty {
+                        if val_ty == *elem_ty && len < idx {
+                            Ok(())
+                        } else {
+                            Err(())
+                        }
                     } else {
                         Err(())
                     }
@@ -351,6 +367,10 @@ impl InstructionValue {
                     Ok(_) => Err(()),
                     Err(_) => Err(()),
                 },
+                ArrayAlloca(ty, len_value) => {
+                    Ok(Type::Array(Box::new(ty.clone()), len_value.clone()))
+                }
+                Insert(_, _, val) => val.get_type(builder),
             }
         }
     }
@@ -371,10 +391,15 @@ impl ConstValue {
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
             ConstValue::Bool(_) => Bool,
-            ConstValue::ConstArray(arr) => Array(
-                Box::new(arr.iter().map(|a| a.get_type()).next().unwrap_or(Void)),
-                arr.len() as u32,
-            ),
+            // ConstValue::Array(arr) => Array(
+            //     Box::new(
+            //         arr.iter()
+            //             .map(|a| a.get_type(builder).unwrap())
+            //             .next()
+            //             .unwrap_or(Void),
+            //     ),
+            //     arr.len() as u32,
+            // ),
         }
     }
 }
