@@ -1,7 +1,7 @@
 // Arithmetic, function calls and imports!
 
 fn array() -> [u16; 4] {
-    return true;
+    return [1, 2, 3, 4];
 }
 
 fn main() -> u16 {

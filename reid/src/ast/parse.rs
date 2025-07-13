@@ -97,7 +97,19 @@ impl Parse for PrimaryExpression {
                     stream.expect(Token::ParenClose)?;
                     exp
                 }
-                _ => Err(stream.expected_err("identifier, constant or parentheses")?)?,
+                Token::BracketOpen => {
+                    let mut expressions = Vec::new();
+                    if let Ok(exp) = stream.parse() {
+                        expressions.push(exp);
+                        while let Some(Token::Comma) = stream.peek() {
+                            stream.next(); // Consume comma
+                            expressions.push(stream.parse()?);
+                        }
+                    }
+                    stream.expect(Token::BracketClose)?;
+                    Expression(Kind::Array(expressions), stream.get_range().unwrap())
+                }
+                _ => Err(stream.expected_err("identifier, constant, parentheses or brackets")?)?,
             }
         } else {
             Err(stream.expected_err("expression")?)?

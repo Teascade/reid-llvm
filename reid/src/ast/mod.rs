@@ -38,6 +38,7 @@ pub struct Expression(pub ExpressionKind, pub TokenRange);
 pub enum ExpressionKind {
     VariableName(String),
     Literal(Literal),
+    Array(Vec<Expression>),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
