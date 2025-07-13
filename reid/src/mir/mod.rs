@@ -6,9 +6,9 @@ use crate::token_stream::TokenRange;
 
 mod display;
 pub mod pass;
-pub mod scopehints;
 pub mod typecheck;
 pub mod typeinference;
+pub mod typerefs;
 pub mod types;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -68,8 +68,8 @@ pub enum VagueType {
     Unknown,
     #[error("Number")]
     Number,
-    #[error("Hinted({0})")]
-    Hinted(usize),
+    #[error("TypeRef({0})")]
+    TypeRef(usize),
 }
 
 impl TypeKind {

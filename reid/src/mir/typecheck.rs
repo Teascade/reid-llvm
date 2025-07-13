@@ -8,7 +8,7 @@ use VagueType::*;
 
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable},
-    scopehints::{ScopeHints, TypeHint, TypeHints},
+    typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
 };
 
@@ -43,7 +43,7 @@ pub enum ErrorKind {
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct TypeCheck<'t> {
-    pub hints: &'t TypeHints,
+    pub refs: &'t TypeRefs,
 }
 
 impl<'t> Pass for TypeCheck<'t> {
@@ -51,7 +51,7 @@ impl<'t> Pass for TypeCheck<'t> {
 
     fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
         for function in &mut module.functions {
-            let res = function.typecheck(&self.hints, &mut state);
+            let res = function.typecheck(&self.refs, &mut state);
             state.ok(res, function.block_meta());
         }
     }
@@ -60,7 +60,7 @@ impl<'t> Pass for TypeCheck<'t> {
 impl FunctionDefinition {
     fn typecheck(
         &mut self,
-        hints: &TypeHints,
+        hints: &TypeRefs,
         state: &mut PassState<ErrorKind>,
     ) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
@@ -101,7 +101,7 @@ impl Block {
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
-        hints: &TypeHints,
+        hints: &TypeRefs,
         hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         let mut state = state.inner();
@@ -246,7 +246,7 @@ impl Expression {
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
-        hints: &TypeHints,
+        hints: &TypeRefs,
         hint_t: Option<TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
@@ -428,7 +428,7 @@ impl TypeKind {
             Vague(vague_type) => match vague_type {
                 Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
                 Number => Ok(TypeKind::I32),
-                Hinted(_) => panic!("Hinted default!"),
+                TypeRef(_) => panic!("Hinted default!"),
             },
             _ => Ok(*self),
         }
@@ -445,9 +445,9 @@ impl TypeKind {
         })
     }
 
-    fn resolve_hinted(&self, hints: &TypeHints) -> TypeKind {
+    fn resolve_hinted(&self, hints: &TypeRefs) -> TypeKind {
         match self {
-            Vague(Hinted(idx)) => hints.retrieve_type(*idx).unwrap(),
+            Vague(TypeRef(idx)) => hints.retrieve_type(*idx).unwrap(),
             _ => *self,
         }
     }

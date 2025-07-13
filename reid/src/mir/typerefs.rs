@@ -10,23 +10,23 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct TypeHint<'scope>(TypeIdRef, &'scope ScopeHints<'scope>);
+pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);
 
-impl<'scope> TypeHint<'scope> {
+impl<'scope> TypeRef<'scope> {
     pub unsafe fn resolve_type(&self) -> TypeKind {
         unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
     }
 
-    pub fn narrow(&mut self, other: &TypeHint) -> Result<TypeHint<'scope>, ErrorKind> {
+    pub fn narrow(&mut self, other: &TypeRef) -> Result<TypeRef<'scope>, ErrorKind> {
         self.1.combine_vars(self, other)
     }
 
     pub fn as_type(&self) -> TypeKind {
-        TypeKind::Vague(super::VagueType::Hinted(*self.0.borrow()))
+        TypeKind::Vague(super::VagueType::TypeRef(*self.0.borrow()))
     }
 }
 
-impl<'scope> std::fmt::Debug for TypeHint<'scope> {
+impl<'scope> std::fmt::Debug for TypeRef<'scope> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Hint")
             .field(&self.0)
@@ -38,14 +38,14 @@ impl<'scope> std::fmt::Debug for TypeHint<'scope> {
 type TypeIdRef = Rc<RefCell<usize>>;
 
 #[derive(Debug, Default)]
-pub struct TypeHints {
+pub struct TypeRefs {
     /// Simple list of types that variables can refrence
     hints: RefCell<Vec<TypeKind>>,
     /// Indirect ID-references, referring to hints-vec
     type_refs: RefCell<Vec<TypeIdRef>>,
 }
 
-impl TypeHints {
+impl TypeRefs {
     pub fn new(&self, ty: TypeKind) -> TypeIdRef {
         let idx = self.hints.borrow().len();
         let typecell = Rc::new(RefCell::new(idx));
@@ -94,16 +94,16 @@ impl TypeHints {
 }
 
 #[derive(Debug)]
-pub struct ScopeHints<'outer> {
-    types: &'outer TypeHints,
-    outer: Option<&'outer ScopeHints<'outer>>,
+pub struct ScopeTypeRefs<'outer> {
+    types: &'outer TypeRefs,
+    outer: Option<&'outer ScopeTypeRefs<'outer>>,
     /// Mapping of what types variables point to
     variables: RefCell<HashMap<String, (bool, TypeIdRef)>>,
 }
 
-impl<'outer> ScopeHints<'outer> {
-    pub fn from(types: &'outer TypeHints) -> ScopeHints<'outer> {
-        ScopeHints {
+impl<'outer> ScopeTypeRefs<'outer> {
+    pub fn from(types: &'outer TypeRefs) -> ScopeTypeRefs<'outer> {
+        ScopeTypeRefs {
             types,
             outer: Default::default(),
             variables: Default::default(),
@@ -115,7 +115,7 @@ impl<'outer> ScopeHints<'outer> {
         name: String,
         mutable: bool,
         initial_ty: TypeKind,
-    ) -> Result<TypeHint<'outer>, ErrorKind> {
+    ) -> Result<TypeRef<'outer>, ErrorKind> {
         if self.variables.borrow().contains_key(&name) {
             return Err(ErrorKind::VariableAlreadyDefined(name));
         }
@@ -123,12 +123,12 @@ impl<'outer> ScopeHints<'outer> {
         self.variables
             .borrow_mut()
             .insert(name, (mutable, idx.clone()));
-        Ok(TypeHint(idx, self))
+        Ok(TypeRef(idx, self))
     }
 
-    pub fn from_type(&'outer self, ty: &TypeKind) -> Option<TypeHint<'outer>> {
+    pub fn from_type(&'outer self, ty: &TypeKind) -> Option<TypeRef<'outer>> {
         let idx = match ty {
-            TypeKind::Vague(super::VagueType::Hinted(idx)) => {
+            TypeKind::Vague(super::VagueType::TypeRef(idx)) => {
                 let inner_idx = unsafe { *self.types.recurse_type_ref(*idx).borrow() };
                 self.types.type_refs.borrow().get(inner_idx).cloned()?
             }
@@ -141,27 +141,27 @@ impl<'outer> ScopeHints<'outer> {
                 }
             }
         };
-        Some(TypeHint(idx, self))
+        Some(TypeRef(idx, self))
     }
 
     fn narrow_to_type(
         &'outer self,
-        hint: &TypeHint,
+        hint: &TypeRef,
         ty: &TypeKind,
-    ) -> Result<TypeHint<'outer>, ErrorKind> {
+    ) -> Result<TypeRef<'outer>, ErrorKind> {
         unsafe {
             let mut hints = self.types.hints.borrow_mut();
             let existing = hints.get_unchecked_mut(*hint.0.borrow());
             *existing = existing.collapse_into(&ty)?;
-            Ok(TypeHint(hint.0.clone(), self))
+            Ok(TypeRef(hint.0.clone(), self))
         }
     }
 
     fn combine_vars(
         &'outer self,
-        hint1: &TypeHint,
-        hint2: &TypeHint,
-    ) -> Result<TypeHint<'outer>, ErrorKind> {
+        hint1: &TypeRef,
+        hint2: &TypeRef,
+    ) -> Result<TypeRef<'outer>, ErrorKind> {
         unsafe {
             let ty = self
                 .types
@@ -175,32 +175,32 @@ impl<'outer> ScopeHints<'outer> {
                     *idx.borrow_mut() = *hint1.0.borrow();
                 }
             }
-            Ok(TypeHint(hint1.0.clone(), self))
+            Ok(TypeRef(hint1.0.clone(), self))
         }
     }
 
-    pub fn inner(&'outer self) -> ScopeHints<'outer> {
-        ScopeHints {
+    pub fn inner(&'outer self) -> ScopeTypeRefs<'outer> {
+        ScopeTypeRefs {
             types: self.types,
             outer: Some(self),
             variables: Default::default(),
         }
     }
 
-    pub fn find_hint(&'outer self, name: &String) -> Option<(bool, TypeHint<'outer>)> {
+    pub fn find_hint(&'outer self, name: &String) -> Option<(bool, TypeRef<'outer>)> {
         self.variables
             .borrow()
             .get(name)
-            .map(|(mutable, idx)| (*mutable, TypeHint(idx.clone(), self)))
+            .map(|(mutable, idx)| (*mutable, TypeRef(idx.clone(), self)))
             .or(self.outer.map(|o| o.find_hint(name)).flatten())
     }
 
     pub fn binop(
         &'outer self,
         op: &BinaryOperator,
-        lhs: &mut TypeHint<'outer>,
-        rhs: &mut TypeHint<'outer>,
-    ) -> Result<TypeHint<'outer>, ErrorKind> {
+        lhs: &mut TypeRef<'outer>,
+        rhs: &mut TypeRef<'outer>,
+    ) -> Result<TypeRef<'outer>, ErrorKind> {
         let ty = lhs.narrow(rhs)?;
         Ok(match op {
             BinaryOperator::Add => ty,

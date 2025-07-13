@@ -4,8 +4,8 @@ use reid_lib::Function;
 
 use super::{
     pass::{Pass, PassState, ScopeVariable},
-    scopehints::{self, ScopeHints, TypeHint, TypeHints},
     typecheck::ErrorKind,
+    typerefs::{self, ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
     ReturnKind, StmtKind,
@@ -16,7 +16,7 @@ use super::{
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct TypeInference<'t> {
-    pub hints: &'t TypeHints,
+    pub refs: &'t TypeRefs,
 }
 
 impl<'t> Pass for TypeInference<'t> {
@@ -24,7 +24,7 @@ impl<'t> Pass for TypeInference<'t> {
 
     fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
         for function in &mut module.functions {
-            let res = function.infer_hints(&self.hints, &mut state);
+            let res = function.infer_hints(&self.refs, &mut state);
             state.ok(res, function.block_meta());
         }
     }
@@ -33,7 +33,7 @@ impl<'t> Pass for TypeInference<'t> {
 impl FunctionDefinition {
     fn infer_hints(
         &mut self,
-        hints: &TypeHints,
+        type_refs: &TypeRefs,
         state: &mut PassState<ErrorKind>,
     ) -> Result<(), ErrorKind> {
         for param in &self.parameters {
@@ -51,7 +51,7 @@ impl FunctionDefinition {
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
             state.ok(res, self.signature());
         }
-        let scope_hints = ScopeHints::from(hints);
+        let scope_hints = ScopeTypeRefs::from(type_refs);
         let return_type = self.return_type.clone();
         let return_type_hint = scope_hints.from_type(&return_type).unwrap();
 
@@ -76,8 +76,8 @@ impl Block {
     fn infer_hints<'s>(
         &mut self,
         state: &mut PassState<ErrorKind>,
-        outer_hints: &'s ScopeHints,
-    ) -> Result<(ReturnKind, TypeHint<'s>), ErrorKind> {
+        outer_hints: &'s ScopeTypeRefs,
+    ) -> Result<(ReturnKind, TypeRef<'s>), ErrorKind> {
         let mut state = state.inner();
         let inner_hints = outer_hints.inner();
 
@@ -140,11 +140,11 @@ impl Expression {
     fn infer_hints<'s>(
         &mut self,
         state: &mut PassState<ErrorKind>,
-        hints: &'s ScopeHints<'s>,
-    ) -> Result<TypeHint<'s>, ErrorKind> {
+        type_refs: &'s ScopeTypeRefs<'s>,
+    ) -> Result<TypeRef<'s>, ErrorKind> {
         match &mut self.0 {
             ExprKind::Variable(var) => {
-                let hint = hints
+                let hint = type_refs
                     .find_hint(&var.1)
                     .map(|(_, hint)| hint)
                     .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
@@ -153,11 +153,11 @@ impl Expression {
                 }
                 hint
             }
-            ExprKind::Literal(literal) => Ok(hints.from_type(&literal.as_type()).unwrap()),
+            ExprKind::Literal(literal) => Ok(type_refs.from_type(&literal.as_type()).unwrap()),
             ExprKind::BinOp(op, lhs, rhs) => {
-                let mut lhs_ref = lhs.infer_hints(state, hints)?;
-                let mut rhs_ref = rhs.infer_hints(state, hints)?;
-                hints.binop(op, &mut lhs_ref, &mut rhs_ref)
+                let mut lhs_ref = lhs.infer_hints(state, type_refs)?;
+                let mut rhs_ref = rhs.infer_hints(state, type_refs)?;
+                type_refs.binop(op, &mut lhs_ref, &mut rhs_ref)
             }
             ExprKind::FunctionCall(function_call) => {
                 let fn_call = state
@@ -172,33 +172,33 @@ impl Expression {
                 for (param_expr, param_t) in
                     function_call.parameters.iter_mut().zip(true_params_iter)
                 {
-                    let expr_res = param_expr.infer_hints(state, hints);
+                    let expr_res = param_expr.infer_hints(state, type_refs);
                     if let Some(mut param_ref) = state.ok(expr_res, param_expr.1) {
                         state.ok(
-                            param_ref.narrow(&mut hints.from_type(param_t).unwrap()),
+                            param_ref.narrow(&mut type_refs.from_type(param_t).unwrap()),
                             param_expr.1,
                         );
                     }
                 }
 
-                Ok(hints.from_type(&fn_call.ret).unwrap())
+                Ok(type_refs.from_type(&fn_call.ret).unwrap())
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                let cond_res = cond.infer_hints(state, hints);
+                let cond_res = cond.infer_hints(state, type_refs);
                 let cond_hints = state.ok(cond_res, cond.1);
 
                 if let Some(mut cond_hints) = cond_hints {
                     state.ok(
-                        cond_hints.narrow(&mut hints.from_type(&Bool).unwrap()),
+                        cond_hints.narrow(&mut type_refs.from_type(&Bool).unwrap()),
                         cond.1,
                     );
                 }
 
-                let lhs_res = lhs.infer_hints(state, hints);
+                let lhs_res = lhs.infer_hints(state, type_refs);
                 let lhs_hints = state.ok(lhs_res, cond.1);
 
                 if let Some(rhs) = rhs {
-                    let rhs_res = rhs.infer_hints(state, hints);
+                    let rhs_res = rhs.infer_hints(state, type_refs);
                     let rhs_hints = state.ok(rhs_res, cond.1);
 
                     if let (Some(mut lhs_hints), Some(mut rhs_hints)) = (lhs_hints, rhs_hints) {
@@ -206,20 +206,20 @@ impl Expression {
                         Ok(pick_return(lhs_hints, rhs_hints).1)
                     } else {
                         // Failed to retrieve types from either
-                        Ok(hints.from_type(&Vague(Unknown)).unwrap())
+                        Ok(type_refs.from_type(&Vague(Unknown)).unwrap())
                     }
                 } else {
                     if let Some((_, type_ref)) = lhs_hints {
                         Ok(type_ref)
                     } else {
-                        Ok(hints.from_type(&Vague(Unknown)).unwrap())
+                        Ok(type_refs.from_type(&Vague(Unknown)).unwrap())
                     }
                 }
             }
             ExprKind::Block(block) => {
-                let block_ref = block.infer_hints(state, hints)?;
+                let block_ref = block.infer_hints(state, type_refs)?;
                 match block_ref.0 {
-                    ReturnKind::Hard => Ok(hints.from_type(&Void).unwrap()),
+                    ReturnKind::Hard => Ok(type_refs.from_type(&Void).unwrap()),
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
