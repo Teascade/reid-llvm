@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    pass::{ScopeVariable, Storage},
+    typecheck::ErrorKind,
+    *,
+};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {
@@ -158,5 +162,25 @@ pub fn pick_return<T>(lhs: (ReturnKind, T), rhs: (ReturnKind, T)) -> (ReturnKind
         (Hard, Soft) => (Soft, rhs.1),
         (Soft, Hard) => (Soft, lhs.1),
         (_, _) => (Soft, lhs.1),
+    }
+}
+
+impl IndexedVariableReference {
+    pub fn get_name(&self) -> String {
+        match &self.kind {
+            IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => name.clone(),
+            IndexedVariableReferenceKind::Index(inner, idx) => {
+                format!("{}[{}]", inner.get_name(), idx)
+            }
+        }
+    }
+
+    pub fn update_type(&mut self, new_ty: &TypeKind) {
+        match &mut self.kind {
+            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => {
+                *ty = new_ty.clone();
+            }
+            IndexedVariableReferenceKind::Index(inner, _) => inner.update_type(new_ty),
+        }
     }
 }

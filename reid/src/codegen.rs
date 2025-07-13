@@ -5,7 +5,7 @@ use reid_lib::{
     TerminatorKind as Term, Type,
 };
 
-use crate::mir::{self, types::ReturnType, NamedVariableRef, TypeKind};
+use crate::mir::{self, types::ReturnType, IndexedVariableReference, NamedVariableRef, TypeKind};
 
 /// Context that contains all of the given modules as complete codegenerated
 /// LLIR that can then be finally compiled into LLVM IR.
@@ -153,6 +153,42 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
     }
 }
 
+impl IndexedVariableReference {
+    fn get_stack_value(&self, scope: &mut Scope) -> Option<StackValue> {
+        use StackValueKind as Kind;
+
+        match &self.kind {
+            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
+                scope.stack_values.get(name).cloned()
+            }
+            mir::IndexedVariableReferenceKind::Index(inner, idx) => {
+                let inner_val = inner.get_stack_value(scope)?;
+                let inner_instr = match inner_val.0 {
+                    Kind::Immutable(val) => val,
+                    Kind::Mutable(val) => val,
+                };
+
+                match inner_val.1 {
+                    Type::ArrayPtr(inner_ty, _) => {
+                        let gep_instr = scope
+                            .block
+                            .build(Instr::ArrayGEP(inner_instr, vec![*idx as u32]))
+                            .unwrap();
+                        Some(StackValue(
+                            match inner_val.0 {
+                                Kind::Immutable(_) => Kind::Immutable(gep_instr),
+                                Kind::Mutable(_) => Kind::Mutable(gep_instr),
+                            },
+                            *inner_ty,
+                        ))
+                    }
+                    _ => panic!("Tried to codegen indexing a non-indexable value!"),
+                }
+            }
+        }
+    }
+}
+
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
@@ -163,14 +199,17 @@ impl mir::Statement {
                     StackValue(
                         match mutable {
                             false => StackValueKind::Immutable(value),
-                            true => StackValueKind::Mutable({
-                                let alloca = scope
-                                    .block
-                                    .build(Instr::Alloca(name.clone(), ty.get_type()))
-                                    .unwrap();
-                                scope.block.build(Instr::Store(alloca, value)).unwrap();
-                                alloca
-                            }),
+                            true => match ty {
+                                TypeKind::Array(_, _) => StackValueKind::Mutable(value),
+                                _ => StackValueKind::Mutable({
+                                    let alloca = scope
+                                        .block
+                                        .build(Instr::Alloca(name.clone(), ty.get_type()))
+                                        .unwrap();
+                                    scope.block.build(Instr::Store(alloca, value)).unwrap();
+                                    alloca
+                                }),
+                            },
                         },
                         ty.get_type(),
                     ),
@@ -178,20 +217,19 @@ impl mir::Statement {
                 None
             }
             mir::StmtKind::Set(var, val) => {
-                todo!("Re-think how set needs to work with arrays");
-                // if let Some(StackValue(kind, _)) = scope.stack_values.get(&var.1).cloned() {
-                //     match kind {
-                //         StackValueKind::Immutable(_) => {
-                //             panic!("Tried to mutate an immutable variable")
-                //         }
-                //         StackValueKind::Mutable(ptr) => {
-                //             let expression = val.codegen(scope).unwrap();
-                //             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
-                //         }
-                //     }
-                // } else {
-                //     panic!("")
-                // }
+                if let Some(StackValue(kind, _)) = var.get_stack_value(scope) {
+                    match kind {
+                        StackValueKind::Immutable(_) => {
+                            panic!("Tried to mutate an immutable variable")
+                        }
+                        StackValueKind::Mutable(ptr) => {
+                            let expression = val.codegen(scope).unwrap();
+                            Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
+                        }
+                    }
+                } else {
+                    panic!("")
+                }
             }
             // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),
@@ -267,9 +305,10 @@ impl mir::Expression {
                     .expect("Variable reference not found?!");
                 Some(match v.0 {
                     StackValueKind::Immutable(val) => val.clone(),
-                    StackValueKind::Mutable(val) => {
-                        scope.block.build(Instr::Load(val, v.1.clone())).unwrap()
-                    }
+                    StackValueKind::Mutable(val) => match v.1 {
+                        Type::ArrayPtr(_, _) => val,
+                        _ => scope.block.build(Instr::Load(val, v.1.clone())).unwrap(),
+                    },
                 })
             }
             mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),

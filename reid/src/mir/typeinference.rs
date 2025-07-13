@@ -13,8 +13,8 @@ use super::{
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
-    Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
-    ReturnKind, StmtKind,
+    Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression,
+    IndexedVariableReference, Module, NamedVariableRef, ReturnKind, StmtKind,
     TypeKind::*,
     VagueType::*,
 };
@@ -113,24 +113,23 @@ impl Block {
                     }
                 }
                 StmtKind::Set(var, expr) => {
-                    todo!("Re-think how set needs to work with arrays")
-                    // // Get the TypeRef for this variable declaration
-                    // let var_ref = inner_hints.find_hint(&var.1);
+                    // Get the TypeRef for this variable declaration
+                    let var_ref = var.find_hint(&inner_hints)?;
 
-                    // // If ok, update the MIR type to this TypeRef
-                    // if let Some((_, var_ref)) = &var_ref {
-                    //     var.0 = var_ref.as_type()
-                    // }
+                    // If ok, update the MIR type to this TypeRef
+                    if let Some((_, var_ref)) = &var_ref {
+                        var.update_type(&var_ref.as_type());
+                    }
 
-                    // // Infer hints for the expression itself
-                    // let inferred = expr.infer_types(&mut state, &inner_hints);
-                    // let expr_ty_ref = state.ok(inferred, expr.1);
+                    // Infer hints for the expression itself
+                    let inferred = expr.infer_types(&mut state, &inner_hints);
+                    let expr_ty_ref = state.ok(inferred, expr.1);
 
-                    // // Try to narrow the variable type declaration with the
-                    // // expression
-                    // if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
-                    //     var_ref.narrow(&expr_ty_ref);
-                    // }
+                    // Try to narrow the variable type declaration with the
+                    // expression
+                    if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
+                        var_ref.narrow(&expr_ty_ref);
+                    }
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expr) => {
@@ -158,6 +157,33 @@ impl Block {
         }
 
         Ok((kind, ret_type_ref))
+    }
+}
+
+impl IndexedVariableReference {
+    fn find_hint<'s>(
+        &self,
+        hints: &'s ScopeTypeRefs,
+    ) -> Result<Option<(bool, TypeRef<'s>)>, ErrorKind> {
+        match &self.kind {
+            super::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
+                Ok(hints.find_hint(&name))
+            }
+            super::IndexedVariableReferenceKind::Index(inner, _) => {
+                if let Some((mutable, inner_ref)) = inner.find_hint(hints)? {
+                    let inner_ty = inner_ref.as_type();
+                    match inner_ty {
+                        Array(type_kind, _) => Ok(hints
+                            .from_type(&type_kind)
+                            .clone()
+                            .map(|t_ref| (mutable, t_ref))),
+                        _ => Err(ErrorKind::TriedIndexingNonArray(inner_ty.clone())),
+                    }
+                } else {
+                    Ok(None)
+                }
+            }
+        }
     }
 }
 
