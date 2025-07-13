@@ -8,8 +8,8 @@ use VagueType::*;
 
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable},
-    typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
-    types::{pick_return, ReturnType},
+    typerefs::TypeRefs,
+    types::ReturnType,
 };
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -129,10 +129,6 @@ impl Block {
                     );
 
                     let res_t = if res_t.known().is_err() {
-                        // state.ok::<_, Infallible>(
-                        //     Err(ErrorKind::TypeNotInferrable(res_t)),
-                        //     variable_reference.2 + expression.1,
-                        // );
                         // Unable to infer variable type even from expression! Default it
                         let res_t =
                             state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
@@ -146,7 +142,7 @@ impl Block {
                         res_t
                     };
 
-                    // Update typing to be more accurate
+                    // Update typing
                     variable_reference.0 = res_t;
 
                     // Variable might already be defined, note error

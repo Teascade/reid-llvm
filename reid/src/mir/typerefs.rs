@@ -17,7 +17,7 @@ impl<'scope> TypeRef<'scope> {
         unsafe { *self.1.types.hints.borrow().get_unchecked(*self.0.borrow()) }
     }
 
-    pub fn narrow(&mut self, other: &TypeRef) -> Result<TypeRef<'scope>, ErrorKind> {
+    pub fn narrow(&mut self, other: &TypeRef) -> Option<TypeRef<'scope>> {
         self.1.combine_vars(self, other)
     }
 
@@ -119,11 +119,11 @@ impl<'outer> ScopeTypeRefs<'outer> {
         if self.variables.borrow().contains_key(&name) {
             return Err(ErrorKind::VariableAlreadyDefined(name));
         }
-        let idx = self.types.new(initial_ty);
+        let type_ref = self.from_type(&initial_ty).unwrap();
         self.variables
             .borrow_mut()
-            .insert(name, (mutable, idx.clone()));
-        Ok(TypeRef(idx, self))
+            .insert(name, (mutable, type_ref.0.clone()));
+        Ok(type_ref)
     }
 
     pub fn from_type(&'outer self, ty: &TypeKind) -> Option<TypeRef<'outer>> {
@@ -144,24 +144,16 @@ impl<'outer> ScopeTypeRefs<'outer> {
         Some(TypeRef(idx, self))
     }
 
-    fn narrow_to_type(
-        &'outer self,
-        hint: &TypeRef,
-        ty: &TypeKind,
-    ) -> Result<TypeRef<'outer>, ErrorKind> {
+    fn narrow_to_type(&'outer self, hint: &TypeRef, ty: &TypeKind) -> Option<TypeRef<'outer>> {
         unsafe {
             let mut hints = self.types.hints.borrow_mut();
             let existing = hints.get_unchecked_mut(*hint.0.borrow());
-            *existing = existing.collapse_into(&ty)?;
-            Ok(TypeRef(hint.0.clone(), self))
+            *existing = existing.collapse_into(&ty).ok()?;
+            Some(TypeRef(hint.0.clone(), self))
         }
     }
 
-    fn combine_vars(
-        &'outer self,
-        hint1: &TypeRef,
-        hint2: &TypeRef,
-    ) -> Result<TypeRef<'outer>, ErrorKind> {
+    fn combine_vars(&'outer self, hint1: &TypeRef, hint2: &TypeRef) -> Option<TypeRef<'outer>> {
         unsafe {
             let ty = self
                 .types
@@ -175,7 +167,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
                     *idx.borrow_mut() = *hint1.0.borrow();
                 }
             }
-            Ok(TypeRef(hint1.0.clone(), self))
+            Some(TypeRef(hint1.0.clone(), self))
         }
     }
 
@@ -200,9 +192,9 @@ impl<'outer> ScopeTypeRefs<'outer> {
         op: &BinaryOperator,
         lhs: &mut TypeRef<'outer>,
         rhs: &mut TypeRef<'outer>,
-    ) -> Result<TypeRef<'outer>, ErrorKind> {
+    ) -> Option<TypeRef<'outer>> {
         let ty = lhs.narrow(rhs)?;
-        Ok(match op {
+        Some(match op {
             BinaryOperator::Add => ty,
             BinaryOperator::Minus => ty,
             BinaryOperator::Mult => ty,
