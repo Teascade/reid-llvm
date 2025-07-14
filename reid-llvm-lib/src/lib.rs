@@ -200,6 +200,7 @@ pub enum Type {
     U128,
     Bool,
     Void,
+    String(u32),
     Ptr(Box<Type>),
 }
 
@@ -216,6 +217,7 @@ pub enum ConstValue {
     U64(u64),
     U128(u128),
     Bool(bool),
+    String(String),
 }
 
 #[derive(Clone, Hash)]

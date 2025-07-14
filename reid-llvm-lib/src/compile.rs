@@ -264,7 +264,7 @@ impl InstructionHolder {
             use super::Instr::*;
             match &self.data.kind {
                 Param(nth) => LLVMGetParam(function.value_ref, *nth as u32),
-                Constant(val) => val.as_llvm(module.context_ref),
+                Constant(val) => val.as_llvm(module.context_ref, module.builder_ref),
                 Add(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
@@ -350,7 +350,8 @@ impl InstructionHolder {
                     module.values.get(&ptr).unwrap().value_ref,
                 ),
                 ArrayAlloca(ty, len) => {
-                    let array_len = ConstValue::U16(*len as u16).as_llvm(module.context_ref);
+                    let array_len = ConstValue::U16(*len as u16)
+                        .as_llvm(module.context_ref, module.builder_ref);
                     LLVMBuildArrayAlloca(
                         module.builder_ref,
                         ty.as_llvm(module.context_ref),
@@ -364,7 +365,9 @@ impl InstructionHolder {
 
                     let mut indices: Vec<_> = indices
                         .iter()
-                        .map(|idx| ConstValue::U32(*idx).as_llvm(module.context_ref))
+                        .map(|idx| {
+                            ConstValue::U32(*idx).as_llvm(module.context_ref, module.builder_ref)
+                        })
                         .collect();
 
                     LLVMBuildGEP2(
@@ -439,7 +442,7 @@ impl CmpPredicate {
 }
 
 impl ConstValue {
-    fn as_llvm(&self, context: LLVMContextRef) -> LLVMValueRef {
+    fn as_llvm(&self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMValueRef {
         unsafe {
             let t = self.get_type().as_llvm(context);
             match self {
@@ -454,6 +457,9 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValue::String(val) => {
+                    LLVMBuildGlobalString(builder, into_cstring(val).as_ptr(), c"string".as_ptr())
+                }
             }
         }
     }
@@ -472,6 +478,7 @@ impl Type {
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
+                String(length) => LLVMArrayType(LLVMInt8TypeInContext(context), *length),
             }
         }
     }

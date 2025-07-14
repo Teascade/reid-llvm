@@ -201,10 +201,10 @@ impl ast::BinaryOperator {
 
 impl ast::Literal {
     fn mir(&self) -> mir::Literal {
-        match *self {
-            ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(v)),
-            ast::Literal::Bool(v) => mir::Literal::Bool(v),
-            ast::Literal::String(_) => todo!("process string literal"),
+        match &self {
+            ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(*v)),
+            ast::Literal::Bool(v) => mir::Literal::Bool(*v),
+            ast::Literal::String(val) => mir::Literal::String(val.clone()),
         }
     }
 }

@@ -532,6 +532,16 @@ impl Literal {
                 (L::U64(_), TypeKind::U64) => self,
                 (L::U128(_), TypeKind::U128) => self,
                 (L::Bool(_), TypeKind::Bool) => self,
+                (L::String(val), TypeKind::String(len)) => {
+                    if val.len() == *len {
+                        L::String(val)
+                    } else {
+                        Err(ErrorKind::LiteralIncompatible(
+                            L::String(val),
+                            TypeKind::String(*len),
+                        ))?
+                    }
+                }
                 // TODO make sure that v is actually able to fit in the
                 // requested type
                 (L::Vague(VagueL::Number(v)), TypeKind::I8) => L::I8(v as i8),

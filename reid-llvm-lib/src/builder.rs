@@ -369,6 +369,7 @@ impl ConstValue {
             ConstValue::U32(_) => U32,
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
+            ConstValue::String(val) => String(val.len() as u32),
             ConstValue::Bool(_) => Bool,
         }
     }
@@ -389,6 +390,7 @@ impl Type {
             Type::U128 => true,
             Type::Bool => true,
             Type::Void => false,
+            Type::String(_) => false,
             Type::Ptr(_) => false,
         }
     }
@@ -407,6 +409,7 @@ impl Type {
             Type::U128 => false,
             Type::Bool => false,
             Type::Void => false,
+            Type::String(_) => false,
             Type::Ptr(_) => false,
         }
     }

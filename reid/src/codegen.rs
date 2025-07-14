@@ -475,7 +475,7 @@ impl mir::Literal {
             mir::Literal::U64(val) => ConstValue::U64(val),
             mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Bool(val) => ConstValue::Bool(val),
-            mir::Literal::String(_) => todo!("impl string const codegen"),
+            mir::Literal::String(val) => ConstValue::String(val.clone()),
             mir::Literal::Vague(_) => panic!("Got vague literal!"),
         })
     }
@@ -495,9 +495,9 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
-            TypeKind::String => todo!("impl string type"),
+            TypeKind::String(length) => Type::String(*length as u32),
             TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type())),
-            TypeKind::Void => panic!("Void not a supported type"),
+            TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
         }
     }
