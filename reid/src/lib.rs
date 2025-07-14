@@ -122,9 +122,9 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
         println!("{}", &context);
     }
 
-    // if !state.errors.is_empty() {
-    //     return Err(ReidError::TypeInferenceErrors(state.errors));
-    // }
+    if !state.errors.is_empty() {
+        return Err(ReidError::TypeInferenceErrors(state.errors));
+    }
 
     let state = context.pass(&mut TypeCheck { refs: &refs });
     #[cfg(debug_assertions)]

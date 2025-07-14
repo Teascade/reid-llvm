@@ -43,18 +43,11 @@ impl FunctionDefinition {
         type_refs: &TypeRefs,
         state: &mut PassState<ErrorKind>,
     ) -> Result<(), ErrorKind> {
+        let mut scope_hints = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
             let param_t = state.or_else(param.1.assert_known(), Vague(Unknown), self.signature());
-            let res = state
-                .scope
-                .variables
-                .set(
-                    param.0.clone(),
-                    ScopeVariable {
-                        ty: param_t,
-                        mutable: false,
-                    },
-                )
+            let res = scope_hints
+                .new_var(param.0.clone(), false, &param_t)
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
             state.ok(res, self.signature());
         }
@@ -62,7 +55,6 @@ impl FunctionDefinition {
         match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 state.scope.return_type_hint = Some(self.return_type.clone());
-                let scope_hints = ScopeTypeRefs::from(type_refs);
 
                 // Infer block return type
                 let ret_res = block.infer_types(state, &scope_hints);
