@@ -163,7 +163,9 @@ impl IndexedVariableReference {
             }
             super::IndexedVariableReferenceKind::Index(inner, _) => {
                 if let Some((mutable, inner_ref)) = inner.find_hint(hints)? {
-                    let inner_ty = inner_ref.as_type();
+                    // Check that the resolved type is at least an array, no
+                    // need for further resolution.
+                    let inner_ty = inner_ref.resolve_weak().unwrap();
                     match inner_ty {
                         Array(type_kind, _) => Ok(hints
                             .from_type(&type_kind)
@@ -284,7 +286,9 @@ impl Expression {
             ExprKind::Index(expression, index_ty, _) => {
                 let expr_ty = expression.infer_types(state, type_refs)?;
 
-                let kind = unsafe { expr_ty.resolve_type() };
+                // Check that the resolved type is at least an array, no
+                // need for further resolution.
+                let kind = expr_ty.resolve_weak().unwrap();
                 match kind {
                     Array(type_kind, _) => {
                         let elem_ty = type_refs.from_type(&type_kind).unwrap();

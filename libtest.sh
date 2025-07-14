@@ -5,13 +5,17 @@
 #
 # Do note this file is extremely simply for my own personal convenience
 
-export .env
-cargo run --release --example cli $1 && \
-# clang hello.o -o main && \
-ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 \
-   -o main /usr/lib/crt1.o hello.o -lc  && \
-./main ; echo "Return value: ""$?"
+# export .env
+# cargo run --release --example cli $1 && \
+# # clang hello.o -o main && \
+# ld -dynamic-linker /lib64/ld-linux-x86-64.so.2 \
+#    -o main /usr/lib/crt1.o hello.o -lc  && \
+# ./main ; echo "Return value: ""$?"
 
+$BINARY="$($1 | cut -d'.' -f1)"".out"
+
+make clean SRC=$1 && make SRC=$1 && echo "" && \
+$BINARY ; echo "Return value: ""$?"
 
 ## Command from: clang -v hello.o -o test
 ## Original command:

@@ -8,3 +8,4 @@ main
 reid_src/*.o
 reid_src/*.ll
 reid_src/*.asm
+reid_src/*.out

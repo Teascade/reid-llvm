@@ -15,23 +15,22 @@ use super::{
 pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);
 
 impl<'scope> TypeRef<'scope> {
-    pub unsafe fn resolve_type(&self) -> TypeKind {
-        unsafe {
-            let resolved = self
-                .1
-                .types
-                .hints
-                .borrow()
-                .get_unchecked(*self.0.borrow())
-                .clone();
+    /// Resolve current type in a weak manner, not resolving any Arrays or
+    /// further inner types
+    pub fn resolve_weak(&self) -> Option<TypeKind> {
+        Some(self.1.types.retrieve_type(*self.0.borrow())?)
+    }
 
-            match resolved {
-                TypeKind::Array(elem_ty, len) => {
-                    let resolved_elem_ty = self.1.from_type(&elem_ty).unwrap().resolve_type();
-                    TypeKind::Array(Box::new(resolved_elem_ty), len)
-                }
-                _ => resolved,
+    /// Resolve type deeply, trying to resolve any inner types as well.
+    pub fn resolve_deep(&self) -> Option<TypeKind> {
+        let resolved = self.resolve_weak()?;
+
+        match resolved {
+            TypeKind::Array(elem_ty, len) => {
+                let resolved_elem_ty = self.1.from_type(&elem_ty).unwrap().resolve_weak()?;
+                Some(TypeKind::Array(Box::new(resolved_elem_ty), len))
             }
+            _ => Some(resolved),
         }
     }
 
@@ -48,7 +47,7 @@ impl<'scope> std::fmt::Debug for TypeRef<'scope> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Hint")
             .field(&self.0)
-            .field(unsafe { &self.resolve_type() })
+            .field(&self.resolve_deep().unwrap())
             .finish()
     }
 }
