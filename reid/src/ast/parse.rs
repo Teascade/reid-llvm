@@ -308,9 +308,17 @@ impl Parse for ImportStatement {
 
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let is_pub = if let Some(Token::PubKeyword) = stream.peek() {
+            stream.next(); // Consume pub
+            true
+        } else {
+            false
+        };
+
         stream.expect(Token::FnKeyword)?;
         Ok(FunctionDefinition(
             stream.parse()?,
+            is_pub,
             stream.parse()?,
             stream.get_range().unwrap(),
         ))
@@ -482,7 +490,9 @@ impl Parse for TopLevelStatement {
                 stream.expect(Token::Semi)?;
                 extern_fn
             }
-            Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
+            Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
+                Stmt::FunctionDefinition(stream.parse()?)
+            }
             _ => Err(stream.expected_err("import or fn")?)?,
         })
     }

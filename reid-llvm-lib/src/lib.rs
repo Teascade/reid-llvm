@@ -89,11 +89,15 @@ pub struct FunctionData {
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct FunctionFlags {
     pub is_extern: bool,
+    pub is_pub: bool,
 }
 
 impl Default for FunctionFlags {
     fn default() -> FunctionFlags {
-        FunctionFlags { is_extern: false }
+        FunctionFlags {
+            is_extern: false,
+            is_pub: false,
+        }
     }
 }
 

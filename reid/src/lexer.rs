@@ -22,6 +22,8 @@ pub enum Token {
     ReturnKeyword,
     /// `fn`
     FnKeyword,
+    /// `pub`
+    PubKeyword,
     /// `->`
     Arrow,
     /// `if`
@@ -208,6 +210,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "true" => Token::True,
                     "false" => Token::False,
                     "extern" => Token::Extern,
+                    "pub" => Token::PubKeyword,
                     _ => Token::Identifier(value),
                 };
                 variant

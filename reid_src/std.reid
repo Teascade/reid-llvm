@@ -1,0 +1,10 @@
+
+extern fn puts(message: string) -> i32;
+
+pub fn print(message: string) {
+    puts(message);
+}
+
+fn main() -> u16 {
+    return 0;
+}

@@ -110,7 +110,7 @@ pub struct LetStatement(
 pub struct ImportStatement(pub Vec<String>, pub TokenRange);
 
 #[derive(Debug)]
-pub struct FunctionDefinition(pub FunctionSignature, pub Block, pub TokenRange);
+pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub TokenRange);
 
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {

@@ -24,9 +24,10 @@ impl ast::Module {
                         imports.push(mir::Import(name.clone(), import.1.into()));
                     }
                 }
-                FunctionDefinition(ast::FunctionDefinition(signature, block, range)) => {
+                FunctionDefinition(ast::FunctionDefinition(signature, is_pub, block, range)) => {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
+                        is_pub: *is_pub,
                         return_type: signature
                             .return_type
                             .clone()
@@ -45,6 +46,7 @@ impl ast::Module {
                 ExternFunction(signature) => {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
+                        is_pub: false,
                         return_type: signature
                             .return_type
                             .clone()

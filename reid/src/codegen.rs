@@ -64,7 +64,10 @@ impl mir::Module {
                     &function.name,
                     function.return_type.get_type(),
                     param_types,
-                    FunctionFlags::default(),
+                    FunctionFlags {
+                        is_pub: function.is_pub,
+                        ..FunctionFlags::default()
+                    },
                 ),
                 mir::FunctionDefinitionKind::Extern => module.function(
                     &function.name,

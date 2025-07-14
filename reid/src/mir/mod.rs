@@ -240,6 +240,7 @@ pub struct FunctionCall {
 #[derive(Debug)]
 pub struct FunctionDefinition {
     pub name: String,
+    pub is_pub: bool,
     pub return_type: TypeKind,
     pub parameters: Vec<(String, TypeKind)>,
     pub kind: FunctionDefinitionKind,

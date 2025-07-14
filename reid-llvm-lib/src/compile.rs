@@ -205,8 +205,16 @@ impl FunctionHolder {
             let own_function = *module.functions.get(&self.value).unwrap();
 
             if self.data.flags.is_extern {
-                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
+                LLVMSetLinkage(
+                    own_function.value_ref,
+                    LLVMLinkage::LLVMAvailableExternallyLinkage,
+                );
                 return;
+            }
+            if self.data.flags.is_pub {
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMCommonLinkage);
+            } else {
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMPrivateLinkage);
             }
 
             for block in &self.blocks {
