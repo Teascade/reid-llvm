@@ -4,10 +4,12 @@ static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8'
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Token {
-    // Values
+    /// Values
     Identifier(String),
     /// Number with at most one decimal point
     DecimalValue(u64),
+    /// Some string literal that was surrounded by "quotes".
+    StringLit(String),
 
     // Keywords
     /// `let`
@@ -162,6 +164,25 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 }
                 continue;
             }
+            '\"' => {
+                let mut value = String::new();
+                let mut ignore_next = false;
+                while cursor.first().is_some() && (cursor.first() != Some('\"') || ignore_next) {
+                    if cursor.first() == Some('\\') && !ignore_next {
+                        cursor.next(); // Consume backslash anjd always add next character
+                        ignore_next = true;
+                    } else {
+                        ignore_next = false;
+                        value += &cursor.next().unwrap().to_string();
+                    }
+                }
+                if cursor.first() == Some('\"') {
+                    cursor.next();
+                } else {
+                    return Err(Error::MissingQuotation(position));
+                }
+                Token::StringLit(value)
+            }
             // "words"
             c if c.is_alphabetic() => {
                 let mut value = character.to_string();
@@ -244,4 +265,6 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
 pub enum Error {
     #[error("Invalid token '{}' at Ln {}, Col {}", .0, (.1).1, (.1).0)]
     InvalidToken(char, Position),
+    #[error("String literal that starts at Ln {}, Col {} is never finished!", (.0).1, (.0).0)]
+    MissingQuotation(Position),
 }

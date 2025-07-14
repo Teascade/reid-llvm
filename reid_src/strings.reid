@@ -1,7 +1,7 @@
 
 
 fn main() -> u16 {
-    let hello = "beep boop";
+    let hello = "beep boop grw";
 
     return 5;
 }
