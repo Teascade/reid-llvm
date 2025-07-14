@@ -205,14 +205,12 @@ impl FunctionHolder {
             let own_function = *module.functions.get(&self.value).unwrap();
 
             if self.data.flags.is_extern {
-                LLVMSetLinkage(
-                    own_function.value_ref,
-                    LLVMLinkage::LLVMAvailableExternallyLinkage,
-                );
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
                 return;
             }
-            if self.data.flags.is_pub {
-                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMCommonLinkage);
+
+            if self.data.flags.is_pub || self.data.name == "main" {
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
             } else {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMPrivateLinkage);
             }
@@ -317,14 +315,22 @@ impl InstructionHolder {
                         .map(|i| module.values.get(i).unwrap().value_ref)
                         .collect();
 
-                    LLVMBuildCall2(
+                    let is_void = module.builder.function_data(&*function_value).ret == Type::Void;
+                    if is_void {
+                        LLVMContextSetDiscardValueNames(module.context_ref, 1);
+                    }
+                    let value = LLVMBuildCall2(
                         module.builder_ref,
                         fun.type_ref,
                         fun.value_ref,
                         param_list.as_mut_ptr(),
                         param_list.len() as u32,
                         c"call".as_ptr(),
-                    )
+                    );
+                    if is_void {
+                        LLVMContextSetDiscardValueNames(module.context_ref, 0);
+                    }
+                    value
                 }
                 Phi(values) => {
                     let mut inc_values = Vec::new();
@@ -491,7 +497,7 @@ impl Type {
                 I64 | U64 => LLVMInt64TypeInContext(context),
                 I128 | U128 => LLVMInt128TypeInContext(context),
                 Bool => LLVMInt1TypeInContext(context),
-                Void => LLVMVoidType(),
+                Void => LLVMVoidTypeInContext(context),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
             }
         }
