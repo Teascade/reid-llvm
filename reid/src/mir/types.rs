@@ -180,3 +180,34 @@ impl IndexedVariableReference {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+pub enum EqualsIssue {
+    #[error("Function is already defined locally at {:?}", (.0).range)]
+    ExistsLocally(Metadata),
+    #[error("asd")]
+    Equals,
+    #[error("asd")]
+    ConflictingImports,
+}
+
+impl FunctionDefinition {
+    pub fn equals_as_imported(&self, other: &FunctionDefinition) -> Result<(), EqualsIssue> {
+        match &self.kind {
+            FunctionDefinitionKind::Local(_, metadata) => {
+                Err(EqualsIssue::ExistsLocally(*metadata))
+            }
+            FunctionDefinitionKind::Extern => {
+                if self.is_pub == other.is_pub
+                    && self.name == other.name
+                    && self.parameters == other.parameters
+                    && self.return_type == other.return_type
+                {
+                    Ok(())
+                } else {
+                    Err(EqualsIssue::ConflictingImports)
+                }
+            }
+        }
+    }
+}

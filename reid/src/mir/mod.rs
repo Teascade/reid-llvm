@@ -2,9 +2,12 @@
 //! Reid. It contains a simplified version of Reid which can be e.g.
 //! typechecked.
 
+use std::path::PathBuf;
+
 use crate::token_stream::TokenRange;
 
 mod display;
+pub mod imports;
 pub mod pass;
 pub mod typecheck;
 pub mod typeinference;
@@ -205,13 +208,13 @@ pub enum ReturnKind {
     Soft,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Import(pub Vec<String>, pub Metadata);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     Variable(NamedVariableRef),
     Index(Box<Expression>, TypeKind, u64),
@@ -223,21 +226,21 @@ pub enum ExprKind {
     Block(Block),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expression(pub ExprKind, pub Metadata);
 
 /// Condition, Then, Else
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfExpression(pub Box<Expression>, pub Block, pub Option<Block>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
     pub return_type: TypeKind,
     pub parameters: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionDefinition {
     pub name: String,
     pub is_pub: bool,
@@ -246,7 +249,7 @@ pub struct FunctionDefinition {
     pub kind: FunctionDefinitionKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range
     Local(Block, Metadata),
@@ -269,7 +272,7 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     /// List of non-returning statements
     pub statements: Vec<Statement>,
@@ -277,22 +280,22 @@ pub struct Block {
     pub meta: Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Statement(pub StmtKind, pub Metadata);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IndexedVariableReference {
     pub kind: IndexedVariableReferenceKind,
     pub meta: Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum IndexedVariableReferenceKind {
     Named(NamedVariableRef),
     Index(Box<IndexedVariableReference>, u64),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StmtKind {
     /// Variable name++mutability+type, evaluation
     Let(NamedVariableRef, bool, Expression),
@@ -301,14 +304,16 @@ pub enum StmtKind {
     Expression(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Module {
     pub name: String,
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionDefinition>,
+    pub path: Option<PathBuf>,
 }
 
 #[derive(Debug)]
 pub struct Context {
     pub modules: Vec<Module>,
+    pub base: PathBuf,
 }

@@ -191,6 +191,7 @@ impl<'st, 'sc, TError: STDError + Clone> PassState<'st, 'sc, TError> {
 pub trait Pass {
     type TError: STDError + Clone;
 
+    fn context(&mut self, _context: &mut Context, mut _state: PassState<Self::TError>) {}
     fn module(&mut self, _module: &mut Module, mut _state: PassState<Self::TError>) {}
     fn function(
         &mut self,
@@ -207,6 +208,7 @@ impl Context {
     pub fn pass<T: Pass>(&mut self, pass: &mut T) -> State<T::TError> {
         let mut state = State::new();
         let mut scope = Scope::default();
+        pass.context(self, PassState::from(&mut state, &mut scope));
         for module in &mut self.modules {
             module.pass(pass, &mut state, &mut scope);
         }

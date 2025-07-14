@@ -267,7 +267,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
     Ok(tokens)
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum Error {
     #[error("Invalid token '{}' at Ln {}, Col {}", .0, (.1).1, (.1).0)]
     InvalidToken(char, Position),

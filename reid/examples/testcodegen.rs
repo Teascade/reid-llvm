@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use reid::mir::{self, *};
 use reid_lib::Context;
 
@@ -159,7 +161,9 @@ fn main() {
             name: "test module".to_owned(),
             imports: vec![],
             functions: vec![fibonacci, main],
+            path: None,
         }],
+        base: PathBuf::new(),
     };
     println!("test1");
 

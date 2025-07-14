@@ -1,6 +1,8 @@
 //! This is the module that contains relevant code to parsing Reid, that is to
 //! say transforming a Vec of FullTokens into a loose parsed AST that can be
 //! used for unwrapping syntax sugar, and then be transformed into Reid MIR.
+use std::path::PathBuf;
+
 use crate::token_stream::TokenRange;
 
 pub mod parse;
@@ -166,4 +168,5 @@ pub enum TopLevelStatement {
 pub struct Module {
     pub name: String,
     pub top_level_statements: Vec<TopLevelStatement>,
+    pub path: Option<PathBuf>,
 }

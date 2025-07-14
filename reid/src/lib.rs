@@ -40,6 +40,8 @@
 //! - Loops
 //! ```
 
+use std::path::PathBuf;
+
 use mir::{typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs};
 use reid_lib::Context;
 
@@ -53,7 +55,7 @@ mod pad_adapter;
 mod token_stream;
 mod util;
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, Clone)]
 pub enum ReidError {
     #[error(transparent)]
     LexerError(#[from] lexer::Error),
@@ -63,10 +65,7 @@ pub enum ReidError {
     TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
 }
 
-/// Takes in a bit of source code, parses and compiles it and produces `hello.o`
-/// and `hello.asm` from it, which can be linked using `ld` to produce an
-/// executable file.
-pub fn compile(source: &str) -> Result<String, ReidError> {
+pub fn compile_module(source: &str, path: Option<PathBuf>) -> Result<mir::Module, ReidError> {
     let tokens = lexer::tokenize(source)?;
 
     dbg!(&tokens);
@@ -83,10 +82,20 @@ pub fn compile(source: &str) -> Result<String, ReidError> {
     let ast_module = ast::Module {
         name: "test".to_owned(),
         top_level_statements: statements,
+        path,
     };
 
-    dbg!(&ast_module);
-    let mut mir_context = mir::Context::from(vec![ast_module]);
+    Ok(ast_module.process())
+}
+
+/// Takes in a bit of source code, parses and compiles it and produces `hello.o`
+/// and `hello.asm` from it, which can be linked using `ld` to produce an
+/// executable file.
+pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
+    let mut mir_context = mir::Context::from(
+        vec![compile_module(source, Some(path.clone()))?],
+        path.parent().unwrap().to_owned(),
+    );
 
     println!("{}", &mir_context);
 
