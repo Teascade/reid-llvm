@@ -9,7 +9,7 @@ use std::iter;
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{Pass, PassState, ScopeVariable},
+    pass::{Pass, PassState},
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
@@ -43,7 +43,7 @@ impl FunctionDefinition {
         type_refs: &TypeRefs,
         state: &mut PassState<ErrorKind>,
     ) -> Result<(), ErrorKind> {
-        let mut scope_hints = ScopeTypeRefs::from(type_refs);
+        let scope_hints = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
             let param_t = state.or_else(param.1.assert_known(), Vague(Unknown), self.signature());
             let res = scope_hints

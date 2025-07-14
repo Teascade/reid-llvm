@@ -158,7 +158,7 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
 
     println!("{}", &mir_context);
 
-    perform_all_passes(&mut mir_context);
+    perform_all_passes(&mut mir_context)?;
 
     let mut context = Context::new();
     let codegen_modules = mir_context.codegen(&mut context);
