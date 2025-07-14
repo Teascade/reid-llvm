@@ -40,7 +40,8 @@ impl Display for FunctionDefinition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "fn {}({}) -> {} ",
+            "{}fn {}({}) -> {} ",
+            if self.is_pub { "pub " } else { "" },
             self.name,
             self.parameters
                 .iter()

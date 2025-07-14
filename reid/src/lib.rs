@@ -42,7 +42,9 @@
 
 use std::path::PathBuf;
 
-use mir::{typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs};
+use mir::{
+    imports::ImportsPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
+};
 use reid_lib::Context;
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
@@ -65,7 +67,11 @@ pub enum ReidError {
     TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
 }
 
-pub fn compile_module(source: &str, path: Option<PathBuf>) -> Result<mir::Module, ReidError> {
+pub fn compile_module(
+    source: &str,
+    name: String,
+    path: Option<PathBuf>,
+) -> Result<mir::Module, ReidError> {
     let tokens = lexer::tokenize(source)?;
 
     dbg!(&tokens);
@@ -80,7 +86,7 @@ pub fn compile_module(source: &str, path: Option<PathBuf>) -> Result<mir::Module
     }
 
     let ast_module = ast::Module {
-        name: "test".to_owned(),
+        name,
         top_level_statements: statements,
         path,
     };
@@ -92,11 +98,21 @@ pub fn compile_module(source: &str, path: Option<PathBuf>) -> Result<mir::Module
 /// and `hello.asm` from it, which can be linked using `ld` to produce an
 /// executable file.
 pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
+    let path = path.canonicalize().unwrap();
+
     let mut mir_context = mir::Context::from(
-        vec![compile_module(source, Some(path.clone()))?],
+        vec![compile_module(
+            source,
+            "main".to_owned(),
+            Some(path.clone()),
+        )?],
         path.parent().unwrap().to_owned(),
     );
 
+    println!("{}", &mir_context);
+
+    let state = mir_context.pass(&mut ImportsPass);
+    dbg!(&state);
     println!("{}", &mir_context);
 
     let refs = TypeRefs::default();

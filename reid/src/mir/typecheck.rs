@@ -92,7 +92,7 @@ impl FunctionDefinition {
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 state.scope.return_type_hint = Some(self.return_type.clone());
-                block.typecheck(state, &hints, Some(&return_type))
+                block.typecheck(&mut state.inner(), &hints, Some(&return_type))
             }
             FunctionDefinitionKind::Extern => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))

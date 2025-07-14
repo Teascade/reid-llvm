@@ -24,7 +24,7 @@ pub enum ErrorKind {
 
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
-pub struct ImportsPass {}
+pub struct ImportsPass;
 
 impl Pass for ImportsPass {
     type TError = ErrorKind;
@@ -35,13 +35,9 @@ impl Pass for ImportsPass {
             modules.insert(module.name.clone(), module);
         }
 
-        let mut modules_to_process: Vec<_> = modules.values().cloned().collect();
+        let mut modules_to_process: Vec<Module> = modules.values().cloned().collect();
 
-        let iter = modules_to_process.iter_mut();
-
-        for module in iter {
-            let mut new_modules = Vec::new();
-
+        while let Some(mut module) = modules_to_process.pop() {
             for import in &module.imports {
                 let Import(path, _) = import;
                 if path.len() != 2 {
@@ -56,8 +52,10 @@ impl Pass for ImportsPass {
                 let imported = if let Some(module) = modules.get(module_name) {
                     module
                 } else {
-                    let file_path = PathBuf::from(&context.base.clone()).join(module_name);
+                    let file_path =
+                        PathBuf::from(&context.base.clone()).join(module_name.to_owned() + ".reid");
 
+                    dbg!(&file_path);
                     let Ok(source) = fs::read_to_string(&file_path) else {
                         state.ok::<_, Infallible>(
                             Err(ErrorKind::ModuleNotFound(module_name.clone())),
@@ -66,10 +64,12 @@ impl Pass for ImportsPass {
                         continue;
                     };
 
-                    match compile_module(&source, Some(file_path)) {
+                    match compile_module(&source, module_name.clone(), Some(file_path)) {
                         Ok(m) => {
-                            new_modules.push(m);
-                            new_modules.last().unwrap()
+                            let module_name = module.name.clone();
+                            modules.insert(module_name.clone(), m);
+                            modules_to_process.push(modules.get_mut(&module_name).unwrap().clone());
+                            modules.get(&module_name).unwrap()
                         }
                         Err(err) => {
                             state.ok::<_, Infallible>(
@@ -115,6 +115,10 @@ impl Pass for ImportsPass {
                     kind: super::FunctionDefinitionKind::Extern,
                 });
             }
+
+            modules.insert(module.name.clone(), module);
         }
+
+        context.modules = modules.into_values().collect();
     }
 }

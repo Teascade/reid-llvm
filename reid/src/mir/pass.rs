@@ -234,7 +234,7 @@ impl Module {
         pass.module(self, PassState::from(state, scope));
 
         for function in &mut self.functions {
-            function.pass(pass, state, scope);
+            function.pass(pass, state, &mut scope.inner());
         }
     }
 }
