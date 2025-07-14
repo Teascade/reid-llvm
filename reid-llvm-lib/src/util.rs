@@ -1,9 +1,17 @@
 use std::{
     ffi::{CStr, CString, c_char},
     ptr::null_mut,
+    string::FromUtf8Error,
 };
 
-use llvm_sys::error::LLVMDisposeErrorMessage;
+use llvm_sys::{
+    core::{
+        LLVMCreateMemoryBufferWithMemoryRange, LLVMDisposeMemoryBuffer, LLVMGetBufferSize,
+        LLVMGetBufferStart,
+    },
+    error::LLVMDisposeErrorMessage,
+    prelude::LLVMMemoryBufferRef,
+};
 
 use crate::{
     Type,
@@ -53,6 +61,52 @@ impl Drop for ErrorMessageHolder {
             if !self.0.is_null() {
                 LLVMDisposeErrorMessage(self.0);
             }
+        }
+    }
+}
+
+/// Utility for creating and handling LLVM MemoryBuffers, needed for printing
+/// out ASM and .o -files without relying on LLVM's own API.
+pub struct MemoryBufferHolder {
+    pub buffer: LLVMMemoryBufferRef,
+}
+
+impl MemoryBufferHolder {
+    pub fn empty(name: &str) -> MemoryBufferHolder {
+        let array = [0i8; 0];
+        unsafe {
+            let buffer = LLVMCreateMemoryBufferWithMemoryRange(
+                array.as_ptr(),
+                array.len(),
+                into_cstring(name).as_ptr(),
+                0,
+            );
+            MemoryBufferHolder { buffer }
+        }
+    }
+
+    pub fn as_buffer(&self) -> Vec<u8> {
+        unsafe {
+            let start = LLVMGetBufferStart(self.buffer);
+            let size = LLVMGetBufferSize(self.buffer);
+
+            let mut buff = Vec::with_capacity(size);
+            for i in 0..size {
+                buff.push(*start.add(i) as u8);
+            }
+            buff
+        }
+    }
+
+    pub fn as_string(&self) -> Result<String, FromUtf8Error> {
+        String::from_utf8(self.as_buffer())
+    }
+}
+
+impl Drop for MemoryBufferHolder {
+    fn drop(&mut self) {
+        unsafe {
+            LLVMDisposeMemoryBuffer(self.buffer);
         }
     }
 }

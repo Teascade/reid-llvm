@@ -46,7 +46,7 @@ use std::path::PathBuf;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
 };
-use reid_lib::Context;
+use reid_lib::{compile::CompileOutput, Context};
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
@@ -145,7 +145,7 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
 /// Takes in a bit of source code, parses and compiles it and produces `hello.o`
 /// and `hello.asm` from it, which can be linked using `ld` to produce an
 /// executable file.
-pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
+pub fn compile(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> {
     let path = path.canonicalize().unwrap();
 
     let mut mir_context = mir::Context::from(
@@ -167,7 +167,5 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
     dbg!(&codegen_modules);
 
     let compiled = codegen_modules.compile();
-    compiled.output();
-
-    Ok(String::new())
+    Ok(compiled.output())
 }

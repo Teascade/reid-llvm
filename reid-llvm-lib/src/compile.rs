@@ -2,7 +2,7 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{collections::HashMap, ffi::CString, ptr::null_mut};
+use std::{collections::HashMap, ptr::null_mut};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage,
@@ -16,11 +16,11 @@ use llvm_sys::{
     },
     target_machine::{
         LLVMCodeGenFileType, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
-        LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetMachineEmitToFile,
+        LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetMachineEmitToMemoryBuffer,
     },
 };
 
-use crate::util::{ErrorMessageHolder, from_cstring, into_cstring};
+use crate::util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring};
 
 use super::{
     CmpPredicate, ConstValue, Context, TerminatorKind, Type,
@@ -49,8 +49,15 @@ pub struct CompiledModule {
     _context: LLVMContext,
 }
 
+pub struct CompileOutput {
+    pub triple: String,
+    pub assembly: String,
+    pub obj_buffer: Vec<u8>,
+    pub llvm_ir: String,
+}
+
 impl CompiledModule {
-    pub fn output(&self) {
+    pub fn output(&self) -> CompileOutput {
         unsafe {
             LLVM_InitializeAllTargets();
             LLVM_InitializeAllTargetInfos();
@@ -63,7 +70,6 @@ impl CompiledModule {
             let mut target: _ = null_mut();
             let mut err = ErrorMessageHolder::null();
             LLVMGetTargetFromTriple(triple, &mut target, err.borrow_mut());
-            println!("{:?}, {:?}", from_cstring(triple), target);
             err.into_result().unwrap();
 
             let target_machine = LLVMCreateTargetMachine(
@@ -88,28 +94,37 @@ impl CompiledModule {
             );
             err.into_result().unwrap();
 
+            let mut asm_buffer = MemoryBufferHolder::empty("asm");
             let mut err = ErrorMessageHolder::null();
-            LLVMTargetMachineEmitToFile(
+            LLVMTargetMachineEmitToMemoryBuffer(
                 target_machine,
                 self.module_ref,
-                CString::new("hello.asm").unwrap().into_raw(),
                 LLVMCodeGenFileType::LLVMAssemblyFile,
                 err.borrow_mut(),
+                &mut asm_buffer.buffer,
             );
             err.into_result().unwrap();
 
+            let mut obj_buffer = MemoryBufferHolder::empty("obj");
             let mut err = ErrorMessageHolder::null();
-            LLVMTargetMachineEmitToFile(
+            LLVMTargetMachineEmitToMemoryBuffer(
                 target_machine,
                 self.module_ref,
-                CString::new("hello.o").unwrap().into_raw(),
                 LLVMCodeGenFileType::LLVMObjectFile,
                 err.borrow_mut(),
+                &mut obj_buffer.buffer,
             );
             err.into_result().unwrap();
 
-            let module_str = from_cstring(LLVMPrintModuleToString(self.module_ref));
-            println!("{}", module_str.unwrap());
+            CompileOutput {
+                triple: from_cstring(triple).expect("Unable to convert triple from cstring"),
+                assembly: asm_buffer
+                    .as_string()
+                    .expect("Error while converting assembly-buffer to string"),
+                obj_buffer: obj_buffer.as_buffer(),
+                llvm_ir: from_cstring(LLVMPrintModuleToString(self.module_ref))
+                    .expect("Unable to print LLVM IR to string"),
+            }
         }
     }
 }
