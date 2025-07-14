@@ -204,6 +204,7 @@ impl ast::Literal {
         match *self {
             ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(v)),
             ast::Literal::Bool(v) => mir::Literal::Bool(v),
+            ast::Literal::String(_) => todo!("process string literal"),
         }
     }
 }

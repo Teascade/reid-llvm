@@ -84,6 +84,10 @@ impl Parse for PrimaryExpression {
                     Kind::Literal(Literal::Number(*v)),
                     stream.get_range().unwrap(),
                 ),
+                Token::StringLit(v) => Expression(
+                    Kind::Literal(Literal::String(v.clone())),
+                    stream.get_range().unwrap(),
+                ),
                 Token::True => Expression(
                     Kind::Literal(Literal::Bool(true)),
                     stream.get_range().unwrap(),
