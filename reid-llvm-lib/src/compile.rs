@@ -5,7 +5,7 @@
 use std::{collections::HashMap, ffi::CString, ptr::null_mut};
 
 use llvm_sys::{
-    LLVMIntPredicate,
+    LLVMIntPredicate, LLVMLinkage,
     analysis::LLVMVerifyModule,
     core::*,
     prelude::*,
@@ -203,6 +203,11 @@ impl FunctionHolder {
     unsafe fn compile(&self, module: &mut LLVMModule) {
         unsafe {
             let own_function = *module.functions.get(&self.value).unwrap();
+
+            if self.data.flags.is_extern {
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
+                return;
+            }
 
             for block in &self.blocks {
                 if block.data.deleted {
