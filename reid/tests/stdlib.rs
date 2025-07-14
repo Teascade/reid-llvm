@@ -2,6 +2,9 @@ use reid::{
     mir::{self, linker::compile_std},
     perform_all_passes,
 };
+use util::assert_err;
+
+mod util;
 
 #[test]
 fn compiles() {
@@ -19,11 +22,4 @@ fn passes_all_passes() {
         modules: vec![std],
         base: Default::default(),
     }));
-}
-
-fn assert_err<T, U: std::fmt::Debug>(value: Result<T, U>) {
-    match value {
-        Ok(_) => {}
-        Err(err) => assert!(false, "{:?}", err),
-    }
 }
