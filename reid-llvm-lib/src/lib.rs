@@ -2,9 +2,10 @@
 //! Low-Level IR (LLIR) using [`Context`] and [`Builder`]. This Builder can then
 //! be used at the end to compile said LLIR into LLVM IR.
 
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
-use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue};
+use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleHolder, ModuleValue};
+use debug::PrintableModule;
 
 pub mod builder;
 pub mod compile;
@@ -75,6 +76,13 @@ impl<'ctx> Module<'ctx> {
 
     pub fn value(&self) -> ModuleValue {
         self.value
+    }
+
+    pub fn as_printable(&self) -> PrintableModule<'ctx> {
+        PrintableModule {
+            phantom: PhantomData,
+            module: self.builder.find_module(self.value),
+        }
     }
 }
 

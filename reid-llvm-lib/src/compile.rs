@@ -2,12 +2,13 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{collections::HashMap, ffi::CString, ptr::null_mut};
+use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::null_mut};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage,
     analysis::LLVMVerifyModule,
     core::*,
+    linker::LLVMLinkModules2,
     prelude::*,
     target::{
         LLVM_InitializeAllAsmParsers, LLVM_InitializeAllAsmPrinters, LLVM_InitializeAllTargetInfos,
@@ -34,8 +35,87 @@ pub struct LLVMContext {
     builder_ref: LLVMBuilderRef,
 }
 
+impl Drop for LLVMContext {
+    fn drop(&mut self) {
+        unsafe {
+            LLVMDisposeBuilder(self.builder_ref);
+            LLVMContextDispose(self.context_ref);
+        }
+    }
+}
+
+pub struct CompiledModule {
+    module_ref: LLVMModuleRef,
+    _context: LLVMContext,
+}
+
+impl CompiledModule {
+    pub fn output(&self) {
+        unsafe {
+            LLVM_InitializeAllTargets();
+            LLVM_InitializeAllTargetInfos();
+            LLVM_InitializeAllTargetMCs();
+            LLVM_InitializeAllAsmParsers();
+            LLVM_InitializeAllAsmPrinters();
+
+            let triple = LLVMGetDefaultTargetTriple();
+
+            let mut target: _ = null_mut();
+            let mut err = ErrorMessageHolder::null();
+            LLVMGetTargetFromTriple(triple, &mut target, err.borrow_mut());
+            println!("{:?}, {:?}", from_cstring(triple), target);
+            err.into_result().unwrap();
+
+            let target_machine = LLVMCreateTargetMachine(
+                target,
+                triple,
+                c"generic".as_ptr(),
+                c"".as_ptr(),
+                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
+                llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
+            );
+
+            let data_layout = LLVMCreateTargetDataLayout(target_machine);
+            LLVMSetTarget(self.module_ref, triple);
+            LLVMSetModuleDataLayout(self.module_ref, data_layout);
+
+            let mut err = ErrorMessageHolder::null();
+            LLVMVerifyModule(
+                self.module_ref,
+                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
+                err.borrow_mut(),
+            );
+            err.into_result().unwrap();
+
+            let mut err = ErrorMessageHolder::null();
+            LLVMTargetMachineEmitToFile(
+                target_machine,
+                self.module_ref,
+                CString::new("hello.asm").unwrap().into_raw(),
+                LLVMCodeGenFileType::LLVMAssemblyFile,
+                err.borrow_mut(),
+            );
+            err.into_result().unwrap();
+
+            let mut err = ErrorMessageHolder::null();
+            LLVMTargetMachineEmitToFile(
+                target_machine,
+                self.module_ref,
+                CString::new("hello.o").unwrap().into_raw(),
+                LLVMCodeGenFileType::LLVMObjectFile,
+                err.borrow_mut(),
+            );
+            err.into_result().unwrap();
+
+            let module_str = from_cstring(LLVMPrintModuleToString(self.module_ref));
+            println!("{}", module_str.unwrap());
+        }
+    }
+}
+
 impl Context {
-    pub fn compile(&self) {
+    pub fn compile(&self) -> CompiledModule {
         unsafe {
             let context_ref = LLVMContextCreate();
 
@@ -44,12 +124,31 @@ impl Context {
                 builder_ref: LLVMCreateBuilderInContext(context_ref),
             };
 
-            for holder in self.builder.get_modules().borrow().iter() {
-                holder.compile(&context, &self.builder);
+            let module_holders = self.builder.get_modules();
+
+            let main_module = module_holders
+                .borrow()
+                .iter()
+                .find(|m| m.data.name == "main")
+                .unwrap_or(module_holders.borrow().first().unwrap())
+                .clone();
+
+            let main_module_ref = main_module.compile(&context, &self.builder);
+            dbg!("main");
+
+            for holder in module_holders.borrow().iter() {
+                if holder.value == main_module.value {
+                    continue;
+                }
+                dbg!(holder.value);
+                let module_ref = holder.compile(&context, &self.builder);
+                LLVMLinkModules2(main_module_ref, module_ref);
             }
 
-            LLVMDisposeBuilder(context.builder_ref);
-            LLVMContextDispose(context.context_ref);
+            CompiledModule {
+                module_ref: main_module_ref,
+                _context: context,
+            }
         }
     }
 }
@@ -77,7 +176,7 @@ pub struct LLVMValue {
 }
 
 impl ModuleHolder {
-    fn compile(&self, context: &LLVMContext, builder: &Builder) {
+    fn compile(&self, context: &LLVMContext, builder: &Builder) -> LLVMModuleRef {
         unsafe {
             let module_ref = LLVMModuleCreateWithNameInContext(
                 into_cstring(&self.data.name).as_ptr(),
@@ -109,64 +208,7 @@ impl ModuleHolder {
                 function.compile(&mut module);
             }
 
-            LLVM_InitializeAllTargets();
-            LLVM_InitializeAllTargetInfos();
-            LLVM_InitializeAllTargetMCs();
-            LLVM_InitializeAllAsmParsers();
-            LLVM_InitializeAllAsmPrinters();
-
-            let triple = LLVMGetDefaultTargetTriple();
-
-            let mut target: _ = null_mut();
-            let mut err = ErrorMessageHolder::null();
-            LLVMGetTargetFromTriple(triple, &mut target, err.borrow_mut());
-            println!("{:?}, {:?}", from_cstring(triple), target);
-            err.into_result().unwrap();
-
-            let target_machine = LLVMCreateTargetMachine(
-                target,
-                triple,
-                c"generic".as_ptr(),
-                c"".as_ptr(),
-                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
-                llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
-                llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
-            );
-
-            let data_layout = LLVMCreateTargetDataLayout(target_machine);
-            LLVMSetTarget(module_ref, triple);
-            LLVMSetModuleDataLayout(module_ref, data_layout);
-
-            let mut err = ErrorMessageHolder::null();
-            LLVMVerifyModule(
-                module_ref,
-                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
-                err.borrow_mut(),
-            );
-            err.into_result().unwrap();
-
-            let mut err = ErrorMessageHolder::null();
-            LLVMTargetMachineEmitToFile(
-                target_machine,
-                module_ref,
-                CString::new("hello.asm").unwrap().into_raw(),
-                LLVMCodeGenFileType::LLVMAssemblyFile,
-                err.borrow_mut(),
-            );
-            err.into_result().unwrap();
-
-            let mut err = ErrorMessageHolder::null();
-            LLVMTargetMachineEmitToFile(
-                target_machine,
-                module_ref,
-                CString::new("hello.o").unwrap().into_raw(),
-                LLVMCodeGenFileType::LLVMObjectFile,
-                err.borrow_mut(),
-            );
-            err.into_result().unwrap();
-
-            let module_str = from_cstring(LLVMPrintModuleToString(module_ref));
-            println!("{}", module_str.unwrap());
+            module_ref
         }
     }
 }

@@ -134,7 +134,8 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
     let codegen_modules = mir_context.codegen(&mut context);
 
     dbg!(&codegen_modules);
-    codegen_modules.compile();
+    let compiled = codegen_modules.compile();
+    compiled.output();
 
     Ok(String::new())
 }

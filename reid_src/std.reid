@@ -5,6 +5,3 @@ pub fn print(message: string) {
     puts(message);
 }
 
-fn main() -> u16 {
-    return 0;
-}

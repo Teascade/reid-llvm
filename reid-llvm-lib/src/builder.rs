@@ -202,6 +202,10 @@ impl Builder {
         }
     }
 
+    pub(crate) fn find_module<'ctx>(&'ctx self, value: ModuleValue) -> ModuleHolder {
+        unsafe { self.modules.borrow().get_unchecked(value.0).clone() }
+    }
+
     pub(crate) fn get_modules(&self) -> Rc<RefCell<Vec<ModuleHolder>>> {
         self.modules.clone()
     }

@@ -1,6 +1,9 @@
 //! Debug implementations for relevant types
 
-use std::fmt::{Debug, Write};
+use std::{
+    fmt::{Debug, Write},
+    marker::PhantomData,
+};
 
 use crate::{CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*};
 
@@ -8,6 +11,17 @@ impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_list().entries(self.get_modules().borrow().iter());
         Ok(())
+    }
+}
+
+pub struct PrintableModule<'ctx> {
+    pub phantom: PhantomData<&'ctx ()>,
+    pub module: ModuleHolder,
+}
+
+impl<'ctx> Debug for PrintableModule<'ctx> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.module.fmt(f)
     }
 }
 

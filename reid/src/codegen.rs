@@ -1,8 +1,8 @@
 use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, FunctionFlags,
-    Instr, Module, TerminatorKind as Term, Type,
+    builder::InstructionValue, compile::CompiledModule, Block, CmpPredicate, ConstValue, Context,
+    Function, FunctionFlags, Instr, Module, TerminatorKind as Term, Type,
 };
 
 use crate::mir::{self, types::ReturnType, IndexedVariableReference, NamedVariableRef, TypeKind};
@@ -11,16 +11,14 @@ use crate::mir::{self, types::ReturnType, IndexedVariableReference, NamedVariabl
 /// LLIR that can then be finally compiled into LLVM IR.
 #[derive(Debug)]
 pub struct CodegenContext<'ctx> {
-    modules: Vec<ModuleCodegen<'ctx>>,
+    context: &'ctx Context,
 }
 
 impl<'ctx> CodegenContext<'ctx> {
     /// Compile contained LLIR into LLVM IR and produce `hello.o` and
     /// `hello.asm`
-    pub fn compile(&self) {
-        for module in &self.modules {
-            module.context.compile();
-        }
+    pub fn compile(&self) -> CompiledModule {
+        self.context.compile()
     }
 }
 
@@ -31,18 +29,17 @@ impl mir::Context {
         for module in &self.modules {
             modules.push(module.codegen(context));
         }
-        CodegenContext { modules }
+        CodegenContext { context }
     }
 }
 
 struct ModuleCodegen<'ctx> {
-    pub context: &'ctx Context,
-    _module: Module<'ctx>,
+    module: Module<'ctx>,
 }
 
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.context.fmt(f)
+        std::fmt::Debug::fmt(&self.module.as_printable(), f)
     }
 }
 
@@ -121,10 +118,7 @@ impl mir::Module {
             }
         }
 
-        ModuleCodegen {
-            context,
-            _module: module,
-        }
+        ModuleCodegen { module }
     }
 }
 
