@@ -58,6 +58,8 @@ pub enum TypeKind {
     U128,
     #[error("void")]
     Void,
+    #[error("string")]
+    String,
     #[error("[{0}; {1}]")]
     Array(Box<TypeKind>, u64),
     #[error(transparent)]
@@ -100,6 +102,7 @@ impl TypeKind {
             TypeKind::U32 => false,
             TypeKind::U64 => false,
             TypeKind::U128 => false,
+            TypeKind::String => false,
             TypeKind::Array(_, _) => false,
         }
     }
@@ -120,12 +123,13 @@ impl TypeKind {
             Bool => true,
             Vague(_) => false,
             Void => false,
+            TypeKind::String => false,
             Array(_, _) => false,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     I8(i8),
     I16(i16),
@@ -138,6 +142,7 @@ pub enum Literal {
     U64(u64),
     U128(u128),
     Bool(bool),
+    String(String),
     Vague(VagueLiteral),
 }
 
@@ -160,6 +165,7 @@ impl Literal {
             Literal::U64(_) => TypeKind::U64,
             Literal::U128(_) => TypeKind::U128,
             Literal::Bool(_) => TypeKind::Bool,
+            Literal::String(_) => TypeKind::String,
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
         }
     }

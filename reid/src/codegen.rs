@@ -463,7 +463,7 @@ impl mir::Literal {
     }
 
     fn as_const_kind(&self) -> Instr {
-        Instr::Constant(match *self {
+        Instr::Constant(match self.clone() {
             mir::Literal::I8(val) => ConstValue::I8(val),
             mir::Literal::I16(val) => ConstValue::I16(val),
             mir::Literal::I32(val) => ConstValue::I32(val),
@@ -475,6 +475,7 @@ impl mir::Literal {
             mir::Literal::U64(val) => ConstValue::U64(val),
             mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Bool(val) => ConstValue::Bool(val),
+            mir::Literal::String(_) => todo!("impl string const codegen"),
             mir::Literal::Vague(_) => panic!("Got vague literal!"),
         })
     }
@@ -494,6 +495,7 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
+            TypeKind::String => todo!("impl string type"),
             TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type())),
             TypeKind::Void => panic!("Void not a supported type"),
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),

@@ -3,7 +3,6 @@
 use std::{convert::Infallible, iter};
 
 use crate::{mir::*, util::try_all};
-use TypeKind::*;
 use VagueType::*;
 
 use super::{
@@ -70,7 +69,11 @@ impl FunctionDefinition {
         state: &mut PassState<ErrorKind>,
     ) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
-            let param_t = state.or_else(param.1.assert_known(), Vague(Unknown), self.signature());
+            let param_t = state.or_else(
+                param.1.assert_known(),
+                TypeKind::Vague(Unknown),
+                self.signature(),
+            );
             let res = state
                 .scope
                 .variables
@@ -91,7 +94,7 @@ impl FunctionDefinition {
                 state.scope.return_type_hint = Some(self.return_type.clone());
                 block.typecheck(state, &hints, Some(&return_type))
             }
-            FunctionDefinitionKind::Extern => Ok((ReturnKind::Soft, Vague(Unknown))),
+            FunctionDefinitionKind::Extern => Ok((ReturnKind::Soft, TypeKind::Vague(Unknown))),
         };
 
         match inferred {
@@ -125,19 +128,22 @@ impl Block {
 
                     // If expression resolution itself was erronous, resolve as
                     // Unknown and note error.
-                    let res = state.or_else(res, Vague(Unknown), expression.1);
+                    let res = state.or_else(res, TypeKind::Vague(Unknown), expression.1);
 
                     // Make sure the expression and variable type really is the same
                     let res_t = state.or_else(
                         res.collapse_into(&var_t_resolved),
-                        Vague(Unknown),
+                        TypeKind::Vague(Unknown),
                         variable_reference.2 + expression.1,
                     );
 
                     let res_t = if res_t.known().is_err() {
                         // Unable to infer variable type even from expression! Default it
-                        let res_t =
-                            state.or_else(res_t.or_default(), Vague(Unknown), variable_reference.2);
+                        let res_t = state.or_else(
+                            res_t.or_default(),
+                            TypeKind::Vague(Unknown),
+                            variable_reference.2,
+                        );
 
                         // Re-typecheck and coerce expression to default type
                         let expr_res = expression.typecheck(&mut state, &hints, Some(&res_t));
@@ -181,13 +187,13 @@ impl Block {
 
                         // If expression resolution itself was erronous, resolve as
                         // Unknown.
-                        let expr_ty = state.or_else(res, Vague(Unknown), expression.1);
+                        let expr_ty = state.or_else(res, TypeKind::Vague(Unknown), expression.1);
 
                         // Make sure the expression and variable type to really
                         // be the same
                         let res_t = state.or_else(
                             expr_ty.collapse_into(&var.ty.resolve_hinted(&hints)),
-                            Vague(Unknown),
+                            TypeKind::Vague(Unknown),
                             variable_reference.meta + expression.1,
                         );
 
@@ -213,7 +219,7 @@ impl Block {
                 StmtKind::Import(_) => todo!(), // TODO
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, &hints, None);
-                    state.or_else(res, Void, expression.1);
+                    state.or_else(res, TypeKind::Void, expression.1);
                     if let Ok((kind, _)) = expression.return_type() {
                         Some((kind, expression))
                     } else {
@@ -233,7 +239,10 @@ impl Block {
         if let Some((ReturnKind::Hard, expr)) = early_return {
             let hint = state.scope.return_type_hint.clone();
             let res = expr.typecheck(&mut state, &hints, hint.as_ref());
-            return Ok((ReturnKind::Hard, state.or_else(res, Vague(Unknown), expr.1)));
+            return Ok((
+                ReturnKind::Hard,
+                state.or_else(res, TypeKind::Vague(Unknown), expr.1),
+            ));
         }
 
         if let Some((return_kind, expr)) = &mut self.return_expression {
@@ -243,9 +252,12 @@ impl Block {
                 ReturnKind::Soft => hint_t.cloned(),
             };
             let res = expr.typecheck(&mut state, &hints, ret_hint_t.as_ref());
-            Ok((*return_kind, state.or_else(res, Vague(Unknown), expr.1)))
+            Ok((
+                *return_kind,
+                state.or_else(res, TypeKind::Vague(Unknown), expr.1),
+            ))
         } else {
-            Ok((ReturnKind::Soft, Void))
+            Ok((ReturnKind::Soft, TypeKind::Void))
         }
     }
 }
@@ -268,7 +280,7 @@ impl Expression {
                             .map(|var| &var.ty)
                             .cloned()
                             .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
-                        Vague(Unknown),
+                        TypeKind::Vague(Unknown),
                         var_ref.2,
                     )
                     .resolve_hinted(hints);
@@ -276,23 +288,23 @@ impl Expression {
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
                     var_ref.0.resolve_hinted(hints).collapse_into(&existing),
-                    Vague(Unknown),
+                    TypeKind::Vague(Unknown),
                     var_ref.2,
                 );
 
                 Ok(var_ref.0.clone())
             }
             ExprKind::Literal(literal) => {
-                *literal = literal.try_coerce(hint_t.cloned())?;
+                *literal = literal.clone().try_coerce(hint_t.cloned())?;
                 Ok(literal.as_type())
             }
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
                 let lhs_res = lhs.typecheck(state, &hints, None);
-                let lhs_type = state.or_else(lhs_res, Vague(Unknown), lhs.1);
+                let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Unknown), lhs.1);
                 let rhs_res = rhs.typecheck(state, &hints, Some(&lhs_type));
-                let rhs_type = state.or_else(rhs_res, Vague(Unknown), rhs.1);
+                let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Unknown), rhs.1);
 
                 if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
                     // Try to coerce both sides again with collapsed type
@@ -328,14 +340,17 @@ impl Expression {
                         );
                     }
 
-                    let true_params_iter = f.params.into_iter().chain(iter::repeat(Vague(Unknown)));
+                    let true_params_iter = f
+                        .params
+                        .into_iter()
+                        .chain(iter::repeat(TypeKind::Vague(Unknown)));
 
                     for (param, true_param_t) in
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
                         // Typecheck every param separately
                         let param_res = param.typecheck(state, &hints, Some(&true_param_t));
-                        let param_t = state.or_else(param_res, Vague(Unknown), param.1);
+                        let param_t = state.or_else(param_res, TypeKind::Vague(Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
                     }
 
@@ -352,31 +367,37 @@ impl Expression {
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                let cond_res = cond.typecheck(state, &hints, Some(&Bool));
-                let cond_t = state.or_else(cond_res, Vague(Unknown), cond.1);
-                state.ok(cond_t.collapse_into(&Bool), cond.1);
+                let cond_res = cond.typecheck(state, &hints, Some(&TypeKind::Bool));
+                let cond_t = state.or_else(cond_res, TypeKind::Vague(Unknown), cond.1);
+                state.ok(cond_t.collapse_into(&TypeKind::Bool), cond.1);
 
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
                 let then_res = lhs.typecheck(state, &hints, hint_t);
-                let (then_ret_kind, then_ret_t) =
-                    state.or_else(then_res, (ReturnKind::Soft, Vague(Unknown)), lhs.meta);
+                let (then_ret_kind, then_ret_t) = state.or_else(
+                    then_res,
+                    (ReturnKind::Soft, TypeKind::Vague(Unknown)),
+                    lhs.meta,
+                );
                 let else_ret_t = if let Some(else_block) = rhs {
                     let res = else_block.typecheck(state, &hints, hint_t);
-                    let (else_ret_kind, else_ret_t) =
-                        state.or_else(res, (ReturnKind::Soft, Vague(Unknown)), else_block.meta);
+                    let (else_ret_kind, else_ret_t) = state.or_else(
+                        res,
+                        (ReturnKind::Soft, TypeKind::Vague(Unknown)),
+                        else_block.meta,
+                    );
 
                     if else_ret_kind == ReturnKind::Hard {
-                        Void
+                        TypeKind::Void
                     } else {
                         else_ret_t
                     }
                 } else {
                     // Else return type is Void if it does not exist
-                    Void
+                    TypeKind::Void
                 };
                 let then_ret_t = if then_ret_kind == ReturnKind::Hard {
-                    Void
+                    TypeKind::Void
                 } else {
                     then_ret_t
                 };
@@ -398,14 +419,14 @@ impl Expression {
                 Ok(collapsed)
             }
             ExprKind::Block(block) => match block.typecheck(state, &hints, hint_t) {
-                Ok((ReturnKind::Hard, _)) => Ok(Void),
+                Ok((ReturnKind::Hard, _)) => Ok(TypeKind::Void),
                 Ok((_, ty)) => Ok(ty),
                 Err(e) => Err(e),
             },
             ExprKind::Index(expression, elem_ty, idx) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
-                    Array(type_kind, _) => &type_kind,
+                    TypeKind::Array(type_kind, _) => &type_kind,
                     _ => t,
                 });
 
@@ -428,7 +449,7 @@ impl Expression {
             ExprKind::Array(expressions) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
-                    Array(type_kind, _) => &type_kind,
+                    TypeKind::Array(type_kind, _) => &type_kind,
                     _ => t,
                 });
 
@@ -445,14 +466,20 @@ impl Expression {
                             for other in iter {
                                 state.ok(first.collapse_into(other), self.1);
                             }
-                            Ok(Array(Box::new(first.clone()), expressions.len() as u64))
+                            Ok(TypeKind::Array(
+                                Box::new(first.clone()),
+                                expressions.len() as u64,
+                            ))
                         } else {
-                            Ok(Array(Box::new(Void), 0))
+                            Ok(TypeKind::Array(Box::new(TypeKind::Void), 0))
                         }
                     }
                     Err(errors) => {
                         state.note_errors(errors, self.1);
-                        Ok(Array(Box::new(Vague(Unknown)), expressions.len() as u64))
+                        Ok(TypeKind::Array(
+                            Box::new(TypeKind::Vague(Unknown)),
+                            expressions.len() as u64,
+                        ))
                     }
                 }
             }
@@ -493,31 +520,31 @@ impl Literal {
         if let Some(hint) = &hint {
             use Literal as L;
             use VagueLiteral as VagueL;
-            Ok(match (self, hint) {
-                (L::I8(_), I8) => self,
-                (L::I16(_), I16) => self,
-                (L::I32(_), I32) => self,
-                (L::I64(_), I64) => self,
-                (L::I128(_), I128) => self,
-                (L::U8(_), U8) => self,
-                (L::U16(_), U16) => self,
-                (L::U32(_), U32) => self,
-                (L::U64(_), U64) => self,
-                (L::U128(_), U128) => self,
-                (L::Bool(_), Bool) => self,
+            Ok(match (self.clone(), hint) {
+                (L::I8(_), TypeKind::I8) => self,
+                (L::I16(_), TypeKind::I16) => self,
+                (L::I32(_), TypeKind::I32) => self,
+                (L::I64(_), TypeKind::I64) => self,
+                (L::I128(_), TypeKind::I128) => self,
+                (L::U8(_), TypeKind::U8) => self,
+                (L::U16(_), TypeKind::U16) => self,
+                (L::U32(_), TypeKind::U32) => self,
+                (L::U64(_), TypeKind::U64) => self,
+                (L::U128(_), TypeKind::U128) => self,
+                (L::Bool(_), TypeKind::Bool) => self,
                 // TODO make sure that v is actually able to fit in the
                 // requested type
-                (L::Vague(VagueL::Number(v)), I8) => L::I8(v as i8),
-                (L::Vague(VagueL::Number(v)), I16) => L::I16(v as i16),
-                (L::Vague(VagueL::Number(v)), I32) => L::I32(v as i32),
-                (L::Vague(VagueL::Number(v)), I64) => L::I64(v as i64),
-                (L::Vague(VagueL::Number(v)), I128) => L::I128(v as i128),
-                (L::Vague(VagueL::Number(v)), U8) => L::U8(v as u8),
-                (L::Vague(VagueL::Number(v)), U16) => L::U16(v as u16),
-                (L::Vague(VagueL::Number(v)), U32) => L::U32(v as u32),
-                (L::Vague(VagueL::Number(v)), U64) => L::U64(v as u64),
-                (L::Vague(VagueL::Number(v)), U128) => L::U128(v as u128),
-                (_, Vague(_)) => self,
+                (L::Vague(VagueL::Number(v)), TypeKind::I8) => L::I8(v as i8),
+                (L::Vague(VagueL::Number(v)), TypeKind::I16) => L::I16(v as i16),
+                (L::Vague(VagueL::Number(v)), TypeKind::I32) => L::I32(v as i32),
+                (L::Vague(VagueL::Number(v)), TypeKind::I64) => L::I64(v as i64),
+                (L::Vague(VagueL::Number(v)), TypeKind::I128) => L::I128(v as i128),
+                (L::Vague(VagueL::Number(v)), TypeKind::U8) => L::U8(v as u8),
+                (L::Vague(VagueL::Number(v)), TypeKind::U16) => L::U16(v as u16),
+                (L::Vague(VagueL::Number(v)), TypeKind::U32) => L::U32(v as u32),
+                (L::Vague(VagueL::Number(v)), TypeKind::U64) => L::U64(v as u64),
+                (L::Vague(VagueL::Number(v)), TypeKind::U128) => L::U128(v as u128),
+                (_, TypeKind::Vague(_)) => self,
                 _ => Err(ErrorKind::LiteralIncompatible(self, hint.clone()))?,
             })
         } else {
@@ -537,7 +564,7 @@ impl TypeKind {
     /// Error if not.
     fn or_default(&self) -> Result<TypeKind, ErrorKind> {
         match self {
-            Vague(vague_type) => match &vague_type {
+            TypeKind::Vague(vague_type) => match &vague_type {
                 Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
                 Number => Ok(TypeKind::I32),
                 TypeRef(_) => panic!("Hinted default!"),
@@ -548,11 +575,11 @@ impl TypeKind {
 
     fn resolve_hinted(&self, hints: &TypeRefs) -> TypeKind {
         let resolved = match self {
-            Vague(TypeRef(idx)) => hints.retrieve_type(*idx).unwrap(),
+            TypeKind::Vague(TypeRef(idx)) => hints.retrieve_type(*idx).unwrap(),
             _ => self.clone(),
         };
         match resolved {
-            Array(t, len) => Array(Box::new(t.resolve_hinted(hints)), len),
+            TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_hinted(hints)), len),
             _ => resolved,
         }
     }
@@ -571,13 +598,24 @@ impl Collapsable for TypeKind {
         }
 
         match (self, other) {
-            (Vague(Number), other) | (other, Vague(Number)) => match other {
-                Vague(Unknown) => Ok(Vague(Number)),
-                Vague(Number) => Ok(Vague(Number)),
-                I8 | I16 | I32 | I64 | I128 | U8 | U16 | U32 | U64 | U128 => Ok(other.clone()),
+            (TypeKind::Vague(Number), other) | (other, TypeKind::Vague(Number)) => match other {
+                TypeKind::Vague(Unknown) => Ok(TypeKind::Vague(Number)),
+                TypeKind::Vague(Number) => Ok(TypeKind::Vague(Number)),
+                TypeKind::I8
+                | TypeKind::I16
+                | TypeKind::I32
+                | TypeKind::I64
+                | TypeKind::I128
+                | TypeKind::U8
+                | TypeKind::U16
+                | TypeKind::U32
+                | TypeKind::U64
+                | TypeKind::U128 => Ok(other.clone()),
                 _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
             },
-            (Vague(Unknown), other) | (other, Vague(Unknown)) => Ok(other.clone()),
+            (TypeKind::Vague(Unknown), other) | (other, TypeKind::Vague(Unknown)) => {
+                Ok(other.clone())
+            }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }

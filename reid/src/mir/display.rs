@@ -199,18 +199,19 @@ impl Display for IndexedVariableReference {
 impl Display for Literal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::I8(val) => write!(f, "{}i8", val),
-            Self::I16(val) => write!(f, "{}i16", val),
-            Self::I32(val) => write!(f, "{}i32", val),
-            Self::I64(val) => write!(f, "{}i64", val),
-            Self::I128(val) => write!(f, "{}i128", val),
-            Self::U8(val) => write!(f, "{}u8", val),
-            Self::U16(val) => write!(f, "{}u16", val),
-            Self::U32(val) => write!(f, "{}u32", val),
-            Self::U64(val) => write!(f, "{}u64", val),
-            Self::U128(val) => write!(f, "{}u128", val),
-            Self::Bool(val) => write!(f, "{}", val),
-            Self::Vague(val) => val.fmt(f),
+            Literal::I8(val) => write!(f, "{}i8", val),
+            Literal::I16(val) => write!(f, "{}i16", val),
+            Literal::I32(val) => write!(f, "{}i32", val),
+            Literal::I64(val) => write!(f, "{}i64", val),
+            Literal::I128(val) => write!(f, "{}i128", val),
+            Literal::U8(val) => write!(f, "{}u8", val),
+            Literal::U16(val) => write!(f, "{}u16", val),
+            Literal::U32(val) => write!(f, "{}u32", val),
+            Literal::U64(val) => write!(f, "{}u64", val),
+            Literal::U128(val) => write!(f, "{}u128", val),
+            Literal::Bool(val) => write!(f, "{}", val),
+            Literal::String(val) => std::fmt::Debug::fmt(val, f),
+            Literal::Vague(val) => val.fmt(f),
         }
     }
 }
