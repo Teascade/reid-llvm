@@ -100,6 +100,46 @@ pub fn compile_module(
     Ok(ast_module.process())
 }
 
+pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
+    let state = context.pass(&mut LinkerPass);
+    #[cfg(debug_assertions)]
+    {
+        dbg!(&context);
+        println!("{}", &context);
+    }
+
+    if !state.errors.is_empty() {
+        return Err(ReidError::LinkerErrors(state.errors));
+    }
+
+    let refs = TypeRefs::default();
+
+    let state = context.pass(&mut TypeInference { refs: &refs });
+    #[cfg(debug_assertions)]
+    {
+        dbg!(&state, &refs);
+        dbg!(&context);
+        println!("{}", &context);
+    }
+
+    // if !state.errors.is_empty() {
+    //     return Err(ReidError::TypeInferenceErrors(state.errors));
+    // }
+
+    let state = context.pass(&mut TypeCheck { refs: &refs });
+    #[cfg(debug_assertions)]
+    {
+        dbg!(&state);
+        println!("{}", &context);
+    }
+
+    if !state.errors.is_empty() {
+        return Err(ReidError::TypeCheckErrors(state.errors));
+    }
+
+    Ok(())
+}
+
 /// Takes in a bit of source code, parses and compiles it and produces `hello.o`
 /// and `hello.asm` from it, which can be linked using `ld` to produce an
 /// executable file.
@@ -118,32 +158,7 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
 
     println!("{}", &mir_context);
 
-    let state = mir_context.pass(&mut LinkerPass);
-    dbg!(&state);
-    println!("{}", &mir_context);
-
-    if !state.errors.is_empty() {
-        return Err(ReidError::LinkerErrors(state.errors));
-    }
-
-    let refs = TypeRefs::default();
-
-    let state = mir_context.pass(&mut TypeInference { refs: &refs });
-    dbg!(&state, &refs);
-    dbg!(&mir_context);
-    println!("{}", &mir_context);
-
-    // if !state.errors.is_empty() {
-    //     return Err(ReidError::TypeInferenceErrors(state.errors));
-    // }
-
-    let state = mir_context.pass(&mut TypeCheck { refs: &refs });
-    dbg!(&state);
-    println!("{}", &mir_context);
-
-    if !state.errors.is_empty() {
-        return Err(ReidError::TypeCheckErrors(state.errors));
-    }
+    perform_all_passes(&mut mir_context);
 
     let mut context = Context::new();
     let codegen_modules = mir_context.codegen(&mut context);

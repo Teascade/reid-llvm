@@ -15,7 +15,7 @@ use super::{
     Context, FunctionDefinition, Import, Metadata, Module,
 };
 
-pub static STD_SOURCE: &str = include_str!("../lib/std.reid");
+pub static STD_SOURCE: &str = include_str!("../../lib/std.reid");
 
 #[derive(thiserror::Error, Debug, Clone)]
 pub enum ErrorKind {
@@ -41,14 +41,10 @@ pub enum ErrorKind {
     FunctionIsPrivate(String, String),
 }
 
-fn compile_main() -> super::Module {
+pub fn compile_std() -> super::Module {
     let module = compile_module(STD_SOURCE, "standard_library".to_owned(), None, false).unwrap();
 
     let mut mir_context = super::Context::from(vec![module], Default::default());
-
-    let mut refs = super::typerefs::TypeRefs::default();
-    mir_context.pass(&mut super::typeinference::TypeInference { refs: &mut refs });
-    mir_context.pass(&mut super::typecheck::TypeCheck { refs: &mut refs });
 
     let std_compiled = mir_context.modules.remove(0);
     std_compiled
@@ -86,7 +82,7 @@ impl Pass for LinkerPass {
             modules.insert(module.name.clone(), Rc::new(RefCell::new(module)));
         }
 
-        modules.insert("std".to_owned(), Rc::new(RefCell::new(compile_main())));
+        modules.insert("std".to_owned(), Rc::new(RefCell::new(compile_std())));
 
         let mut modules_to_process: Vec<Rc<RefCell<Module>>> = modules.values().cloned().collect();
 
