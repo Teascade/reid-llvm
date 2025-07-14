@@ -56,7 +56,7 @@ impl<'t> Pass for TypeCheck<'t> {
 
     fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
         for function in &mut module.functions {
-            let res = function.typecheck(&self.refs, &mut state);
+            let res = function.typecheck(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
         }
     }
