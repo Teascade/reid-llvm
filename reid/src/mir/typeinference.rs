@@ -31,7 +31,7 @@ impl<'t> Pass for TypeInference<'t> {
 
     fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
         for function in &mut module.functions {
-            let res = function.infer_types(&self.refs, &mut state);
+            let res = function.infer_types(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
         }
     }

@@ -45,7 +45,7 @@ impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
 
 impl mir::Module {
     fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
-        let mut module = context.module(&self.name);
+        let mut module = context.module(&self.name, self.is_main);
 
         let mut functions = HashMap::new();
 
@@ -56,13 +56,16 @@ impl mir::Module {
                 .map(|(_, p)| p.get_type())
                 .collect();
 
+            let is_main = self.is_main && function.name == "main";
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => module.function(
                     &function.name,
                     function.return_type.get_type(),
                     param_types,
                     FunctionFlags {
-                        is_pub: function.is_pub,
+                        is_pub: function.is_pub || is_main,
+                        is_main,
+                        is_imported: function.is_imported,
                         ..FunctionFlags::default()
                     },
                 ),

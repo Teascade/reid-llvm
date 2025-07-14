@@ -28,7 +28,6 @@ impl<'scope> TypeRef<'scope> {
             match resolved {
                 TypeKind::Array(elem_ty, len) => {
                     let resolved_elem_ty = self.1.from_type(&elem_ty).unwrap().resolve_type();
-                    dbg!(&elem_ty, &resolved_elem_ty);
                     TypeKind::Array(Box::new(resolved_elem_ty), len)
                 }
                 _ => resolved,

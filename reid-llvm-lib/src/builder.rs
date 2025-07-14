@@ -272,7 +272,6 @@ impl Builder {
                 }
                 Store(ptr, _) => {
                     if let Ok(ty) = ptr.get_type(&self) {
-                        dbg!(&ty);
                         if let Type::Ptr(_) = ty {
                             Ok(())
                         } else {

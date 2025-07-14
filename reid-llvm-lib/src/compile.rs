@@ -2,7 +2,7 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{collections::HashMap, ffi::CString, marker::PhantomData, ptr::null_mut};
+use std::{collections::HashMap, ffi::CString, ptr::null_mut};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage,
@@ -134,13 +134,11 @@ impl Context {
                 .clone();
 
             let main_module_ref = main_module.compile(&context, &self.builder);
-            dbg!("main");
 
             for holder in module_holders.borrow().iter() {
                 if holder.value == main_module.value {
                     continue;
                 }
-                dbg!(holder.value);
                 let module_ref = holder.compile(&context, &self.builder);
                 LLVMLinkModules2(main_module_ref, module_ref);
             }
@@ -205,7 +203,7 @@ impl ModuleHolder {
             };
 
             for function in &self.functions {
-                function.compile(&mut module);
+                function.compile(&mut module, self.data.is_main);
             }
 
             module_ref
@@ -242,19 +240,24 @@ impl FunctionHolder {
         }
     }
 
-    unsafe fn compile(&self, module: &mut LLVMModule) {
+    unsafe fn compile(&self, module: &mut LLVMModule, in_main_module: bool) {
         unsafe {
             let own_function = *module.functions.get(&self.value).unwrap();
 
             if self.data.flags.is_extern {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
+                // Use "available internally"  if the other kind of extern
                 return;
             }
 
-            if self.data.flags.is_pub || self.data.name == "main" {
+            if self.data.flags.is_imported && !in_main_module {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
             } else {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMPrivateLinkage);
+            }
+
+            if in_main_module && self.data.flags.is_main {
+                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
             }
 
             for block in &self.blocks {

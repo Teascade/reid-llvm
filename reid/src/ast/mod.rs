@@ -169,4 +169,5 @@ pub struct Module {
     pub name: String,
     pub top_level_statements: Vec<TopLevelStatement>,
     pub path: Option<PathBuf>,
+    pub is_main: bool,
 }

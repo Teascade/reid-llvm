@@ -10,6 +10,7 @@ fn main() {
     let fibonacci = FunctionDefinition {
         name: fibonacci_name.clone(),
         is_pub: false,
+        is_imported: false,
         return_type: TypeKind::I32,
         parameters: vec![(fibonacci_n.clone(), TypeKind::I32)],
         kind: FunctionDefinitionKind::Local(
@@ -131,6 +132,7 @@ fn main() {
     let main = FunctionDefinition {
         name: "main".to_owned(),
         is_pub: false,
+        is_imported: false,
         return_type: TypeKind::I32,
         parameters: vec![],
         kind: FunctionDefinitionKind::Local(
@@ -162,6 +164,7 @@ fn main() {
             imports: vec![],
             functions: vec![fibonacci, main],
             path: None,
+            is_main: true,
         }],
         base: PathBuf::new(),
     };

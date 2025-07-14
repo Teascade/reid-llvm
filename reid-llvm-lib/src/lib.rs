@@ -4,7 +4,7 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleHolder, ModuleValue};
+use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue};
 use debug::PrintableModule;
 
 pub mod builder;
@@ -26,9 +26,10 @@ impl Context {
         }
     }
 
-    pub fn module<'ctx>(&'ctx self, name: &str) -> Module<'ctx> {
+    pub fn module<'ctx>(&'ctx self, name: &str, main: bool) -> Module<'ctx> {
         let value = self.builder.add_module(ModuleData {
             name: name.to_owned(),
+            is_main: main,
         });
         Module {
             phantom: PhantomData,
@@ -41,6 +42,7 @@ impl Context {
 #[derive(Debug, Clone, Hash)]
 pub struct ModuleData {
     name: String,
+    is_main: bool,
 }
 
 pub struct Module<'ctx> {
@@ -97,14 +99,18 @@ pub struct FunctionData {
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct FunctionFlags {
     pub is_extern: bool,
+    pub is_main: bool,
     pub is_pub: bool,
+    pub is_imported: bool,
 }
 
 impl Default for FunctionFlags {
     fn default() -> FunctionFlags {
         FunctionFlags {
             is_extern: false,
+            is_main: false,
             is_pub: false,
+            is_imported: false,
         }
     }
 }

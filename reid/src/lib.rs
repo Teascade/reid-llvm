@@ -43,7 +43,7 @@
 use std::path::PathBuf;
 
 use mir::{
-    imports::ImportsPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
+    linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
 };
 use reid_lib::Context;
 
@@ -65,12 +65,17 @@ pub enum ReidError {
     ParserError(#[from] token_stream::Error),
     #[error("Errors during typecheck: {0:?}")]
     TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
+    #[error("Errors during type inference: {0:?}")]
+    TypeInferenceErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
+    #[error("Errors during linking: {0:?}")]
+    LinkerErrors(Vec<mir::pass::Error<mir::linker::ErrorKind>>),
 }
 
 pub fn compile_module(
     source: &str,
     name: String,
     path: Option<PathBuf>,
+    is_main: bool,
 ) -> Result<mir::Module, ReidError> {
     let tokens = lexer::tokenize(source)?;
 
@@ -89,6 +94,7 @@ pub fn compile_module(
         name,
         top_level_statements: statements,
         path,
+        is_main,
     };
 
     Ok(ast_module.process())
@@ -103,17 +109,22 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
     let mut mir_context = mir::Context::from(
         vec![compile_module(
             source,
-            "main".to_owned(),
+            path.file_name().unwrap().to_str().unwrap().to_owned(),
             Some(path.clone()),
+            true,
         )?],
         path.parent().unwrap().to_owned(),
     );
 
     println!("{}", &mir_context);
 
-    let state = mir_context.pass(&mut ImportsPass);
+    let state = mir_context.pass(&mut LinkerPass);
     dbg!(&state);
     println!("{}", &mir_context);
+
+    if !state.errors.is_empty() {
+        return Err(ReidError::LinkerErrors(state.errors));
+    }
 
     let refs = TypeRefs::default();
 
@@ -121,6 +132,10 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
     dbg!(&state, &refs);
     dbg!(&mir_context);
     println!("{}", &mir_context);
+
+    // if !state.errors.is_empty() {
+    //     return Err(ReidError::TypeInferenceErrors(state.errors));
+    // }
 
     let state = mir_context.pass(&mut TypeCheck { refs: &refs });
     dbg!(&state);

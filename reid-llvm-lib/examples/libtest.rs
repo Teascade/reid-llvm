@@ -6,7 +6,7 @@ fn main() {
 
     let context = Context::new();
 
-    let mut module = context.module("test");
+    let mut module = context.module("test", true);
 
     let main = module.function("main", Type::I32, Vec::new(), FunctionFlags::default());
     let mut m_entry = main.block("entry");

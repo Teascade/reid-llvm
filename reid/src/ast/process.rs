@@ -26,6 +26,7 @@ impl ast::Module {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         is_pub: *is_pub,
+                        is_imported: false,
                         return_type: signature
                             .return_type
                             .clone()
@@ -45,6 +46,7 @@ impl ast::Module {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         is_pub: false,
+                        is_imported: false,
                         return_type: signature
                             .return_type
                             .clone()
@@ -68,6 +70,7 @@ impl ast::Module {
             imports,
             functions,
             path: self.path.clone(),
+            is_main: self.is_main,
         }
     }
 }

@@ -401,9 +401,7 @@ impl Parse for VariableReference {
                 stream.get_range().unwrap(),
             );
 
-            dbg!(&var_ref);
             while let Ok(ValueIndex(idx)) = stream.parse() {
-                dbg!(idx);
                 var_ref = VariableReference(
                     VariableReferenceKind::Index(Box::new(var_ref), idx),
                     stream.get_range().unwrap(),
