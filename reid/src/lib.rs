@@ -38,6 +38,7 @@
 //! - ~~Extern functions~~ (DONE)
 //! - ~~Strings~~ (DONE)
 //! - Loops
+//! - Debug Symbols
 //! ```
 
 use std::path::PathBuf;
@@ -79,6 +80,7 @@ pub fn compile_module(
 ) -> Result<mir::Module, ReidError> {
     let tokens = lexer::tokenize(source)?;
 
+    #[cfg(debug_assertions)]
     dbg!(&tokens);
 
     let mut token_stream = TokenStream::from(&tokens);
@@ -101,12 +103,13 @@ pub fn compile_module(
 }
 
 pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
-    let state = context.pass(&mut LinkerPass);
     #[cfg(debug_assertions)]
-    {
-        dbg!(&context);
-        println!("{}", &context);
-    }
+    println!("{}", &context);
+
+    let state = context.pass(&mut LinkerPass);
+
+    #[cfg(debug_assertions)]
+    println!("{:?}\n{}", &context, &context);
 
     if !state.errors.is_empty() {
         return Err(ReidError::LinkerErrors(state.errors));
@@ -115,23 +118,22 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
     let refs = TypeRefs::default();
 
     let state = context.pass(&mut TypeInference { refs: &refs });
+
     #[cfg(debug_assertions)]
-    {
-        dbg!(&state, &refs);
-        dbg!(&context);
-        println!("{}", &context);
-    }
+    dbg!(&state, &refs);
+    #[cfg(debug_assertions)]
+    println!("{}", &context);
 
     if !state.errors.is_empty() {
         return Err(ReidError::TypeInferenceErrors(state.errors));
     }
 
     let state = context.pass(&mut TypeCheck { refs: &refs });
+
     #[cfg(debug_assertions)]
-    {
-        dbg!(&state);
-        println!("{}", &context);
-    }
+    dbg!(&state);
+    #[cfg(debug_assertions)]
+    println!("{}", &context);
 
     if !state.errors.is_empty() {
         return Err(ReidError::TypeCheckErrors(state.errors));
@@ -156,14 +158,14 @@ pub fn compile(source: &str, path: PathBuf) -> Result<String, ReidError> {
         path.parent().unwrap().to_owned(),
     );
 
-    println!("{}", &mir_context);
-
     perform_all_passes(&mut mir_context)?;
 
     let mut context = Context::new();
     let codegen_modules = mir_context.codegen(&mut context);
 
+    #[cfg(debug_assertions)]
     dbg!(&codegen_modules);
+
     let compiled = codegen_modules.compile();
     compiled.output();
 

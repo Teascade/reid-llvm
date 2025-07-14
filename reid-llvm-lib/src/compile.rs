@@ -246,7 +246,7 @@ impl FunctionHolder {
 
             if self.data.flags.is_extern {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
-                // Use "available internally"  if the other kind of extern
+                // TODO Use "available internally"  if the other kind of extern
                 return;
             }
 
