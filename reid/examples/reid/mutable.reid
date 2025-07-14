@@ -6,11 +6,11 @@ fn indirection() -> bool {
 
 fn main() -> u16 {
     let mut test = 5;
-    let heehoo = 10;
+    let addition = 10;
 
     if indirection() {
         test = 11;
     }
 
-    return test + heehoo;
+    return test + addition;
 }
