@@ -326,7 +326,7 @@ impl Expression {
                     .cloned()
                     .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
 
-                if let Ok(f) = true_function {
+                if let Some(f) = state.ok(true_function, self.1) {
                     let param_len_given = function_call.parameters.len();
                     let param_len_expected = f.params.len();
 
