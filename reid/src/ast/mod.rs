@@ -22,6 +22,7 @@ pub enum TypeKind {
     U32,
     U64,
     U128,
+    String,
     Array(Box<TypeKind>, u64),
 }
 
@@ -157,6 +158,7 @@ pub enum BlockLevelStatement {
 #[derive(Debug)]
 pub enum TopLevelStatement {
     Import(ImportStatement),
+    ExternFunction(FunctionSignature),
     FunctionDefinition(FunctionDefinition),
 }
 

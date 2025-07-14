@@ -42,6 +42,24 @@ impl ast::Module {
                     };
                     functions.push(def);
                 }
+                ExternFunction(signature) => {
+                    let def = mir::FunctionDefinition {
+                        name: signature.name.clone(),
+                        return_type: signature
+                            .return_type
+                            .clone()
+                            .map(|r| r.0.into())
+                            .unwrap_or(mir::TypeKind::Void),
+                        parameters: signature
+                            .args
+                            .iter()
+                            .cloned()
+                            .map(|p| (p.0, p.1.into()))
+                            .collect(),
+                        kind: mir::FunctionDefinitionKind::Extern,
+                    };
+                    functions.push(def);
+                }
             }
         }
 
@@ -226,6 +244,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::Array(type_kind, length) => {
                 mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
             }
+            ast::TypeKind::String => mir::TypeKind::StringPtr,
         }
     }
 }

@@ -38,6 +38,7 @@ impl Parse for Type {
                     "u32" => TypeKind::U32,
                     "u64" => TypeKind::U64,
                     "u128" => TypeKind::U128,
+                    "string" => TypeKind::String,
                     _ => Err(stream.expected_err("known type identifier")?)?,
                 }
             } else {
@@ -474,6 +475,13 @@ impl Parse for TopLevelStatement {
         use TopLevelStatement as Stmt;
         Ok(match stream.peek() {
             Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
+            Some(Token::Extern) => {
+                stream.next(); // Consume Extern
+                stream.expect(Token::FnKeyword)?;
+                let extern_fn = Stmt::ExternFunction(stream.parse()?);
+                stream.expect(Token::Semi)?;
+                extern_fn
+            }
             Some(Token::FnKeyword) => Stmt::FunctionDefinition(stream.parse()?),
             _ => Err(stream.expected_err("import or fn")?)?,
         })

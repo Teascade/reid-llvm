@@ -200,7 +200,6 @@ pub enum Type {
     U128,
     Bool,
     Void,
-    String(u32),
     Ptr(Box<Type>),
 }
 

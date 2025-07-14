@@ -457,9 +457,11 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::String(val) => {
-                    LLVMBuildGlobalString(builder, into_cstring(val).as_ptr(), c"string".as_ptr())
-                }
+                ConstValue::String(val) => LLVMBuildGlobalStringPtr(
+                    builder,
+                    into_cstring(val).as_ptr(),
+                    c"string".as_ptr(),
+                ),
             }
         }
     }
@@ -478,7 +480,6 @@ impl Type {
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidType(),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
-                String(length) => LLVMArrayType(LLVMInt8TypeInContext(context), *length),
             }
         }
     }

@@ -32,6 +32,8 @@ pub enum Token {
     True,
     /// `false`
     False,
+    /// `extern`
+    Extern,
 
     // Symbols
     /// `;`
@@ -205,6 +207,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "else" => Token::Else,
                     "true" => Token::True,
                     "false" => Token::False,
+                    "extern" => Token::Extern,
                     _ => Token::Identifier(value),
                 };
                 variant

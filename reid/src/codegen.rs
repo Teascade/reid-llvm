@@ -495,7 +495,7 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
-            TypeKind::String(length) => Type::String(*length as u32),
+            TypeKind::StringPtr => Type::Ptr(Box::new(Type::I8)),
             TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type())),
             TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
