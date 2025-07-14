@@ -49,7 +49,13 @@ pub struct Module<'ctx> {
 }
 
 impl<'ctx> Module<'ctx> {
-    pub fn function(&mut self, name: &str, ret: Type, params: Vec<Type>) -> Function<'ctx> {
+    pub fn function(
+        &mut self,
+        name: &str,
+        ret: Type,
+        params: Vec<Type>,
+        flags: FunctionFlags,
+    ) -> Function<'ctx> {
         unsafe {
             Function {
                 phantom: PhantomData,
@@ -60,6 +66,7 @@ impl<'ctx> Module<'ctx> {
                         name: name.to_owned(),
                         ret,
                         params,
+                        flags,
                     },
                 ),
             }
@@ -76,6 +83,18 @@ pub struct FunctionData {
     name: String,
     ret: Type,
     params: Vec<Type>,
+    flags: FunctionFlags,
+}
+
+#[derive(Debug, Clone, Copy, Hash)]
+pub struct FunctionFlags {
+    pub is_extern: bool,
+}
+
+impl Default for FunctionFlags {
+    fn default() -> FunctionFlags {
+        FunctionFlags { is_extern: false }
+    }
 }
 
 pub struct Function<'ctx> {

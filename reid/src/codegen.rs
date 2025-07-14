@@ -1,8 +1,8 @@
 use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, Instr, Module,
-    TerminatorKind as Term, Type,
+    builder::InstructionValue, Block, CmpPredicate, ConstValue, Context, Function, FunctionFlags,
+    Instr, Module, TerminatorKind as Term, Type,
 };
 
 use crate::mir::{self, types::ReturnType, IndexedVariableReference, NamedVariableRef, TypeKind};
@@ -60,10 +60,21 @@ impl mir::Module {
                 .collect();
 
             let func = match &function.kind {
-                mir::FunctionDefinitionKind::Local(_, _) => {
-                    module.function(&function.name, function.return_type.get_type(), param_types)
-                }
-                mir::FunctionDefinitionKind::Extern => todo!(),
+                mir::FunctionDefinitionKind::Local(_, _) => module.function(
+                    &function.name,
+                    function.return_type.get_type(),
+                    param_types,
+                    FunctionFlags::default(),
+                ),
+                mir::FunctionDefinitionKind::Extern => module.function(
+                    &function.name,
+                    function.return_type.get_type(),
+                    param_types,
+                    FunctionFlags {
+                        is_extern: true,
+                        ..FunctionFlags::default()
+                    },
+                ),
             };
             functions.insert(function.name.clone(), func);
         }

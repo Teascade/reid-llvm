@@ -536,7 +536,7 @@ impl Literal {
                 (L::U64(_), TypeKind::U64) => self,
                 (L::U128(_), TypeKind::U128) => self,
                 (L::Bool(_), TypeKind::Bool) => self,
-                (L::String(val), TypeKind::StringPtr) => self,
+                (L::String(_), TypeKind::StringPtr) => self,
                 // TODO make sure that v is actually able to fit in the
                 // requested type
                 (L::Vague(VagueL::Number(v)), TypeKind::I8) => L::I8(v as i8),

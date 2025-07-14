@@ -1,4 +1,4 @@
-use reid_lib::{ConstValue, Context, Instr, CmpPredicate, TerminatorKind, Type};
+use reid_lib::{CmpPredicate, ConstValue, Context, FunctionFlags, Instr, TerminatorKind, Type};
 
 fn main() {
     use ConstValue::*;
@@ -8,10 +8,15 @@ fn main() {
 
     let mut module = context.module("test");
 
-    let main = module.function("main", Type::I32, Vec::new());
+    let main = module.function("main", Type::I32, Vec::new(), FunctionFlags::default());
     let mut m_entry = main.block("entry");
 
-    let fibonacci = module.function("fibonacci", Type::I32, vec![Type::I32]);
+    let fibonacci = module.function(
+        "fibonacci",
+        Type::I32,
+        vec![Type::I32],
+        FunctionFlags::default(),
+    );
 
     let arg = m_entry.build(Constant(I32(5))).unwrap();
     let fibonacci_call = m_entry
