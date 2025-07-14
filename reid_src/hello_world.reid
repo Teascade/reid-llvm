@@ -1,10 +1,10 @@
 
-extern fn puts(message: string) -> i32;
+import std::print;
 
 fn main() -> u16 {
     let hello = "hello world";
 
-    puts(hello);
+    print(hello);
 
     return 0;
 }

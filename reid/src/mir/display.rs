@@ -32,7 +32,7 @@ impl Display for Module {
 
 impl Display for Import {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "import {}", self.0)
+        write!(f, "import {}", self.0.join("::"))
     }
 }
 

@@ -20,9 +20,7 @@ impl ast::Module {
         for stmt in &self.top_level_statements {
             match stmt {
                 Import(import) => {
-                    for name in &import.0 {
-                        imports.push(mir::Import(name.clone(), import.1.into()));
-                    }
+                    imports.push(mir::Import(import.0.clone(), import.1.into()));
                 }
                 FunctionDefinition(ast::FunctionDefinition(signature, is_pub, block, range)) => {
                     let def = mir::FunctionDefinition {
