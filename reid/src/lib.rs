@@ -19,7 +19,7 @@
 //!
 //! An example program of Reid, that calculates the 5th fibonacci number (and
 //! uses Rust for highlighting) is:
-//! ```rust
+//! ```reid
 //! fn main() -> u16 {
 //!     return fibonacci(5);
 //! }
@@ -30,6 +30,7 @@
 //!     }
 //!     return fibonacci(n-1) + fibonacci(n-2);
 //! }
+//! ```
 //!
 //! Currently missing relevant features (TODOs) are:
 //! - ~~Arrays~~ (DONE)

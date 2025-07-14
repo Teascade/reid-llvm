@@ -91,13 +91,13 @@ impl FunctionDefinition {
                 state.scope.return_type_hint = Some(self.return_type.clone());
                 block.typecheck(state, &hints, Some(&return_type))
             }
-            FunctionDefinitionKind::Extern => Ok(Vague(Unknown)),
+            FunctionDefinitionKind::Extern => Ok((ReturnKind::Soft, Vague(Unknown))),
         };
 
         match inferred {
             Ok(t) => return_type
-                .collapse_into(&t)
-                .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t))),
+                .collapse_into(&t.1)
+                .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
             Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
         }
     }
@@ -109,7 +109,7 @@ impl Block {
         state: &mut PassState<ErrorKind>,
         hints: &TypeRefs,
         hint_t: Option<&TypeKind>,
-    ) -> Result<TypeKind, ErrorKind> {
+    ) -> Result<(ReturnKind, TypeKind), ErrorKind> {
         let mut state = state.inner();
 
         let mut early_return = None;
@@ -233,7 +233,7 @@ impl Block {
         if let Some((ReturnKind::Hard, expr)) = early_return {
             let hint = state.scope.return_type_hint.clone();
             let res = expr.typecheck(&mut state, &hints, hint.as_ref());
-            return Ok(state.or_else(res, Vague(Unknown), expr.1));
+            return Ok((ReturnKind::Hard, state.or_else(res, Vague(Unknown), expr.1)));
         }
 
         if let Some((return_kind, expr)) = &mut self.return_expression {
@@ -243,9 +243,9 @@ impl Block {
                 ReturnKind::Soft => hint_t.cloned(),
             };
             let res = expr.typecheck(&mut state, &hints, ret_hint_t.as_ref());
-            Ok(state.or_else(res, Vague(Unknown), expr.1))
+            Ok((*return_kind, state.or_else(res, Vague(Unknown), expr.1)))
         } else {
-            Ok(Void)
+            Ok((ReturnKind::Soft, Void))
         }
     }
 }
@@ -359,13 +359,26 @@ impl Expression {
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
                 let then_res = lhs.typecheck(state, &hints, hint_t);
-                let then_ret_t = state.or_else(then_res, Vague(Unknown), lhs.meta);
+                let (then_ret_kind, then_ret_t) =
+                    state.or_else(then_res, (ReturnKind::Soft, Vague(Unknown)), lhs.meta);
                 let else_ret_t = if let Some(else_block) = rhs {
                     let res = else_block.typecheck(state, &hints, hint_t);
-                    state.or_else(res, Vague(Unknown), else_block.meta)
+                    let (else_ret_kind, else_ret_t) =
+                        state.or_else(res, (ReturnKind::Soft, Vague(Unknown)), else_block.meta);
+
+                    if else_ret_kind == ReturnKind::Hard {
+                        Void
+                    } else {
+                        else_ret_t
+                    }
                 } else {
                     // Else return type is Void if it does not exist
                     Void
+                };
+                let then_ret_t = if then_ret_kind == ReturnKind::Hard {
+                    Void
+                } else {
+                    then_ret_t
                 };
 
                 // Make sure then and else -blocks have the same return type
@@ -384,7 +397,11 @@ impl Expression {
 
                 Ok(collapsed)
             }
-            ExprKind::Block(block) => block.typecheck(state, &hints, hint_t),
+            ExprKind::Block(block) => match block.typecheck(state, &hints, hint_t) {
+                Ok((ReturnKind::Hard, _)) => Ok(Void),
+                Ok((_, ty)) => Ok(ty),
+                Err(e) => Err(e),
+            },
             ExprKind::Index(expression, elem_ty, idx) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
