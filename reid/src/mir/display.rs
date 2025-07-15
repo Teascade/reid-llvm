@@ -199,8 +199,8 @@ impl Display for ExprKind {
             }
             ExprKind::StructIndex(expression, type_kind, name) => {
                 Display::fmt(&expression, f)?;
-                write!(f, "<{}>", type_kind)?;
-                write_access(f, name)
+                write_access(f, name)?;
+                write!(f, "<{}>", type_kind)
             }
         }
     }
