@@ -210,7 +210,7 @@ impl Context {
         let mut scope = Scope::default();
         pass.context(self, PassState::from(&mut state, &mut scope));
         for module in &mut self.modules {
-            module.pass(pass, &mut state, &mut scope);
+            module.pass(pass, &mut state, &mut scope.inner());
         }
         state
     }
