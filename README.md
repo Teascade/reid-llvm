@@ -38,6 +38,7 @@ Currently missing relevant features (TODOs) are:
 - ~~Extern functions~~ (DONE)
 - ~~Strings~~ (DONE)
 - Loops
+- Debug Information
 
 ### Why "Reid"
 

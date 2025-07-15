@@ -5,11 +5,14 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
-    util::match_types,
+    TypeData, util::match_types,
 };
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
 pub struct ModuleValue(pub(crate) usize);
+
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct TypeValue(pub(crate) ModuleValue, pub(crate) usize);
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
 pub struct FunctionValue(pub(crate) ModuleValue, pub(crate) usize);
@@ -25,6 +28,13 @@ pub struct ModuleHolder {
     pub(crate) value: ModuleValue,
     pub(crate) data: ModuleData,
     pub(crate) functions: Vec<FunctionHolder>,
+    pub(crate) types: Vec<TypeHolder>,
+}
+
+#[derive(Clone)]
+pub struct TypeHolder {
+    pub(crate) value: TypeValue,
+    pub(crate) data: TypeData,
 }
 
 #[derive(Clone)]
@@ -65,6 +75,7 @@ impl Builder {
             value,
             data,
             functions: Vec::new(),
+            types: Vec::new(),
         });
         value
     }

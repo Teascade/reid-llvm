@@ -263,3 +263,14 @@ pub enum TerminatorKind {
     Br(BlockValue),
     CondBr(InstructionValue, BlockValue, BlockValue),
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct TypeData {
+    name: String,
+    kind: CustomTypeKind,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub enum CustomTypeKind {
+    Struct(Vec<Type>),
+}
