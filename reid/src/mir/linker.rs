@@ -193,7 +193,7 @@ impl Pass for LinkerPass {
                     is_imported: false,
                     return_type: func.return_type.clone(),
                     parameters: func.parameters.clone(),
-                    kind: super::FunctionDefinitionKind::Extern,
+                    kind: super::FunctionDefinitionKind::Extern(true),
                 });
             }
         }

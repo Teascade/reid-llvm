@@ -61,7 +61,8 @@ impl Display for FunctionDefinitionKind {
                 write!(f, "{}", block)?;
                 Ok(())
             }
-            Self::Extern => write!(f, "<External>"),
+            Self::Extern(true) => write!(f, "<Classical Extern>"),
+            Self::Extern(false) => write!(f, "<Imported Extern>"),
         }
     }
 }

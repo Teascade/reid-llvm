@@ -181,14 +181,16 @@ impl IndexedVariableReference {
     }
 }
 
-#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum EqualsIssue {
     #[error("Function is already defined locally at {:?}", (.0).range)]
     ExistsLocally(Metadata),
-    #[error("asd")]
+    #[error("Equals")]
     Equals,
-    #[error("asd")]
-    ConflictingImports,
+    #[error("Function {0} is already declared locally at {:?}", (.1).range)]
+    AlreadyExtern(String, Metadata),
+    #[error("Function {0} is already imported from another module")]
+    ConflictWithImport(String),
 }
 
 impl FunctionDefinition {
@@ -197,15 +199,22 @@ impl FunctionDefinition {
             FunctionDefinitionKind::Local(_, metadata) => {
                 Err(EqualsIssue::ExistsLocally(*metadata))
             }
-            FunctionDefinitionKind::Extern => {
-                if self.is_pub == other.is_pub
-                    && self.name == other.name
-                    && self.parameters == other.parameters
-                    && self.return_type == other.return_type
-                {
-                    Ok(())
+            FunctionDefinitionKind::Extern(imported) => {
+                if *imported {
+                    Err(EqualsIssue::ConflictWithImport(self.name.clone()))
                 } else {
-                    Err(EqualsIssue::ConflictingImports)
+                    if self.is_pub == other.is_pub
+                        && self.name == other.name
+                        && self.parameters == other.parameters
+                        && self.return_type == other.return_type
+                    {
+                        Ok(())
+                    } else {
+                        Err(EqualsIssue::AlreadyExtern(
+                            self.name.clone(),
+                            self.signature(),
+                        ))
+                    }
                 }
             }
         }

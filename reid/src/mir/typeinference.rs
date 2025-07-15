@@ -64,7 +64,7 @@ impl FunctionDefinition {
                     ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
                 }
             }
-            FunctionDefinitionKind::Extern => {}
+            FunctionDefinitionKind::Extern(_) => {}
         };
 
         Ok(())

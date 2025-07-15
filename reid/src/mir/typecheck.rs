@@ -94,7 +94,7 @@ impl FunctionDefinition {
                 state.scope.return_type_hint = Some(self.return_type.clone());
                 block.typecheck(&mut state.inner(), &hints, Some(&return_type))
             }
-            FunctionDefinitionKind::Extern => {
+            FunctionDefinitionKind::Extern(_) => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
             }
         };

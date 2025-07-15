@@ -254,21 +254,22 @@ pub struct FunctionDefinition {
 pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range
     Local(Block, Metadata),
-    Extern,
+    /// True = imported from other module, False = Is user defined extern
+    Extern(bool),
 }
 
 impl FunctionDefinition {
     fn block_meta(&self) -> Metadata {
         match &self.kind {
             FunctionDefinitionKind::Local(block, _) => block.meta,
-            FunctionDefinitionKind::Extern => Metadata::default(),
+            FunctionDefinitionKind::Extern(_) => Metadata::default(),
         }
     }
 
     fn signature(&self) -> Metadata {
         match &self.kind {
             FunctionDefinitionKind::Local(_, metadata) => *metadata,
-            FunctionDefinitionKind::Extern => Metadata::default(),
+            FunctionDefinitionKind::Extern(_) => Metadata::default(),
         }
     }
 }

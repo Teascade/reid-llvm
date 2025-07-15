@@ -58,7 +58,7 @@ impl ast::Module {
                             .cloned()
                             .map(|p| (p.0, p.1.into()))
                             .collect(),
-                        kind: mir::FunctionDefinitionKind::Extern,
+                        kind: mir::FunctionDefinitionKind::Extern(false),
                     };
                     functions.push(def);
                 }

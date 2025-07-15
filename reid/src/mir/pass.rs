@@ -261,7 +261,7 @@ impl FunctionDefinition {
                 scope.return_type_hint = Some(self.return_type.clone());
                 block.pass(pass, state, scope);
             }
-            FunctionDefinitionKind::Extern => {}
+            FunctionDefinitionKind::Extern(_) => {}
         };
     }
 }

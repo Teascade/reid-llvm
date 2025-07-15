@@ -69,12 +69,13 @@ impl mir::Module {
                         ..FunctionFlags::default()
                     },
                 ),
-                mir::FunctionDefinitionKind::Extern => module.function(
+                mir::FunctionDefinitionKind::Extern(imported) => module.function(
                     &function.name,
                     function.return_type.get_type(),
                     param_types,
                     FunctionFlags {
                         is_extern: true,
+                        is_imported: *imported,
                         ..FunctionFlags::default()
                     },
                 ),
@@ -117,7 +118,7 @@ impl mir::Module {
                         }
                     }
                 }
-                mir::FunctionDefinitionKind::Extern => {}
+                mir::FunctionDefinitionKind::Extern(_) => {}
             }
         }
 

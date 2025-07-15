@@ -265,8 +265,15 @@ impl FunctionHolder {
                 return;
             }
 
-            if self.data.flags.is_imported && !in_main_module {
-                LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
+            if self.data.flags.is_imported {
+                if self.data.flags.is_extern {
+                    LLVMSetLinkage(
+                        own_function.value_ref,
+                        LLVMLinkage::LLVMAvailableExternallyLinkage,
+                    );
+                } else {
+                    LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
+                }
             } else {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMPrivateLinkage);
             }
