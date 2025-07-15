@@ -371,11 +371,12 @@ impl Expression {
                 let kind = expr_ty.resolve_weak().unwrap();
                 match kind {
                     CustomType(name) => {
-                        let struct_ty = state.scope.get_struct_type_mut(&name)?;
-                        match struct_ty.get_field_ty_mut(&field_name) {
+                        let struct_ty = state.scope.get_struct_type(&name)?;
+                        match struct_ty.get_field_ty(&field_name) {
                             Some(field_ty) => {
-                                let elem_ty = type_refs.from_type(&type_kind).unwrap();
-                                *field_ty = elem_ty.as_type().clone();
+                                let mut elem_ty = type_refs.from_type(&type_kind).unwrap();
+                                elem_ty.narrow(&type_refs.from_type(&field_ty).unwrap());
+                                *type_kind = elem_ty.as_type().clone();
                                 Ok(elem_ty)
                             }
                             None => Err(ErrorKind::NoSuchField(field_name.clone())),
@@ -389,8 +390,10 @@ impl Expression {
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
                         let field_ty = field.1.infer_types(state, type_refs);
+                        dbg!(&field_ty, expected_field_ty);
                         if let Some(mut field_ty) = state.ok(field_ty, field.1 .1) {
                             field_ty.narrow(&type_refs.from_type(&expected_field_ty).unwrap());
+                            dbg!(&field_ty);
                         }
                     } else {
                         state.ok::<_, Infallible>(
