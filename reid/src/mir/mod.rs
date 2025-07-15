@@ -330,7 +330,7 @@ pub struct TypeDefinition {
 
 #[derive(Debug)]
 pub enum TypeDefinitionKind {
-    Struct(Vec<(String, Type)>),
+    Struct(Vec<(String, TypeKind)>),
 }
 
 #[derive(Debug)]

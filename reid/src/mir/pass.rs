@@ -109,6 +109,7 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
 pub struct Scope {
     pub function_returns: Storage<ScopeFunction>,
     pub variables: Storage<ScopeVariable>,
+    pub types: Storage<ScopeTypedefKind>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
 }
@@ -125,11 +126,17 @@ pub struct ScopeVariable {
     pub mutable: bool,
 }
 
+#[derive(Clone, Debug)]
+pub enum ScopeTypedefKind {
+    Struct(Vec<(String, TypeKind)>),
+}
+
 impl Scope {
     pub fn inner(&self) -> Scope {
         Scope {
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
+            types: self.types.clone(),
             return_type_hint: self.return_type_hint.clone(),
         }
     }
@@ -218,6 +225,13 @@ impl Context {
 
 impl Module {
     fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+        for typedef in &self.typedefs {
+            let kind = match &typedef.kind {
+                TypeDefinitionKind::Struct(fields) => ScopeTypedefKind::Struct(fields.clone()),
+            };
+            scope.types.set(typedef.name.clone(), kind).ok();
+        }
+
         for function in &self.functions {
             scope
                 .function_returns
