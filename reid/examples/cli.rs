@@ -1,4 +1,4 @@
-use std::{env, fs, path::PathBuf};
+use std::{env, error::Error, fs, path::PathBuf};
 
 use reid::compile;
 use reid_lib::compile::CompileOutput;

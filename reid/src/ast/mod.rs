@@ -49,6 +49,7 @@ pub enum ExpressionKind {
     FunctionCall(Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
     IfExpr(Box<IfExpression>),
+    StructInit(StructInit),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -131,6 +132,12 @@ pub enum ReturnType {
 }
 
 #[derive(Debug, Clone)]
+pub struct StructInit {
+    name: String,
+    fields: Vec<(String, Expression)>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Block(
     pub Vec<BlockLevelStatement>,
     pub Option<(ReturnType, Expression)>,
@@ -160,18 +167,18 @@ pub enum BlockLevelStatement {
 
 #[derive(Debug)]
 pub struct TypeDefinition {
-    range: TokenRange,
     name: String,
     kind: TypeDefinitionKind,
+    range: TokenRange,
 }
 
 #[derive(Debug)]
 pub enum TypeDefinitionKind {
-    Struct(Vec<StructField>),
+    Struct(Vec<StructDefinitionField>),
 }
 
 #[derive(Debug)]
-pub struct StructField {
+pub struct StructDefinitionField {
     name: String,
     ty: Type,
     range: TokenRange,

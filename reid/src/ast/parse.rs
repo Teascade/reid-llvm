@@ -76,10 +76,24 @@ impl Parse for PrimaryExpression {
             )
         } else if let Ok(ifexpr) = stream.parse() {
             Expression(Kind::IfExpr(Box::new(ifexpr)), stream.get_range().unwrap())
+        } else if let (Some(Token::Identifier(_)), Some(Token::BraceOpen)) =
+            (stream.peek(), stream.peek2())
+        {
+            Expression(
+                Kind::StructInit(stream.parse()?),
+                stream.get_range().unwrap(),
+            )
         } else if let Some(token) = stream.next() {
             match &token {
                 Token::Identifier(v) => {
-                    Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
+                    if let Some(Token::BraceOpen) = stream.peek() {
+                        Expression(
+                            Kind::StructInit(stream.parse()?),
+                            stream.get_range().unwrap(),
+                        )
+                    } else {
+                        Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
+                    }
                 }
                 Token::DecimalValue(v) => Expression(
                     Kind::Literal(Literal::Number(*v)),
@@ -415,6 +429,57 @@ impl Parse for VariableReference {
     }
 }
 
+impl Parse for StructInit {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let Some(Token::Identifier(name)) = stream.next() else {
+            return Err(stream.expected_err("struct identifier")?);
+        };
+        stream.expect(Token::BraceOpen)?;
+        let named_list = stream.parse::<NamedFieldList<Expression>>()?;
+        let fields = named_list.0.into_iter().map(|f| (f.0, f.1)).collect();
+
+        stream.expect(Token::BraceClose)?;
+        stream.expect(Token::Semi)?;
+
+        Ok(StructInit { name, fields })
+    }
+}
+
+#[derive(Debug)]
+pub struct NamedFieldList<T: Parse + std::fmt::Debug>(Vec<NamedField<T>>);
+
+impl<T: Parse + std::fmt::Debug> Parse for NamedFieldList<T> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let mut fields = Vec::new();
+        while let Ok(field) = stream.parse() {
+            fields.push(field);
+            match stream.peek() {
+                Some(Token::Comma) => {
+                    stream.next();
+                } // Consume comma
+                Some(Token::BraceClose) => break,
+                Some(_) | None => Err(stream.expected_err("another field or closing brace")?)?,
+            }
+        }
+        Ok(NamedFieldList(fields))
+    }
+}
+
+#[derive(Debug)]
+pub struct NamedField<T: Parse + std::fmt::Debug>(String, T, TokenRange);
+
+impl<T: Parse + std::fmt::Debug> Parse for NamedField<T> {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let Some(Token::Identifier(field_name)) = stream.next() else {
+            return Err(stream.expected_err("type name")?);
+        };
+        stream.expect(Token::Colon)?;
+        let value = stream.parse()?;
+
+        Ok(NamedField(field_name, value, stream.get_range().unwrap()))
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ValueIndex(u64);
 
@@ -476,9 +541,30 @@ impl Parse for SetStatement {
     }
 }
 
-impl Parse for TypeDefinition {
-    fn parse(stream: TokenStream) -> Result<Self, Error> {
-        todo!()
+#[derive(Debug)]
+pub struct StructDefinition(String, Vec<StructDefinitionField>, TokenRange);
+
+impl Parse for StructDefinition {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::Struct)?;
+
+        let Some(Token::Identifier(name)) = stream.next() else {
+            return Err(stream.expected_err("identifier")?);
+        };
+
+        stream.expect(Token::BraceOpen)?;
+        let named_fields = stream.parse::<NamedFieldList<Type>>()?;
+        let fields = named_fields
+            .0
+            .into_iter()
+            .map(|f| StructDefinitionField {
+                name: f.0,
+                ty: f.1,
+                range: f.2,
+            })
+            .collect();
+        stream.expect(Token::BraceClose)?;
+        Ok(StructDefinition(name, fields, stream.get_range().unwrap()))
     }
 }
 
@@ -496,6 +582,14 @@ impl Parse for TopLevelStatement {
             }
             Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
                 Stmt::FunctionDefinition(stream.parse()?)
+            }
+            Some(Token::Struct) => {
+                let StructDefinition(name, fields, range) = stream.parse::<StructDefinition>()?;
+                Stmt::TypeDefinition(TypeDefinition {
+                    name,
+                    kind: TypeDefinitionKind::Struct(fields),
+                    range,
+                })
             }
             _ => Err(stream.expected_err("import or fn")?)?,
         })

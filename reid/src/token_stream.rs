@@ -63,6 +63,14 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
+    pub fn peek2(&mut self) -> Option<Token> {
+        if self.tokens.len() < (self.position + 1) {
+            None
+        } else {
+            Some(self.tokens[self.position + 1].token.clone())
+        }
+    }
+
     /// Parse the next value of trait Parse. If the parse succeeded, the related
     /// tokens are consumed, otherwise token stream does not advance.
     ///

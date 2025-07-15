@@ -199,6 +199,7 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 *idx,
             ),
+            ast::ExpressionKind::StructInit(struct_init) => todo!("implement struct init process"),
         };
 
         mir::Expression(kind, self.1.into())
