@@ -125,9 +125,11 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
     let state = context.pass(&mut TypeInference { refs: &refs });
 
     #[cfg(debug_assertions)]
+    dbg!(&refs);
+    #[cfg(debug_assertions)]
     println!("{}", &context);
     #[cfg(debug_assertions)]
-    dbg!(&state, &refs);
+    dbg!(&state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::TypeInferenceErrors(state.errors));
