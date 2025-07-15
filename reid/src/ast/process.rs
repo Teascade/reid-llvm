@@ -62,6 +62,7 @@ impl ast::Module {
                     };
                     functions.push(def);
                 }
+                TypeDefinition(type_definition) => todo!("Add process for type definition"),
             }
         }
 
@@ -249,6 +250,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
                 mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
             }
             ast::TypeKind::String => mir::TypeKind::StringPtr,
+            ast::TypeKind::Custom(_) => todo!("Add processing for custom types"),
         }
     }
 }

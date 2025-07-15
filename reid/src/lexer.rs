@@ -36,6 +36,8 @@ pub enum Token {
     False,
     /// `extern`
     Extern,
+    /// `struct`
+    Struct,
 
     // Symbols
     /// `;`
@@ -74,6 +76,8 @@ pub enum Token {
     BracketClose,
     /// `,`
     Comma,
+    /// `.`
+    Dot,
 
     Eof,
 }
@@ -211,6 +215,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "false" => Token::False,
                     "extern" => Token::Extern,
                     "pub" => Token::PubKeyword,
+                    "struct" => Token::Struct,
                     _ => Token::Identifier(value),
                 };
                 variant
@@ -249,6 +254,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '{' => Token::BraceOpen,
             '}' => Token::BraceClose,
             ',' => Token::Comma,
+            '.' => Token::Dot,
             // Invalid token
             _ => Err(Error::InvalidToken(*character, cursor.position))?,
         };

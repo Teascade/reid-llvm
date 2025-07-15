@@ -26,6 +26,7 @@ pub enum TypeKind {
     U128,
     String,
     Array(Box<TypeKind>, u64),
+    Custom(String),
 }
 
 #[derive(Debug, Clone)]
@@ -158,10 +159,30 @@ pub enum BlockLevelStatement {
 }
 
 #[derive(Debug)]
+pub struct TypeDefinition {
+    range: TokenRange,
+    name: String,
+    kind: TypeDefinitionKind,
+}
+
+#[derive(Debug)]
+pub enum TypeDefinitionKind {
+    Struct(Vec<StructField>),
+}
+
+#[derive(Debug)]
+pub struct StructField {
+    name: String,
+    ty: Type,
+    range: TokenRange,
+}
+
+#[derive(Debug)]
 pub enum TopLevelStatement {
     Import(ImportStatement),
     ExternFunction(FunctionSignature),
     FunctionDefinition(FunctionDefinition),
+    TypeDefinition(TypeDefinition),
 }
 
 #[derive(Debug)]

@@ -476,6 +476,12 @@ impl Parse for SetStatement {
     }
 }
 
+impl Parse for TypeDefinition {
+    fn parse(stream: TokenStream) -> Result<Self, Error> {
+        todo!()
+    }
+}
+
 impl Parse for TopLevelStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         use TopLevelStatement as Stmt;

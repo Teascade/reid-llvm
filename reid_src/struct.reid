@@ -1,0 +1,15 @@
+// Arithmetic, function calls and imports!
+
+struct Test {
+    field: i32,
+    second: u32
+}
+
+fn main() -> u32 {
+    let value = Test {
+        field: 5,
+        second: 3,
+    };
+
+    return Test.second;
+}
