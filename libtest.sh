@@ -12,9 +12,10 @@
 #    -o main /usr/lib/crt1.o hello.o -lc  && \
 # ./main ; echo "Return value: ""$?"
 
-$BINARY="$($1 | cut -d'.' -f1)"".out"
+BINARY="$(echo $1 | cut -d'.' -f1)"".out"
 
-make clean SRC=$1 && make SRC=$1 && echo "" && \
+make clean SRC=$1 && make SRC=$1 && echo ""
+
 $BINARY ; echo "Return value: ""$?"
 
 ## Command from: clang -v hello.o -o test
