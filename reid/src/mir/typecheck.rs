@@ -427,7 +427,7 @@ impl Expression {
                 Ok((_, ty)) => Ok(ty),
                 Err(e) => Err(e),
             },
-            ExprKind::Index(expression, elem_ty, idx) => {
+            ExprKind::ArrayIndex(expression, elem_ty, idx) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
                     TypeKind::Array(type_kind, _) => &type_kind,
@@ -487,6 +487,10 @@ impl Expression {
                     }
                 }
             }
+            ExprKind::StructIndex(expression, type_kind, _) => {
+                todo!("typechecking for struct index")
+            }
+            ExprKind::Struct(_, items) => todo!("typechecking for struct expression"),
         }
     }
 }

@@ -130,7 +130,7 @@ impl Display for ExprKind {
             ExprKind::FunctionCall(fc) => Display::fmt(fc, f),
             ExprKind::If(if_exp) => Display::fmt(&if_exp, f),
             ExprKind::Block(block) => Display::fmt(block, f),
-            ExprKind::Index(expression, elem_ty, idx) => {
+            ExprKind::ArrayIndex(expression, elem_ty, idx) => {
                 Display::fmt(&expression, f)?;
                 write!(f, "<{}>", elem_ty)?;
                 write_index(f, *idx)
@@ -151,6 +151,28 @@ impl Display for ExprKind {
                     writeln!(inner_f, "")?;
                 }
                 f.write_char(']')
+            }
+            ExprKind::Struct(name, items) => {
+                write!(f, "{} ", name);
+
+                f.write_char('{')?;
+                let mut state = Default::default();
+                let mut inner_f = PadAdapter::wrap(f, &mut state);
+                let mut iter = items.iter();
+                if let Some((name, expr)) = iter.next() {
+                    write!(inner_f, "\n{}: {}", name, expr);
+                    while let Some((name, expr)) = iter.next() {
+                        writeln!(inner_f, ",")?;
+                        write!(inner_f, "{}: {}", name, expr);
+                    }
+                    writeln!(inner_f, "")?;
+                }
+                f.write_char('}')
+            }
+            ExprKind::StructIndex(expression, type_kind, name) => {
+                Display::fmt(&expression, f)?;
+                write!(f, "<{}>", type_kind)?;
+                write_access(f, name)
             }
         }
     }
@@ -253,4 +275,9 @@ fn write_index(f: &mut std::fmt::Formatter<'_>, idx: u64) -> std::fmt::Result {
     f.write_char('[')?;
     Display::fmt(&idx, f)?;
     f.write_char(']')
+}
+
+fn write_access(f: &mut std::fmt::Formatter<'_>, name: &String) -> std::fmt::Result {
+    f.write_char('.')?;
+    Display::fmt(name, f)
 }

@@ -283,7 +283,7 @@ impl Expression {
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
-            ExprKind::Index(expression, index_ty, _) => {
+            ExprKind::ArrayIndex(expression, index_ty, _) => {
                 let expr_ty = expression.infer_types(state, type_refs)?;
 
                 // Check that the resolved type is at least an array, no
@@ -336,6 +336,10 @@ impl Expression {
                     }
                 }
             }
+            ExprKind::StructIndex(expression, type_kind, _) => {
+                todo!("type inference for struct indexes")
+            }
+            ExprKind::Struct(_, items) => todo!("type inference for struct expression"),
         }
     }
 }

@@ -385,7 +385,7 @@ impl mir::Expression {
                     None
                 }
             }
-            mir::ExprKind::Index(expression, val_t, idx) => {
+            mir::ExprKind::ArrayIndex(expression, val_t, idx) => {
                 let array = expression.codegen(scope)?;
                 let ptr = scope
                     .block
@@ -428,6 +428,10 @@ impl mir::Expression {
 
                 Some(array)
             }
+            mir::ExprKind::StructIndex(expression, type_kind, _) => {
+                todo!("codegen for struct index")
+            }
+            mir::ExprKind::Struct(_, items) => todo!("codegen for struct expression"),
         }
     }
 }
@@ -511,6 +515,7 @@ impl TypeKind {
             TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type())),
             TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
+            TypeKind::CustomType(_, custom_type_kind) => todo!("codegen for custom type"),
         }
     }
 }

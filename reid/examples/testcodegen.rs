@@ -163,6 +163,7 @@ fn main() {
             name: "test module".to_owned(),
             imports: vec![],
             functions: vec![fibonacci, main],
+            typedefs: Vec::new(),
             path: None,
             is_main: true,
         }],

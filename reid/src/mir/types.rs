@@ -1,3 +1,5 @@
+use crate::util::try_all;
+
 use super::*;
 
 #[derive(Debug, Clone)]
@@ -87,7 +89,7 @@ impl ReturnType for Expression {
             Block(block) => block.return_type(),
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
-            Index(expression, _, _) => {
+            ArrayIndex(expression, _, _) => {
                 let expr_type = expression.return_type()?;
                 if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
                     Ok((ReturnKind::Soft, *elem_ty))
@@ -104,6 +106,18 @@ impl ReturnType for Expression {
                 Ok((
                     ReturnKind::Soft,
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
+                ))
+            }
+            StructIndex(expression, type_kind, _) => todo!("todo return type for struct index"),
+            Struct(name, items) => {
+                let f_types = try_all(items.iter().map(|e| e.1.return_type()).collect())
+                    .map_err(|e| unsafe { e.get_unchecked(0).clone() })?
+                    .iter()
+                    .map(|r| r.1.clone())
+                    .collect();
+                Ok((
+                    ReturnKind::Soft,
+                    TypeKind::CustomType(name.clone(), CustomTypeKind::Struct(f_types)),
                 ))
             }
         }

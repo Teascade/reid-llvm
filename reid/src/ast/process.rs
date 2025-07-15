@@ -72,6 +72,7 @@ impl ast::Module {
             functions,
             path: self.path.clone(),
             is_main: self.is_main,
+            typedefs: todo!("process for typedefs"),
         }
     }
 }
@@ -197,7 +198,7 @@ impl ast::Expression {
             ast::ExpressionKind::Array(expressions) => {
                 mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
             }
-            ast::ExpressionKind::ArrayIndex(expression, idx) => mir::ExprKind::Index(
+            ast::ExpressionKind::ArrayIndex(expression, idx) => mir::ExprKind::ArrayIndex(
                 Box::new(expression.process()),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 *idx,

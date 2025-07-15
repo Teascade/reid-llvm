@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use crate::token_stream::TokenRange;
+use crate::{ast::Type, token_stream::TokenRange};
 
 mod display;
 pub mod linker;
@@ -65,6 +65,8 @@ pub enum TypeKind {
     StringPtr,
     #[error("[{0}; {1}]")]
     Array(Box<TypeKind>, u64),
+    #[error("{0} ({1})")]
+    CustomType(String, CustomTypeKind),
     #[error(transparent)]
     Vague(#[from] VagueType),
 }
@@ -77,6 +79,14 @@ pub enum VagueType {
     Number,
     #[error("TypeRef({0})")]
     TypeRef(usize),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum CustomTypeKind {
+    #[error("struct({0:?})")]
+    Struct(Vec<TypeKind>),
+    #[error("CustomType")]
+    Unknown,
 }
 
 impl TypeKind {
@@ -107,6 +117,7 @@ impl TypeKind {
             TypeKind::U128 => false,
             TypeKind::StringPtr => false,
             TypeKind::Array(_, _) => false,
+            TypeKind::CustomType(_, _) => false,
         }
     }
 
@@ -126,8 +137,9 @@ impl TypeKind {
             Bool => true,
             Vague(_) => false,
             Void => false,
-            TypeKind::StringPtr => false,
+            StringPtr => false,
             Array(_, _) => false,
+            TypeKind::CustomType(_, _) => false,
         }
     }
 }
@@ -217,8 +229,10 @@ pub struct Import(pub Vec<String>, pub Metadata);
 #[derive(Debug)]
 pub enum ExprKind {
     Variable(NamedVariableRef),
-    Index(Box<Expression>, TypeKind, u64),
+    ArrayIndex(Box<Expression>, TypeKind, u64),
+    StructIndex(Box<Expression>, TypeKind, String),
     Array(Vec<Expression>),
+    Struct(String, Vec<(String, Expression)>),
     Literal(Literal),
     BinOp(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(FunctionCall),
@@ -307,10 +321,22 @@ pub enum StmtKind {
 }
 
 #[derive(Debug)]
+pub struct TypeDefinition {
+    pub name: String,
+    pub kind: TypeDefinitionKind,
+}
+
+#[derive(Debug)]
+pub enum TypeDefinitionKind {
+    Struct(Vec<(String, Type)>),
+}
+
+#[derive(Debug)]
 pub struct Module {
     pub name: String,
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionDefinition>,
+    pub typedefs: Vec<TypeDefinition>,
     pub path: Option<PathBuf>,
     pub is_main: bool,
 }
