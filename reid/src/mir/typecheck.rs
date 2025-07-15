@@ -504,7 +504,7 @@ impl IndexedVariableReference {
             IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
                 Ok(storage.get(&name).cloned())
             }
-            IndexedVariableReferenceKind::Index(inner_ref, _) => {
+            IndexedVariableReferenceKind::ArrayIndex(inner_ref, _) => {
                 if let Some(var) = inner_ref.get_variable(storage)? {
                     match &var.ty {
                         TypeKind::Array(inner_ty, _) => Ok(Some(ScopeVariable {
@@ -516,6 +516,9 @@ impl IndexedVariableReference {
                 } else {
                     Ok(None)
                 }
+            }
+            IndexedVariableReferenceKind::StructIndex(indexed_variable_reference, _) => {
+                todo!("struct index refrence typecheck")
             }
         }
     }

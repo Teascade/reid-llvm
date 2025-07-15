@@ -308,7 +308,8 @@ pub struct IndexedVariableReference {
 #[derive(Debug)]
 pub enum IndexedVariableReferenceKind {
     Named(NamedVariableRef),
-    Index(Box<IndexedVariableReference>, u64),
+    ArrayIndex(Box<IndexedVariableReference>, u64),
+    StructIndex(Box<IndexedVariableReference>, String),
 }
 
 #[derive(Debug)]
@@ -324,6 +325,7 @@ pub enum StmtKind {
 pub struct TypeDefinition {
     pub name: String,
     pub kind: TypeDefinitionKind,
+    pub meta: Metadata,
 }
 
 #[derive(Debug)]

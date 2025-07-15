@@ -15,6 +15,7 @@ impl ast::Module {
     pub fn process(&self) -> mir::Module {
         let mut imports = Vec::new();
         let mut functions = Vec::new();
+        let mut typedefs = Vec::new();
 
         use ast::TopLevelStatement::*;
         for stmt in &self.top_level_statements {
@@ -62,7 +63,23 @@ impl ast::Module {
                     };
                     functions.push(def);
                 }
-                TypeDefinition(type_definition) => todo!("Add process for type definition"),
+                TypeDefinition(ast::TypeDefinition { name, kind, range }) => {
+                    let def = mir::TypeDefinition {
+                        name: name.clone(),
+                        kind: match kind {
+                            ast::TypeDefinitionKind::Struct(struct_definition_fields) => {
+                                mir::TypeDefinitionKind::Struct(
+                                    struct_definition_fields
+                                        .iter()
+                                        .map(|s| (s.name.clone(), s.ty.clone().into()))
+                                        .collect(),
+                                )
+                            }
+                        },
+                        meta: (*range).into(),
+                    };
+                    typedefs.push(def);
+                }
             }
         }
 
@@ -72,7 +89,7 @@ impl ast::Module {
             functions,
             path: self.path.clone(),
             is_main: self.is_main,
-            typedefs: todo!("process for typedefs"),
+            typedefs,
         }
     }
 }
@@ -154,10 +171,13 @@ impl ast::VariableReferenceKind {
                 ))
             }
             ast::VariableReferenceKind::ArrayIndex(var_ref, idx) => {
-                mir::IndexedVariableReferenceKind::Index(Box::new(var_ref.process()), *idx)
+                mir::IndexedVariableReferenceKind::ArrayIndex(Box::new(var_ref.process()), *idx)
             }
-            ast::VariableReferenceKind::StructIndex(variable_reference, _) => {
-                todo!("struct indexing into mir")
+            ast::VariableReferenceKind::StructIndex(var_ref, name) => {
+                mir::IndexedVariableReferenceKind::StructIndex(
+                    Box::new(var_ref.process()),
+                    name.clone(),
+                )
             }
         }
     }
@@ -203,10 +223,19 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 *idx,
             ),
-            ast::ExpressionKind::StructExpression(struct_init) => {
-                todo!("implement struct init process")
-            }
-            ast::ExpressionKind::StructIndex(expression, _) => todo!("struct index expression"),
+            ast::ExpressionKind::StructExpression(struct_init) => mir::ExprKind::Struct(
+                struct_init.name.clone(),
+                struct_init
+                    .fields
+                    .iter()
+                    .map(|(n, e)| (n.clone(), e.process()))
+                    .collect(),
+            ),
+            ast::ExpressionKind::StructIndex(expression, name) => mir::ExprKind::StructIndex(
+                Box::new(expression.process()),
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
+                name.clone(),
+            ),
         };
 
         mir::Expression(kind, self.1.into())

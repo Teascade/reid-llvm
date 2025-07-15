@@ -179,8 +179,11 @@ impl IndexedVariableReference {
     pub fn get_name(&self) -> String {
         match &self.kind {
             IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => name.clone(),
-            IndexedVariableReferenceKind::Index(inner, idx) => {
+            IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
                 format!("{}[{}]", inner.get_name(), idx)
+            }
+            IndexedVariableReferenceKind::StructIndex(inner, name) => {
+                format!("{}.{}", inner.get_name(), name)
             }
         }
     }
@@ -190,7 +193,8 @@ impl IndexedVariableReference {
             IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => {
                 *ty = new_ty.clone();
             }
-            IndexedVariableReferenceKind::Index(inner, _) => inner.update_type(new_ty),
+            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.update_type(new_ty),
+            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.update_type(new_ty),
         }
     }
 }

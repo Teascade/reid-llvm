@@ -161,7 +161,7 @@ impl IndexedVariableReference {
             super::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
                 Ok(hints.find_hint(&name))
             }
-            super::IndexedVariableReferenceKind::Index(inner, _) => {
+            super::IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
                 if let Some((mutable, inner_ref)) = inner.find_hint(hints)? {
                     // Check that the resolved type is at least an array, no
                     // need for further resolution.
@@ -176,6 +176,9 @@ impl IndexedVariableReference {
                 } else {
                     Ok(None)
                 }
+            }
+            super::IndexedVariableReferenceKind::StructIndex(indexed_variable_reference, _) => {
+                todo!("struct index refrence type inference")
             }
         }
     }

@@ -173,7 +173,7 @@ impl IndexedVariableReference {
                 .get(name)
                 .cloned()
                 .map(|v| (v, Vec::new())),
-            mir::IndexedVariableReferenceKind::Index(inner, idx) => {
+            mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
                 let (inner_val, mut indices) = inner.get_stack_value(scope)?;
 
                 match &inner_val.1 {
@@ -183,6 +183,9 @@ impl IndexedVariableReference {
                     }
                     _ => panic!("Tried to codegen indexing a non-indexable value!"),
                 }
+            }
+            mir::IndexedVariableReferenceKind::StructIndex(indexed_variable_reference, _) => {
+                todo!("codegen for indexed var refrence")
             }
         }
     }

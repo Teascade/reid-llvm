@@ -23,6 +23,9 @@ impl Display for Module {
         for import in &self.imports {
             writeln!(inner_f, "{}", import)?;
         }
+        for typedef in &self.typedefs {
+            writeln!(inner_f, "{}", typedef)?;
+        }
         for fun in &self.functions {
             writeln!(inner_f, "{}", fun)?;
         }
@@ -33,6 +36,31 @@ impl Display for Module {
 impl Display for Import {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "import {}", self.0.join("::"))
+    }
+}
+
+impl Display for TypeDefinition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "type {} = ", self.name)?;
+        Display::fmt(&self.kind, f)
+    }
+}
+
+impl Display for TypeDefinitionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeDefinitionKind::Struct(items) => {
+                write!(f, "struct ")?;
+                f.write_char('{')?;
+                writeln!(f)?;
+                let mut state = Default::default();
+                let mut inner_f = PadAdapter::wrap(f, &mut state);
+                for (field_name, field_ty) in items {
+                    writeln!(inner_f, "{}: {:?},", field_name, field_ty)?;
+                }
+                f.write_char('}')
+            }
+        }
     }
 }
 
@@ -153,17 +181,17 @@ impl Display for ExprKind {
                 f.write_char(']')
             }
             ExprKind::Struct(name, items) => {
-                write!(f, "{} ", name);
+                write!(f, "{} ", name)?;
 
                 f.write_char('{')?;
                 let mut state = Default::default();
                 let mut inner_f = PadAdapter::wrap(f, &mut state);
                 let mut iter = items.iter();
                 if let Some((name, expr)) = iter.next() {
-                    write!(inner_f, "\n{}: {}", name, expr);
+                    write!(inner_f, "\n{}: {}", name, expr)?;
                     while let Some((name, expr)) = iter.next() {
                         writeln!(inner_f, ",")?;
-                        write!(inner_f, "{}: {}", name, expr);
+                        write!(inner_f, "{}: {}", name, expr)?;
                     }
                     writeln!(inner_f, "")?;
                 }
@@ -212,9 +240,13 @@ impl Display for IndexedVariableReference {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.kind {
             IndexedVariableReferenceKind::Named(name) => Display::fmt(name, f),
-            IndexedVariableReferenceKind::Index(variable_reference_kind, idx) => {
-                Display::fmt(&variable_reference_kind, f)?;
+            IndexedVariableReferenceKind::ArrayIndex(var_ref, idx) => {
+                Display::fmt(&var_ref, f)?;
                 write_index(f, *idx)
+            }
+            IndexedVariableReferenceKind::StructIndex(var_ref, name) => {
+                Display::fmt(&var_ref, f)?;
+                write_access(f, name)
             }
         }
     }
