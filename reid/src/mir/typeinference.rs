@@ -412,25 +412,3 @@ impl Expression {
         }
     }
 }
-
-impl pass::Scope {
-    fn get_struct_type(&self, name: &String) -> Result<&StructType, ErrorKind> {
-        let ty = self
-            .types
-            .get(&name)
-            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
-        match ty {
-            TypeDefinitionKind::Struct(struct_ty) => Ok(struct_ty),
-        }
-    }
-
-    fn get_struct_type_mut(&mut self, name: &String) -> Result<&mut StructType, ErrorKind> {
-        let ty = self
-            .types
-            .get_mut(&name)
-            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
-        match ty {
-            TypeDefinitionKind::Struct(struct_ty) => Ok(struct_ty),
-        }
-    }
-}

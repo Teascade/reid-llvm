@@ -103,10 +103,6 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
     pub fn get(&self, key: &String) -> Option<&T> {
         self.0.get(key)
     }
-
-    pub fn get_mut(&mut self, key: &String) -> Option<&mut T> {
-        self.0.get_mut(key)
-    }
 }
 
 #[derive(Clone, Default, Debug)]
