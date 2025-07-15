@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::util::try_all;
 
 use super::*;
@@ -26,6 +28,16 @@ impl TypeKind {
             BinaryOperator::And => TypeKind::Bool,
             BinaryOperator::Cmp(_) => TypeKind::Bool,
         }
+    }
+}
+
+impl StructType {
+    pub fn get_field_ty(&self, name: &String) -> Option<&TypeKind> {
+        self.0.iter().find(|(n, _)| n == name).map(|(_, ty)| ty)
+    }
+
+    pub fn get_field_ty_mut(&mut self, name: &String) -> Option<&mut TypeKind> {
+        self.0.iter_mut().find(|(n, _)| n == name).map(|(_, ty)| ty)
     }
 }
 
@@ -108,18 +120,8 @@ impl ReturnType for Expression {
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
                 ))
             }
-            StructIndex(expression, type_kind, _) => todo!("todo return type for struct index"),
-            Struct(name, items) => {
-                let f_types = try_all(items.iter().map(|e| e.1.return_type()).collect())
-                    .map_err(|e| unsafe { e.get_unchecked(0).clone() })?
-                    .iter()
-                    .map(|r| r.1.clone())
-                    .collect();
-                Ok((
-                    ReturnKind::Soft,
-                    TypeKind::CustomType(name.clone(), CustomTypeKind::Struct(f_types)),
-                ))
-            }
+            StructIndex(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
+            Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
         }
     }
 }

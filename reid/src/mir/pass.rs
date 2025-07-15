@@ -103,13 +103,17 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
     pub fn get(&self, key: &String) -> Option<&T> {
         self.0.get(key)
     }
+
+    pub fn get_mut(&mut self, key: &String) -> Option<&mut T> {
+        self.0.get_mut(key)
+    }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct Scope {
     pub function_returns: Storage<ScopeFunction>,
     pub variables: Storage<ScopeVariable>,
-    pub types: Storage<ScopeTypedefKind>,
+    pub types: Storage<TypeDefinitionKind>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
 }
@@ -126,11 +130,6 @@ pub struct ScopeVariable {
     pub mutable: bool,
 }
 
-#[derive(Clone, Debug)]
-pub enum ScopeTypedefKind {
-    Struct(Vec<(String, TypeKind)>),
-}
-
 impl Scope {
     pub fn inner(&self) -> Scope {
         Scope {
@@ -139,6 +138,10 @@ impl Scope {
             types: self.types.clone(),
             return_type_hint: self.return_type_hint.clone(),
         }
+    }
+
+    pub fn get_typedefs(&self) -> &TypedefMap {
+        &self.types.0
     }
 }
 
@@ -227,7 +230,7 @@ impl Module {
     fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
         for typedef in &self.typedefs {
             let kind = match &typedef.kind {
-                TypeDefinitionKind::Struct(fields) => ScopeTypedefKind::Struct(fields.clone()),
+                TypeDefinitionKind::Struct(fields) => TypeDefinitionKind::Struct(fields.clone()),
             };
             scope.types.set(typedef.name.clone(), kind).ok();
         }

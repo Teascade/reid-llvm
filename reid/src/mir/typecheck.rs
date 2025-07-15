@@ -43,6 +43,12 @@ pub enum ErrorKind {
     TriedIndexingNonArray(TypeKind),
     #[error("Index {0} out of bounds ({1})")]
     IndexOutOfBounds(u64, u64),
+    #[error("No such type {0} could be found")]
+    NoSuchType(String),
+    #[error("Attempted to access field of non-struct type of {0}")]
+    TriedAccessingNonStruct(TypeKind),
+    #[error("No such struct-field on type {0}")]
+    NoSuchField(String),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the

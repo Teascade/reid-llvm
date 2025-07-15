@@ -8,7 +8,7 @@ use crate::mir::VagueType;
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
-    BinaryOperator, TypeKind,
+    BinaryOperator, TypeDefinition, TypeKind,
 };
 
 #[derive(Clone)]
@@ -209,12 +209,12 @@ impl<'outer> ScopeTypeRefs<'outer> {
         }
     }
 
-    pub fn find_hint(&'outer self, name: &String) -> Option<(bool, TypeRef<'outer>)> {
+    pub fn find_var(&'outer self, name: &String) -> Option<(bool, TypeRef<'outer>)> {
         self.variables
             .borrow()
             .get(name)
             .map(|(mutable, idx)| (*mutable, TypeRef(idx.clone(), self)))
-            .or(self.outer.map(|o| o.find_hint(name)).flatten())
+            .or(self.outer.map(|o| o.find_var(name)).flatten())
     }
 
     pub fn binop(

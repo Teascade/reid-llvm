@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     ast::{self},
-    mir::{self, NamedVariableRef, StmtKind},
+    mir::{self, NamedVariableRef, StmtKind, StructType},
 };
 
 impl mir::Context {
@@ -68,12 +68,12 @@ impl ast::Module {
                         name: name.clone(),
                         kind: match kind {
                             ast::TypeDefinitionKind::Struct(struct_definition_fields) => {
-                                mir::TypeDefinitionKind::Struct(
+                                mir::TypeDefinitionKind::Struct(StructType(
                                     struct_definition_fields
                                         .iter()
                                         .map(|s| (s.name.clone(), s.ty.clone().into()))
                                         .collect(),
-                                )
+                                ))
                             }
                         },
                         meta: (*range).into(),

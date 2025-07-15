@@ -2,9 +2,9 @@
 //! Reid. It contains a simplified version of Reid which can be e.g.
 //! typechecked.
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
-use crate::{ast::Type, token_stream::TokenRange};
+use crate::token_stream::TokenRange;
 
 mod display;
 pub mod linker;
@@ -65,8 +65,8 @@ pub enum TypeKind {
     StringPtr,
     #[error("[{0}; {1}]")]
     Array(Box<TypeKind>, u64),
-    #[error("{0} ({1})")]
-    CustomType(String, CustomTypeKind),
+    #[error("{0}")]
+    CustomType(String),
     #[error(transparent)]
     Vague(#[from] VagueType),
 }
@@ -81,13 +81,10 @@ pub enum VagueType {
     TypeRef(usize),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum CustomTypeKind {
-    #[error("struct({0:?})")]
-    Struct(Vec<TypeKind>),
-    #[error("CustomType")]
-    Unknown,
-}
+#[derive(Clone, Debug)]
+pub struct StructType(pub Vec<(String, TypeKind)>);
+
+pub type TypedefMap = HashMap<String, TypeDefinitionKind>;
 
 impl TypeKind {
     pub fn known(&self) -> Result<TypeKind, VagueType> {
@@ -100,7 +97,7 @@ impl TypeKind {
 }
 
 impl TypeKind {
-    pub fn signed(&self) -> bool {
+    pub fn signed(&self, typedefs: &TypedefMap) -> bool {
         match self {
             TypeKind::Void => false,
             TypeKind::Vague(_) => false,
@@ -117,11 +114,13 @@ impl TypeKind {
             TypeKind::U128 => false,
             TypeKind::StringPtr => false,
             TypeKind::Array(_, _) => false,
-            TypeKind::CustomType(_, _) => false,
+            TypeKind::CustomType(name) => match typedefs.get(name).unwrap() {
+                TypeDefinitionKind::Struct(_) => false,
+            },
         }
     }
 
-    pub fn is_maths(&self) -> bool {
+    pub fn is_maths(&self, typedefs: &TypedefMap) -> bool {
         use TypeKind::*;
         match &self {
             I8 => true,
@@ -139,7 +138,9 @@ impl TypeKind {
             Void => false,
             StringPtr => false,
             Array(_, _) => false,
-            TypeKind::CustomType(_, _) => false,
+            TypeKind::CustomType(name) => match typedefs.get(name).unwrap() {
+                TypeDefinitionKind::Struct(_) => false,
+            },
         }
     }
 }
@@ -328,9 +329,9 @@ pub struct TypeDefinition {
     pub meta: Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeDefinitionKind {
-    Struct(Vec<(String, TypeKind)>),
+    Struct(StructType),
 }
 
 #[derive(Debug)]

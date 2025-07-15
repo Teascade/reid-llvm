@@ -4,17 +4,18 @@
 //! must then be passed through TypeCheck with the same [`TypeRefs`] in order to
 //! place the correct types from the IDs and check that there are no issues.
 
-use std::iter;
+use std::{convert::Infallible, iter};
 
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{Pass, PassState},
+    pass::{self, Pass, PassState},
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression,
-    IndexedVariableReference, Module, NamedVariableRef, ReturnKind, StmtKind,
+    IndexedVariableReference, IndexedVariableReferenceKind, Module, NamedVariableRef, ReturnKind,
+    StmtKind, StructType, TypeDefinitionKind,
     TypeKind::*,
     VagueType::*,
 };
@@ -106,7 +107,7 @@ impl Block {
                 }
                 StmtKind::Set(var, expr) => {
                     // Get the TypeRef for this variable declaration
-                    let var_ref = var.find_hint(&inner_hints)?;
+                    let var_ref = var.find_hint(&state, &inner_hints)?;
 
                     // If ok, update the MIR type to this TypeRef
                     if let Some((_, var_ref)) = &var_ref {
@@ -155,14 +156,15 @@ impl Block {
 impl IndexedVariableReference {
     fn find_hint<'s>(
         &self,
+        state: &PassState<ErrorKind>,
         hints: &'s ScopeTypeRefs,
     ) -> Result<Option<(bool, TypeRef<'s>)>, ErrorKind> {
         match &self.kind {
-            super::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
-                Ok(hints.find_hint(&name))
+            IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
+                Ok(hints.find_var(&name))
             }
-            super::IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
-                if let Some((mutable, inner_ref)) = inner.find_hint(hints)? {
+            IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
+                if let Some((mutable, inner_ref)) = inner.find_hint(state, hints)? {
                     // Check that the resolved type is at least an array, no
                     // need for further resolution.
                     let inner_ty = inner_ref.resolve_weak().unwrap();
@@ -177,8 +179,30 @@ impl IndexedVariableReference {
                     Ok(None)
                 }
             }
-            super::IndexedVariableReferenceKind::StructIndex(indexed_variable_reference, _) => {
-                todo!("struct index refrence type inference")
+            IndexedVariableReferenceKind::StructIndex(inner, field_name) => {
+                if let Some((mutable, inner_ref)) = inner.find_hint(state, hints)? {
+                    // Check that the resolved type is at least an array, no
+                    // need for further resolution.
+                    let inner_ty = inner_ref.resolve_weak().unwrap();
+                    match &inner_ty {
+                        CustomType(struct_name) => match state.scope.types.get(&struct_name) {
+                            Some(kind) => match kind {
+                                TypeDefinitionKind::Struct(struct_ty) => Ok(hints
+                                    .from_type(
+                                        &struct_ty
+                                            .get_field_ty(field_name)
+                                            .cloned()
+                                            .ok_or(ErrorKind::NoSuchField(self.get_name()))?,
+                                    )
+                                    .map(|v| (mutable, v))),
+                            },
+                            None => Err(ErrorKind::TriedAccessingNonStruct(inner_ty.clone())),
+                        },
+                        _ => Err(ErrorKind::TriedAccessingNonStruct(inner_ty)),
+                    }
+                } else {
+                    Ok(None)
+                }
             }
         }
     }
@@ -194,7 +218,7 @@ impl Expression {
             ExprKind::Variable(var) => {
                 // Find variable type
                 let type_ref = type_refs
-                    .find_hint(&var.1)
+                    .find_var(&var.1)
                     .map(|(_, hint)| hint)
                     .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
 
@@ -339,10 +363,71 @@ impl Expression {
                     }
                 }
             }
-            ExprKind::StructIndex(expression, type_kind, _) => {
-                todo!("type inference for struct indexes")
+            ExprKind::StructIndex(expression, type_kind, field_name) => {
+                let expr_ty = expression.infer_types(state, type_refs)?;
+
+                // Check that the resolved type is at least a struct, no
+                // need for further resolution.
+                let kind = expr_ty.resolve_weak().unwrap();
+                match kind {
+                    CustomType(name) => {
+                        let struct_ty = state.scope.get_struct_type_mut(&name)?;
+                        match struct_ty.get_field_ty_mut(&field_name) {
+                            Some(field_ty) => {
+                                let elem_ty = type_refs.from_type(&type_kind).unwrap();
+                                *field_ty = elem_ty.as_type().clone();
+                                Ok(elem_ty)
+                            }
+                            None => Err(ErrorKind::NoSuchField(field_name.clone())),
+                        }
+                    }
+                    _ => Err(ErrorKind::TriedAccessingNonStruct(kind)),
+                }
             }
-            ExprKind::Struct(_, items) => todo!("type inference for struct expression"),
+            ExprKind::Struct(struct_name, fields) => {
+                let expected_struct_ty = state.scope.get_struct_type(&struct_name)?.clone();
+                for field in fields {
+                    if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
+                        let field_ty = field.1.infer_types(state, type_refs);
+                        if let Some(mut field_ty) = state.ok(field_ty, field.1 .1) {
+                            field_ty.narrow(&type_refs.from_type(&expected_field_ty).unwrap());
+                        }
+                    } else {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::NoSuchField(format!(
+                                "{}.{}",
+                                struct_name, field.0
+                            ))),
+                            field.1 .1,
+                        );
+                    }
+                }
+                Ok(type_refs
+                    .from_type(&TypeKind::CustomType(struct_name.clone()))
+                    .unwrap())
+            }
+        }
+    }
+}
+
+impl pass::Scope {
+    fn get_struct_type(&self, name: &String) -> Result<&StructType, ErrorKind> {
+        let ty = self
+            .types
+            .get(&name)
+            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
+        match ty {
+            TypeDefinitionKind::Struct(struct_ty) => Ok(struct_ty),
+        }
+    }
+
+    fn get_struct_type_mut(&mut self, name: &String) -> Result<&mut StructType, ErrorKind> {
+        let ty = self
+            .types
+            .get_mut(&name)
+            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
+        match ty {
+            TypeDefinitionKind::Struct(struct_ty) => Ok(struct_ty),
         }
     }
 }

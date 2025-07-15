@@ -55,7 +55,7 @@ impl Display for TypeDefinitionKind {
                 writeln!(f)?;
                 let mut state = Default::default();
                 let mut inner_f = PadAdapter::wrap(f, &mut state);
-                for (field_name, field_ty) in items {
+                for (field_name, field_ty) in &items.0 {
                     writeln!(inner_f, "{}: {:?},", field_name, field_ty)?;
                 }
                 f.write_char('}')
