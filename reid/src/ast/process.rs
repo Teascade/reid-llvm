@@ -152,8 +152,11 @@ impl ast::VariableReferenceKind {
                     (*range).into(),
                 ))
             }
-            ast::VariableReferenceKind::Index(var_ref, idx) => {
+            ast::VariableReferenceKind::ArrayIndex(var_ref, idx) => {
                 mir::IndexedVariableReferenceKind::Index(Box::new(var_ref.process()), *idx)
+            }
+            ast::VariableReferenceKind::StructIndex(variable_reference, _) => {
+                todo!("struct indexing into mir")
             }
         }
     }
@@ -194,12 +197,15 @@ impl ast::Expression {
             ast::ExpressionKind::Array(expressions) => {
                 mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
             }
-            ast::ExpressionKind::Index(expression, idx) => mir::ExprKind::Index(
+            ast::ExpressionKind::ArrayIndex(expression, idx) => mir::ExprKind::Index(
                 Box::new(expression.process()),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 *idx,
             ),
-            ast::ExpressionKind::StructInit(struct_init) => todo!("implement struct init process"),
+            ast::ExpressionKind::StructExpression(struct_init) => {
+                todo!("implement struct init process")
+            }
+            ast::ExpressionKind::StructIndex(expression, _) => todo!("struct index expression"),
         };
 
         mir::Expression(kind, self.1.into())

@@ -80,7 +80,7 @@ impl Parse for PrimaryExpression {
             (stream.peek(), stream.peek2())
         {
             Expression(
-                Kind::StructInit(stream.parse()?),
+                Kind::StructExpression(stream.parse()?),
                 stream.get_range().unwrap(),
             )
         } else if let Some(token) = stream.next() {
@@ -88,7 +88,7 @@ impl Parse for PrimaryExpression {
                 Token::Identifier(v) => {
                     if let Some(Token::BraceOpen) = stream.peek() {
                         Expression(
-                            Kind::StructInit(stream.parse()?),
+                            Kind::StructExpression(stream.parse()?),
                             stream.get_range().unwrap(),
                         )
                     } else {
@@ -134,11 +134,21 @@ impl Parse for PrimaryExpression {
             Err(stream.expected_err("expression")?)?
         };
 
-        while let Ok(ValueIndex(idx)) = stream.parse() {
-            expr = Expression(
-                ExpressionKind::Index(Box::new(expr), idx),
-                stream.get_range().unwrap(),
-            );
+        while let Ok(index) = stream.parse::<ValueIndex>() {
+            match index {
+                ValueIndex::Array(ArrayValueIndex(idx)) => {
+                    expr = Expression(
+                        ExpressionKind::ArrayIndex(Box::new(expr), idx),
+                        stream.get_range().unwrap(),
+                    );
+                }
+                ValueIndex::Struct(StructValueIndex(name)) => {
+                    expr = Expression(
+                        ExpressionKind::StructIndex(Box::new(expr), name),
+                        stream.get_range().unwrap(),
+                    );
+                }
+            }
         }
 
         Ok(PrimaryExpression(expr))
@@ -415,9 +425,9 @@ impl Parse for VariableReference {
                 stream.get_range().unwrap(),
             );
 
-            while let Ok(ValueIndex(idx)) = stream.parse() {
+            while let Ok(ArrayValueIndex(idx)) = stream.parse() {
                 var_ref = VariableReference(
-                    VariableReferenceKind::Index(Box::new(var_ref), idx),
+                    VariableReferenceKind::ArrayIndex(Box::new(var_ref), idx),
                     stream.get_range().unwrap(),
                 );
             }
@@ -429,7 +439,7 @@ impl Parse for VariableReference {
     }
 }
 
-impl Parse for StructInit {
+impl Parse for StructExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let Some(Token::Identifier(name)) = stream.next() else {
             return Err(stream.expected_err("struct identifier")?);
@@ -439,9 +449,8 @@ impl Parse for StructInit {
         let fields = named_list.0.into_iter().map(|f| (f.0, f.1)).collect();
 
         stream.expect(Token::BraceClose)?;
-        stream.expect(Token::Semi)?;
 
-        Ok(StructInit { name, fields })
+        Ok(StructExpression { name, fields })
     }
 }
 
@@ -480,17 +489,47 @@ impl<T: Parse + std::fmt::Debug> Parse for NamedField<T> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ValueIndex(u64);
+#[derive(Debug, Clone)]
+pub enum ValueIndex {
+    Array(ArrayValueIndex),
+    Struct(StructValueIndex),
+}
 
 impl Parse for ValueIndex {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        match stream.peek() {
+            Some(Token::BracketOpen) => Ok(ValueIndex::Array(stream.parse()?)),
+            Some(Token::Dot) => Ok(ValueIndex::Struct(stream.parse()?)),
+            _ => Err(stream.expected_err("value or struct index")?),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ArrayValueIndex(u64);
+
+impl Parse for ArrayValueIndex {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::BracketOpen)?;
         if let Some(Token::DecimalValue(idx)) = stream.next() {
             stream.expect(Token::BracketClose)?;
-            Ok(ValueIndex(idx))
+            Ok(ArrayValueIndex(idx))
         } else {
             return Err(stream.expected_err("array index (number)")?);
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructValueIndex(String);
+
+impl Parse for StructValueIndex {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::Dot)?;
+        if let Some(Token::Identifier(name)) = stream.next() {
+            Ok(StructValueIndex(name))
+        } else {
+            return Err(stream.expected_err("struct index (number)")?);
         }
     }
 }

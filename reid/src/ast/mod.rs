@@ -44,12 +44,13 @@ pub enum ExpressionKind {
     VariableName(String),
     Literal(Literal),
     Array(Vec<Expression>),
-    Index(Box<Expression>, u64),
+    ArrayIndex(Box<Expression>, u64),
+    StructIndex(Box<Expression>, String),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
     IfExpr(Box<IfExpression>),
-    StructInit(StructInit),
+    StructExpression(StructExpression),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -132,7 +133,7 @@ pub enum ReturnType {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructInit {
+pub struct StructExpression {
     name: String,
     fields: Vec<(String, Expression)>,
 }
@@ -150,7 +151,8 @@ pub struct VariableReference(pub VariableReferenceKind, pub TokenRange);
 #[derive(Debug, Clone)]
 pub enum VariableReferenceKind {
     Name(String, TokenRange),
-    Index(Box<VariableReference>, u64),
+    ArrayIndex(Box<VariableReference>, u64),
+    StructIndex(Box<VariableReference>, String),
 }
 
 #[derive(Debug, Clone)]
