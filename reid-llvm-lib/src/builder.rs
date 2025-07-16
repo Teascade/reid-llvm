@@ -1,7 +1,7 @@
 //! This module contains simply [`Builder`] and it's related utility Values.
 //! Builder is the actual struct being modified when building the LLIR.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     BlockData, ConstValue, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData,

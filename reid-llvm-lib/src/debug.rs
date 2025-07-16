@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{CmpPredicate, Instr, InstructionData, NamedStruct, TerminatorKind, builder::*};
+use crate::{CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*};
 
 impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

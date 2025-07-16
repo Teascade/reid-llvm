@@ -8,7 +8,7 @@ use crate::mir::VagueType;
 
 use super::{
     typecheck::{Collapsable, ErrorKind},
-    BinaryOperator, TypeDefinition, TypeKind,
+    BinaryOperator, TypeKind,
 };
 
 #[derive(Clone)]

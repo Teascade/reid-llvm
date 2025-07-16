@@ -9,13 +9,13 @@ use std::{convert::Infallible, iter};
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{self, Pass, PassState},
+    pass::{Pass, PassState},
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression,
     IndexedVariableReference, IndexedVariableReferenceKind, Module, NamedVariableRef, ReturnKind,
-    StmtKind, StructType, TypeDefinitionKind,
+    StmtKind, TypeDefinitionKind,
     TypeKind::*,
     VagueType::*,
 };
