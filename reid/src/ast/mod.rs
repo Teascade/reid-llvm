@@ -148,20 +148,10 @@ pub struct Block(
 );
 
 #[derive(Debug, Clone)]
-pub struct VariableReference(pub VariableReferenceKind, pub TokenRange);
-
-#[derive(Debug, Clone)]
-pub enum VariableReferenceKind {
-    Name(String, TokenRange),
-    ArrayIndex(Box<VariableReference>, u64),
-    StructIndex(Box<VariableReference>, String),
-}
-
-#[derive(Debug, Clone)]
 pub enum BlockLevelStatement {
     Let(LetStatement),
     /// Try to set a variable to a specified expression value
-    Set(VariableReference, Expression, TokenRange),
+    Set(Expression, Expression, TokenRange),
     Import {
         _i: ImportStatement,
     },

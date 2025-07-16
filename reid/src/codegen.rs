@@ -8,8 +8,7 @@ use reid_lib::{
 };
 
 use crate::mir::{
-    self, types::ReturnType, IndexedVariableReference, NamedVariableRef, StructField, StructType,
-    TypeDefinitionKind, TypeKind, VagueLiteral,
+    self, NamedVariableRef, StructField, StructType, TypeDefinitionKind, TypeKind, VagueLiteral,
 };
 
 /// Context that contains all of the given modules as complete codegenerated
@@ -45,6 +44,69 @@ struct ModuleCodegen<'ctx> {
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self.module.as_printable(), f)
+    }
+}
+
+pub struct Scope<'ctx, 'a> {
+    context: &'ctx Context,
+    module: &'ctx Module<'ctx>,
+    function: &'ctx Function<'ctx>,
+    block: Block<'ctx>,
+    types: &'a HashMap<TypeValue, TypeDefinitionKind>,
+    type_values: &'a HashMap<String, TypeValue>,
+    functions: &'a HashMap<String, Function<'ctx>>,
+    stack_values: HashMap<String, StackValue>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StackValue(StackValueKind, Type);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StackValueKind {
+    Immutable(InstructionValue),
+    Mutable(InstructionValue),
+}
+
+impl StackValueKind {
+    unsafe fn get_instr(&self) -> &InstructionValue {
+        match self {
+            StackValueKind::Immutable(val) => val,
+            StackValueKind::Mutable(val) => val,
+        }
+    }
+
+    fn with_instr(&self, instr: InstructionValue) -> StackValueKind {
+        match self {
+            StackValueKind::Immutable(_) => StackValueKind::Immutable(instr),
+            StackValueKind::Mutable(_) => StackValueKind::Mutable(instr),
+        }
+    }
+}
+
+impl<'ctx, 'a> Scope<'ctx, 'a> {
+    fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
+        Scope {
+            block,
+            function: self.function,
+            context: self.context,
+            module: self.module,
+            functions: self.functions,
+            types: self.types,
+            type_values: self.type_values,
+            stack_values: self.stack_values.clone(),
+        }
+    }
+
+    /// Takes the block out from this scope, swaps the given block in it's place
+    /// and returns the old block.
+    fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
+        let mut old_block = block;
+        mem::swap(&mut self.block, &mut old_block);
+        old_block
+    }
+
+    fn get_typedef(&self, name: &String) -> Option<&TypeDefinitionKind> {
+        self.type_values.get(name).and_then(|v| self.types.get(v))
     }
 }
 
@@ -155,66 +217,24 @@ impl mir::Module {
     }
 }
 
-pub struct Scope<'ctx, 'a> {
-    context: &'ctx Context,
-    module: &'ctx Module<'ctx>,
-    function: &'ctx Function<'ctx>,
-    block: Block<'ctx>,
-    types: &'a HashMap<TypeValue, TypeDefinitionKind>,
-    type_values: &'a HashMap<String, TypeValue>,
-    functions: &'a HashMap<String, Function<'ctx>>,
-    stack_values: HashMap<String, StackValue>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StackValue(StackValueKind, Type);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StackValueKind {
-    Immutable(InstructionValue),
-    Mutable(InstructionValue),
-}
-
-impl StackValueKind {
-    unsafe fn get_instr(&self) -> &InstructionValue {
-        match self {
-            StackValueKind::Immutable(val) => val,
-            StackValueKind::Mutable(val) => val,
+impl mir::Block {
+    fn codegen<'ctx, 'a>(&self, mut scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+        for stmt in &self.statements {
+            stmt.codegen(&mut scope);
         }
-    }
 
-    fn with_instr(&self, instr: InstructionValue) -> StackValueKind {
-        match self {
-            StackValueKind::Immutable(_) => StackValueKind::Immutable(instr),
-            StackValueKind::Mutable(_) => StackValueKind::Mutable(instr),
+        if let Some((kind, expr)) = &self.return_expression {
+            match kind {
+                mir::ReturnKind::Hard => {
+                    let ret = expr.codegen(&mut scope)?;
+                    scope.block.terminate(Term::Ret(ret)).unwrap();
+                    None
+                }
+                mir::ReturnKind::Soft => expr.codegen(&mut scope),
+            }
+        } else {
+            None
         }
-    }
-}
-
-impl<'ctx, 'a> Scope<'ctx, 'a> {
-    fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
-        Scope {
-            block,
-            function: self.function,
-            context: self.context,
-            module: self.module,
-            functions: self.functions,
-            types: self.types,
-            type_values: self.type_values,
-            stack_values: self.stack_values.clone(),
-        }
-    }
-
-    /// Takes the block out from this scope, swaps the given block in it's place
-    /// and returns the old block.
-    fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
-        let mut old_block = block;
-        mem::swap(&mut self.block, &mut old_block);
-        old_block
-    }
-
-    fn get_typedef(&self, name: &String) -> Option<&TypeDefinitionKind> {
-        self.type_values.get(name).and_then(|v| self.types.get(v))
     }
 }
 
@@ -257,80 +277,26 @@ impl mir::Statement {
                 );
                 None
             }
-            mir::StmtKind::Set(var, val) => {
-                if let Some(StackValue(kind, _)) = var.get_stack_value(scope, false) {
-                    match kind {
-                        StackValueKind::Immutable(_) => {
-                            panic!("Tried to mutate an immutable variable")
-                        }
-                        StackValueKind::Mutable(ptr) => {
-                            let expression = val.codegen(scope).unwrap();
-                            Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
-                        }
-                    }
-                } else {
-                    panic!("")
-                }
+            mir::StmtKind::Set(lhs, rhs) => {
+                todo!("codegen!");
+
+                // if let Some(StackValue(kind, _)) = var.get_stack_value(scope, false) {
+                //     match kind {
+                //         StackValueKind::Immutable(_) => {
+                //             panic!("Tried to mutate an immutable variable")
+                //         }
+                //         StackValueKind::Mutable(ptr) => {
+                //             let expression = val.codegen(scope).unwrap();
+                //             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
+                //         }
+                //     }
+                // } else {
+                //     panic!("")
+                // }
             }
             // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope),
-        }
-    }
-}
-
-impl mir::IfExpression {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
-        let condition = self.0.codegen(scope).unwrap();
-
-        // Create blocks
-        let then_b = scope.function.block("then");
-        let mut else_b = scope.function.block("else");
-        let after_b = scope.function.block("after");
-
-        // Store for convenience
-        let then_bb = then_b.value();
-        let else_bb = else_b.value();
-        let after_bb = after_b.value();
-
-        // Generate then-block content
-        let mut then_scope = scope.with_block(then_b);
-        let then_res = self.1.codegen(&mut then_scope);
-        then_scope.block.terminate(Term::Br(after_bb)).ok();
-
-        let else_res = if let Some(else_block) = &self.2 {
-            let mut else_scope = scope.with_block(else_b);
-            scope
-                .block
-                .terminate(Term::CondBr(condition, then_bb, else_bb))
-                .unwrap();
-
-            let opt = else_block.codegen(&mut else_scope);
-
-            if let Some(ret) = opt {
-                else_scope.block.terminate(Term::Br(after_bb)).ok();
-                Some(ret)
-            } else {
-                None
-            }
-        } else {
-            else_b.terminate(Term::Br(after_bb)).unwrap();
-            scope
-                .block
-                .terminate(Term::CondBr(condition, then_bb, after_bb))
-                .unwrap();
-            None
-        };
-
-        // Swap block to the after-block so that construction can continue correctly
-        scope.swap_block(after_b);
-
-        if then_res.is_none() && else_res.is_none() {
-            None
-        } else {
-            let mut incoming = Vec::from(then_res.as_slice());
-            incoming.extend(else_res);
-            Some(scope.block.build(Instr::Phi(incoming)).unwrap())
         }
     }
 }
@@ -517,85 +483,140 @@ impl mir::Expression {
     }
 }
 
-impl IndexedVariableReference {
-    fn get_stack_value(&self, scope: &mut Scope, load_after_gep: bool) -> Option<StackValue> {
-        match &self.kind {
-            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
-                scope.stack_values.get(name).cloned().map(|v| v)
+impl mir::IfExpression {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
+        let condition = self.0.codegen(scope).unwrap();
+
+        // Create blocks
+        let then_b = scope.function.block("then");
+        let mut else_b = scope.function.block("else");
+        let after_b = scope.function.block("after");
+
+        // Store for convenience
+        let then_bb = then_b.value();
+        let else_bb = else_b.value();
+        let after_bb = after_b.value();
+
+        // Generate then-block content
+        let mut then_scope = scope.with_block(then_b);
+        let then_res = self.1.codegen(&mut then_scope);
+        then_scope.block.terminate(Term::Br(after_bb)).ok();
+
+        let else_res = if let Some(else_block) = &self.2 {
+            let mut else_scope = scope.with_block(else_b);
+            scope
+                .block
+                .terminate(Term::CondBr(condition, then_bb, else_bb))
+                .unwrap();
+
+            let opt = else_block.codegen(&mut else_scope);
+
+            if let Some(ret) = opt {
+                else_scope.block.terminate(Term::Br(after_bb)).ok();
+                Some(ret)
+            } else {
+                None
             }
-            mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
-                let inner_stack_val = inner.get_stack_value(scope, true)?;
+        } else {
+            else_b.terminate(Term::Br(after_bb)).unwrap();
+            scope
+                .block
+                .terminate(Term::CondBr(condition, then_bb, after_bb))
+                .unwrap();
+            None
+        };
 
-                todo!();
-                // let mut gep_instr = scope
-                //     .block
-                //     .build(Instr::GetElemPtr(
-                //         unsafe { *inner_stack_val.0.get_instr() },
-                //         vec![*idx as u32],
-                //     ))
-                //     .unwrap();
+        // Swap block to the after-block so that construction can continue correctly
+        scope.swap_block(after_b);
 
-                // match &inner_stack_val.1 {
-                //     Type::Ptr(inner_ty) => {
-                //         if load_after_gep {
-                //             gep_instr = scope
-                //                 .block
-                //                 .build(Instr::Load(gep_instr, *inner_ty.clone()))
-                //                 .unwrap()
-                //         }
-                //         Some(StackValue(
-                //             inner_stack_val.0.with_instr(gep_instr),
-                //             *inner_ty.clone(),
-                //         ))
-                //     }
-                //     _ => panic!("Tried to codegen indexing a non-indexable value!"),
-                // }
-            }
-            mir::IndexedVariableReferenceKind::StructIndex(inner, field) => {
-                let inner_stack_val = inner.get_stack_value(scope, true)?;
-
-                let (instr_value, inner_ty) = if let Type::Ptr(inner_ty) = inner_stack_val.1 {
-                    if let Type::CustomType(ty_val) = *inner_ty {
-                        match scope.types.get(&ty_val).unwrap() {
-                            TypeDefinitionKind::Struct(struct_type) => {
-                                let idx = struct_type.find_index(field)?;
-                                let field_ty = struct_type
-                                    .get_field_ty(field)?
-                                    .get_type(scope.type_values, scope.types);
-
-                                let mut gep_instr = scope
-                                    .block
-                                    .build(Instr::GetStructElemPtr(
-                                        unsafe { *inner_stack_val.0.get_instr() },
-                                        idx,
-                                    ))
-                                    .unwrap();
-
-                                if load_after_gep {
-                                    gep_instr = scope
-                                        .block
-                                        .build(Instr::Load(gep_instr, field_ty.clone()))
-                                        .unwrap()
-                                }
-
-                                Some((gep_instr, field_ty))
-                            }
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }?;
-
-                Some(StackValue(
-                    inner_stack_val.0.with_instr(instr_value),
-                    Type::Ptr(Box::new(inner_ty)),
-                ))
-            }
+        if then_res.is_none() && else_res.is_none() {
+            None
+        } else {
+            let mut incoming = Vec::from(then_res.as_slice());
+            incoming.extend(else_res);
+            Some(scope.block.build(Instr::Phi(incoming)).unwrap())
         }
     }
 }
+
+// impl IndexedVariableReference {
+//     fn get_stack_value(&self, scope: &mut Scope_after_gep: bool) -> Option<StackValue> {
+//         match &self.kind {
+//             mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
+//                 scope.stack_values.get(name).cloned().map(|v| v)
+//             }
+//             mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
+//                 let inner_stack_val = inner.get_stack_value(scope, true)?;
+
+//                 let mut gep_instr = scope
+//                     .block
+//                     .build(Instr::GetElemPtr(
+//                         unsafe { *inner_stack_val.0.get_instr() },
+//                         vec![*idx as u32],
+//                     ))
+//                     .unwrap();
+
+//                 match &inner_stack_val.1 {
+//                     Type::Ptr(inner_ty) => {
+//                         if load_after_gep {
+//                             gep_instr = scope
+//                                 .block
+//                                 .build(Instr::Load(gep_instr, *inner_ty.clone()))
+//                                 .unwrap()
+//                         }
+//                         Some(StackValue(
+//                             inner_stack_val.0.with_instr(gep_instr),
+//                             *inner_ty.clone(),
+//                         ))
+//                     }
+//                     _ => panic!("Tried to codegen indexing a non-indexable value!"),
+//                 }
+//             }
+//             mir::IndexedVariableReferenceKind::StructIndex(inner, field) => {
+//                 let inner_stack_val = inner.get_stack_value(scope, true)?;
+
+//                 let (instr_value, inner_ty) = if let Type::Ptr(inner_ty) = inner_stack_val.1 {
+//                     if let Type::CustomType(ty_val) = *inner_ty {
+//                         match scope.types.get(&ty_val).unwrap() {
+//                             TypeDefinitionKind::Struct(struct_type) => {
+//                                 let idx = struct_type.find_index(field)?;
+//                                 let field_ty = struct_type
+//                                     .get_field_ty(field)?
+//                                     .get_type(scope.type_values, scope.types);
+
+//                                 let mut gep_instr = scope
+//                                     .block
+//                                     .build(Instr::GetStructElemPtr(
+//                                         unsafe { *inner_stack_val.0.get_instr() },
+//                                         idx,
+//                                     ))
+//                                     .unwrap();
+
+//                                 if load_after_gep {
+//                                     gep_instr = scope
+//                                         .block
+//                                         .build(Instr::Load(gep_instr, field_ty.clone()))
+//                                         .unwrap()
+//                                 }
+
+//                                 Some((gep_instr, field_ty))
+//                             }
+//                         }
+//                     } else {
+//                         None
+//                     }
+//                 } else {
+//                     None
+//                 }?;
+
+//                 Some(StackValue(
+//                     inner_stack_val.0.with_instr(instr_value),
+//                     Type::Ptr(Box::new(inner_ty)),
+//                 ))
+//             }
+//         }
+//     }
+// }
 
 impl mir::CmpOperator {
     fn int_predicate(&self) -> CmpPredicate {
@@ -606,30 +627,6 @@ impl mir::CmpOperator {
             mir::CmpOperator::GE => CmpPredicate::GE,
             mir::CmpOperator::EQ => CmpPredicate::EQ,
             mir::CmpOperator::NE => CmpPredicate::NE,
-        }
-    }
-}
-
-impl mir::Block {
-    fn codegen<'ctx, 'a>(&self, mut scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
-        for stmt in &self.statements {
-            stmt.codegen(&mut scope);
-        }
-
-        if let Some((kind, expr)) = &self.return_expression {
-            if let Some(ret) = expr.codegen(&mut scope) {
-                match kind {
-                    mir::ReturnKind::Hard => {
-                        scope.block.terminate(Term::Ret(ret)).unwrap();
-                        None
-                    }
-                    mir::ReturnKind::Soft => Some(ret),
-                }
-            } else {
-                None
-            }
-        } else {
-            None
         }
     }
 }

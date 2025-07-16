@@ -11,7 +11,7 @@ use crate::{compile_module, ReidError};
 
 use super::{
     pass::{Pass, PassState},
-    types::EqualsIssue,
+    r#impl::EqualsIssue,
     Context, FunctionDefinition, Import, Metadata, Module,
 };
 

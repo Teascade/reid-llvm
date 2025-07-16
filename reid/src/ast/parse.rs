@@ -417,32 +417,6 @@ impl Parse for Block {
     }
 }
 
-impl Parse for VariableReference {
-    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
-        if let Some(Token::Identifier(ident)) = stream.next() {
-            let mut var_ref = VariableReference(
-                VariableReferenceKind::Name(ident, stream.get_one_token_range()),
-                stream.get_range().unwrap(),
-            );
-
-            while let Ok(val) = stream.parse::<ValueIndex>() {
-                match val {
-                    ValueIndex::Array(ArrayValueIndex(idx)) => {
-                        todo!();
-                    }
-                    ValueIndex::Struct(StructValueIndex(name)) => {
-                        todo!();
-                    }
-                }
-            }
-
-            Ok(var_ref)
-        } else {
-            Err(stream.expected_err("identifier")?)?
-        }
-    }
-}
-
 impl Parse for StructExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let Some(Token::Identifier(name)) = stream.next() else {
@@ -569,7 +543,7 @@ impl Parse for BlockLevelStatement {
 }
 
 #[derive(Debug)]
-pub struct SetStatement(VariableReference, Expression, TokenRange);
+pub struct SetStatement(Expression, Expression, TokenRange);
 
 impl Parse for SetStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {

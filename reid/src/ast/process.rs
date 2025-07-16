@@ -157,38 +157,6 @@ impl From<ast::ReturnType> for mir::ReturnKind {
     }
 }
 
-impl ast::VariableReference {
-    fn process(&self) -> mir::IndexedVariableReference {
-        mir::IndexedVariableReference {
-            kind: self.0.process(),
-            meta: self.1.into(),
-        }
-    }
-}
-
-impl ast::VariableReferenceKind {
-    fn process(&self) -> mir::IndexedVariableReferenceKind {
-        match &self {
-            ast::VariableReferenceKind::Name(name, range) => {
-                mir::IndexedVariableReferenceKind::Named(NamedVariableRef(
-                    mir::TypeKind::Vague(mir::VagueType::Unknown),
-                    name.clone(),
-                    (*range).into(),
-                ))
-            }
-            ast::VariableReferenceKind::ArrayIndex(var_ref, idx) => {
-                mir::IndexedVariableReferenceKind::ArrayIndex(Box::new(var_ref.process()), *idx)
-            }
-            ast::VariableReferenceKind::StructIndex(var_ref, name) => {
-                mir::IndexedVariableReferenceKind::StructIndex(
-                    Box::new(var_ref.process()),
-                    name.clone(),
-                )
-            }
-        }
-    }
-}
-
 impl ast::Expression {
     fn process(&self) -> mir::Expression {
         let kind = match &self.0 {

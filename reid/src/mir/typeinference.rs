@@ -10,9 +10,9 @@ use crate::{mir::TypeKind, util::try_all};
 
 use super::{
     pass::{Pass, PassState},
+    r#impl::pick_return,
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
-    types::{pick_return, ReturnType},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
     ReturnKind, StmtKind,
     TypeKind::*,
@@ -104,18 +104,18 @@ impl Block {
                         var_ref.narrow(&expr_ty_ref);
                     }
                 }
-                StmtKind::Set(var, expr) => {
-                    // Update this MIR type to its TypeRef
-                    let var_ref = var.into_typeref(&inner_hints);
+                StmtKind::Set(lhs, rhs) => {
+                    // Infer hints for the expression itself
+                    let lhs_infer = lhs.infer_types(&mut state, &inner_hints);
+                    let lhs_ref = state.ok(lhs_infer, rhs.1);
 
                     // Infer hints for the expression itself
-                    let inferred = expr.infer_types(&mut state, &inner_hints);
-                    let expr_ty_ref = state.ok(inferred, expr.1);
+                    let rhs_infer = rhs.infer_types(&mut state, &inner_hints);
+                    let rhs_ref = state.ok(rhs_infer, rhs.1);
 
-                    // Try to narrow the variable type declaration with the
-                    // expression
-                    if let (Some((_, mut var_ref)), Some(expr_ty_ref)) = (var_ref, expr_ty_ref) {
-                        var_ref.narrow(&expr_ty_ref);
+                    // Try to narrow the lhs with rhs
+                    if let (Some(mut lhs_ref), Some(rhs_ref)) = (lhs_ref, rhs_ref) {
+                        lhs_ref.narrow(&rhs_ref);
                     }
                 }
                 StmtKind::Import(_) => todo!(),

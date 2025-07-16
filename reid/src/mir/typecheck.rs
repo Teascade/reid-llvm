@@ -8,7 +8,6 @@ use VagueType as Vague;
 use super::{
     pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
     typerefs::TypeRefs,
-    types::ReturnType,
 };
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -31,7 +30,7 @@ pub enum ErrorKind {
     FunctionAlreadyDefined(String),
     #[error("Variable not defined: {0}")]
     VariableAlreadyDefined(String),
-    #[error("Variable not mutable: {0}")]
+    #[error("Variable {0} is not declared as mutable")]
     VariableNotMutable(String),
     #[error("Function {0} was given {1} parameters, but {2} were expected")]
     InvalidAmountParameters(String, usize, usize),
@@ -55,6 +54,8 @@ pub enum ErrorKind {
     DuplicateTypeName(String),
     #[error("Recursive type definition: {0}.{1}")]
     RecursiveTypeDefinition(String, String),
+    #[error("This type of expression can not be used for assignment")]
+    InvalidSetExpression,
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -250,51 +251,46 @@ impl Block {
                     state.ok(res, variable_reference.2);
                     None
                 }
-                StmtKind::Set(variable_reference, expression) => {
-                    // Update typing from reference
-                    variable_reference.resolve_ref(&typerefs)?;
+                StmtKind::Set(lhs, rhs) => {
+                    // Typecheck expression and coerce to variable type
+                    let lhs_res = lhs.typecheck(&mut state, typerefs, None);
+                    // If expression resolution itself was erronous, resolve as
+                    // Unknown.
+                    let lhs_ty = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
 
-                    if let Some(var) = state
-                        .ok(
-                            variable_reference
-                                .get_variable(&state.scope.variables, &state.scope.types),
-                            variable_reference.meta,
-                        )
-                        .flatten()
-                    {
-                        let field_ty = variable_reference.retrieve_type(&state.scope)?;
-                        dbg!(&field_ty);
+                    // Typecheck expression and coerce to variable type
+                    let res = rhs.typecheck(&mut state, &typerefs, Some(&lhs_ty));
 
-                        // Typecheck expression and coerce to variable type
-                        let res = expression.typecheck(&mut state, &typerefs, Some(&field_ty));
+                    // If expression resolution itself was erronous, resolve as
+                    // Unknown.
+                    let rhs_ty = state.or_else(res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                        // If expression resolution itself was erronous, resolve as
-                        // Unknown.
-                        let expr_ty =
-                            state.or_else(res, TypeKind::Vague(Vague::Unknown), expression.1);
+                    // Make sure the expression and variable type to really
+                    // be the same
+                    state.ok(lhs_ty.collapse_into(&rhs_ty), lhs.1 + rhs.1);
 
-                        // Make sure the expression and variable type to really
-                        // be the same
-                        state.ok(
-                            expr_ty.collapse_into(&field_ty),
-                            variable_reference.meta + expression.1,
-                        );
-
-                        if !var.mutable {
-                            state.ok::<_, Infallible>(
-                                Err(ErrorKind::VariableNotMutable(variable_reference.get_name())),
-                                variable_reference.meta,
-                            );
+                    if let Some(named_var) = lhs.backing_var() {
+                        if let Some(scope_var) = state.scope.variables.get(&named_var.1) {
+                            if !scope_var.mutable {
+                                state.ok::<_, Infallible>(
+                                    Err(ErrorKind::VariableNotMutable(named_var.1.clone())),
+                                    lhs.1,
+                                );
+                            }
                         }
-
-                        None
                     } else {
-                        state.ok::<_, Infallible>(
-                            Err(ErrorKind::VariableNotDefined(variable_reference.get_name())),
-                            variable_reference.meta,
-                        );
-                        None
+                        state.ok::<_, Infallible>(Err(ErrorKind::InvalidSetExpression), lhs.1);
                     }
+                    // TODO add error about variable mutability, need to check
+                    // that the expression is based on a variable first though..
+                    // if true {
+                    //     state.ok::<_, Infallible>(
+                    //         Err(ErrorKind::VariableNotMutable(variable_reference.get_name())),
+                    //         variable_reference.meta,
+                    //     );
+                    // }
+
+                    None
                 }
                 StmtKind::Import(_) => todo!(), // TODO
                 StmtKind::Expression(expression) => {
@@ -346,7 +342,7 @@ impl Expression {
     fn typecheck(
         &mut self,
         state: &mut PassState<ErrorKind>,
-        hints: &TypeRefs,
+        typerefs: &TypeRefs,
         hint_t: Option<&TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {
         match &mut self.0 {
@@ -363,11 +359,11 @@ impl Expression {
                         TypeKind::Vague(Vague::Unknown),
                         var_ref.2,
                     )
-                    .resolve_ref(hints);
+                    .resolve_ref(typerefs);
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
-                    var_ref.0.resolve_ref(hints).collapse_into(&existing),
+                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
                 );
@@ -381,15 +377,15 @@ impl Expression {
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, &hints, None);
+                let lhs_res = lhs.typecheck(state, &typerefs, None);
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, &hints, Some(&lhs_type));
+                let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
                 if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
                     // Try to coerce both sides again with collapsed type
-                    lhs.typecheck(state, &hints, Some(&collapsed)).ok();
-                    rhs.typecheck(state, &hints, Some(&collapsed)).ok();
+                    lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
+                    rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
                 }
 
                 let both_t = lhs_type.collapse_into(&rhs_type)?;
@@ -429,7 +425,7 @@ impl Expression {
                         function_call.parameters.iter_mut().zip(true_params_iter)
                     {
                         // Typecheck every param separately
-                        let param_res = param.typecheck(state, &hints, Some(&true_param_t));
+                        let param_res = param.typecheck(state, &typerefs, Some(&true_param_t));
                         let param_t =
                             state.or_else(param_res, TypeKind::Vague(Vague::Unknown), param.1);
                         state.ok(param_t.collapse_into(&true_param_t), param.1);
@@ -439,29 +435,29 @@ impl Expression {
                     // return type
                     let ret_t = f
                         .ret
-                        .collapse_into(&function_call.return_type.resolve_ref(hints))?;
+                        .collapse_into(&function_call.return_type.resolve_ref(typerefs))?;
                     // Update typing to be more accurate
                     function_call.return_type = ret_t.clone();
-                    Ok(ret_t.resolve_ref(hints))
+                    Ok(ret_t.resolve_ref(typerefs))
                 } else {
-                    Ok(function_call.return_type.clone().resolve_ref(hints))
+                    Ok(function_call.return_type.clone().resolve_ref(typerefs))
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                let cond_res = cond.typecheck(state, &hints, Some(&TypeKind::Bool));
+                let cond_res = cond.typecheck(state, &typerefs, Some(&TypeKind::Bool));
                 let cond_t = state.or_else(cond_res, TypeKind::Vague(Vague::Unknown), cond.1);
                 state.ok(cond_t.collapse_into(&TypeKind::Bool), cond.1);
 
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
-                let then_res = lhs.typecheck(state, &hints, hint_t);
+                let then_res = lhs.typecheck(state, &typerefs, hint_t);
                 let (then_ret_kind, then_ret_t) = state.or_else(
                     then_res,
                     (ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)),
                     lhs.meta,
                 );
                 let else_ret_t = if let Some(else_block) = rhs {
-                    let res = else_block.typecheck(state, &hints, hint_t);
+                    let res = else_block.typecheck(state, &typerefs, hint_t);
                     let (else_ret_kind, else_ret_t) = state.or_else(
                         res,
                         (ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)),
@@ -491,30 +487,32 @@ impl Expression {
                 if let Some(rhs) = rhs {
                     // If rhs existed, typecheck both sides to perform type
                     // coercion.
-                    let lhs_res = lhs.typecheck(state, &hints, Some(&collapsed));
-                    let rhs_res = rhs.typecheck(state, &hints, Some(&collapsed));
+                    let lhs_res = lhs.typecheck(state, &typerefs, Some(&collapsed));
+                    let rhs_res = rhs.typecheck(state, &typerefs, Some(&collapsed));
                     state.ok(lhs_res, lhs.meta);
                     state.ok(rhs_res, rhs.meta);
                 }
 
                 Ok(collapsed)
             }
-            ExprKind::Block(block) => match block.typecheck(state, &hints, hint_t) {
+            ExprKind::Block(block) => match block.typecheck(state, &typerefs, hint_t) {
                 Ok((ReturnKind::Hard, _)) => Ok(TypeKind::Void),
                 Ok((_, ty)) => Ok(ty),
                 Err(e) => Err(e),
             },
-            ExprKind::Indexed(expression, elem_ty, idx) => {
+            ExprKind::Indexed(expression, elem_ty, _) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
                     TypeKind::Array(type_kind, _) => &type_kind,
                     _ => t,
                 });
 
-                let expr_t = expression.typecheck(state, hints, hint_t)?;
-                if let TypeKind::Array(inferred_ty, len) = expr_t {
+                // TODO it could be possible to check length against constants..
+
+                let expr_t = expression.typecheck(state, typerefs, hint_t)?;
+                if let TypeKind::Array(inferred_ty, _) = expr_t {
                     let ty = state.or_else(
-                        elem_ty.resolve_ref(hints).collapse_into(&inferred_ty),
+                        elem_ty.resolve_ref(typerefs).collapse_into(&inferred_ty),
                         TypeKind::Vague(Vague::Unknown),
                         self.1,
                     );
@@ -534,7 +532,7 @@ impl Expression {
                 let mut expr_result = try_all(
                     expressions
                         .iter_mut()
-                        .map(|e| e.typecheck(state, hints, hint_t))
+                        .map(|e| e.typecheck(state, typerefs, hint_t))
                         .collect(),
                 );
                 match &mut expr_result {
@@ -563,10 +561,10 @@ impl Expression {
             }
             ExprKind::Accessed(expression, type_kind, field_name) => {
                 // Resolve expected type
-                let expected_ty = type_kind.resolve_ref(hints);
+                let expected_ty = type_kind.resolve_ref(typerefs);
 
                 // Typecheck expression
-                let expr_res = expression.typecheck(state, hints, Some(&expected_ty));
+                let expr_res = expression.typecheck(state, typerefs, Some(&expected_ty));
                 let expr_ty =
                     state.or_else(expr_res, TypeKind::Vague(Vague::Unknown), expression.1);
 
@@ -612,7 +610,7 @@ impl Expression {
                     );
 
                     // Typecheck the actual expression
-                    let expr_res = field_expr.typecheck(state, hints, Some(expected_ty));
+                    let expr_res = field_expr.typecheck(state, typerefs, Some(expected_ty));
                     let expr_ty =
                         state.or_else(expr_res, TypeKind::Vague(Vague::Unknown), field_expr.1);
 
@@ -620,64 +618,6 @@ impl Expression {
                     state.ok(expr_ty.collapse_into(&expr_ty), field_expr.1);
                 }
                 Ok(TypeKind::CustomType(struct_name.clone()))
-            }
-        }
-    }
-}
-
-impl IndexedVariableReference {
-    fn get_variable(
-        &self,
-        storage: &Storage<ScopeVariable>,
-        types: &Storage<TypeDefinitionKind>,
-    ) -> Result<Option<ScopeVariable>, ErrorKind> {
-        match &self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
-                Ok(storage.get(&name).cloned())
-            }
-            IndexedVariableReferenceKind::ArrayIndex(inner_ref, _) => {
-                if let Some(var) = inner_ref.get_variable(storage, types)? {
-                    match &var.ty {
-                        TypeKind::Array(inner_ty, _) => Ok(Some(ScopeVariable {
-                            ty: *inner_ty.clone(),
-                            mutable: var.mutable,
-                        })),
-                        _ => Err(ErrorKind::TriedIndexingNonArray(var.ty.clone())),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-            IndexedVariableReferenceKind::StructIndex(var_ref, field_name) => {
-                if let Some(var) = var_ref.get_variable(storage, types)? {
-                    match &var.ty {
-                        TypeKind::CustomType(type_name) => {
-                            if let Some(kind) = types.get(type_name) {
-                                match &kind {
-                                    TypeDefinitionKind::Struct(struct_type) => {
-                                        if let Some(StructField(_, field_ty, _)) = struct_type
-                                            .0
-                                            .iter()
-                                            .find(|StructField(n, _, _)| n == field_name)
-                                        {
-                                            Ok(Some(ScopeVariable {
-                                                ty: field_ty.clone(),
-                                                mutable: var.mutable,
-                                            }))
-                                        } else {
-                                            Err(ErrorKind::NoSuchField(field_name.clone()))
-                                        }
-                                    }
-                                }
-                            } else {
-                                Err(ErrorKind::NoSuchType(type_name.clone()))
-                            }
-                        }
-                        _ => Err(ErrorKind::TriedAccessingNonStruct(var.ty.clone())),
-                    }
-                } else {
-                    Ok(None)
-                }
             }
         }
     }

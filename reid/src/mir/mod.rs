@@ -7,12 +7,12 @@ use std::{collections::HashMap, path::PathBuf};
 use crate::token_stream::TokenRange;
 
 mod display;
+pub mod r#impl;
 pub mod linker;
 pub mod pass;
 pub mod typecheck;
 pub mod typeinference;
 pub mod typerefs;
-pub mod types;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Metadata {
@@ -263,23 +263,10 @@ pub struct Block {
 pub struct Statement(pub StmtKind, pub Metadata);
 
 #[derive(Debug)]
-pub struct IndexedVariableReference {
-    pub kind: IndexedVariableReferenceKind,
-    pub meta: Metadata,
-}
-
-#[derive(Debug)]
-pub enum IndexedVariableReferenceKind {
-    Named(NamedVariableRef),
-    ArrayIndex(Box<IndexedVariableReference>, u64),
-    StructIndex(Box<IndexedVariableReference>, String),
-}
-
-#[derive(Debug)]
 pub enum StmtKind {
     /// Variable name++mutability+type, evaluation
     Let(NamedVariableRef, bool, Expression),
-    Set(IndexedVariableReference, Expression),
+    Set(Expression, Expression),
     Import(Import),
     Expression(Expression),
 }

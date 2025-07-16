@@ -47,13 +47,33 @@ impl StructType {
     }
 }
 
-pub trait ReturnType {
-    /// Return the return type of this node
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther>;
+enum BlockReturn<'b> {
+    Early(&'b Statement),
+    Normal(ReturnKind, &'b Expression),
 }
 
-impl ReturnType for Block {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl Block {
+    fn return_expr(&self) -> Result<BlockReturn, ReturnTypeOther> {
+        let mut early_return = None;
+
+        for statement in &self.statements {
+            let ret = statement.return_type();
+            if let Ok((ReturnKind::Hard, _)) = ret {
+                early_return = Some(statement);
+            }
+        }
+
+        if let Some(s) = early_return {
+            return Ok(BlockReturn::Early(s));
+        }
+
+        self.return_expression
+            .as_ref()
+            .map(|(r, e)| BlockReturn::Normal(*r, e))
+            .ok_or(ReturnTypeOther::NoBlockReturn(self.meta))
+    }
+
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         let mut early_return = None;
 
         for statement in &self.statements {
@@ -72,28 +92,47 @@ impl ReturnType for Block {
             .ok_or(ReturnTypeOther::NoBlockReturn(self.meta))
             .and_then(|(kind, stmt)| Ok((*kind, stmt.return_type()?.1)))
     }
+
+    pub fn backing_var(&self) -> Option<&NamedVariableRef> {
+        match self.return_expr().ok()? {
+            BlockReturn::Early(statement) => statement.backing_var(),
+            BlockReturn::Normal(kind, expr) => {
+                if kind == ReturnKind::Soft {
+                    expr.backing_var()
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
-impl ReturnType for Statement {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl Statement {
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         use StmtKind::*;
         match &self.0 {
             Let(var, _, expr) => if_hard(
                 expr.return_type()?,
                 Err(ReturnTypeOther::Let(var.2 + expr.1)),
             ),
-            Set(var, expr) => if_hard(
-                expr.return_type()?,
-                Err(ReturnTypeOther::Set(var.meta + expr.1)),
-            ),
+            Set(lhs, rhs) => if_hard(rhs.return_type()?, Err(ReturnTypeOther::Set(lhs.1 + rhs.1))),
             Import(_) => todo!(),
             Expression(expression) => expression.return_type(),
         }
     }
+
+    pub fn backing_var(&self) -> Option<&NamedVariableRef> {
+        match &self.0 {
+            StmtKind::Let(_, _, _) => None,
+            StmtKind::Set(_, _) => None,
+            StmtKind::Import(_) => None,
+            StmtKind::Expression(expr) => expr.backing_var(),
+        }
+    }
 }
 
-impl ReturnType for Expression {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl Expression {
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         use ExprKind::*;
         match &self.0 {
             Literal(lit) => Ok((ReturnKind::Soft, lit.as_type())),
@@ -130,10 +169,25 @@ impl ReturnType for Expression {
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
         }
     }
+
+    pub fn backing_var(&self) -> Option<&NamedVariableRef> {
+        match &self.0 {
+            ExprKind::Variable(var_ref) => Some(var_ref),
+            ExprKind::Indexed(lhs, _, _) => lhs.backing_var(),
+            ExprKind::Accessed(lhs, _, _) => lhs.backing_var(),
+            ExprKind::Array(_) => None,
+            ExprKind::Struct(_, _) => None,
+            ExprKind::Literal(_) => None,
+            ExprKind::BinOp(_, _, _) => None,
+            ExprKind::FunctionCall(_) => None,
+            ExprKind::If(_) => None,
+            ExprKind::Block(block) => block.backing_var(),
+        }
+    }
 }
 
-impl ReturnType for IfExpression {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl IfExpression {
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         let then_r = self.1.return_type()?;
         if let Some(else_b) = &self.2 {
             let else_r = else_b.return_type()?;
@@ -150,14 +204,14 @@ impl ReturnType for IfExpression {
     }
 }
 
-impl ReturnType for NamedVariableRef {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl NamedVariableRef {
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         Ok((ReturnKind::Soft, self.0.clone()))
     }
 }
 
-impl ReturnType for FunctionCall {
-    fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+impl FunctionCall {
+    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         Ok((ReturnKind::Soft, self.return_type.clone()))
     }
 }
@@ -211,72 +265,6 @@ impl TypeKind {
         match resolved {
             TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
             _ => resolved,
-        }
-    }
-}
-
-impl IndexedVariableReference {
-    pub fn get_name(&self) -> String {
-        match &self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => name.clone(),
-            IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
-                format!("{}[{}]", inner.get_name(), idx)
-            }
-            IndexedVariableReferenceKind::StructIndex(inner, name) => {
-                format!("{}.{}", inner.get_name(), name)
-            }
-        }
-    }
-
-    /// Retrieve the indexed type that this variable reference is pointing to
-    pub fn retrieve_type(&self, scope: &pass::Scope) -> Result<TypeKind, ErrorKind> {
-        match &self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => Ok(ty.clone()),
-            IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
-                let inner_ty = inner.retrieve_type(scope)?;
-                match inner_ty {
-                    TypeKind::Array(type_kind, _) => Ok(*type_kind),
-                    _ => Err(ErrorKind::TriedIndexingNonArray(inner_ty)),
-                }
-            }
-            IndexedVariableReferenceKind::StructIndex(inner, field_name) => {
-                let inner_ty = inner.retrieve_type(scope)?;
-                match inner_ty {
-                    TypeKind::CustomType(struct_name) => {
-                        let struct_ty = scope
-                            .get_struct_type(&struct_name)
-                            .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?;
-                        struct_ty
-                            .get_field_ty(&field_name)
-                            .ok_or(ErrorKind::NoSuchField(field_name.clone()))
-                            .cloned()
-                    }
-                    _ => Err(ErrorKind::TriedAccessingNonStruct(inner_ty)),
-                }
-            }
-        }
-    }
-
-    pub fn into_typeref<'s>(&mut self, typerefs: &'s ScopeTypeRefs) -> Option<(bool, TypeRef<'s>)> {
-        match &mut self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, name, _)) => {
-                let t = typerefs.find_var(name)?;
-                *ty = t.1.as_type();
-                Some(t)
-            }
-            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.into_typeref(typerefs),
-            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.into_typeref(typerefs),
-        }
-    }
-
-    pub fn resolve_ref<'s>(&mut self, typerefs: &'s TypeRefs) -> Result<TypeKind, ErrorKind> {
-        match &mut self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => {
-                *ty = ty.resolve_ref(typerefs);
-                Ok(ty.clone())
-            }
-            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.resolve_ref(typerefs),
-            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.resolve_ref(typerefs),
         }
     }
 }
