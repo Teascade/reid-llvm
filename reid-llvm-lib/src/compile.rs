@@ -501,7 +501,6 @@ impl InstructionHolder {
                 }
                 GetStructElemPtr(struct_val, idx) => {
                     let t = struct_val.get_type(module.builder).unwrap();
-                    dbg!(&t);
                     let Type::Ptr(struct_t) = t else { panic!() };
 
                     let type_fmt = if let Type::CustomType(type_val) = *struct_t {
@@ -509,7 +508,6 @@ impl InstructionHolder {
                     } else {
                         format!("{:?}", struct_t)
                     };
-                    dbg!(idx);
 
                     LLVMBuildStructGEP2(
                         module.builder_ref,
