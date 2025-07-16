@@ -248,14 +248,24 @@ impl mir::Statement {
                             panic!("Tried to mutate an immutable variable")
                         }
                         StackValueKind::Mutable(mut ptr) => {
-                            for (i, idx) in indices.iter().enumerate() {
+                            for (i, idx_kind) in indices.iter().enumerate() {
                                 let Type::Ptr(inner) = ty else { panic!() };
                                 ty = *inner;
 
-                                ptr = scope
-                                    .block
-                                    .build(Instr::GetElemPtr(ptr, vec![*idx]))
-                                    .unwrap();
+                                match idx_kind {
+                                    IndexKind::Array(idx) => {
+                                        ptr = scope
+                                            .block
+                                            .build(Instr::GetElemPtr(ptr, vec![*idx]))
+                                            .unwrap();
+                                    }
+                                    IndexKind::Struct(idx) => {
+                                        ptr = scope
+                                            .block
+                                            .build(Instr::GetStructElemPtr(ptr, *idx))
+                                            .unwrap();
+                                    }
+                                }
                                 if i < (indices.len() - 1) {
                                     ptr = scope.block.build(Instr::Load(ptr, ty.clone())).unwrap()
                                 }
@@ -508,8 +518,13 @@ impl mir::Expression {
     }
 }
 
+pub enum IndexKind {
+    Array(u32),
+    Struct(u32),
+}
+
 impl IndexedVariableReference {
-    fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<u32>)> {
+    fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<IndexKind>)> {
         match &self.kind {
             mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => scope
                 .stack_values
@@ -521,7 +536,7 @@ impl IndexedVariableReference {
 
                 match &inner_val.1 {
                     Type::Ptr(_) => {
-                        indices.push(*idx as u32);
+                        indices.push(IndexKind::Array(*idx as u32));
                         Some((inner_val, indices))
                     }
                     _ => panic!("Tried to codegen indexing a non-indexable value!"),
@@ -545,7 +560,7 @@ impl IndexedVariableReference {
                     None
                 }?;
 
-                indices.push(idx as u32);
+                indices.push(IndexKind::Struct(idx as u32));
                 Some((
                     StackValue(
                         inner_val.0,

@@ -317,8 +317,6 @@ impl InstructionValue {
                 GetElemPtr(ptr, _) => ptr.get_type(builder),
                 GetStructElemPtr(instr, idx) => {
                     let instr_ty = instr.get_type(builder)?;
-                    dbg!(&builder);
-                    dbg!(&instr, &instr_ty, idx);
                     let Type::Ptr(inner_ty) = instr_ty else {
                         panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
                     };

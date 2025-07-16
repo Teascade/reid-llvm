@@ -496,15 +496,7 @@ impl InstructionHolder {
                         module.values.get(arr).unwrap().value_ref,
                         llvm_indices.as_mut_ptr(),
                         llvm_indices.len() as u32,
-                        into_cstring(format!(
-                            "array_gep_{:?}",
-                            indices
-                                .iter()
-                                .map(|v| v.to_string())
-                                .collect::<Vec<_>>()
-                                .join("_")
-                        ))
-                        .as_ptr(),
+                        into_cstring(format!("array_gep")).as_ptr(),
                     )
                 }
                 GetStructElemPtr(struct_val, idx) => {
