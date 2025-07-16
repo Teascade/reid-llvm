@@ -65,7 +65,7 @@ impl mir::Module {
                             // TODO: Reorder custom-type definitions such that
                             // inner types get evaluated first. Otherwise this
                             // will cause a panic!
-                            .map(|StructField(_, t, _)| t.get_type(&type_values))
+                            .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
                             .collect(),
                     )))
                 }
@@ -80,14 +80,14 @@ impl mir::Module {
             let param_types: Vec<Type> = function
                 .parameters
                 .iter()
-                .map(|(_, p)| p.get_type(&type_values))
+                .map(|(_, p)| p.get_type(&type_values, &types))
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => module.function(
                     &function.name,
-                    function.return_type.get_type(&type_values),
+                    function.return_type.get_type(&type_values, &types),
                     param_types,
                     FunctionFlags {
                         is_pub: function.is_pub || is_main,
@@ -98,7 +98,7 @@ impl mir::Module {
                 ),
                 mir::FunctionDefinitionKind::Extern(imported) => module.function(
                     &function.name,
-                    function.return_type.get_type(&type_values),
+                    function.return_type.get_type(&type_values, &types),
                     param_types,
                     FunctionFlags {
                         is_extern: true,
@@ -120,7 +120,7 @@ impl mir::Module {
                     p_name.clone(),
                     StackValue(
                         StackValueKind::Immutable(entry.build(Instr::Param(i)).unwrap()),
-                        p_ty.get_type(&type_values),
+                        p_ty.get_type(&type_values, &types),
                     ),
                 );
             }
@@ -202,48 +202,6 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
     }
 }
 
-impl IndexedVariableReference {
-    fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<u32>)> {
-        match &self.kind {
-            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => scope
-                .stack_values
-                .get(name)
-                .cloned()
-                .map(|v| (v, Vec::new())),
-            mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
-                let (inner_val, mut indices) = inner.get_stack_value(scope)?;
-
-                match &inner_val.1 {
-                    Type::Ptr(_) => {
-                        indices.push(*idx as u32);
-                        Some((inner_val, indices))
-                    }
-                    _ => panic!("Tried to codegen indexing a non-indexable value!"),
-                }
-            }
-            mir::IndexedVariableReferenceKind::StructIndex(inner, field) => {
-                let (inner_val, mut indices) = inner.get_stack_value(scope)?;
-
-                let idx = if let Type::CustomType(ty_val) = inner_val.1 {
-                    match scope.types.get(&ty_val).unwrap() {
-                        TypeDefinitionKind::Struct(struct_type) => struct_type.find_index(field),
-                    }
-                } else {
-                    None
-                }?;
-
-                match &inner_val.1 {
-                    Type::Ptr(_) => {
-                        indices.push(idx as u32);
-                        Some((inner_val, indices))
-                    }
-                    _ => panic!("Tried to codegen indexing a non-indexable value!"),
-                }
-            }
-        }
-    }
-}
-
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Option<InstructionValue> {
         match &self.0 {
@@ -255,13 +213,22 @@ impl mir::Statement {
                         match mutable {
                             false => StackValueKind::Immutable(value),
                             true => match ty {
+                                // Struct is already allocated at initialization
                                 TypeKind::Array(_, _) => StackValueKind::Mutable(value),
+                                TypeKind::CustomType(n) => match scope
+                                    .types
+                                    .get(scope.type_values.get(n).unwrap())
+                                    .unwrap()
+                                {
+                                    // Struct also is allocated at initialization
+                                    TypeDefinitionKind::Struct(_) => StackValueKind::Mutable(value),
+                                },
                                 _ => StackValueKind::Mutable({
                                     let alloca = scope
                                         .block
                                         .build(Instr::Alloca(
                                             name.clone(),
-                                            ty.get_type(scope.type_values),
+                                            ty.get_type(scope.type_values, scope.types),
                                         ))
                                         .unwrap();
                                     scope.block.build(Instr::Store(alloca, value)).unwrap();
@@ -269,7 +236,7 @@ impl mir::Statement {
                                 }),
                             },
                         },
-                        ty.get_type(scope.type_values),
+                        ty.get_type(scope.type_values, scope.types),
                     ),
                 );
                 None
@@ -454,7 +421,10 @@ impl mir::Expression {
                 Some(
                     scope
                         .block
-                        .build(Instr::Load(ptr, val_t.get_type(scope.type_values)))
+                        .build(Instr::Load(
+                            ptr,
+                            val_t.get_type(scope.type_values, scope.types),
+                        ))
                         .unwrap(),
                 )
             }
@@ -472,7 +442,7 @@ impl mir::Expression {
                 let array = scope
                     .block
                     .build(Instr::ArrayAlloca(
-                        instr_t.get_type(scope.type_values),
+                        instr_t.get_type(scope.type_values, scope.types),
                         instr_list.len() as u32,
                     ))
                     .unwrap();
@@ -502,10 +472,14 @@ impl mir::Expression {
                     .build(Instr::GetStructElemPtr(struct_val, idx as u32))
                     .unwrap();
 
+                dbg!(&type_kind.get_type(scope.type_values, scope.types));
                 Some(
                     scope
                         .block
-                        .build(Instr::Load(ptr, type_kind.get_type(scope.type_values)))
+                        .build(Instr::Load(
+                            ptr,
+                            type_kind.get_type(scope.type_values, scope.types),
+                        ))
                         .unwrap(),
                 )
             }
@@ -529,6 +503,56 @@ impl mir::Expression {
                 }
 
                 Some(struct_ptr)
+            }
+        }
+    }
+}
+
+impl IndexedVariableReference {
+    fn get_stack_value(&self, scope: &mut Scope) -> Option<(StackValue, Vec<u32>)> {
+        match &self.kind {
+            mir::IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => scope
+                .stack_values
+                .get(name)
+                .cloned()
+                .map(|v| (v, Vec::new())),
+            mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
+                let (inner_val, mut indices) = inner.get_stack_value(scope)?;
+
+                match &inner_val.1 {
+                    Type::Ptr(_) => {
+                        indices.push(*idx as u32);
+                        Some((inner_val, indices))
+                    }
+                    _ => panic!("Tried to codegen indexing a non-indexable value!"),
+                }
+            }
+            mir::IndexedVariableReferenceKind::StructIndex(inner, field) => {
+                let (inner_val, mut indices) = inner.get_stack_value(scope)?;
+
+                let (idx, elem_ty) = if let Type::Ptr(inner_ty) = inner_val.1 {
+                    if let Type::CustomType(ty_val) = *inner_ty {
+                        match scope.types.get(&ty_val).unwrap() {
+                            TypeDefinitionKind::Struct(struct_type) => Some((
+                                struct_type.find_index(field)?,
+                                struct_type.get_field_ty(field)?,
+                            )),
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }?;
+
+                indices.push(idx as u32);
+                Some((
+                    StackValue(
+                        inner_val.0,
+                        Type::Ptr(Box::new(elem_ty.get_type(scope.type_values, scope.types))),
+                    ),
+                    indices,
+                ))
             }
         }
     }
@@ -596,7 +620,11 @@ impl mir::Literal {
 }
 
 impl TypeKind {
-    fn get_type(&self, type_vals: &HashMap<String, TypeValue>) -> Type {
+    fn get_type(
+        &self,
+        type_vals: &HashMap<String, TypeValue>,
+        typedefs: &HashMap<TypeValue, TypeDefinitionKind>,
+    ) -> Type {
         match &self {
             TypeKind::I8 => Type::I8,
             TypeKind::I16 => Type::I16,
@@ -610,10 +638,16 @@ impl TypeKind {
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
             TypeKind::StringPtr => Type::Ptr(Box::new(Type::I8)),
-            TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type(type_vals))),
+            TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type(type_vals, typedefs))),
             TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
-            TypeKind::CustomType(n) => Type::CustomType(type_vals.get(n).unwrap().clone()),
+            TypeKind::CustomType(n) => {
+                let type_val = type_vals.get(n).unwrap().clone();
+                let custom_t = Type::CustomType(type_val);
+                match typedefs.get(&type_val).unwrap() {
+                    TypeDefinitionKind::Struct(_) => Type::Ptr(Box::new(custom_t)),
+                }
+            }
         }
     }
 }

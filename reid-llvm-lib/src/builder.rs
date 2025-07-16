@@ -310,10 +310,12 @@ impl Builder {
                 Instr::ArrayAlloca(_, _) => Ok(()),
                 Instr::GetElemPtr(ptr_val, _) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
-                    if let Type::Ptr(_) = ptr_ty {
-                        Ok(())
-                    } else {
-                        Err(()) // TODO error: not a pointer
+                    match ptr_ty {
+                        Type::CustomType(custom) => match self.type_data(&custom).kind {
+                            CustomTypeKind::NamedStruct(_) => Ok(()),
+                        },
+                        Type::Ptr(_) => Ok(()),
+                        _ => Err(()),
                     }
                 }
                 Instr::GetStructElemPtr(ptr_val, idx) => {

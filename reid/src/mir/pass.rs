@@ -33,9 +33,6 @@ impl<TErr: STDError> STDError for Error<TErr> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Storage<T: std::fmt::Debug>(HashMap<String, T>);
-
 #[derive(Debug)]
 pub struct State<TErr: STDError> {
     pub errors: Vec<Error<TErr>>,
@@ -84,6 +81,9 @@ impl<TErr: STDError> State<TErr> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Storage<T: std::fmt::Debug>(HashMap<String, T>);
+
 impl<T: std::fmt::Debug> Default for Storage<T> {
     fn default() -> Self {
         Self(Default::default())
@@ -114,6 +114,24 @@ pub struct Scope {
     pub return_type_hint: Option<TypeKind>,
 }
 
+impl Scope {
+    pub fn inner(&self) -> Scope {
+        Scope {
+            function_returns: self.function_returns.clone(),
+            variables: self.variables.clone(),
+            types: self.types.clone(),
+            return_type_hint: self.return_type_hint.clone(),
+        }
+    }
+
+    pub fn get_struct_type(&self, name: &String) -> Option<&StructType> {
+        let ty = self.types.get(&name)?;
+        match ty {
+            TypeDefinitionKind::Struct(struct_ty) => Some(struct_ty),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct ScopeFunction {
     pub ret: TypeKind,
@@ -124,17 +142,6 @@ pub struct ScopeFunction {
 pub struct ScopeVariable {
     pub ty: TypeKind,
     pub mutable: bool,
-}
-
-impl Scope {
-    pub fn inner(&self) -> Scope {
-        Scope {
-            function_returns: self.function_returns.clone(),
-            variables: self.variables.clone(),
-            types: self.types.clone(),
-            return_type_hint: self.return_type_hint.clone(),
-        }
-    }
 }
 
 pub struct PassState<'st, 'sc, TError: STDError + Clone> {

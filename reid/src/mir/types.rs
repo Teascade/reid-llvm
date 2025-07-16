@@ -1,4 +1,8 @@
-use super::*;
+use super::{
+    typecheck::{Collapsable, ErrorKind},
+    typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
+    VagueType as Vague, *,
+};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {
@@ -179,6 +183,38 @@ pub fn pick_return<T>(lhs: (ReturnKind, T), rhs: (ReturnKind, T)) -> (ReturnKind
     }
 }
 
+impl TypeKind {
+    /// Assert that a type is already known and not vague. Return said type or
+    /// error.
+    pub fn assert_known(&self) -> Result<TypeKind, ErrorKind> {
+        self.known().map_err(ErrorKind::TypeIsVague)
+    }
+
+    /// Try to collapse a type on itself producing a default type if one exists,
+    /// Error if not.
+    pub fn or_default(&self) -> Result<TypeKind, ErrorKind> {
+        match self {
+            TypeKind::Vague(vague_type) => match &vague_type {
+                Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
+                Vague::Number => Ok(TypeKind::I32),
+                Vague::TypeRef(_) => panic!("Hinted default!"),
+            },
+            _ => Ok(self.clone()),
+        }
+    }
+
+    pub fn resolve_ref(&self, refs: &TypeRefs) -> TypeKind {
+        let resolved = match self {
+            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_type(*idx).unwrap(),
+            _ => self.clone(),
+        };
+        match resolved {
+            TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
+            _ => resolved,
+        }
+    }
+}
+
 impl IndexedVariableReference {
     pub fn get_name(&self) -> String {
         match &self.kind {
@@ -192,13 +228,55 @@ impl IndexedVariableReference {
         }
     }
 
-    pub fn update_type(&mut self, new_ty: &TypeKind) {
+    /// Retrieve the indexed type that this variable reference is pointing to
+    pub fn retrieve_type(&self, scope: &pass::Scope) -> Result<TypeKind, ErrorKind> {
+        match &self.kind {
+            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => Ok(ty.clone()),
+            IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
+                let inner_ty = inner.retrieve_type(scope)?;
+                match inner_ty {
+                    TypeKind::Array(type_kind, _) => Ok(*type_kind),
+                    _ => Err(ErrorKind::TriedIndexingNonArray(inner_ty)),
+                }
+            }
+            IndexedVariableReferenceKind::StructIndex(inner, field_name) => {
+                let inner_ty = inner.retrieve_type(scope)?;
+                match inner_ty {
+                    TypeKind::CustomType(struct_name) => {
+                        let struct_ty = scope
+                            .get_struct_type(&struct_name)
+                            .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?;
+                        struct_ty
+                            .get_field_ty(&field_name)
+                            .ok_or(ErrorKind::NoSuchField(field_name.clone()))
+                            .cloned()
+                    }
+                    _ => Err(ErrorKind::TriedAccessingNonStruct(inner_ty)),
+                }
+            }
+        }
+    }
+
+    pub fn into_typeref<'s>(&mut self, typerefs: &'s ScopeTypeRefs) -> Option<(bool, TypeRef<'s>)> {
+        match &mut self.kind {
+            IndexedVariableReferenceKind::Named(NamedVariableRef(ty, name, _)) => {
+                let t = typerefs.find_var(name)?;
+                *ty = t.1.as_type();
+                Some(t)
+            }
+            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.into_typeref(typerefs),
+            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.into_typeref(typerefs),
+        }
+    }
+
+    pub fn resolve_ref<'s>(&mut self, typerefs: &'s TypeRefs) -> Result<TypeKind, ErrorKind> {
         match &mut self.kind {
             IndexedVariableReferenceKind::Named(NamedVariableRef(ty, _, _)) => {
-                *ty = new_ty.clone();
+                *ty = ty.resolve_ref(typerefs);
+                Ok(ty.clone())
             }
-            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.update_type(new_ty),
-            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.update_type(new_ty),
+            IndexedVariableReferenceKind::ArrayIndex(inner, _) => inner.resolve_ref(typerefs),
+            IndexedVariableReferenceKind::StructIndex(inner, _) => inner.resolve_ref(typerefs),
         }
     }
 }

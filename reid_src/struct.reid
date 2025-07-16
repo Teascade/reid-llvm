@@ -6,10 +6,12 @@ struct Test {
 }
 
 fn main() -> u32 {
-    let value = Test {
+    let mut value = Test {
         field: 5,
         second: 3,
     };
+
+    value.second = 17;
 
     return value.second;
 }

@@ -106,13 +106,8 @@ impl Block {
                     }
                 }
                 StmtKind::Set(var, expr) => {
-                    // Get the TypeRef for this variable declaration
-                    let var_ref = var.find_hint(&state, &inner_hints)?;
-
-                    // If ok, update the MIR type to this TypeRef
-                    if let Some((_, var_ref)) = &var_ref {
-                        var.update_type(&var_ref.as_type());
-                    }
+                    // Update this MIR type to its TypeRef
+                    let var_ref = var.into_typeref(&inner_hints);
 
                     // Infer hints for the expression itself
                     let inferred = expr.infer_types(&mut state, &inner_hints);
@@ -371,7 +366,10 @@ impl Expression {
                 let kind = expr_ty.resolve_weak().unwrap();
                 match kind {
                     CustomType(name) => {
-                        let struct_ty = state.scope.get_struct_type(&name)?;
+                        let struct_ty = state
+                            .scope
+                            .get_struct_type(&name)
+                            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
                         match struct_ty.get_field_ty(&field_name) {
                             Some(field_ty) => {
                                 let mut elem_ty = type_refs.from_type(&type_kind).unwrap();
@@ -386,7 +384,11 @@ impl Expression {
                 }
             }
             ExprKind::Struct(struct_name, fields) => {
-                let expected_struct_ty = state.scope.get_struct_type(&struct_name)?.clone();
+                let expected_struct_ty = state
+                    .scope
+                    .get_struct_type(&struct_name)
+                    .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?
+                    .clone();
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
                         let field_ty = field.1.infer_types(state, type_refs);
