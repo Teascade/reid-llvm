@@ -6,6 +6,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
 use debug::PrintableModule;
+use util::match_types;
 
 pub mod builder;
 pub mod compile;
@@ -289,3 +290,119 @@ pub enum CustomTypeKind {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct NamedStruct(pub String, pub Vec<Type>);
+
+impl InstructionValue {
+    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+        use Instr::*;
+        unsafe {
+            match &builder.instr_data(self).kind {
+                Param(nth) => builder
+                    .function_data(&self.0.0)
+                    .params
+                    .get(*nth)
+                    .cloned()
+                    .ok_or(()),
+                Constant(c) => Ok(c.get_type()),
+                Add(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Mult(lhs, rhs) => match_types(lhs, rhs, &builder),
+                And(lhs, rhs) => match_types(lhs, rhs, &builder),
+                ICmp(_, _, _) => Ok(Type::Bool),
+                FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
+                Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
+                Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Load(_, ty) => Ok(ty.clone()),
+                Store(_, value) => value.get_type(builder),
+                ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                GetElemPtr(ptr, _) => ptr.get_type(builder),
+                GetStructElemPtr(instr, idx) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    let Type::Ptr(inner_ty) = instr_ty else {
+                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
+                    };
+                    let Type::CustomType(ty_value) = *inner_ty else {
+                        panic!("GetStructElemPtr on non-struct! ({:?})", &inner_ty)
+                    };
+                    let field_ty = match builder.type_data(&ty_value).kind {
+                        CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
+                            fields.get_unchecked(*idx as usize).clone()
+                        }
+                    };
+                    Ok(Type::Ptr(Box::new(field_ty)))
+                }
+            }
+        }
+    }
+}
+
+impl ConstValue {
+    pub fn get_type(&self) -> Type {
+        use Type::*;
+        match self {
+            ConstValue::I8(_) => I8,
+            ConstValue::I16(_) => I16,
+            ConstValue::I32(_) => I32,
+            ConstValue::I64(_) => I64,
+            ConstValue::I128(_) => I128,
+            ConstValue::U8(_) => U8,
+            ConstValue::U16(_) => U16,
+            ConstValue::U32(_) => U32,
+            ConstValue::U64(_) => U64,
+            ConstValue::U128(_) => U128,
+            ConstValue::StringPtr(_) => Ptr(Box::new(I8)),
+            ConstValue::Bool(_) => Bool,
+        }
+    }
+}
+
+impl Type {
+    pub fn comparable(&self) -> bool {
+        match self {
+            Type::I8 => true,
+            Type::I16 => true,
+            Type::I32 => true,
+            Type::I64 => true,
+            Type::I128 => true,
+            Type::U8 => true,
+            Type::U16 => true,
+            Type::U32 => true,
+            Type::U64 => true,
+            Type::U128 => true,
+            Type::Bool => true,
+            Type::Void => false,
+            Type::Ptr(_) => false,
+            Type::CustomType(_) => false,
+        }
+    }
+
+    pub fn signed(&self) -> bool {
+        match self {
+            Type::I8 => true,
+            Type::I16 => true,
+            Type::I32 => true,
+            Type::I64 => true,
+            Type::I128 => true,
+            Type::U8 => false,
+            Type::U16 => false,
+            Type::U32 => false,
+            Type::U64 => false,
+            Type::U128 => false,
+            Type::Bool => false,
+            Type::Void => false,
+            Type::Ptr(_) => false,
+            Type::CustomType(_) => false,
+        }
+    }
+}
+
+impl TerminatorKind {
+    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+        use TerminatorKind::*;
+        match self {
+            Ret(instr_val) => instr_val.get_type(builder),
+            RetVoid => Ok(Type::Void),
+            Br(_) => Ok(Type::Void),
+            CondBr(_, _, _) => Ok(Type::Void),
+        }
+    }
+}

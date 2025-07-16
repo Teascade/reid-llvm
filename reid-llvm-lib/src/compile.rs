@@ -509,27 +509,22 @@ impl InstructionHolder {
                 }
                 GetStructElemPtr(struct_val, idx) => {
                     let t = struct_val.get_type(module.builder).unwrap();
-                    let Type::Ptr(inner_t) = t else { panic!() };
+                    dbg!(&t);
+                    let Type::Ptr(struct_t) = t else { panic!() };
 
-                    let Type::CustomType(struct_ty) = *inner_t else {
-                        panic!();
+                    let type_fmt = if let Type::CustomType(type_val) = *struct_t {
+                        format!("M{}T{}", type_val.0.0, type_val.1)
+                    } else {
+                        format!("{:?}", struct_t)
                     };
-                    let struct_ty_data = module.builder.type_data(&struct_ty);
-                    let (name, elem_ty) = match struct_ty_data.kind {
-                        CustomTypeKind::NamedStruct(NamedStruct(name, fields)) => (
-                            name,
-                            fields
-                                .get_unchecked(*idx as usize)
-                                .as_llvm(module.context_ref, &module.types),
-                        ),
-                    };
+                    dbg!(idx);
 
                     LLVMBuildStructGEP2(
                         module.builder_ref,
-                        elem_ty,
+                        struct_t.as_llvm(module.context_ref, &module.types),
                         module.values.get(struct_val).unwrap().value_ref,
                         *idx,
-                        into_cstring(format!("struct_gep_{}_{}", name, idx)).as_ptr(),
+                        into_cstring(format!("struct.{}.{}.gep", type_fmt, idx)).as_ptr(),
                     )
                 }
             }
