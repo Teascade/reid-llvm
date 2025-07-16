@@ -5,7 +5,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*};
+use crate::{CmpPredicate, Instr, InstructionData, NamedStruct, TerminatorKind, builder::*};
 
 impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -99,6 +99,12 @@ impl Debug for InstructionValue {
     }
 }
 
+impl Debug for TypeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Ty[{:0>2}-{:0>2}]", &self.0.0, self.1)
+    }
+}
+
 impl Debug for Instr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -126,6 +132,9 @@ impl Debug for Instr {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
+            Instr::GetStructElemPtr(instruction_value, index) => {
+                fmt_index(f, instruction_value, &index.to_string())
+            }
         }
     }
 }

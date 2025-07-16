@@ -20,7 +20,11 @@ use llvm_sys::{
     },
 };
 
-use crate::util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring};
+use crate::{
+    CustomTypeKind, NamedStruct,
+    builder::{TypeHolder, TypeValue},
+    util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring},
+};
 
 use super::{
     CmpPredicate, ConstValue, Context, TerminatorKind, Type,
@@ -175,6 +179,7 @@ pub struct LLVMModule<'a> {
     functions: HashMap<FunctionValue, LLVMFunction>,
     blocks: HashMap<BlockValue, LLVMBasicBlockRef>,
     values: HashMap<InstructionValue, LLVMValue>,
+    types: HashMap<TypeValue, LLVMTypeRef>,
 }
 
 #[derive(Clone, Copy)]
@@ -202,12 +207,16 @@ impl ModuleHolder {
 
             // Compile the contents
 
-            let mut functions = HashMap::new();
+            let mut types = HashMap::new();
+            for ty in &self.types {
+                types.insert(ty.value, ty.compile_type(context, &types));
+            }
 
+            let mut functions = HashMap::new();
             for function in &self.functions {
                 functions.insert(
                     function.value,
-                    function.compile_signature(context, module_ref),
+                    function.compile_signature(context, module_ref, &types),
                 );
             }
 
@@ -217,6 +226,7 @@ impl ModuleHolder {
                 builder_ref: context.builder_ref,
                 module_ref,
                 functions,
+                types,
                 blocks: HashMap::new(),
                 values: HashMap::new(),
             };
@@ -230,19 +240,46 @@ impl ModuleHolder {
     }
 }
 
+impl TypeHolder {
+    unsafe fn compile_type(
+        &self,
+        context: &LLVMContext,
+        types: &HashMap<TypeValue, LLVMTypeRef>,
+    ) -> LLVMTypeRef {
+        unsafe {
+            match &self.data.kind {
+                CustomTypeKind::NamedStruct(named_struct) => {
+                    let mut elem_types = Vec::new();
+                    for ty in &named_struct.1 {
+                        elem_types.push(ty.as_llvm(context.context_ref, types));
+                    }
+                    let struct_ty = LLVMStructTypeInContext(
+                        context.context_ref,
+                        elem_types.as_mut_ptr(),
+                        elem_types.len() as u32,
+                        0,
+                    );
+                    struct_ty
+                }
+            }
+        }
+    }
+}
+
 impl FunctionHolder {
     unsafe fn compile_signature(
         &self,
         context: &LLVMContext,
         module_ref: LLVMModuleRef,
+        types: &HashMap<TypeValue, LLVMTypeRef>,
     ) -> LLVMFunction {
         unsafe {
-            let ret_type = self.data.ret.as_llvm(context.context_ref);
+            let ret_type = self.data.ret.as_llvm(context.context_ref, types);
             let mut param_types: Vec<LLVMTypeRef> = self
                 .data
                 .params
                 .iter()
-                .map(|t| t.as_llvm(context.context_ref))
+                .map(|t| t.as_llvm(context.context_ref, types))
                 .collect();
             let param_ptr = param_types.as_mut_ptr();
             let param_len = param_types.len();
@@ -346,7 +383,7 @@ impl InstructionHolder {
             use super::Instr::*;
             match &self.data.kind {
                 Param(nth) => LLVMGetParam(function.value_ref, *nth as u32),
-                Constant(val) => val.as_llvm(module.context_ref, module.builder_ref),
+                Constant(val) => val.as_llvm(module),
                 Add(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
@@ -412,7 +449,7 @@ impl InstructionHolder {
                     }
                     let phi = LLVMBuildPhi(
                         module.builder_ref,
-                        _ty.as_llvm(module.context_ref),
+                        _ty.as_llvm(module.context_ref, &module.types),
                         c"phi".as_ptr(),
                     );
                     LLVMAddIncoming(
@@ -425,12 +462,12 @@ impl InstructionHolder {
                 }
                 Alloca(name, ty) => LLVMBuildAlloca(
                     module.builder_ref,
-                    ty.as_llvm(module.context_ref),
+                    ty.as_llvm(module.context_ref, &module.types),
                     into_cstring(name).as_ptr(),
                 ),
                 Load(ptr, ty) => LLVMBuildLoad2(
                     module.builder_ref,
-                    ty.as_llvm(module.context_ref),
+                    ty.as_llvm(module.context_ref, &module.types),
                     module.values.get(&ptr).unwrap().value_ref,
                     c"load".as_ptr(),
                 ),
@@ -440,11 +477,10 @@ impl InstructionHolder {
                     module.values.get(&ptr).unwrap().value_ref,
                 ),
                 ArrayAlloca(ty, len) => {
-                    let array_len = ConstValue::U16(*len as u16)
-                        .as_llvm(module.context_ref, module.builder_ref);
+                    let array_len = ConstValue::U16(*len as u16).as_llvm(module);
                     LLVMBuildArrayAlloca(
                         module.builder_ref,
-                        ty.as_llvm(module.context_ref),
+                        ty.as_llvm(module.context_ref, &module.types),
                         array_len,
                         c"array_alloca".as_ptr(),
                     )
@@ -453,20 +489,51 @@ impl InstructionHolder {
                     let t = arr.get_type(module.builder).unwrap();
                     let Type::Ptr(elem_t) = t else { panic!() };
 
-                    let mut indices: Vec<_> = indices
+                    let mut llvm_indices: Vec<_> = indices
                         .iter()
-                        .map(|idx| {
-                            ConstValue::U32(*idx).as_llvm(module.context_ref, module.builder_ref)
-                        })
+                        .map(|idx| ConstValue::U32(*idx).as_llvm(module))
                         .collect();
 
                     LLVMBuildGEP2(
                         module.builder_ref,
-                        elem_t.as_llvm(module.context_ref),
+                        elem_t.as_llvm(module.context_ref, &module.types),
                         module.values.get(arr).unwrap().value_ref,
-                        indices.as_mut_ptr(),
-                        indices.len() as u32,
-                        c"array_gep".as_ptr(),
+                        llvm_indices.as_mut_ptr(),
+                        llvm_indices.len() as u32,
+                        into_cstring(format!(
+                            "array_gep_{:?}",
+                            indices
+                                .iter()
+                                .map(|v| v.to_string())
+                                .collect::<Vec<_>>()
+                                .join("_")
+                        ))
+                        .as_ptr(),
+                    )
+                }
+                GetStructElemPtr(struct_val, idx) => {
+                    let t = struct_val.get_type(module.builder).unwrap();
+                    let Type::Ptr(inner_t) = t else { panic!() };
+
+                    let Type::CustomType(struct_ty) = *inner_t else {
+                        panic!();
+                    };
+                    let struct_ty_data = module.builder.type_data(&struct_ty);
+                    let (name, elem_ty) = match struct_ty_data.kind {
+                        CustomTypeKind::NamedStruct(NamedStruct(name, fields)) => (
+                            name,
+                            fields
+                                .get_unchecked(*idx as usize)
+                                .as_llvm(module.context_ref, &module.types),
+                        ),
+                    };
+
+                    LLVMBuildStructGEP2(
+                        module.builder_ref,
+                        elem_ty,
+                        module.values.get(struct_val).unwrap().value_ref,
+                        *idx,
+                        into_cstring(format!("struct_gep_{}_{}", name, idx)).as_ptr(),
                     )
                 }
             }
@@ -532,9 +599,9 @@ impl CmpPredicate {
 }
 
 impl ConstValue {
-    fn as_llvm(&self, context: LLVMContextRef, builder: LLVMBuilderRef) -> LLVMValueRef {
+    fn as_llvm(&self, module: &LLVMModule) -> LLVMValueRef {
         unsafe {
-            let t = self.get_type().as_llvm(context);
+            let t = self.get_type().as_llvm(module.context_ref, &module.types);
             match self {
                 ConstValue::Bool(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::I8(val) => LLVMConstInt(t, *val as u64, 1),
@@ -547,8 +614,8 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::String(val) => LLVMBuildGlobalStringPtr(
-                    builder,
+                ConstValue::StringPtr(val) => LLVMBuildGlobalStringPtr(
+                    module.builder_ref,
                     into_cstring(val).as_ptr(),
                     c"string".as_ptr(),
                 ),
@@ -558,7 +625,11 @@ impl ConstValue {
 }
 
 impl Type {
-    fn as_llvm(&self, context: LLVMContextRef) -> LLVMTypeRef {
+    fn as_llvm(
+        &self,
+        context: LLVMContextRef,
+        typemap: &HashMap<TypeValue, LLVMTypeRef>,
+    ) -> LLVMTypeRef {
         use Type::*;
         unsafe {
             match self {
@@ -569,7 +640,8 @@ impl Type {
                 I128 | U128 => LLVMInt128TypeInContext(context),
                 Bool => LLVMInt1TypeInContext(context),
                 Void => LLVMVoidTypeInContext(context),
-                Ptr(ty) => LLVMPointerType(ty.as_llvm(context), 0),
+                Ptr(ty) => LLVMPointerType(ty.as_llvm(context, typemap), 0),
+                CustomType(struct_ty) => *typemap.get(struct_ty).unwrap(),
             }
         }
     }

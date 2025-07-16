@@ -1,11 +1,11 @@
 //! This module contains simply [`Builder`] and it's related utility Values.
 //! Builder is the actual struct being modified when building the LLIR.
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
-    BlockData, ConstValue, FunctionData, Instr, InstructionData, ModuleData, TerminatorKind, Type,
-    TypeData, util::match_types,
+    BlockData, ConstValue, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData,
+    NamedStruct, TerminatorKind, Type, TypeData, util::match_types,
 };
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
@@ -213,6 +213,18 @@ impl Builder {
         }
     }
 
+    pub(crate) unsafe fn type_data(&self, value: &TypeValue) -> TypeData {
+        unsafe {
+            self.modules
+                .borrow()
+                .get_unchecked(value.0.0)
+                .types
+                .get_unchecked(value.1)
+                .data
+                .clone()
+        }
+    }
+
     pub(crate) fn find_module<'ctx>(&'ctx self, value: ModuleValue) -> ModuleHolder {
         unsafe { self.modules.borrow().get_unchecked(value.0).clone() }
     }
@@ -222,16 +234,15 @@ impl Builder {
     }
 
     pub fn check_instruction(&self, instruction: &InstructionValue) -> Result<(), ()> {
-        use super::Instr::*;
         unsafe {
             match self.instr_data(&instruction).kind {
-                Param(_) => Ok(()),
-                Constant(_) => Ok(()),
-                Add(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Sub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Mult(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                ICmp(_, lhs, rhs) => {
+                Instr::Param(_) => Ok(()),
+                Instr::Constant(_) => Ok(()),
+                Instr::Add(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::Sub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::Mult(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::ICmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
                     if t.comparable() {
                         Ok(())
@@ -239,7 +250,7 @@ impl Builder {
                         Err(()) // TODO error: Types not comparable
                     }
                 }
-                FunctionCall(fun, params) => {
+                Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
                     if param_types.len() != params.len() {
                         return Err(()); // TODO error: invalid amount of params
@@ -251,7 +262,7 @@ impl Builder {
                     }
                     Ok(())
                 }
-                Phi(vals) => {
+                Instr::Phi(vals) => {
                     let mut iter = vals.iter();
                     // TODO error: Phi must contain at least one item
 
@@ -265,40 +276,53 @@ impl Builder {
                     }
                     Ok(())
                 }
-                Alloca(_, _) => Ok(()),
-                Load(ptr, load_ty) => {
-                    if let Ok(ptr_ty) = ptr.get_type(&self) {
-                        if let Type::Ptr(ptr_ty_inner) = ptr_ty {
-                            if *ptr_ty_inner == load_ty {
-                                Ok(())
-                            } else {
-                                Err(())
-                            }
-                        } else {
-                            Err(())
-                        }
-                    } else {
-                        Err(())
-                    }
-                }
-                Store(ptr, _) => {
-                    if let Ok(ty) = ptr.get_type(&self) {
-                        if let Type::Ptr(_) = ty {
+                Instr::Alloca(_, _) => Ok(()),
+                Instr::Load(ptr, load_ty) => {
+                    let ptr_ty = ptr.get_type(&self)?;
+                    if let Type::Ptr(ptr_ty_inner) = ptr_ty {
+                        if *ptr_ty_inner == load_ty {
                             Ok(())
                         } else {
-                            Err(())
+                            Err(()) // TODO error: inner type mismatch
                         }
                     } else {
-                        Err(())
+                        Err(()) // TODO error: not a pointer
                     }
                 }
-                ArrayAlloca(_, _) => Ok(()),
-                GetElemPtr(arr, _) => {
-                    let arr_ty = arr.get_type(&self)?;
-                    if let Type::Ptr(_) = arr_ty {
+                Instr::Store(ptr, _) => {
+                    let ty = ptr.get_type(&self)?;
+                    if let Type::Ptr(_) = ty {
                         Ok(())
                     } else {
-                        Err(())
+                        Err(()) // TODO error: not a pointer
+                    }
+                }
+                Instr::ArrayAlloca(_, _) => Ok(()),
+                Instr::GetElemPtr(ptr_val, _) => {
+                    let ptr_ty = ptr_val.get_type(&self)?;
+                    if let Type::Ptr(_) = ptr_ty {
+                        Ok(())
+                    } else {
+                        Err(()) // TODO error: not a pointer
+                    }
+                }
+                Instr::GetStructElemPtr(ptr_val, idx) => {
+                    let ptr_ty = ptr_val.get_type(&self)?;
+                    if let Type::Ptr(ty) = ptr_ty {
+                        if let Type::CustomType(val) = *ty {
+                            match self.type_data(&val).kind {
+                                CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
+                                    if fields.len() <= idx as usize {
+                                        return Err(()); // TODO error: no such field
+                                    }
+                                }
+                            }
+                            Ok(())
+                        } else {
+                            Err(()) // TODO error: not a struct
+                        }
+                    } else {
+                        Err(()) // TODO error: not a pointer
                     }
                 }
             }
@@ -364,6 +388,17 @@ impl InstructionValue {
                 Store(_, value) => value.get_type(builder),
                 ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 GetElemPtr(ptr, _) => ptr.get_type(builder),
+                GetStructElemPtr(instr, idx) => {
+                    let instr_val = instr.get_type(builder)?;
+                    let Type::CustomType(ty_value) = instr_val else {
+                        panic!("GetStructElemPtr on non-struct! ({:?})", &instr_val)
+                    };
+                    match builder.type_data(&ty_value).kind {
+                        CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
+                            Ok(fields.get_unchecked(*idx as usize).clone())
+                        }
+                    }
+                }
             }
         }
     }
@@ -383,7 +418,7 @@ impl ConstValue {
             ConstValue::U32(_) => U32,
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
-            ConstValue::String(_) => Ptr(Box::new(I8)),
+            ConstValue::StringPtr(_) => Ptr(Box::new(I8)),
             ConstValue::Bool(_) => Bool,
         }
     }
@@ -405,6 +440,7 @@ impl Type {
             Type::Bool => true,
             Type::Void => false,
             Type::Ptr(_) => false,
+            Type::CustomType(_) => false,
         }
     }
 
@@ -423,6 +459,7 @@ impl Type {
             Type::Bool => false,
             Type::Void => false,
             Type::Ptr(_) => false,
+            Type::CustomType(_) => false,
         }
     }
 }

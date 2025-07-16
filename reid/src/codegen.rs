@@ -494,7 +494,7 @@ impl mir::Literal {
             mir::Literal::U64(val) => ConstValue::U64(val),
             mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Bool(val) => ConstValue::Bool(val),
-            mir::Literal::String(val) => ConstValue::String(val.clone()),
+            mir::Literal::String(val) => ConstValue::StringPtr(val.clone()),
             mir::Literal::Vague(_) => panic!("Got vague literal!"),
         })
     }

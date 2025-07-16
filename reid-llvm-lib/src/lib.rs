@@ -4,7 +4,7 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
-use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue};
+use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
 use debug::PrintableModule;
 
 pub mod builder;
@@ -205,6 +205,7 @@ pub enum CmpPredicate {
 pub enum Instr {
     Param(usize),
     Constant(ConstValue),
+
     Add(InstructionValue, InstructionValue),
     Sub(InstructionValue, InstructionValue),
     Mult(InstructionValue, InstructionValue),
@@ -216,6 +217,7 @@ pub enum Instr {
     Store(InstructionValue, InstructionValue),
     ArrayAlloca(Type, u32),
     GetElemPtr(InstructionValue, Vec<u32>),
+    GetStructElemPtr(InstructionValue, u32),
 
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
@@ -237,6 +239,7 @@ pub enum Type {
     U128,
     Bool,
     Void,
+    CustomType(TypeValue),
     Ptr(Box<Type>),
 }
 
@@ -253,7 +256,7 @@ pub enum ConstValue {
     U64(u64),
     U128(u128),
     Bool(bool),
-    String(String),
+    StringPtr(String),
 }
 
 #[derive(Clone, Hash)]
@@ -272,5 +275,8 @@ pub struct TypeData {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum CustomTypeKind {
-    Struct(Vec<Type>),
+    NamedStruct(NamedStruct),
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+pub struct NamedStruct(String, Vec<Type>);
