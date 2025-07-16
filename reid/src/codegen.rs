@@ -65,6 +65,7 @@ pub struct StackValue(StackValueKind, Type);
 pub enum StackValueKind {
     Immutable(InstructionValue),
     Mutable(InstructionValue),
+    Any(InstructionValue),
 }
 
 impl StackValueKind {
@@ -72,6 +73,7 @@ impl StackValueKind {
         match self {
             StackValueKind::Immutable(val) => val,
             StackValueKind::Mutable(val) => val,
+            StackValueKind::Any(val) => val,
         }
     }
 
@@ -79,6 +81,7 @@ impl StackValueKind {
         match self {
             StackValueKind::Immutable(_) => StackValueKind::Immutable(instr),
             StackValueKind::Mutable(_) => StackValueKind::Mutable(instr),
+            StackValueKind::Any(_) => StackValueKind::Any(instr),
         }
     }
 }
@@ -346,6 +349,7 @@ impl mir::Expression {
                             val
                         }
                     }
+                    _ => panic!("Found an unknown-mutable variable!"),
                 })
             }
             mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
