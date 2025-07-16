@@ -80,6 +80,16 @@ impl Builder {
         value
     }
 
+    pub(crate) unsafe fn add_type(&self, mod_val: &ModuleValue, data: TypeData) -> TypeValue {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(mod_val.0);
+            let value = TypeValue(module.value, module.types.len());
+            module.types.push(TypeHolder { value, data });
+            value
+        }
+    }
+
     pub(crate) unsafe fn add_function(
         &self,
         mod_val: &ModuleValue,

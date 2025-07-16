@@ -76,6 +76,15 @@ impl<'ctx> Module<'ctx> {
         }
     }
 
+    pub fn custom_type(&mut self, ty: CustomTypeKind) -> TypeValue {
+        unsafe {
+            let (name, kind) = match &ty {
+                CustomTypeKind::NamedStruct(NamedStruct(name, _)) => (name.clone(), ty),
+            };
+            self.builder.add_type(&self.value, TypeData { name, kind })
+        }
+    }
+
     pub fn value(&self) -> ModuleValue {
         self.value
     }
