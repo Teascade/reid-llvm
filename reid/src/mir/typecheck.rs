@@ -64,40 +64,13 @@ pub struct TypeCheck<'t> {
     pub refs: &'t TypeRefs,
 }
 
-fn check_typedefs_for_recursion<'a, 'b>(
-    defmap: &'b HashMap<&'a String, &'b TypeDefinition>,
-    typedef: &'b TypeDefinition,
-    mut seen: HashSet<String>,
-    state: &mut PassState<ErrorKind>,
-) {
-    match &typedef.kind {
-        TypeDefinitionKind::Struct(StructType(fields)) => {
-            for field_ty in fields.iter().map(|StructField(_, ty, _)| ty) {
-                if let TypeKind::CustomType(name) = field_ty {
-                    if seen.contains(name) {
-                        state.ok::<_, Infallible>(
-                            Err(ErrorKind::RecursiveTypeDefinition(
-                                typedef.name.clone(),
-                                name.clone(),
-                            )),
-                            typedef.meta,
-                        );
-                    } else {
-                        seen.insert(name.clone());
-                        if let Some(inner_typedef) = defmap.get(name) {
-                            check_typedefs_for_recursion(defmap, inner_typedef, seen.clone(), state)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+type TypecheckPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
 impl<'t> Pass for TypeCheck<'t> {
+    type Data = ();
     type TError = ErrorKind;
 
-    fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
+    fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) {
         let mut defmap = HashMap::new();
         for typedef in &module.typedefs {
             let TypeDefinition { name, kind, meta } = &typedef;
@@ -137,11 +110,41 @@ impl<'t> Pass for TypeCheck<'t> {
     }
 }
 
+fn check_typedefs_for_recursion<'a, 'b>(
+    defmap: &'b HashMap<&'a String, &'b TypeDefinition>,
+    typedef: &'b TypeDefinition,
+    mut seen: HashSet<String>,
+    state: &mut TypecheckPassState,
+) {
+    match &typedef.kind {
+        TypeDefinitionKind::Struct(StructType(fields)) => {
+            for field_ty in fields.iter().map(|StructField(_, ty, _)| ty) {
+                if let TypeKind::CustomType(name) = field_ty {
+                    if seen.contains(name) {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::RecursiveTypeDefinition(
+                                typedef.name.clone(),
+                                name.clone(),
+                            )),
+                            typedef.meta,
+                        );
+                    } else {
+                        seen.insert(name.clone());
+                        if let Some(inner_typedef) = defmap.get(name) {
+                            check_typedefs_for_recursion(defmap, inner_typedef, seen.clone(), state)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 impl FunctionDefinition {
     fn typecheck(
         &mut self,
         hints: &TypeRefs,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypecheckPassState,
     ) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
             let param_t = state.or_else(
@@ -186,7 +189,7 @@ impl FunctionDefinition {
 impl Block {
     fn typecheck(
         &mut self,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypecheckPassState,
         typerefs: &TypeRefs,
         hint_t: Option<&TypeKind>,
     ) -> Result<(ReturnKind, TypeKind), ErrorKind> {
@@ -341,7 +344,7 @@ impl Block {
 impl Expression {
     fn typecheck(
         &mut self,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypecheckPassState,
         typerefs: &TypeRefs,
         hint_t: Option<&TypeKind>,
     ) -> Result<TypeKind, ErrorKind> {

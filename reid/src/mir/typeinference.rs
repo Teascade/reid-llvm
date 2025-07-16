@@ -26,10 +26,13 @@ pub struct TypeInference<'t> {
     pub refs: &'t TypeRefs,
 }
 
+type TypeInferencePassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+
 impl<'t> Pass for TypeInference<'t> {
+    type Data = ();
     type TError = ErrorKind;
 
-    fn module(&mut self, module: &mut Module, mut state: PassState<ErrorKind>) {
+    fn module(&mut self, module: &mut Module, mut state: TypeInferencePassState) {
         for function in &mut module.functions {
             let res = function.infer_types(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
@@ -41,7 +44,7 @@ impl FunctionDefinition {
     fn infer_types(
         &mut self,
         type_refs: &TypeRefs,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypeInferencePassState,
     ) -> Result<(), ErrorKind> {
         let scope_hints = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
@@ -74,7 +77,7 @@ impl FunctionDefinition {
 impl Block {
     fn infer_types<'s>(
         &mut self,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypeInferencePassState,
         outer_hints: &'s ScopeTypeRefs,
     ) -> Result<(ReturnKind, TypeRef<'s>), ErrorKind> {
         let mut state = state.inner();
@@ -150,7 +153,7 @@ impl Block {
 impl Expression {
     fn infer_types<'s>(
         &mut self,
-        state: &mut PassState<ErrorKind>,
+        state: &mut TypeInferencePassState,
         type_refs: &'s ScopeTypeRefs<'s>,
     ) -> Result<TypeRef<'s>, ErrorKind> {
         match &mut self.0 {

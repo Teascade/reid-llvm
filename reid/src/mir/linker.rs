@@ -2,6 +2,7 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     convert::Infallible,
+    fmt::Error,
     fs::{self},
     path::PathBuf,
     rc::Rc,
@@ -54,9 +55,12 @@ pub fn compile_std() -> super::Module {
 /// MIR.
 pub struct LinkerPass;
 
+type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+
 impl Pass for LinkerPass {
+    type Data = ();
     type TError = ErrorKind;
-    fn context(&mut self, context: &mut Context, mut state: PassState<Self::TError>) {
+    fn context(&mut self, context: &mut Context, mut state: LinkerPassState) {
         let mains = context
             .modules
             .iter()

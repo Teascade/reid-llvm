@@ -106,21 +106,23 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
 }
 
 #[derive(Clone, Default, Debug)]
-pub struct Scope {
+pub struct Scope<Data: Clone + Default> {
     pub function_returns: Storage<ScopeFunction>,
     pub variables: Storage<ScopeVariable>,
     pub types: Storage<TypeDefinitionKind>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
+    pub data: Data,
 }
 
-impl Scope {
-    pub fn inner(&self) -> Scope {
+impl<Data: Clone + Default> Scope<Data> {
+    pub fn inner(&self) -> Scope<Data> {
         Scope {
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
             types: self.types.clone(),
             return_type_hint: self.return_type_hint.clone(),
+            data: self.data.clone(),
         }
     }
 
@@ -144,14 +146,14 @@ pub struct ScopeVariable {
     pub mutable: bool,
 }
 
-pub struct PassState<'st, 'sc, TError: STDError + Clone> {
+pub struct PassState<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> {
     state: &'st mut State<TError>,
-    pub scope: &'sc mut Scope,
-    inner: Vec<Scope>,
+    pub scope: &'sc mut Scope<Data>,
+    inner: Vec<Scope<Data>>,
 }
 
-impl<'st, 'sc, TError: STDError + Clone> PassState<'st, 'sc, TError> {
-    fn from(state: &'st mut State<TError>, scope: &'sc mut Scope) -> Self {
+impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, 'sc, Data, TError> {
+    fn from(state: &'st mut State<TError>, scope: &'sc mut Scope<Data>) -> Self {
         PassState {
             state,
             scope,
@@ -186,7 +188,7 @@ impl<'st, 'sc, TError: STDError + Clone> PassState<'st, 'sc, TError> {
         }
     }
 
-    pub fn inner(&mut self) -> PassState<TError> {
+    pub fn inner(&mut self) -> PassState<Data, TError> {
         self.inner.push(self.scope.inner());
         let scope = self.inner.last_mut().unwrap();
         PassState {
@@ -198,19 +200,21 @@ impl<'st, 'sc, TError: STDError + Clone> PassState<'st, 'sc, TError> {
 }
 
 pub trait Pass {
+    type Data: Clone + Default;
     type TError: STDError + Clone;
 
-    fn context(&mut self, _context: &mut Context, mut _state: PassState<Self::TError>) {}
-    fn module(&mut self, _module: &mut Module, mut _state: PassState<Self::TError>) {}
+    fn context(&mut self, _context: &mut Context, mut _state: PassState<Self::Data, Self::TError>) {
+    }
+    fn module(&mut self, _module: &mut Module, mut _state: PassState<Self::Data, Self::TError>) {}
     fn function(
         &mut self,
         _function: &mut FunctionDefinition,
-        mut _state: PassState<Self::TError>,
+        mut _state: PassState<Self::Data, Self::TError>,
     ) {
     }
-    fn block(&mut self, _block: &mut Block, mut _state: PassState<Self::TError>) {}
-    fn stmt(&mut self, _stmt: &mut Statement, mut _state: PassState<Self::TError>) {}
-    fn expr(&mut self, _expr: &mut Expression, mut _state: PassState<Self::TError>) {}
+    fn block(&mut self, _block: &mut Block, mut _state: PassState<Self::Data, Self::TError>) {}
+    fn stmt(&mut self, _stmt: &mut Statement, mut _state: PassState<Self::Data, Self::TError>) {}
+    fn expr(&mut self, _expr: &mut Expression, mut _state: PassState<Self::Data, Self::TError>) {}
 }
 
 impl Context {
@@ -226,7 +230,12 @@ impl Context {
 }
 
 impl Module {
-    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+    fn pass<T: Pass>(
+        &mut self,
+        pass: &mut T,
+        state: &mut State<T::TError>,
+        scope: &mut Scope<T::Data>,
+    ) {
         for typedef in &self.typedefs {
             let kind = match &typedef.kind {
                 TypeDefinitionKind::Struct(fields) => TypeDefinitionKind::Struct(fields.clone()),
@@ -256,7 +265,12 @@ impl Module {
 }
 
 impl FunctionDefinition {
-    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+    fn pass<T: Pass>(
+        &mut self,
+        pass: &mut T,
+        state: &mut State<T::TError>,
+        scope: &mut Scope<T::Data>,
+    ) {
         for param in &self.parameters {
             scope
                 .variables
@@ -283,7 +297,12 @@ impl FunctionDefinition {
 }
 
 impl Block {
-    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+    fn pass<T: Pass>(
+        &mut self,
+        pass: &mut T,
+        state: &mut State<T::TError>,
+        scope: &mut Scope<T::Data>,
+    ) {
         let mut scope = scope.inner();
 
         for statement in &mut self.statements {
@@ -295,7 +314,12 @@ impl Block {
 }
 
 impl Statement {
-    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+    fn pass<T: Pass>(
+        &mut self,
+        pass: &mut T,
+        state: &mut State<T::TError>,
+        scope: &mut Scope<T::Data>,
+    ) {
         match &mut self.0 {
             StmtKind::Let(_, _, expression) => {
                 expression.pass(pass, state, scope);
@@ -332,7 +356,12 @@ impl Statement {
 }
 
 impl Expression {
-    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope) {
+    fn pass<T: Pass>(
+        &mut self,
+        pass: &mut T,
+        state: &mut State<T::TError>,
+        scope: &mut Scope<T::Data>,
+    ) {
         pass.expr(self, PassState::from(state, scope));
     }
 }
