@@ -56,6 +56,9 @@ pub struct Scope<'ctx, 'a> {
     type_values: &'a HashMap<String, TypeValue>,
     functions: &'a HashMap<String, Function<'ctx>>,
     stack_values: HashMap<String, StackValue>,
+    // True if the current expression should attemt to load it's pointer value,
+    // or keep it as a pointer (mainly used for Set-statement).
+    should_load: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +97,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             types: self.types,
             type_values: self.type_values,
             stack_values: self.stack_values.clone(),
+            should_load: self.should_load,
         }
     }
 
@@ -107,6 +111,13 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
     fn get_typedef(&self, name: &String) -> Option<&TypeDefinitionKind> {
         self.type_values.get(name).and_then(|v| self.types.get(v))
+    }
+
+    /// Sets should load, returning the old value
+    fn set_should_load(&mut self, should: bool) -> bool {
+        let old = self.should_load;
+        self.should_load = should;
+        old
     }
 }
 
@@ -196,6 +207,7 @@ impl mir::Module {
                 types: &types,
                 type_values: &type_values,
                 stack_values,
+                should_load: true,
             };
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
@@ -226,6 +238,7 @@ impl mir::Block {
         if let Some((kind, expr)) = &self.return_expression {
             match kind {
                 mir::ReturnKind::Hard => {
+                    scope.should_load = true;
                     let ret = expr.codegen(&mut scope)?;
                     scope.block.terminate(Term::Ret(ret)).unwrap();
                     None
@@ -278,23 +291,21 @@ impl mir::Statement {
                 None
             }
             mir::StmtKind::Set(lhs, rhs) => {
-                todo!("codegen!");
+                let old = scope.set_should_load(false);
+                let lhs_value = lhs
+                    .codegen(scope)
+                    .expect("non-returning LHS snuck into codegen!");
+                scope.should_load = old;
 
-                // if let Some(StackValue(kind, _)) = var.get_stack_value(scope, false) {
-                //     match kind {
-                //         StackValueKind::Immutable(_) => {
-                //             panic!("Tried to mutate an immutable variable")
-                //         }
-                //         StackValueKind::Mutable(ptr) => {
-                //             let expression = val.codegen(scope).unwrap();
-                //             Some(scope.block.build(Instr::Store(ptr, expression)).unwrap())
-                //         }
-                //     }
-                // } else {
-                //     panic!("")
-                // }
+                let rhs_value = rhs.codegen(scope)?;
+
+                Some(
+                    scope
+                        .block
+                        .build(Instr::Store(lhs_value, rhs_value))
+                        .unwrap(),
+                )
             }
-            // mir::StmtKind::If(if_expression) => if_expression.codegen(scope),
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope),
         }
@@ -312,11 +323,17 @@ impl mir::Expression {
                     .expect("Variable reference not found?!");
                 Some(match v.0 {
                     StackValueKind::Immutable(val) => val.clone(),
-                    StackValueKind::Mutable(val) => match v.1 {
-                        // TODO probably wrong ..?
-                        Type::Ptr(_) => val,
-                        _ => scope.block.build(Instr::Load(val, v.1.clone())).unwrap(),
-                    },
+                    StackValueKind::Mutable(val) => {
+                        if scope.should_load {
+                            match v.1 {
+                                // TODO probably wrong ..?
+                                Type::Ptr(_) => val,
+                                _ => scope.block.build(Instr::Load(val, v.1.clone())).unwrap(),
+                            }
+                        } else {
+                            val
+                        }
+                    }
                 })
             }
             mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
@@ -384,20 +401,22 @@ impl mir::Expression {
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
                 let array = expression.codegen(scope)?;
                 let idx = idx_expr.codegen(scope)?;
-                let ptr = scope
+                let mut ptr = scope
                     .block
                     .build(Instr::GetElemPtr(array, vec![idx]))
                     .unwrap();
 
-                Some(
-                    scope
+                if scope.should_load {
+                    ptr = scope
                         .block
                         .build(Instr::Load(
                             ptr,
                             val_t.get_type(scope.type_values, scope.types),
                         ))
-                        .unwrap(),
-                )
+                        .unwrap();
+                }
+
+                Some(ptr)
             }
             mir::ExprKind::Array(expressions) => {
                 let instr_list = expressions
@@ -433,7 +452,9 @@ impl mir::Expression {
                 Some(array)
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
+                let old = scope.set_should_load(true);
                 let struct_val = expression.codegen(scope)?;
+                scope.should_load = old;
 
                 let struct_ty = expression.return_type().ok()?.1.known().ok()?;
                 let TypeKind::CustomType(name) = struct_ty else {
@@ -442,21 +463,22 @@ impl mir::Expression {
                 let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&name)?;
                 let idx = struct_ty.find_index(field)?;
 
-                let ptr = scope
+                let mut value = scope
                     .block
                     .build(Instr::GetStructElemPtr(struct_val, idx as u32))
                     .unwrap();
 
-                dbg!(&type_kind.get_type(scope.type_values, scope.types));
-                Some(
-                    scope
+                if scope.should_load {
+                    value = scope
                         .block
                         .build(Instr::Load(
-                            ptr,
+                            value,
                             type_kind.get_type(scope.type_values, scope.types),
                         ))
-                        .unwrap(),
-                )
+                        .unwrap();
+                }
+
+                Some(value)
             }
             mir::ExprKind::Struct(name, items) => {
                 let struct_ptr = scope
