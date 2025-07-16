@@ -8,7 +8,7 @@ use reid_lib::{
 };
 
 use crate::mir::{
-    self, types::ReturnType, IndexedVariableReference, NamedVariableRef, StructType,
+    self, types::ReturnType, IndexedVariableReference, NamedVariableRef, StructField, StructType,
     TypeDefinitionKind, TypeKind,
 };
 
@@ -65,7 +65,7 @@ impl mir::Module {
                             // TODO: Reorder custom-type definitions such that
                             // inner types get evaluated first. Otherwise this
                             // will cause a panic!
-                            .map(|(_, t)| t.get_type(&type_values))
+                            .map(|StructField(_, t, _)| t.get_type(&type_values))
                             .collect(),
                     )))
                 }

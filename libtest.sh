@@ -14,6 +14,8 @@
 
 BINARY="$(echo $1 | cut -d'.' -f1)"".out"
 
+echo $1
+
 make clean SRC=$1 ; make SRC=$1 && echo ""
 
 $BINARY ; echo "Return value: ""$?"

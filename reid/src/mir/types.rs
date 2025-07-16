@@ -29,11 +29,17 @@ impl TypeKind {
 
 impl StructType {
     pub fn get_field_ty(&self, name: &String) -> Option<&TypeKind> {
-        self.0.iter().find(|(n, _)| n == name).map(|(_, ty)| ty)
+        self.0
+            .iter()
+            .find(|StructField(n, _, _)| n == name)
+            .map(|StructField(_, ty, _)| ty)
     }
 
     pub fn get_field_ty_mut(&mut self, name: &String) -> Option<&mut TypeKind> {
-        self.0.iter_mut().find(|(n, _)| n == name).map(|(_, ty)| ty)
+        self.0
+            .iter_mut()
+            .find(|StructField(n, _, _)| n == name)
+            .map(|StructField(_, ty, _)| ty)
     }
 }
 

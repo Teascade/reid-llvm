@@ -55,12 +55,18 @@ impl Display for TypeDefinitionKind {
                 writeln!(f)?;
                 let mut state = Default::default();
                 let mut inner_f = PadAdapter::wrap(f, &mut state);
-                for (field_name, field_ty) in &items.0 {
-                    writeln!(inner_f, "{}: {:?},", field_name, field_ty)?;
+                for field in &items.0 {
+                    writeln!(inner_f, "{},", field)?;
                 }
                 f.write_char('}')
             }
         }
+    }
+}
+
+impl Display for StructField {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{}: {:?},", self.0, self.1)
     }
 }
 

@@ -21,7 +21,7 @@ use llvm_sys::{
 };
 
 use crate::{
-    CustomTypeKind, NamedStruct,
+    CustomTypeKind,
     builder::{TypeHolder, TypeValue},
     util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring},
 };

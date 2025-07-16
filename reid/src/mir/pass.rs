@@ -135,10 +135,6 @@ impl Scope {
             return_type_hint: self.return_type_hint.clone(),
         }
     }
-
-    pub fn get_typedefs(&self) -> &TypedefMap {
-        &self.types.0
-    }
 }
 
 pub struct PassState<'st, 'sc, TError: STDError + Clone> {

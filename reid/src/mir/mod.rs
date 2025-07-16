@@ -82,19 +82,20 @@ pub enum VagueType {
 }
 
 #[derive(Clone, Debug)]
-pub struct StructType(pub Vec<(String, TypeKind)>);
+pub struct StructType(pub Vec<StructField>);
+
+#[derive(Clone, Debug)]
+pub struct StructField(pub String, pub TypeKind, pub Metadata);
 
 impl StructType {
     pub fn find_index(&self, name: &String) -> Option<u32> {
         self.0
             .iter()
             .enumerate()
-            .find(|(_, (n, _))| n == name)
+            .find(|(_, StructField(n, _, _))| n == name)
             .map(|(i, _)| i as u32)
     }
 }
-
-pub type TypedefMap = HashMap<String, TypeDefinitionKind>;
 
 impl TypeKind {
     pub fn known(&self) -> Result<TypeKind, VagueType> {
@@ -102,55 +103,6 @@ impl TypeKind {
             Err(*vague)
         } else {
             Ok(self.clone())
-        }
-    }
-}
-
-impl TypeKind {
-    pub fn signed(&self, typedefs: &TypedefMap) -> bool {
-        match self {
-            TypeKind::Void => false,
-            TypeKind::Vague(_) => false,
-            TypeKind::Bool => false,
-            TypeKind::I8 => false,
-            TypeKind::I16 => false,
-            TypeKind::I32 => false,
-            TypeKind::I64 => false,
-            TypeKind::I128 => false,
-            TypeKind::U8 => false,
-            TypeKind::U16 => false,
-            TypeKind::U32 => false,
-            TypeKind::U64 => false,
-            TypeKind::U128 => false,
-            TypeKind::StringPtr => false,
-            TypeKind::Array(_, _) => false,
-            TypeKind::CustomType(name) => match typedefs.get(name).unwrap() {
-                TypeDefinitionKind::Struct(_) => false,
-            },
-        }
-    }
-
-    pub fn is_maths(&self, typedefs: &TypedefMap) -> bool {
-        use TypeKind::*;
-        match &self {
-            I8 => true,
-            I16 => true,
-            I32 => true,
-            I64 => true,
-            I128 => true,
-            U8 => true,
-            U16 => true,
-            U32 => true,
-            U64 => true,
-            U128 => true,
-            Bool => true,
-            Vague(_) => false,
-            Void => false,
-            StringPtr => false,
-            Array(_, _) => false,
-            TypeKind::CustomType(name) => match typedefs.get(name).unwrap() {
-                TypeDefinitionKind::Struct(_) => false,
-            },
         }
     }
 }

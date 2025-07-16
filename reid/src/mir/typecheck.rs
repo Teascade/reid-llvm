@@ -71,7 +71,7 @@ fn check_typedefs_for_recursion<'a, 'b>(
 ) {
     match &typedef.kind {
         TypeDefinitionKind::Struct(StructType(fields)) => {
-            for field_ty in fields.iter().map(|(_, ty)| ty) {
+            for field_ty in fields.iter().map(|StructField(_, ty, _)| ty) {
                 if let TypeKind::CustomType(name) = field_ty {
                     if seen.contains(name) {
                         state.ok::<_, Infallible>(
@@ -103,11 +103,11 @@ impl<'t> Pass for TypeCheck<'t> {
             match kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
                     let mut fieldmap = HashMap::new();
-                    for (name, field_ty) in fields {
+                    for StructField(name, field_ty, field_meta) in fields {
                         if let Some(_) = fieldmap.insert(name, field_ty) {
                             state.ok::<_, Infallible>(
                                 Err(ErrorKind::DuplicateStructField(name.clone())),
-                                meta.clone(),
+                                field_meta.clone(),
                             );
                         }
                     }
@@ -649,8 +649,10 @@ impl IndexedVariableReference {
                             if let Some(kind) = types.get(type_name) {
                                 match &kind {
                                     TypeDefinitionKind::Struct(struct_type) => {
-                                        if let Some((_, field_ty)) =
-                                            struct_type.0.iter().find(|(n, _)| n == field_name)
+                                        if let Some(StructField(_, field_ty, _)) = struct_type
+                                            .0
+                                            .iter()
+                                            .find(|StructField(n, _, _)| n == field_name)
                                         {
                                             Ok(Some(ScopeVariable {
                                                 ty: field_ty.clone(),
