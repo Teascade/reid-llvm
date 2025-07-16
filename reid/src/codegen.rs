@@ -415,12 +415,11 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
-                dbg!(&expression, &idx_expr);
                 let array = expression
-                    .codegen(scope, state)
+                    .codegen(scope, &state.load(true))
                     .expect("array returned none!");
                 let idx = idx_expr
-                    .codegen(scope, state)
+                    .codegen(scope, &state.load(true))
                     .expect("index returned none!");
 
                 let mut ptr = scope
@@ -488,6 +487,8 @@ impl mir::Expression {
                 let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&name).unwrap();
                 let idx = struct_ty.find_index(field).unwrap();
 
+                dbg!(&scope.context);
+                dbg!(&struct_val);
                 let mut value = scope
                     .block
                     .build(Instr::GetStructElemPtr(struct_val, idx as u32))
