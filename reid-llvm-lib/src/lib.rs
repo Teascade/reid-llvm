@@ -288,4 +288,4 @@ pub enum CustomTypeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct NamedStruct(String, Vec<Type>);
+pub struct NamedStruct(pub String, pub Vec<Type>);

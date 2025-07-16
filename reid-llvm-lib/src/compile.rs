@@ -201,10 +201,6 @@ impl ModuleHolder {
                 context.context_ref,
             );
 
-            for _ty in &self.types {
-                todo!("Do something with types!");
-            }
-
             // Compile the contents
 
             let mut types = HashMap::new();

@@ -84,6 +84,16 @@ pub enum VagueType {
 #[derive(Clone, Debug)]
 pub struct StructType(pub Vec<(String, TypeKind)>);
 
+impl StructType {
+    pub fn find_index(&self, name: &String) -> Option<u32> {
+        self.0
+            .iter()
+            .enumerate()
+            .find(|(_, (n, _))| n == name)
+            .map(|(i, _)| i as u32)
+    }
+}
+
 pub type TypedefMap = HashMap<String, TypeDefinitionKind>;
 
 impl TypeKind {

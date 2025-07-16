@@ -300,7 +300,7 @@ impl Statement {
             StmtKind::Set(_, expression) => {
                 expression.pass(pass, state, scope);
             }
-            StmtKind::Import(_) => todo!(),
+            StmtKind::Import(_) => {} // Never exists at this stage
             StmtKind::Expression(expression) => {
                 expression.pass(pass, state, scope);
             }
@@ -322,7 +322,7 @@ impl Statement {
                     .ok();
             }
             StmtKind::Set(_, _) => {}
-            StmtKind::Import(_) => todo!(),
+            StmtKind::Import(_) => {} // Never exists at this stage
             StmtKind::Expression(_) => {}
         };
     }
