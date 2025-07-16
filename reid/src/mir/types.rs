@@ -107,7 +107,7 @@ impl ReturnType for Expression {
             Block(block) => block.return_type(),
             FunctionCall(fcall) => fcall.return_type(),
             If(expr) => expr.return_type(),
-            ArrayIndex(expression, _, _) => {
+            Indexed(expression, _, _) => {
                 let expr_type = expression.return_type()?;
                 if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
                     Ok((ReturnKind::Soft, *elem_ty))
@@ -126,7 +126,7 @@ impl ReturnType for Expression {
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
                 ))
             }
-            StructIndex(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
+            Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
         }
     }

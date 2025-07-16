@@ -136,15 +136,15 @@ impl Parse for PrimaryExpression {
 
         while let Ok(index) = stream.parse::<ValueIndex>() {
             match index {
-                ValueIndex::Array(ArrayValueIndex(idx)) => {
+                ValueIndex::Array(ArrayValueIndex(idx_expr)) => {
                     expr = Expression(
-                        ExpressionKind::ArrayIndex(Box::new(expr), idx),
+                        ExpressionKind::Indexed(Box::new(expr), Box::new(idx_expr)),
                         stream.get_range().unwrap(),
                     );
                 }
                 ValueIndex::Struct(StructValueIndex(name)) => {
                     expr = Expression(
-                        ExpressionKind::StructIndex(Box::new(expr), name),
+                        ExpressionKind::Accessed(Box::new(expr), name),
                         stream.get_range().unwrap(),
                     );
                 }
@@ -428,16 +428,10 @@ impl Parse for VariableReference {
             while let Ok(val) = stream.parse::<ValueIndex>() {
                 match val {
                     ValueIndex::Array(ArrayValueIndex(idx)) => {
-                        var_ref = VariableReference(
-                            VariableReferenceKind::ArrayIndex(Box::new(var_ref), idx),
-                            stream.get_range().unwrap(),
-                        );
+                        todo!();
                     }
                     ValueIndex::Struct(StructValueIndex(name)) => {
-                        var_ref = VariableReference(
-                            VariableReferenceKind::StructIndex(Box::new(var_ref), name),
-                            stream.get_range().unwrap(),
-                        );
+                        todo!();
                     }
                 }
             }
@@ -515,18 +509,15 @@ impl Parse for ValueIndex {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct ArrayValueIndex(u64);
+#[derive(Debug, Clone)]
+pub struct ArrayValueIndex(Expression);
 
 impl Parse for ArrayValueIndex {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::BracketOpen)?;
-        if let Some(Token::DecimalValue(idx)) = stream.next() {
-            stream.expect(Token::BracketClose)?;
-            Ok(ArrayValueIndex(idx))
-        } else {
-            return Err(stream.expected_err("array index (number)")?);
-        }
+        let expr = stream.parse()?;
+        stream.expect(Token::BracketClose)?;
+        Ok(ArrayValueIndex(expr))
     }
 }
 

@@ -9,7 +9,7 @@ use reid_lib::{
 
 use crate::mir::{
     self, types::ReturnType, IndexedVariableReference, NamedVariableRef, StructField, StructType,
-    TypeDefinitionKind, TypeKind,
+    TypeDefinitionKind, TypeKind, VagueLiteral,
 };
 
 /// Context that contains all of the given modules as complete codegenerated
@@ -415,11 +415,12 @@ impl mir::Expression {
                     None
                 }
             }
-            mir::ExprKind::ArrayIndex(expression, val_t, idx) => {
+            mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
                 let array = expression.codegen(scope)?;
+                let idx = idx_expr.codegen(scope)?;
                 let ptr = scope
                     .block
-                    .build(Instr::GetElemPtr(array, vec![*idx as u32]))
+                    .build(Instr::GetElemPtr(array, vec![idx]))
                     .unwrap();
 
                 Some(
@@ -451,17 +452,21 @@ impl mir::Expression {
                     ))
                     .unwrap();
 
-                for (i, instr) in instr_list.iter().enumerate() {
+                for (index, instr) in instr_list.iter().enumerate() {
+                    let index_expr = scope
+                        .block
+                        .build(Instr::Constant(ConstValue::U32(index as u32)))
+                        .unwrap();
                     let ptr = scope
                         .block
-                        .build(Instr::GetElemPtr(array, vec![i as u32]))
+                        .build(Instr::GetElemPtr(array, vec![index_expr]))
                         .unwrap();
                     scope.block.build(Instr::Store(ptr, *instr)).unwrap();
                 }
 
                 Some(array)
             }
-            mir::ExprKind::StructIndex(expression, type_kind, field) => {
+            mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope)?;
 
                 let struct_ty = expression.return_type().ok()?.1.known().ok()?;
@@ -521,29 +526,30 @@ impl IndexedVariableReference {
             mir::IndexedVariableReferenceKind::ArrayIndex(inner, idx) => {
                 let inner_stack_val = inner.get_stack_value(scope, true)?;
 
-                let mut gep_instr = scope
-                    .block
-                    .build(Instr::GetElemPtr(
-                        unsafe { *inner_stack_val.0.get_instr() },
-                        vec![*idx as u32],
-                    ))
-                    .unwrap();
+                todo!();
+                // let mut gep_instr = scope
+                //     .block
+                //     .build(Instr::GetElemPtr(
+                //         unsafe { *inner_stack_val.0.get_instr() },
+                //         vec![*idx as u32],
+                //     ))
+                //     .unwrap();
 
-                match &inner_stack_val.1 {
-                    Type::Ptr(inner_ty) => {
-                        if load_after_gep {
-                            gep_instr = scope
-                                .block
-                                .build(Instr::Load(gep_instr, *inner_ty.clone()))
-                                .unwrap()
-                        }
-                        Some(StackValue(
-                            inner_stack_val.0.with_instr(gep_instr),
-                            *inner_ty.clone(),
-                        ))
-                    }
-                    _ => panic!("Tried to codegen indexing a non-indexable value!"),
-                }
+                // match &inner_stack_val.1 {
+                //     Type::Ptr(inner_ty) => {
+                //         if load_after_gep {
+                //             gep_instr = scope
+                //                 .block
+                //                 .build(Instr::Load(gep_instr, *inner_ty.clone()))
+                //                 .unwrap()
+                //         }
+                //         Some(StackValue(
+                //             inner_stack_val.0.with_instr(gep_instr),
+                //             *inner_ty.clone(),
+                //         ))
+                //     }
+                //     _ => panic!("Tried to codegen indexing a non-indexable value!"),
+                // }
             }
             mir::IndexedVariableReferenceKind::StructIndex(inner, field) => {
                 let inner_stack_val = inner.get_stack_value(scope, true)?;
@@ -647,7 +653,7 @@ impl mir::Literal {
             mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Bool(val) => ConstValue::Bool(val),
             mir::Literal::String(val) => ConstValue::StringPtr(val.clone()),
-            mir::Literal::Vague(_) => panic!("Got vague literal!"),
+            mir::Literal::Vague(VagueLiteral::Number(val)) => ConstValue::I32(val as i32),
         })
     }
 }

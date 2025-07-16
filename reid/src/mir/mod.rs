@@ -192,8 +192,8 @@ pub struct Import(pub Vec<String>, pub Metadata);
 #[derive(Debug)]
 pub enum ExprKind {
     Variable(NamedVariableRef),
-    ArrayIndex(Box<Expression>, TypeKind, u64),
-    StructIndex(Box<Expression>, TypeKind, String),
+    Indexed(Box<Expression>, TypeKind, Box<Expression>),
+    Accessed(Box<Expression>, TypeKind, String),
     Array(Vec<Expression>),
     Struct(String, Vec<(String, Expression)>),
     Literal(Literal),

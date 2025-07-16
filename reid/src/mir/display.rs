@@ -164,10 +164,10 @@ impl Display for ExprKind {
             ExprKind::FunctionCall(fc) => Display::fmt(fc, f),
             ExprKind::If(if_exp) => Display::fmt(&if_exp, f),
             ExprKind::Block(block) => Display::fmt(block, f),
-            ExprKind::ArrayIndex(expression, elem_ty, idx) => {
+            ExprKind::Indexed(expression, elem_ty, idx_expr) => {
                 Display::fmt(&expression, f)?;
                 write!(f, "<{}>", elem_ty)?;
-                write_index(f, *idx)
+                write_index(f, idx_expr)
             }
             ExprKind::Array(expressions) => {
                 f.write_char('[')?;
@@ -203,7 +203,7 @@ impl Display for ExprKind {
                 }
                 f.write_char('}')
             }
-            ExprKind::StructIndex(expression, type_kind, name) => {
+            ExprKind::Accessed(expression, type_kind, name) => {
                 Display::fmt(&expression, f)?;
                 write_access(f, name)?;
                 write!(f, "<{}>", type_kind)
@@ -309,7 +309,7 @@ impl Display for Metadata {
     }
 }
 
-fn write_index(f: &mut std::fmt::Formatter<'_>, idx: u64) -> std::fmt::Result {
+fn write_index(f: &mut std::fmt::Formatter<'_>, idx: impl std::fmt::Display) -> std::fmt::Result {
     f.write_char('[')?;
     Display::fmt(&idx, f)?;
     f.write_char(']')

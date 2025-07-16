@@ -504,7 +504,7 @@ impl Expression {
                 Ok((_, ty)) => Ok(ty),
                 Err(e) => Err(e),
             },
-            ExprKind::ArrayIndex(expression, elem_ty, idx) => {
+            ExprKind::Indexed(expression, elem_ty, idx) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
                     TypeKind::Array(type_kind, _) => &type_kind,
@@ -513,9 +513,6 @@ impl Expression {
 
                 let expr_t = expression.typecheck(state, hints, hint_t)?;
                 if let TypeKind::Array(inferred_ty, len) = expr_t {
-                    if len <= *idx {
-                        return Err(ErrorKind::IndexOutOfBounds(*idx, len));
-                    }
                     let ty = state.or_else(
                         elem_ty.resolve_ref(hints).collapse_into(&inferred_ty),
                         TypeKind::Vague(Vague::Unknown),
@@ -564,7 +561,7 @@ impl Expression {
                     }
                 }
             }
-            ExprKind::StructIndex(expression, type_kind, field_name) => {
+            ExprKind::Accessed(expression, type_kind, field_name) => {
                 // Resolve expected type
                 let expected_ty = type_kind.resolve_ref(hints);
 

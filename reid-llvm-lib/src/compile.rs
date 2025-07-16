@@ -487,7 +487,7 @@ impl InstructionHolder {
 
                     let mut llvm_indices: Vec<_> = indices
                         .iter()
-                        .map(|idx| ConstValue::U32(*idx).as_llvm(module))
+                        .map(|idx_elem| module.values.get(idx_elem).unwrap().value_ref)
                         .collect();
 
                     LLVMBuildGEP2(

@@ -226,7 +226,7 @@ pub enum Instr {
     Load(InstructionValue, Type),
     Store(InstructionValue, InstructionValue),
     ArrayAlloca(Type, u32),
-    GetElemPtr(InstructionValue, Vec<u32>),
+    GetElemPtr(InstructionValue, Vec<InstructionValue>),
     GetStructElemPtr(InstructionValue, u32),
 
     /// Integer Comparison

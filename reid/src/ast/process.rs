@@ -224,10 +224,10 @@ impl ast::Expression {
             ast::ExpressionKind::Array(expressions) => {
                 mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
             }
-            ast::ExpressionKind::ArrayIndex(expression, idx) => mir::ExprKind::ArrayIndex(
+            ast::ExpressionKind::Indexed(expression, idx_expr) => mir::ExprKind::Indexed(
                 Box::new(expression.process()),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
-                *idx,
+                Box::new(idx_expr.process()),
             ),
             ast::ExpressionKind::StructExpression(struct_init) => mir::ExprKind::Struct(
                 struct_init.name.clone(),
@@ -237,7 +237,7 @@ impl ast::Expression {
                     .map(|(n, e)| (n.clone(), e.process()))
                     .collect(),
             ),
-            ast::ExpressionKind::StructIndex(expression, name) => mir::ExprKind::StructIndex(
+            ast::ExpressionKind::Accessed(expression, name) => mir::ExprKind::Accessed(
                 Box::new(expression.process()),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),

@@ -128,7 +128,7 @@ impl Debug for Instr {
                 instruction_value,
                 &items
                     .iter()
-                    .map(|i| i.to_string())
+                    .map(|expr| format!("{:?}", expr))
                     .collect::<Vec<_>>()
                     .join(", "),
             ),

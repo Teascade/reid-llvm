@@ -44,8 +44,10 @@ pub enum ExpressionKind {
     VariableName(String),
     Literal(Literal),
     Array(Vec<Expression>),
-    ArrayIndex(Box<Expression>, u64),
-    StructIndex(Box<Expression>, String),
+    /// Array-indexed, e.g. <expr>[<expr>]
+    Indexed(Box<Expression>, Box<Expression>),
+    /// Struct-accessed, e.g. <expr>.<expr>
+    Accessed(Box<Expression>, String),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
