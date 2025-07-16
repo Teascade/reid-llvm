@@ -14,7 +14,10 @@ fn main() -> u32 {
     let val1 = 0;
     let val2 = 1;
 
-    value[val1].second[val2 + 1] = 99;
+    // value[val1].second[val2 + 1] = 99;
+
+    let mut b = value[val1];
+    b.second[2] = 99;
 
     return value[0].second[2];
 }

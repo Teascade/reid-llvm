@@ -265,7 +265,7 @@ impl mir::Statement {
     ) -> Option<InstructionValue> {
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
-                let value = expression.codegen(scope, state).unwrap();
+                let value = expression.codegen(scope, &state.load(true)).unwrap();
                 scope.stack_values.insert(
                     name.clone(),
                     StackValue(
