@@ -1,0 +1,17 @@
+// Arithmetic, function calls and imports!
+
+struct Test {
+    field: i32,
+    second: [u32; 4]
+}
+
+fn main() -> u32 {
+    let mut value = [Test {
+        field: 5,
+        second: [6, 3, 17, 8],
+    }];
+
+    value[0].second[2] = 99;
+
+    return value[0].second[2];
+}
