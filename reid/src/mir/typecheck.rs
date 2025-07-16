@@ -503,12 +503,16 @@ impl Expression {
                 Ok((_, ty)) => Ok(ty),
                 Err(e) => Err(e),
             },
-            ExprKind::Indexed(expression, elem_ty, _) => {
+            ExprKind::Indexed(expression, elem_ty, idx_expr) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
                     TypeKind::Array(type_kind, _) => &type_kind,
                     _ => t,
                 });
+
+                // Typecheck and narrow index-expression
+                let idx_expr_res = idx_expr.typecheck(state, typerefs, Some(&TypeKind::U32));
+                state.ok(idx_expr_res, idx_expr.1);
 
                 // TODO it could be possible to check length against constants..
 

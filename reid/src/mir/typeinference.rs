@@ -105,6 +105,7 @@ impl Block {
                         (var_ref.as_mut(), expr_ty_ref.as_mut())
                     {
                         var_ref.narrow(&expr_ty_ref);
+                        dbg!(var_ref);
                     }
                 }
                 StmtKind::Set(lhs, rhs) => {
@@ -252,8 +253,12 @@ impl Expression {
                     ReturnKind::Soft => Ok(block_ref.1),
                 }
             }
-            ExprKind::Indexed(expression, index_ty, _) => {
+            ExprKind::Indexed(expression, index_ty, idx_expr) => {
                 let expr_ty = expression.infer_types(state, type_refs)?;
+
+                // Infer and narrow types used for indexing
+                let mut idx_ty = idx_expr.infer_types(state, type_refs)?;
+                idx_ty.narrow(&type_refs.from_type(&U32).unwrap());
 
                 // Check that the resolved type is at least an array, no
                 // need for further resolution.
