@@ -425,11 +425,21 @@ impl Parse for VariableReference {
                 stream.get_range().unwrap(),
             );
 
-            while let Ok(ArrayValueIndex(idx)) = stream.parse() {
-                var_ref = VariableReference(
-                    VariableReferenceKind::ArrayIndex(Box::new(var_ref), idx),
-                    stream.get_range().unwrap(),
-                );
+            while let Ok(val) = stream.parse::<ValueIndex>() {
+                match val {
+                    ValueIndex::Array(ArrayValueIndex(idx)) => {
+                        var_ref = VariableReference(
+                            VariableReferenceKind::ArrayIndex(Box::new(var_ref), idx),
+                            stream.get_range().unwrap(),
+                        );
+                    }
+                    ValueIndex::Struct(StructValueIndex(name)) => {
+                        var_ref = VariableReference(
+                            VariableReferenceKind::StructIndex(Box::new(var_ref), name),
+                            stream.get_range().unwrap(),
+                        );
+                    }
+                }
             }
 
             Ok(var_ref)
