@@ -149,7 +149,7 @@ impl Expression {
             Indexed(expression, _, _) => {
                 let expr_type = expression.return_type()?;
                 if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
-                    Ok((ReturnKind::Soft, *elem_ty))
+                    Ok((ReturnKind::Soft, TypeKind::Borrow(Box::new(*elem_ty))))
                 } else {
                     Err(ReturnTypeOther::IndexingNonArray(expression.1))
                 }
@@ -165,7 +165,10 @@ impl Expression {
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
                 ))
             }
-            Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
+            Accessed(_, type_kind, _) => Ok((
+                ReturnKind::Soft,
+                TypeKind::Borrow(Box::new(type_kind.clone())),
+            )),
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
         }
     }
@@ -265,6 +268,13 @@ impl TypeKind {
         match resolved {
             TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
             _ => resolved,
+        }
+    }
+
+    pub fn deref_borrow(&self) -> TypeKind {
+        match self {
+            TypeKind::Borrow(type_kind) => *type_kind.clone(),
+            _ => self.clone(),
         }
     }
 }

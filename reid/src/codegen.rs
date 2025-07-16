@@ -415,8 +415,14 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
-                let array = expression.codegen(scope, state)?;
-                let idx = idx_expr.codegen(scope, state)?;
+                dbg!(&expression, &idx_expr);
+                let array = expression
+                    .codegen(scope, state)
+                    .expect("array returned none!");
+                let idx = idx_expr
+                    .codegen(scope, state)
+                    .expect("index returned none!");
+
                 let mut ptr = scope
                     .block
                     .build(Instr::GetElemPtr(array, vec![idx]))
@@ -468,14 +474,19 @@ impl mir::Expression {
                 Some(array)
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
-                let struct_val = expression.codegen(scope, &mut state.load(true))?;
+                let struct_val = expression.codegen(scope, &mut state.load(true)).unwrap();
 
-                let struct_ty = expression.return_type().ok()?.1.known().ok()?;
-                let TypeKind::CustomType(name) = struct_ty else {
-                    return None;
+                let struct_ty = expression
+                    .return_type()
+                    .map(|r| r.1.known())
+                    .unwrap()
+                    .unwrap();
+
+                let TypeKind::CustomType(name) = struct_ty.deref_borrow() else {
+                    panic!("tried accessing non-custom-type");
                 };
-                let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&name)?;
-                let idx = struct_ty.find_index(field)?;
+                let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&name).unwrap();
+                let idx = struct_ty.find_index(field).unwrap();
 
                 let mut value = scope
                     .block
@@ -643,6 +654,9 @@ impl TypeKind {
                 match typedefs.get(&type_val).unwrap() {
                     TypeDefinitionKind::Struct(_) => Type::Ptr(Box::new(custom_t)),
                 }
+            }
+            TypeKind::Borrow(type_kind) => {
+                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
         }
     }
