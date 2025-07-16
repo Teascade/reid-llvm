@@ -512,11 +512,6 @@ impl mir::Expression {
     }
 }
 
-pub enum IndexKind {
-    Array(u32),
-    Struct(u32),
-}
-
 impl IndexedVariableReference {
     fn get_stack_value(&self, scope: &mut Scope, load_after_gep: bool) -> Option<StackValue> {
         match &self.kind {

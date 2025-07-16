@@ -13,9 +13,8 @@ use super::{
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     types::{pick_return, ReturnType},
-    Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression,
-    IndexedVariableReference, IndexedVariableReferenceKind, Module, NamedVariableRef, ReturnKind,
-    StmtKind, TypeDefinitionKind,
+    Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
+    ReturnKind, StmtKind,
     TypeKind::*,
     VagueType::*,
 };
@@ -145,61 +144,6 @@ impl Block {
         }
 
         Ok((kind, ret_type_ref))
-    }
-}
-
-impl IndexedVariableReference {
-    fn find_hint<'s>(
-        &self,
-        state: &PassState<ErrorKind>,
-        hints: &'s ScopeTypeRefs,
-    ) -> Result<Option<(bool, TypeRef<'s>)>, ErrorKind> {
-        match &self.kind {
-            IndexedVariableReferenceKind::Named(NamedVariableRef(_, name, _)) => {
-                Ok(hints.find_var(&name))
-            }
-            IndexedVariableReferenceKind::ArrayIndex(inner, _) => {
-                if let Some((mutable, inner_ref)) = inner.find_hint(state, hints)? {
-                    // Check that the resolved type is at least an array, no
-                    // need for further resolution.
-                    let inner_ty = inner_ref.resolve_weak().unwrap();
-                    match inner_ty {
-                        Array(type_kind, _) => Ok(hints
-                            .from_type(&type_kind)
-                            .clone()
-                            .map(|t_ref| (mutable, t_ref))),
-                        _ => Err(ErrorKind::TriedIndexingNonArray(inner_ty.clone())),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-            IndexedVariableReferenceKind::StructIndex(inner, field_name) => {
-                if let Some((mutable, inner_ref)) = inner.find_hint(state, hints)? {
-                    // Check that the resolved type is at least an array, no
-                    // need for further resolution.
-                    let inner_ty = inner_ref.resolve_weak().unwrap();
-                    match &inner_ty {
-                        CustomType(struct_name) => match state.scope.types.get(&struct_name) {
-                            Some(kind) => match kind {
-                                TypeDefinitionKind::Struct(struct_ty) => Ok(hints
-                                    .from_type(
-                                        &struct_ty
-                                            .get_field_ty(field_name)
-                                            .cloned()
-                                            .ok_or(ErrorKind::NoSuchField(self.get_name()))?,
-                                    )
-                                    .map(|v| (mutable, v))),
-                            },
-                            None => Err(ErrorKind::TriedAccessingNonStruct(inner_ty.clone())),
-                        },
-                        _ => Err(ErrorKind::TriedAccessingNonStruct(inner_ty)),
-                    }
-                } else {
-                    Ok(None)
-                }
-            }
-        }
     }
 }
 

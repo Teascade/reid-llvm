@@ -1,5 +1,5 @@
 use super::{
-    typecheck::{Collapsable, ErrorKind},
+    typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     VagueType as Vague, *,
 };
