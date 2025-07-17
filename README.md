@@ -34,11 +34,12 @@ fn fibonacci(n: u16) -> u16 {
 
 Currently missing relevant features (TODOs) are:
 - ~~Arrays~~ (DONE)
-- Structs (and custom types as such)
+- ~~Structs~~ (DONE)
 - ~~Extern functions~~ (DONE)
 - ~~Strings~~ (DONE)
 - Loops
 - Debug Information
+- Borrows+Pointers
 
 ### Why "Reid"
 
