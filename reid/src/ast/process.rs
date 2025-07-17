@@ -275,7 +275,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
                 mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
             }
             ast::TypeKind::String => mir::TypeKind::StringPtr,
-            ast::TypeKind::Custom(_) => todo!("Add processing for custom types"),
+            ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(name.clone()),
         }
     }
 }

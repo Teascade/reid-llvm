@@ -39,7 +39,7 @@ impl Parse for Type {
                     "u64" => TypeKind::U64,
                     "u128" => TypeKind::U128,
                     "string" => TypeKind::String,
-                    _ => Err(stream.expected_err("known type identifier")?)?,
+                    _ => TypeKind::Custom(ident),
                 }
             } else {
                 return Err(stream.expected_err("type identifier")?)?;
