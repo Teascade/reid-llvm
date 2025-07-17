@@ -6,14 +6,17 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
 use debug::PrintableModule;
+use debug_information::{
+    DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
+    DebugScopeValue,
+};
 use util::match_types;
 
 pub mod builder;
 pub mod compile;
 mod debug;
+pub mod debug_information;
 mod util;
-
-// pub struct InstructionValue(BlockValue, usize);
 
 #[derive(Debug)]
 pub struct Context {
@@ -36,6 +39,7 @@ impl Context {
             phantom: PhantomData,
             builder: self.builder.clone(),
             value,
+            debug_info: None,
         }
     }
 }
@@ -50,11 +54,12 @@ pub struct Module<'ctx> {
     phantom: PhantomData<&'ctx ()>,
     builder: Builder,
     value: ModuleValue,
+    debug_info: Option<DebugInformation>,
 }
 
 impl<'ctx> Module<'ctx> {
     pub fn function(
-        &mut self,
+        &self,
         name: &str,
         ret: Type,
         params: Vec<Type>,
@@ -71,13 +76,14 @@ impl<'ctx> Module<'ctx> {
                         ret,
                         params,
                         flags,
+                        meta: None,
                     },
                 ),
             }
         }
     }
 
-    pub fn custom_type(&mut self, ty: CustomTypeKind) -> TypeValue {
+    pub fn custom_type(&self, ty: CustomTypeKind) -> TypeValue {
         unsafe {
             let (name, kind) = match &ty {
                 CustomTypeKind::NamedStruct(NamedStruct(name, _)) => (name.clone(), ty),
@@ -96,6 +102,27 @@ impl<'ctx> Module<'ctx> {
             module: self.builder.find_module(self.value),
         }
     }
+
+    pub fn create_debug_info(
+        &mut self,
+        file: DebugFileData,
+    ) -> (DebugInformation, DebugScopeValue) {
+        let (debug_info, scope) = DebugInformation::from_file(file);
+        self.debug_info = Some(debug_info.clone());
+        (debug_info, scope)
+    }
+
+    pub fn get_debug_info(&self) -> &Option<DebugInformation> {
+        &self.debug_info
+    }
+}
+
+impl<'ctx> Drop for Module<'ctx> {
+    fn drop(&mut self) {
+        if let Some(debug_info) = self.debug_info.take() {
+            self.builder.set_debug_information(&self.value, debug_info);
+        }
+    }
 }
 
 #[derive(Debug, Clone, Hash)]
@@ -104,6 +131,7 @@ pub struct FunctionData {
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,
+    meta: Option<DebugMetadataValue>,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
@@ -149,6 +177,12 @@ impl<'ctx> Function<'ctx> {
         }
     }
 
+    pub fn set_metadata(&self, metadata: DebugMetadataValue) {
+        unsafe {
+            self.builder.add_function_metadata(&self.value, metadata);
+        }
+    }
+
     pub fn value(&self) -> FunctionValue {
         self.value
     }
@@ -170,8 +204,28 @@ pub struct Block<'builder> {
 impl<'builder> Block<'builder> {
     pub fn build(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
         unsafe {
+            self.builder.add_instruction(
+                &self.value,
+                InstructionData {
+                    kind: instruction,
+                    location: None,
+                    meta: None,
+                },
+            )
+        }
+    }
+
+    pub fn set_instr_location(&self, instruction: InstructionValue, location: DebugLocationValue) {
+        unsafe {
             self.builder
-                .add_instruction(&self.value, InstructionData { kind: instruction })
+                .add_instruction_location(&instruction, location);
+        }
+    }
+
+    pub fn set_instr_metadata(&self, instruction: InstructionValue, location: DebugMetadataValue) {
+        unsafe {
+            self.builder
+                .add_instruction_metadata(&instruction, location);
         }
     }
 
@@ -196,9 +250,11 @@ impl<'builder> Block<'builder> {
     }
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub struct InstructionData {
     kind: Instr,
+    location: Option<DebugLocationValue>,
+    meta: Option<DebugMetadataValue>,
 }
 
 #[derive(Clone, Copy, Hash)]

@@ -5,7 +5,11 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData, NamedStruct,
-    TerminatorKind, Type, TypeData, util::match_types,
+    TerminatorKind, Type, TypeData,
+    debug_information::{
+        DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
+    },
+    util::match_types,
 };
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
@@ -29,6 +33,7 @@ pub struct ModuleHolder {
     pub(crate) data: ModuleData,
     pub(crate) functions: Vec<FunctionHolder>,
     pub(crate) types: Vec<TypeHolder>,
+    pub(crate) debug_information: Option<DebugInformation>,
 }
 
 #[derive(Clone)]
@@ -76,8 +81,21 @@ impl Builder {
             data,
             functions: Vec::new(),
             types: Vec::new(),
+            debug_information: None,
         });
         value
+    }
+
+    pub(crate) fn set_debug_information(
+        &self,
+        mod_val: &ModuleValue,
+        debug_info: DebugInformation,
+    ) {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(mod_val.0);
+            module.debug_information = Some(debug_info);
+        }
     }
 
     pub(crate) unsafe fn add_type(&self, mod_val: &ModuleValue, data: TypeData) -> TypeValue {
@@ -142,6 +160,49 @@ impl Builder {
 
             self.check_instruction(&value)?;
             Ok(value)
+        }
+    }
+
+    pub(crate) unsafe fn add_instruction_location(
+        &self,
+        value: &InstructionValue,
+        location: DebugLocationValue,
+    ) {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(value.0.0.0.0);
+            let function = module.functions.get_unchecked_mut(value.0.0.1);
+            let block = function.blocks.get_unchecked_mut(value.0.1);
+            let instr = block.instructions.get_unchecked_mut(value.1);
+            instr.data.location = Some(location)
+        }
+    }
+
+    pub(crate) unsafe fn add_instruction_metadata(
+        &self,
+        value: &InstructionValue,
+        metadata: DebugMetadataValue,
+    ) {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(value.0.0.0.0);
+            let function = module.functions.get_unchecked_mut(value.0.0.1);
+            let block = function.blocks.get_unchecked_mut(value.0.1);
+            let instr = block.instructions.get_unchecked_mut(value.1);
+            instr.data.meta = Some(metadata)
+        }
+    }
+
+    pub(crate) unsafe fn add_function_metadata(
+        &self,
+        value: &FunctionValue,
+        metadata: DebugMetadataValue,
+    ) {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(value.0.0);
+            let function = module.functions.get_unchecked_mut(value.1);
+            function.data.meta = Some(metadata)
         }
     }
 

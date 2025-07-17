@@ -3,6 +3,10 @@ use std::{collections::HashMap, mem};
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
+    debug_information::{
+        AteEncoding, DebugBasicType, DebugFileData, DebugFunction, DebugInformation, DebugLocation,
+        DebugMetadata, DebugMetadataValue, DebugScopeValue,
+    },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
     Module, NamedStruct, TerminatorKind as Term, Type,
 };
@@ -56,6 +60,9 @@ pub struct Scope<'ctx, 'a> {
     type_values: &'a HashMap<String, TypeValue>,
     functions: &'a HashMap<String, Function<'ctx>>,
     stack_values: HashMap<String, StackValue>,
+    debug: &'ctx DebugInformation,
+    debug_scope: DebugScopeValue,
+    debug_const_tys: &'a HashMap<TypeKind, DebugMetadataValue>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +86,9 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             types: self.types,
             type_values: self.type_values,
             stack_values: self.stack_values.clone(),
+            debug: self.debug,
+            debug_scope: self.debug_scope.clone(),
+            debug_const_tys: self.debug_const_tys,
         }
     }
 
@@ -119,8 +129,33 @@ impl mir::Module {
     fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name, self.is_main);
 
+        let (debug, debug_scope) = if let Some(path) = &self.path {
+            module.create_debug_info(DebugFileData {
+                name: path.file_name().unwrap().to_str().unwrap().to_owned(),
+                directory: path.parent().unwrap().to_str().unwrap().to_owned(),
+            })
+        } else {
+            module.create_debug_info(DebugFileData {
+                name: self.name.clone(),
+                directory: String::new(),
+            })
+        };
+
         let mut types = HashMap::new();
         let mut type_values = HashMap::new();
+        let mut debug_const_types = HashMap::new();
+
+        debug_const_types.insert(
+            TypeKind::U32,
+            debug.metadata(
+                &debug_scope,
+                DebugMetadata::BasicType(DebugBasicType {
+                    name: String::from("u32"),
+                    size_bits: 32,
+                    encoding: AteEncoding::Unsigned,
+                }),
+            ),
+        );
 
         for typedef in &self.typedefs {
             let type_value = match &typedef.kind {
@@ -201,6 +236,9 @@ impl mir::Module {
                 types: &types,
                 type_values: &type_values,
                 stack_values,
+                debug: &debug,
+                debug_scope: debug_scope.clone(),
+                debug_const_tys: &debug_const_types,
             };
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
@@ -214,6 +252,23 @@ impl mir::Module {
                             scope.block.terminate(Term::RetVoid).ok();
                         }
                     }
+
+                    let fn_return_ty = debug_const_types.get(&TypeKind::U32).unwrap();
+
+                    scope.function.set_metadata(scope.debug.metadata(
+                        &scope.debug_scope,
+                        DebugMetadata::Function(DebugFunction {
+                            scope: scope.debug_scope.clone(),
+                            name: mir_function.name.clone(),
+                            linkage_name: String::new(),
+                            location: DebugLocation { line: 0, column: 0 },
+                            return_ty: fn_return_ty.clone(),
+                            is_local: true,
+                            is_definition: true,
+                            is_optimized: false,
+                            scope_line: 0,
+                        }),
+                    ));
                 }
                 mir::FunctionDefinitionKind::Extern(_) => {}
             }

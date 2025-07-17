@@ -61,7 +61,7 @@ impl TokenRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, PartialOrd, Ord, Hash)]
 pub enum TypeKind {
     #[error("bool")]
     Bool,
@@ -99,7 +99,7 @@ pub enum TypeKind {
     Vague(#[from] VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error, PartialOrd, Ord, Hash)]
 pub enum VagueType {
     #[error("Unknown")]
     Unknown,
