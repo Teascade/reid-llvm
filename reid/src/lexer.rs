@@ -1,4 +1,7 @@
-use std::{fmt::Debug, str::Chars};
+use std::{
+    fmt::{Debug, Write},
+    str::Chars,
+};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -99,6 +102,54 @@ impl From<Token> for String {
     }
 }
 
+impl Token {
+    pub fn len(&self) -> usize {
+        self.to_string().len()
+    }
+}
+
+impl ToString for Token {
+    fn to_string(&self) -> String {
+        match &self {
+            Token::Identifier(ident) => ident.clone(),
+            Token::DecimalValue(val) => val.to_string(),
+            Token::StringLit(lit) => format!("\"{}\"", lit),
+            Token::LetKeyword => String::from("let"),
+            Token::MutKeyword => String::from("mut"),
+            Token::ImportKeyword => String::from("import"),
+            Token::ReturnKeyword => String::from("return"),
+            Token::FnKeyword => String::from("fn"),
+            Token::PubKeyword => String::from("pub"),
+            Token::Arrow => String::from("=>"),
+            Token::If => String::from("if"),
+            Token::Else => String::from("else"),
+            Token::True => String::from("true"),
+            Token::False => String::from("false"),
+            Token::Extern => String::from("extern"),
+            Token::Struct => String::from("struct"),
+            Token::Semi => String::from(';'),
+            Token::Equals => String::from('='),
+            Token::Colon => String::from(':'),
+            Token::Plus => String::from('+'),
+            Token::Times => String::from('*'),
+            Token::Minus => String::from('-'),
+            Token::GreaterThan => String::from('>'),
+            Token::LessThan => String::from('<'),
+            Token::Et => String::from('&'),
+            Token::Exclamation => String::from('!'),
+            Token::ParenOpen => String::from('('),
+            Token::ParenClose => String::from(')'),
+            Token::BraceOpen => String::from('{'),
+            Token::BraceClose => String::from('}'),
+            Token::BracketOpen => String::from('['),
+            Token::BracketClose => String::from(']'),
+            Token::Comma => String::from(','),
+            Token::Dot => String::from('.'),
+            Token::Eof => String::new(),
+        }
+    }
+}
+
 /// A token with a position
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullToken {
@@ -115,7 +166,19 @@ impl Debug for FullToken {
     }
 }
 
-pub type Position = (u32, u32);
+/// (Column, Line)
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Position(pub u32, pub u32);
+
+impl Position {
+    pub fn add(&self, num: u32) -> Position {
+        Position(self.0 + num, self.1)
+    }
+
+    pub fn sub(&self, num: u32) -> Position {
+        Position(self.0 - num, self.1)
+    }
+}
 
 struct Cursor<'a> {
     pub position: Position,
@@ -153,14 +216,14 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
     let to_tokenize = to_tokenize.into();
     let mut cursor = Cursor {
         char_stream: to_tokenize.chars(),
-        position: (0, 1),
+        position: Position(0, 1),
     };
 
     let mut tokens = Vec::new();
 
     while let Some(character) = &cursor.next() {
         // Save "current" token first character position
-        let position = (cursor.position.0 - 1, cursor.position.1);
+        let position = cursor.position.sub(1);
 
         let variant = match character {
             // Whitespace
@@ -275,9 +338,9 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    #[error("Invalid token '{}' at Ln {}, Col {}", .0, (.1).1, (.1).0)]
+    #[error("Invalid token '{}' ", .0)]
     InvalidToken(char, Position),
-    #[error("String literal that starts at Ln {}, Col {} is never finished!", (.0).1, (.0).0)]
+    #[error("String literal is never finished!")]
     MissingQuotation(Position),
 }
 

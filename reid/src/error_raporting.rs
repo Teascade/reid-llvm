@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     ast,
-    lexer::{self, FullToken},
+    lexer::{self, FullToken, Position},
     mir::{self, pass, Metadata, SourceModuleId},
-    token_stream,
+    token_stream::{self, TokenRange},
 };
 
 impl<T: std::error::Error + std::fmt::Display> pass::Error<T> {
@@ -16,17 +16,26 @@ impl<T: std::error::Error + std::fmt::Display> pass::Error<T> {
     }
 }
 
+fn label(text: &str) -> &str {
+    #[cfg(debug_assertions)]
+    {
+        return text;
+    }
+    #[cfg(not(debug_assertions))]
+    ""
+}
+
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
-    #[error("Lexing: {}", .0.kind)]
+    #[error("{}{}", label("(Lexing) "), .0.kind)]
     LexerError(#[from] mir::pass::Error<lexer::Error>),
-    #[error("Parsing: {}", .0.kind)]
+    #[error("{}{}", label("(Parsing) "), .0.kind)]
     ParserError(#[from] mir::pass::Error<token_stream::Error>),
-    #[error("Typechecking: {}", .0.kind)]
+    #[error("{}{}", label("(TypeCheck) "), .0.kind)]
     TypeCheckError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
-    #[error("Type Inference: {}", .0.kind)]
+    #[error("{}{}", label("(TypeInference) "), .0.kind)]
     TypeInferenceError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
-    #[error("Linking: {}", .0.kind)]
+    #[error("{}{}", label("(Linker) "), .0.kind)]
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
 }
 
@@ -102,68 +111,10 @@ impl ModuleMap {
     }
 }
 
-// impl TryFrom<&mir::Context> for ModuleMap {
-//     type Error = ();
-
-//     fn try_from(value: &mir::Context) -> Result<Self, Self::Error> {
-//         let mut map = HashMap::new();
-//         for module in &value.modules {
-//             if let Some(_) = map.insert(
-//                 module.module_id,
-//                 ErrModule {
-//                     name: module.name.clone(),
-//                     tokens: Some(module.clone()),
-//                 },
-//             ) {
-//                 return Err(());
-//             }
-//         }
-//         let module_counter = value.modules.iter().map(|m| m.module_id).max().ok_or(())?;
-//         Ok(ModuleMap {
-//             module_map: map,
-//             module_counter,
-//         })
-//     }
-// }
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReidError {
     map: ModuleMap,
     errors: Vec<ErrorKind>,
-}
-
-impl std::error::Error for ReidError {}
-
-impl std::fmt::Display for ReidError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut sorted_errors = self.errors.clone();
-        sorted_errors.sort_by(|a, b| a.cmp(&b));
-        sorted_errors.dedup();
-
-        let mut curr_module = None;
-        for error in sorted_errors {
-            let meta = error.get_meta();
-            if curr_module != Some(meta.source_module_id) {
-                curr_module = Some(meta.source_module_id);
-                writeln!(
-                    f,
-                    "Errors in module {}:",
-                    color_err(format!(
-                        "{}",
-                        self.map
-                            .module_map
-                            .get(&meta.source_module_id)
-                            .unwrap()
-                            .name
-                    ))?
-                )?;
-            }
-            write!(f, "  {}: ", color_err("Error")?)?;
-            writeln!(f, "{}", error)?;
-            writeln!(f, "      {}: {}", color_warn("At")?, meta)?;
-        }
-        Ok(())
-    }
 }
 
 impl ReidError {
@@ -214,6 +165,176 @@ impl ReidError {
     }
 }
 
+impl std::error::Error for ReidError {}
+
+impl std::fmt::Display for ReidError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut sorted_errors = self.errors.clone();
+        sorted_errors.sort_by(|a, b| a.cmp(&b));
+        sorted_errors.dedup();
+
+        let mut curr_module = None;
+        for error in sorted_errors {
+            let meta = error.get_meta();
+            let module = self.map.get_module(&meta.source_module_id).unwrap();
+            let (position_fmt, line_fmt) = if let Some(tokens) = &module.tokens {
+                let range_tokens = meta.range.into_tokens(&tokens);
+                let position = get_position(&range_tokens).unwrap();
+                let full_lines = get_full_lines(&tokens, position);
+                (
+                    fmt_positions(get_position(&full_lines).unwrap()),
+                    Some(fmt_tokens(&full_lines, &range_tokens)),
+                )
+            } else if let Some(position) = meta.position {
+                (fmt_positions((position, position)), None)
+            } else {
+                ("unknown".to_owned(), None)
+            };
+
+            if curr_module != Some(meta.source_module_id) {
+                curr_module = Some(meta.source_module_id);
+                writeln!(
+                    f,
+                    "Errors in module {}:",
+                    color_err(format!(
+                        "{}",
+                        self.map
+                            .module_map
+                            .get(&meta.source_module_id)
+                            .unwrap()
+                            .name
+                    ))?
+                )?;
+            }
+            writeln!(f)?;
+            write!(f, "  Error: ")?;
+            writeln!(f, "{}", color_err(format!("{}", error))?)?;
+            writeln!(f, "{:>20}{}", color_warn("At: ")?, position_fmt)?;
+            if let Some(line_fmt) = line_fmt {
+                writeln!(f, "{:>20}{}", color_warn("")?, line_fmt)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TokenRange {
+    pub fn into_tokens<'v>(&self, tokens: &'v Vec<FullToken>) -> Vec<&'v FullToken> {
+        tokens
+            .iter()
+            .skip(self.start)
+            .by_ref()
+            .take(self.end - self.start)
+            .collect::<Vec<_>>()
+    }
+}
+
+fn get_position(tokens: &Vec<&FullToken>) -> Option<(Position, Position)> {
+    if let Some(first) = tokens.first() {
+        let last = tokens.last().unwrap();
+        Some((first.position, last.position.add(last.token.len() as u32)))
+    } else {
+        None
+    }
+}
+
+fn get_full_lines<'v>(
+    tokens: &'v Vec<FullToken>,
+    (start, end): (Position, Position),
+) -> Vec<&'v FullToken> {
+    let (first_token_pos, _) = tokens
+        .iter()
+        .enumerate()
+        .find(|(_, token)| token.position.1 == start.1)
+        .unwrap();
+    tokens
+        .iter()
+        .skip(first_token_pos)
+        .by_ref()
+        .take_while(|token| token.position.1 <= end.1)
+        .collect::<Vec<_>>()
+}
+
+fn fmt_tokens(tokens: &Vec<&FullToken>, highlighted: &Vec<&FullToken>) -> String {
+    let mut text = String::new();
+    let mut last_likes_space = false;
+    for (i, token) in tokens.iter().enumerate() {
+        if token.token.needs_space() || (token.token.likes_space() && last_likes_space) {
+            text += " ";
+        }
+        last_likes_space = token.token.likes_space();
+
+        let mut token_fmt = format!("{}", token.token.to_string());
+        if highlighted.contains(token) {
+            token_fmt = color_underline(token_fmt).unwrap();
+        }
+        text += &token_fmt;
+        if token.token.is_newline() && i > (tokens.len() - 1) {
+            text += "\n"
+        }
+    }
+
+    text
+}
+
+fn fmt_positions((start, end): (Position, Position)) -> String {
+    if start == end {
+        format!("ln {}, col {}", start.1, start.0)
+    } else if start.1 == end.1 {
+        format!("ln {}, col {}-{}", start.1, start.0, end.0)
+    } else {
+        format!("{}:{} - {}:{}", start.1, start.0, end.1, end.0)
+    }
+}
+
+impl lexer::Token {
+    fn likes_space(&self) -> bool {
+        match self {
+            lexer::Token::Identifier(_) => true,
+            lexer::Token::DecimalValue(_) => true,
+            lexer::Token::StringLit(_) => true,
+            lexer::Token::LetKeyword => true,
+            lexer::Token::MutKeyword => true,
+            lexer::Token::ImportKeyword => true,
+            lexer::Token::ReturnKeyword => true,
+            lexer::Token::FnKeyword => true,
+            lexer::Token::PubKeyword => true,
+            lexer::Token::Arrow => true,
+            lexer::Token::If => true,
+            lexer::Token::Else => true,
+            lexer::Token::True => true,
+            lexer::Token::False => true,
+            lexer::Token::Extern => true,
+            lexer::Token::Struct => true,
+            lexer::Token::Equals => true,
+            _ => false,
+        }
+    }
+
+    fn needs_space(&self) -> bool {
+        match self {
+            lexer::Token::LetKeyword => true,
+            lexer::Token::MutKeyword => true,
+            lexer::Token::ImportKeyword => true,
+            lexer::Token::ReturnKeyword => true,
+            lexer::Token::FnKeyword => true,
+            lexer::Token::PubKeyword => true,
+            lexer::Token::Arrow => true,
+            lexer::Token::Equals => true,
+            _ => false,
+        }
+    }
+
+    fn is_newline(&self) -> bool {
+        match self {
+            lexer::Token::Semi => true,
+            lexer::Token::BraceOpen => true,
+            lexer::Token::BraceClose => true,
+            _ => false,
+        }
+    }
+}
+
 fn color_err(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
     let mut text = format!("{}", elem);
 
@@ -233,6 +354,18 @@ fn color_warn(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
     {
         use colored::Colorize;
         text = format!("{}", text.bright_yellow())
+    }
+
+    Ok(text)
+}
+
+fn color_underline(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
+    let mut text = format!("{}", elem);
+
+    #[cfg(feature = "color")]
+    {
+        use colored::Colorize;
+        text = format!("{}", text.bright_yellow().underline())
     }
 
     Ok(text)
