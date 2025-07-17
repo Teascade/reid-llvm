@@ -14,7 +14,7 @@ fn compiles() {
 #[test]
 fn passes_all_passes() {
     let mut map = Default::default();
-    let mut std = compile_std(&mut map);
+    let (mut std, _) = compile_std(&mut map);
 
     // Needed to pass linker-pass
     std.is_main = true;

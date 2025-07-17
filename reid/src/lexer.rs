@@ -100,7 +100,7 @@ impl From<Token> for String {
 }
 
 /// A token with a position
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullToken {
     pub token: Token,
     pub position: Position,

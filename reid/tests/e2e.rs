@@ -1,7 +1,7 @@
 use reid::{
     compile_module,
     mir::{self},
-    perform_all_passes,
+    parse_module, perform_all_passes,
 };
 use util::assert_err;
 
@@ -9,13 +9,8 @@ mod util;
 
 fn test(source: &str, name: &str) {
     let mut map = Default::default();
-    let module = assert_err(compile_module(
-        source,
-        name.to_owned(),
-        &mut map,
-        None,
-        true,
-    ));
+    let (id, tokens) = assert_err(parse_module(source, name, &mut map));
+    let module = assert_err(compile_module(id, &tokens, &mut map, None, true));
 
     assert_err(perform_all_passes(
         &mut mir::Context {

@@ -4,7 +4,8 @@ use std::{
 };
 
 use crate::{
-    ast, lexer,
+    ast,
+    lexer::{self, FullToken},
     mir::{self, pass, Metadata, SourceModuleId},
     token_stream,
 };
@@ -65,37 +66,65 @@ impl Ord for ErrorKind {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ErrModule {
+    pub name: String,
+    pub tokens: Option<Vec<FullToken>>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ModuleMap {
-    module_map: HashMap<mir::SourceModuleId, String>,
+    module_map: HashMap<mir::SourceModuleId, ErrModule>,
     module_counter: mir::SourceModuleId,
 }
 
 impl ModuleMap {
     pub fn add_module<T: Into<String>>(&mut self, name: T) -> Option<mir::SourceModuleId> {
         let id = self.module_counter.increment();
-        self.module_map.insert(id, name.into().clone());
+        self.module_map.insert(
+            id,
+            ErrModule {
+                name: name.into(),
+                tokens: None,
+            },
+        );
         Some(id)
     }
-}
 
-impl TryFrom<&mir::Context> for ModuleMap {
-    type Error = ();
-
-    fn try_from(value: &mir::Context) -> Result<Self, Self::Error> {
-        let mut map = HashMap::new();
-        for module in &value.modules {
-            if let Some(_) = map.insert(module.module_id, module.name.clone()) {
-                return Err(());
-            }
+    pub fn set_tokens(&mut self, id: mir::SourceModuleId, tokens: Vec<FullToken>) {
+        if let Some(module) = self.module_map.get_mut(&id) {
+            module.tokens = Some(tokens);
         }
-        let module_counter = value.modules.iter().map(|m| m.module_id).max().ok_or(())?;
-        Ok(ModuleMap {
-            module_map: map,
-            module_counter,
-        })
+    }
+
+    pub fn get_module(&self, id: &mir::SourceModuleId) -> Option<&ErrModule> {
+        self.module_map.get(id)
     }
 }
+
+// impl TryFrom<&mir::Context> for ModuleMap {
+//     type Error = ();
+
+//     fn try_from(value: &mir::Context) -> Result<Self, Self::Error> {
+//         let mut map = HashMap::new();
+//         for module in &value.modules {
+//             if let Some(_) = map.insert(
+//                 module.module_id,
+//                 ErrModule {
+//                     name: module.name.clone(),
+//                     tokens: Some(module.clone()),
+//                 },
+//             ) {
+//                 return Err(());
+//             }
+//         }
+//         let module_counter = value.modules.iter().map(|m| m.module_id).max().ok_or(())?;
+//         Ok(ModuleMap {
+//             module_map: map,
+//             module_counter,
+//         })
+//     }
+// }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReidError {
@@ -121,7 +150,11 @@ impl std::fmt::Display for ReidError {
                     "Errors in module {}:",
                     color_err(format!(
                         "{}",
-                        self.map.module_map.get(&meta.source_module_id).unwrap()
+                        self.map
+                            .module_map
+                            .get(&meta.source_module_id)
+                            .unwrap()
+                            .name
                     ))?
                 )?;
             }

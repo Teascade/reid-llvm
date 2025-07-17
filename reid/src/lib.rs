@@ -44,6 +44,7 @@
 use std::{convert::Infallible, path::PathBuf};
 
 use error_raporting::{ErrorKind as ErrorRapKind, ModuleMap, ReidError};
+use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
     SourceModuleId,
@@ -61,42 +62,58 @@ mod pad_adapter;
 mod token_stream;
 mod util;
 
-pub fn compile_module<'map>(
+pub fn parse_module<'map, T: Into<String>>(
     source: &str,
-    name: String,
+    name: T,
+    map: &'map mut ModuleMap,
+) -> Result<(mir::SourceModuleId, Vec<FullToken>), ReidError> {
+    let id = map.add_module(name.into()).unwrap();
+
+    let tokens = ReidError::from_lexer(lexer::tokenize(source), map.clone(), id)?;
+
+    map.set_tokens(id, tokens.clone());
+
+    #[cfg(debug_assertions)]
+    dbg!(&tokens);
+
+    Ok((id, tokens))
+}
+
+pub fn compile_module<'map>(
+    module_id: mir::SourceModuleId,
+    tokens: &Vec<FullToken>,
     map: &'map mut ModuleMap,
     path: Option<PathBuf>,
     is_main: bool,
 ) -> Result<mir::Module, ReidError> {
-    let id = map.add_module(name.clone()).unwrap();
-    let tokens = ReidError::from_lexer(lexer::tokenize(source), map.clone(), id)?;
-
-    #[cfg(debug_assertions)]
-    dbg!(&tokens);
+    let module = map.get_module(&module_id).cloned().unwrap();
 
     let mut token_stream = TokenStream::from(&tokens);
 
     let mut statements = Vec::new();
 
     while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
-        let statement =
-            ReidError::from_parser(token_stream.parse::<TopLevelStatement>(), map.clone(), id)?;
+        let statement = ReidError::from_parser(
+            token_stream.parse::<TopLevelStatement>(),
+            map.clone(),
+            module_id,
+        )?;
         statements.push(statement);
     }
 
     let ast_module = ast::Module {
-        name,
+        name: module.name,
         top_level_statements: statements,
         path,
         is_main,
     };
 
-    Ok(ast_module.process(id))
+    Ok(ast_module.process(module_id))
 }
 
 pub fn perform_all_passes<'map>(
     context: &mut mir::Context,
-    map: &'map mut ModuleMap,
+    module_map: &'map mut ModuleMap,
 ) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
     dbg!(&context);
@@ -104,11 +121,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{}", &context);
 
-    let mut module_map = (&*context).try_into().unwrap();
-
-    let state = context.pass(&mut LinkerPass {
-        module_map: &mut module_map,
-    });
+    let state = context.pass(&mut LinkerPass { module_map });
 
     #[cfg(debug_assertions)]
     println!("{}", &context);
@@ -118,7 +131,7 @@ pub fn perform_all_passes<'map>(
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind::<()>(
             state.errors.iter().map(|e| e.clone().into()).collect(),
-            map.clone(),
+            module_map.clone(),
         ));
     }
 
@@ -159,7 +172,7 @@ pub fn perform_all_passes<'map>(
     );
 
     if !errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(errors, map.clone()));
+        return Err(ReidError::from_kind::<()>(errors, module_map.clone()));
     }
 
     Ok(())
@@ -174,14 +187,10 @@ pub fn compile_and_pass<'map>(
     module_map: &'map mut ModuleMap,
 ) -> Result<CompileOutput, ReidError> {
     let path = path.canonicalize().unwrap();
+    let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-    let module = compile_module(
-        source,
-        path.file_name().unwrap().to_str().unwrap().to_owned(),
-        module_map,
-        Some(path.clone()),
-        true,
-    )?;
+    let (id, tokens) = parse_module(source, name, module_map).unwrap();
+    let module = compile_module(id, &tokens, module_map, Some(path.clone()), true)?;
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
 
