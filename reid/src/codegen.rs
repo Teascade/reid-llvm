@@ -113,7 +113,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Default, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 struct State {
     should_load: bool,
 }
@@ -124,6 +124,12 @@ impl State {
         State {
             should_load: should,
         }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self { should_load: true }
     }
 }
 
@@ -216,8 +222,8 @@ impl mir::Module {
             };
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
-                    let mut state = State::default();
-                    if let Some(ret) = block.codegen(&mut scope, &mut state) {
+                    let state = State::default();
+                    if let Some(ret) = block.codegen(&mut scope, &state) {
                         scope.block.terminate(Term::Ret(ret)).unwrap();
                     } else {
                         if !scope.block.delete_if_unused().unwrap() {
@@ -248,7 +254,7 @@ impl mir::Block {
         if let Some((kind, expr)) = &self.return_expression {
             match kind {
                 mir::ReturnKind::Hard => {
-                    let ret = expr.codegen(&mut scope, &mut state.load(true))?;
+                    let ret = expr.codegen(&mut scope, &state)?;
                     scope.block.terminate(Term::Ret(ret)).unwrap();
                     None
                 }
@@ -268,7 +274,7 @@ impl mir::Statement {
     ) -> Option<InstructionValue> {
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
-                let value = expression.codegen(scope, &state.load(true)).unwrap();
+                let value = expression.codegen(scope, &state).unwrap();
                 scope.stack_values.insert(
                     name.clone(),
                     StackValue(
@@ -305,7 +311,7 @@ impl mir::Statement {
             }
             mir::StmtKind::Set(lhs, rhs) => {
                 let lhs_value = lhs
-                    .codegen(scope, &mut state.load(false))
+                    .codegen(scope, &state.load(false))
                     .expect("non-returning LHS snuck into codegen!");
 
                 let rhs_value = rhs.codegen(scope, state)?;
