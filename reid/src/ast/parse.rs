@@ -392,7 +392,7 @@ impl Parse for Block {
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
                     // In theory could ignore the missing semicolon..
-                    return Err(stream.expected_err("expected semicolon to complete statement")?);
+                    return Err(stream.expected_err("semicolon to complete statement")?);
                 }
 
                 statements.push(BlockLevelStatement::Expression(e));

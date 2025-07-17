@@ -1,7 +1,4 @@
-use std::{
-    fmt::{Debug, Write},
-    str::Chars,
-};
+use std::{fmt::Debug, str::Chars};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 

@@ -41,13 +41,12 @@
 //! - Debug Symbols
 //! ```
 
-use std::{convert::Infallible, path::PathBuf};
+use std::path::PathBuf;
 
 use error_raporting::{ErrorKind as ErrorRapKind, ModuleMap, ReidError};
 use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
-    SourceModuleId,
 };
 use reid_lib::{compile::CompileOutput, Context};
 

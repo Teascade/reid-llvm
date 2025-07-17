@@ -4,17 +4,10 @@ use std::{
 };
 
 use crate::{
-    ast,
     lexer::{self, Cursor, FullToken, Position},
     mir::{self, pass, Metadata, SourceModuleId},
     token_stream::{self, TokenRange},
 };
-
-impl<T: std::error::Error + std::fmt::Display> pass::Error<T> {
-    fn fmt_simple(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.kind, f)
-    }
-}
 
 fn label(text: &str) -> &str {
     #[cfg(debug_assertions)]

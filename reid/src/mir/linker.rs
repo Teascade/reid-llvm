@@ -12,7 +12,7 @@ use crate::{compile_module, error_raporting::ModuleMap, lexer::FullToken, parse_
 use super::{
     pass::{Pass, PassState},
     r#impl::EqualsIssue,
-    Context, FunctionDefinition, Import, Metadata, Module, SourceModuleId,
+    Context, FunctionDefinition, Import, Metadata, Module,
 };
 
 pub static STD_SOURCE: &str = include_str!("../../lib/std.reid");

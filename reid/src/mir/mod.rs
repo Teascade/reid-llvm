@@ -4,10 +4,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{
-    lexer::{FullToken, Position},
-    token_stream::TokenRange,
-};
+use crate::{lexer::Position, token_stream::TokenRange};
 
 mod display;
 pub mod r#impl;

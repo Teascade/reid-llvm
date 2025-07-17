@@ -3,7 +3,7 @@
 
 use crate::{
     ast::parse::Parse,
-    lexer::{FullToken, Position, Token},
+    lexer::{FullToken, Token},
 };
 
 /// Utility struct that is able to parse [`FullToken`]s while being
@@ -175,15 +175,6 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    fn get_position(&self, offset: usize) -> Result<Position, Error> {
-        if self.tokens.is_empty() {
-            Err(Error::FileEmpty)
-        } else {
-            let token_idx = (self.position - 1).min(self.tokens.len() - 1);
-            Ok(self.tokens[token_idx].position)
-        }
-    }
-
     pub fn get_range(&self) -> Option<TokenRange> {
         self.ref_position.as_ref().map(|ref_pos| TokenRange {
             start: **ref_pos,
@@ -237,7 +228,7 @@ impl std::iter::Sum for TokenRange {
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    #[error("Expected {} got {:?}", .0, .1)]
+    #[error("Expected {} got \"{}\"", .0, .1.to_string())]
     Expected(String, Token, TokenRange),
     #[error("Source file contains no tokens")]
     FileEmpty,
