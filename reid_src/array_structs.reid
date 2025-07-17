@@ -8,7 +8,7 @@ struct Test {
 fn main() -> u32 {
     let mut value = [Test {
         field: 5,
-        second: [6, 3, 17, 8],
+        second: [6, 3, "hello", 8],
     }];
 
     let val1 = 0;
@@ -16,8 +16,8 @@ fn main() -> u32 {
 
     // value[val1].second[val2 + 1] = 99;
 
-    let mut b = value[val1];
+    let mut b = valude[val1];
     b.second[2] = 99;
 
-    return value[val1].second[2];
+    return value[val1].sezcond[2];
 }

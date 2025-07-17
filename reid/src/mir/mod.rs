@@ -31,6 +31,13 @@ pub struct Metadata {
     pub position: Option<Position>,
 }
 
+impl Metadata {
+    pub fn complete_overlap(&self, other: &Metadata) -> bool {
+        (self.range.start >= other.range.start && self.range.end <= other.range.end)
+            || (other.range.start >= self.range.start && other.range.end <= self.range.end)
+    }
+}
+
 impl std::ops::Add for Metadata {
     type Output = Metadata;
 

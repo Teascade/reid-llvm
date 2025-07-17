@@ -15,7 +15,7 @@ pub enum SimplePassError {
     VariableAlreadyDefined(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord)]
 pub struct Error<TErr: STDError> {
     pub metadata: Metadata,
     pub kind: TErr,
@@ -30,6 +30,12 @@ impl<TErr: STDError> std::fmt::Display for Error<TErr> {
 impl<TErr: STDError> STDError for Error<TErr> {
     fn source(&self) -> Option<&(dyn STDError + 'static)> {
         self.kind.source()
+    }
+}
+
+impl<TErr: STDError + PartialEq> PartialEq for Error<TErr> {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind && self.metadata.complete_overlap(&other.metadata)
     }
 }
 

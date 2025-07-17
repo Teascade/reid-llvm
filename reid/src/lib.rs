@@ -124,6 +124,8 @@ pub fn perform_all_passes<'map>(
 
     let refs = TypeRefs::default();
 
+    let mut errors = Vec::new();
+
     let state = context.pass(&mut TypeInference { refs: &refs });
 
     #[cfg(debug_assertions)]
@@ -133,16 +135,13 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&state);
 
-    if !state.errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(
-            state
-                .errors
-                .iter()
-                .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
-                .collect(),
-            map.clone(),
-        ));
-    }
+    errors.extend(
+        state
+            .errors
+            .iter()
+            .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
+            .collect::<Vec<_>>(),
+    );
 
     let state = context.pass(&mut TypeCheck { refs: &refs });
 
@@ -151,15 +150,16 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&state);
 
-    if !state.errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(
-            state
-                .errors
-                .iter()
-                .map(|e| ErrorRapKind::TypeCheckError(e.clone()))
-                .collect(),
-            map.clone(),
-        ));
+    errors.extend(
+        state
+            .errors
+            .iter()
+            .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
+            .collect::<Vec<_>>(),
+    );
+
+    if !errors.is_empty() {
+        return Err(ReidError::from_kind::<()>(errors, map.clone()));
     }
 
     Ok(())

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Write},
+};
 
 use crate::{
     ast, lexer,
@@ -14,15 +17,15 @@ impl<T: std::error::Error + std::fmt::Display> pass::Error<T> {
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum ErrorKind {
-    #[error("Lexing: {0:?}")]
+    #[error("Lexing: {}", .0.kind)]
     LexerError(#[from] mir::pass::Error<lexer::Error>),
-    #[error("Parsing: {0:?}")]
+    #[error("Parsing: {}", .0.kind)]
     ParserError(#[from] mir::pass::Error<token_stream::Error>),
-    #[error("Typechecking: {0:?}")]
+    #[error("Typechecking: {}", .0.kind)]
     TypeCheckError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
-    #[error("Type Inference: {0:?}")]
+    #[error("Type Inference: {}", .0.kind)]
     TypeInferenceError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
-    #[error("Linking: {0:?}")]
+    #[error("Linking: {}", .0.kind)]
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
 }
 
@@ -106,6 +109,7 @@ impl std::fmt::Display for ReidError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sorted_errors = self.errors.clone();
         sorted_errors.sort_by(|a, b| a.cmp(&b));
+        sorted_errors.dedup();
 
         let mut curr_module = None;
         for error in sorted_errors {
@@ -115,12 +119,15 @@ impl std::fmt::Display for ReidError {
                 writeln!(
                     f,
                     "Errors in module {}:",
-                    self.map.module_map.get(&meta.source_module_id).unwrap()
+                    color_err(format!(
+                        "{}",
+                        self.map.module_map.get(&meta.source_module_id).unwrap()
+                    ))?
                 )?;
             }
-            write!(f, "  Error: ")?;
-            std::fmt::Display::fmt(&error, f)?;
-            writeln!(f, "      At: {}", meta)?;
+            write!(f, "  {}: ", color_err("Error")?)?;
+            writeln!(f, "{}", error)?;
+            writeln!(f, "      {}: {}", color_warn("At")?, meta)?;
         }
         Ok(())
     }
@@ -172,4 +179,28 @@ impl ReidError {
     pub fn from_kind<U>(errors: Vec<ErrorKind>, map: ModuleMap) -> ReidError {
         ReidError { map, errors }
     }
+}
+
+fn color_err(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
+    let mut text = format!("{}", elem);
+
+    #[cfg(feature = "color")]
+    {
+        use colored::Colorize;
+        text = format!("{}", text.bright_red())
+    }
+
+    Ok(text)
+}
+
+fn color_warn(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
+    let mut text = format!("{}", elem);
+
+    #[cfg(feature = "color")]
+    {
+        use colored::Colorize;
+        text = format!("{}", text.bright_yellow())
+    }
+
+    Ok(text)
 }
