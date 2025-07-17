@@ -15,7 +15,13 @@ pub static STRINGS: &str = include_str!("../../reid_src/strings.reid");
 
 #[test]
 fn array_compiles_well() {
-    let module = assert_err(compile_module(ARRAY, "array".to_owned(), None, true));
+    let module = assert_err(compile_module(
+        ARRAY,
+        "array".to_owned(),
+        Default::default(),
+        None,
+        true,
+    ));
 
     assert_err(perform_all_passes(&mut mir::Context {
         modules: vec![module],
@@ -28,6 +34,7 @@ fn fibonacci_compiles_well() {
     let module = assert_err(compile_module(
         FIBONACCI,
         "fibonacci".to_owned(),
+        Default::default(),
         None,
         true,
     ));
@@ -43,6 +50,7 @@ fn hello_world_compiles_well() {
     let module = assert_err(compile_module(
         HELLO_WORLD,
         "hello_world".to_owned(),
+        Default::default(),
         None,
         true,
     ));
@@ -55,7 +63,13 @@ fn hello_world_compiles_well() {
 
 #[test]
 fn mutable_compiles_well() {
-    let module = assert_err(compile_module(MUTABLE, "mutable".to_owned(), None, true));
+    let module = assert_err(compile_module(
+        MUTABLE,
+        "mutable".to_owned(),
+        Default::default(),
+        None,
+        true,
+    ));
 
     assert_err(perform_all_passes(&mut mir::Context {
         modules: vec![module],
@@ -65,7 +79,13 @@ fn mutable_compiles_well() {
 
 #[test]
 fn strings_compiles_well() {
-    let module = assert_err(compile_module(STRINGS, "strings".to_owned(), None, true));
+    let module = assert_err(compile_module(
+        STRINGS,
+        "strings".to_owned(),
+        Default::default(),
+        None,
+        true,
+    ));
 
     assert_err(perform_all_passes(&mut mir::Context {
         modules: vec![module],

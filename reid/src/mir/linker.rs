@@ -12,7 +12,7 @@ use crate::{compile_module, ReidError};
 use super::{
     pass::{Pass, PassState},
     r#impl::EqualsIssue,
-    Context, FunctionDefinition, Import, Metadata, Module,
+    Context, FunctionDefinition, Import, Metadata, Module, SourceModuleId,
 };
 
 pub static STD_SOURCE: &str = include_str!("../../lib/std.reid");
@@ -41,8 +41,15 @@ pub enum ErrorKind {
     FunctionIsPrivate(String, String),
 }
 
-pub fn compile_std() -> super::Module {
-    let module = compile_module(STD_SOURCE, "standard_library".to_owned(), None, false).unwrap();
+pub fn compile_std(module_id: SourceModuleId) -> super::Module {
+    let module = compile_module(
+        STD_SOURCE,
+        "standard_library".to_owned(),
+        module_id,
+        None,
+        false,
+    )
+    .unwrap();
 
     let mut mir_context = super::Context::from(vec![module], Default::default());
 
@@ -85,7 +92,16 @@ impl Pass for LinkerPass {
             modules.insert(module.name.clone(), Rc::new(RefCell::new(module)));
         }
 
-        modules.insert("std".to_owned(), Rc::new(RefCell::new(compile_std())));
+        let mut module_counter = modules
+            .values()
+            .map(|m| m.borrow().module_id)
+            .max()
+            .unwrap();
+
+        modules.insert(
+            "std".to_owned(),
+            Rc::new(RefCell::new(compile_std(module_counter.increment()))),
+        );
 
         let mut modules_to_process: Vec<Rc<RefCell<Module>>> = modules.values().cloned().collect();
 
@@ -117,7 +133,13 @@ impl Pass for LinkerPass {
                         continue;
                     };
 
-                    match compile_module(&source, module_name.clone(), Some(file_path), false) {
+                    match compile_module(
+                        &source,
+                        module_name.clone(),
+                        module_counter.increment(),
+                        Some(file_path),
+                        false,
+                    ) {
                         Ok(imported_module) => {
                             if imported_module.is_main {
                                 state.ok::<_, Infallible>(

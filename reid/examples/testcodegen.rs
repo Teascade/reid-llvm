@@ -161,6 +161,7 @@ fn main() {
     let mir_context = mir::Context {
         modules: vec![Module {
             name: "test module".to_owned(),
+            module_id: SourceModuleId::default(),
             imports: vec![],
             functions: vec![fibonacci, main],
             typedefs: Vec::new(),

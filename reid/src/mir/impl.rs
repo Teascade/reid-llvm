@@ -1,4 +1,8 @@
-use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
+use super::{
+    typecheck::ErrorKind,
+    typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
+    VagueType as Vague, *,
+};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {

@@ -14,24 +14,40 @@ pub mod typecheck;
 pub mod typeinference;
 pub mod typerefs;
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
+pub struct SourceModuleId(u32);
+
+impl SourceModuleId {
+    pub fn increment(&mut self) -> SourceModuleId {
+        self.0 += 1;
+        SourceModuleId(self.0)
+    }
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Metadata {
     pub range: TokenRange,
+    pub source_module_id: SourceModuleId,
 }
 
 impl std::ops::Add for Metadata {
     type Output = Metadata;
 
     fn add(self, rhs: Self) -> Self::Output {
+        assert!(self.source_module_id == rhs.source_module_id);
         Metadata {
             range: self.range + rhs.range,
+            source_module_id: self.source_module_id,
         }
     }
 }
 
-impl From<TokenRange> for Metadata {
-    fn from(value: TokenRange) -> Self {
-        Metadata { range: value }
+impl TokenRange {
+    pub fn as_meta(self, module: SourceModuleId) -> Metadata {
+        Metadata {
+            range: self,
+            source_module_id: module,
+        }
     }
 }
 
@@ -240,14 +256,14 @@ pub enum FunctionDefinitionKind {
 impl FunctionDefinition {
     fn block_meta(&self) -> Metadata {
         match &self.kind {
-            FunctionDefinitionKind::Local(block, _) => block.meta,
+            FunctionDefinitionKind::Local(block, _) => block.meta.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
         }
     }
 
     fn signature(&self) -> Metadata {
         match &self.kind {
-            FunctionDefinitionKind::Local(_, metadata) => *metadata,
+            FunctionDefinitionKind::Local(_, metadata) => metadata.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
         }
     }
@@ -288,6 +304,7 @@ pub enum TypeDefinitionKind {
 #[derive(Debug)]
 pub struct Module {
     pub name: String,
+    pub module_id: SourceModuleId,
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionDefinition>,
     pub typedefs: Vec<TypeDefinition>,

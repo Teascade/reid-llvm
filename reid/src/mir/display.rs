@@ -289,7 +289,13 @@ impl Display for CmpOperator {
 
 impl Display for Metadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.range)
+        write!(f, "{:?} ({})", self.range, self.source_module_id)
+    }
+}
+
+impl Display for SourceModuleId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Mod {}", self.0)
     }
 }
 

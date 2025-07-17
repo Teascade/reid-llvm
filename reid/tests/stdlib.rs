@@ -8,12 +8,12 @@ mod util;
 
 #[test]
 fn compiles() {
-    let _ = compile_std();
+    let _ = compile_std(Default::default());
 }
 
 #[test]
 fn passes_all_passes() {
-    let mut std = compile_std();
+    let mut std = compile_std(Default::default());
 
     // Needed to pass linker-pass
     std.is_main = true;

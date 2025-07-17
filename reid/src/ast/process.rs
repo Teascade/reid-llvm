@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     ast::{self},
-    mir::{self, NamedVariableRef, StmtKind, StructField, StructType},
+    mir::{self, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType},
 };
 
 impl mir::Context {
@@ -12,7 +12,7 @@ impl mir::Context {
 }
 
 impl ast::Module {
-    pub fn process(&self) -> mir::Module {
+    pub fn process(&self, module_id: SourceModuleId) -> mir::Module {
         let mut imports = Vec::new();
         let mut functions = Vec::new();
         let mut typedefs = Vec::new();
@@ -21,7 +21,7 @@ impl ast::Module {
         for stmt in &self.top_level_statements {
             match stmt {
                 Import(import) => {
-                    imports.push(mir::Import(import.0.clone(), import.1.into()));
+                    imports.push(mir::Import(import.0.clone(), import.1.as_meta(module_id)));
                 }
                 FunctionDefinition(ast::FunctionDefinition(signature, is_pub, block, range)) => {
                     let def = mir::FunctionDefinition {
@@ -39,7 +39,10 @@ impl ast::Module {
                             .cloned()
                             .map(|p| (p.0, p.1.into()))
                             .collect(),
-                        kind: mir::FunctionDefinitionKind::Local(block.into_mir(), (*range).into()),
+                        kind: mir::FunctionDefinitionKind::Local(
+                            block.into_mir(module_id),
+                            (*range).as_meta(module_id),
+                        ),
                     };
                     functions.push(def);
                 }
@@ -75,14 +78,14 @@ impl ast::Module {
                                             StructField(
                                                 s.name.clone(),
                                                 s.ty.clone().into(),
-                                                s.range.into(),
+                                                s.range.as_meta(module_id),
                                             )
                                         })
                                         .collect(),
                                 ))
                             }
                         },
-                        meta: (*range).into(),
+                        meta: (*range).as_meta(module_id),
                     };
                     typedefs.push(def);
                 }
@@ -91,6 +94,7 @@ impl ast::Module {
 
         mir::Module {
             name: self.name.clone(),
+            module_id: module_id,
             imports,
             functions,
             path: self.path.clone(),
@@ -101,7 +105,7 @@ impl ast::Module {
 }
 
 impl ast::Block {
-    pub fn into_mir(&self) -> mir::Block {
+    pub fn into_mir(&self, module_id: SourceModuleId) -> mir::Block {
         let mut mir_statements = Vec::new();
 
         for statement in &self.0 {
@@ -115,27 +119,31 @@ impl ast::Block {
                                 .map(|t| t.0.into())
                                 .unwrap_or(mir::TypeKind::Vague(mir::VagueType::Unknown)),
                             s_let.0.clone(),
-                            s_let.4.into(),
+                            s_let.4.as_meta(module_id),
                         ),
                         s_let.2,
-                        s_let.3.process(),
+                        s_let.3.process(module_id),
                     ),
                     s_let.4,
                 ),
                 ast::BlockLevelStatement::Set(var_ref, expression, range) => (
-                    StmtKind::Set(var_ref.process(), expression.process()),
+                    StmtKind::Set(var_ref.process(module_id), expression.process(module_id)),
                     *range,
                 ),
                 ast::BlockLevelStatement::Import { _i } => todo!(),
-                ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process()), e.1),
-                ast::BlockLevelStatement::Return(_, e) => (StmtKind::Expression(e.process()), e.1),
+                ast::BlockLevelStatement::Expression(e) => {
+                    (StmtKind::Expression(e.process(module_id)), e.1)
+                }
+                ast::BlockLevelStatement::Return(_, e) => {
+                    (StmtKind::Expression(e.process(module_id)), e.1)
+                }
             };
 
-            mir_statements.push(mir::Statement(kind, range.into()));
+            mir_statements.push(mir::Statement(kind, range.as_meta(module_id)));
         }
 
         let return_expression = if let Some(r) = &self.1 {
-            Some((r.0.into(), Box::new(r.1.process())))
+            Some((r.0.into(), Box::new(r.1.process(module_id))))
         } else {
             None
         };
@@ -143,7 +151,7 @@ impl ast::Block {
         mir::Block {
             statements: mir_statements,
             return_expression,
-            meta: self.2.into(),
+            meta: self.2.as_meta(module_id),
         }
     }
 }
@@ -158,61 +166,67 @@ impl From<ast::ReturnType> for mir::ReturnKind {
 }
 
 impl ast::Expression {
-    fn process(&self) -> mir::Expression {
+    fn process(&self, module_id: SourceModuleId) -> mir::Expression {
         let kind = match &self.0 {
             ast::ExpressionKind::VariableName(name) => mir::ExprKind::Variable(NamedVariableRef(
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
-                self.1.into(),
+                self.1.as_meta(module_id),
             )),
             ast::ExpressionKind::Literal(literal) => mir::ExprKind::Literal(literal.mir()),
             ast::ExpressionKind::Binop(binary_operator, lhs, rhs) => mir::ExprKind::BinOp(
                 binary_operator.mir(),
-                Box::new(lhs.process()),
-                Box::new(rhs.process()),
+                Box::new(lhs.process(module_id)),
+                Box::new(rhs.process(module_id)),
             ),
             ast::ExpressionKind::FunctionCall(fn_call_expr) => {
                 mir::ExprKind::FunctionCall(mir::FunctionCall {
                     name: fn_call_expr.0.clone(),
                     return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
-                    parameters: fn_call_expr.1.iter().map(|e| e.process()).collect(),
+                    parameters: fn_call_expr
+                        .1
+                        .iter()
+                        .map(|e| e.process(module_id))
+                        .collect(),
                 })
             }
-            ast::ExpressionKind::BlockExpr(block) => mir::ExprKind::Block(block.into_mir()),
+            ast::ExpressionKind::BlockExpr(block) => {
+                mir::ExprKind::Block(block.into_mir(module_id))
+            }
             ast::ExpressionKind::IfExpr(if_expression) => {
-                let cond = if_expression.0.process();
-                let then_block = if_expression.1.into_mir();
+                let cond = if_expression.0.process(module_id);
+                let then_block = if_expression.1.into_mir(module_id);
                 let else_block = if let Some(el) = &if_expression.2 {
-                    Some(el.into_mir())
+                    Some(el.into_mir(module_id))
                 } else {
                     None
                 };
                 mir::ExprKind::If(mir::IfExpression(Box::new(cond), then_block, else_block))
             }
             ast::ExpressionKind::Array(expressions) => {
-                mir::ExprKind::Array(expressions.iter().map(|e| e.process()).collect())
+                mir::ExprKind::Array(expressions.iter().map(|e| e.process(module_id)).collect())
             }
             ast::ExpressionKind::Indexed(expression, idx_expr) => mir::ExprKind::Indexed(
-                Box::new(expression.process()),
+                Box::new(expression.process(module_id)),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
-                Box::new(idx_expr.process()),
+                Box::new(idx_expr.process(module_id)),
             ),
             ast::ExpressionKind::StructExpression(struct_init) => mir::ExprKind::Struct(
                 struct_init.name.clone(),
                 struct_init
                     .fields
                     .iter()
-                    .map(|(n, e)| (n.clone(), e.process()))
+                    .map(|(n, e)| (n.clone(), e.process(module_id)))
                     .collect(),
             ),
             ast::ExpressionKind::Accessed(expression, name) => mir::ExprKind::Accessed(
-                Box::new(expression.process()),
+                Box::new(expression.process(module_id)),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
             ),
         };
 
-        mir::Expression(kind, self.1.into())
+        mir::Expression(kind, self.1.as_meta(module_id))
     }
 }
 

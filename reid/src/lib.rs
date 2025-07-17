@@ -45,6 +45,7 @@ use std::path::PathBuf;
 
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
+    SourceModuleId,
 };
 use reid_lib::{compile::CompileOutput, Context};
 
@@ -75,6 +76,7 @@ pub enum ReidError {
 pub fn compile_module(
     source: &str,
     name: String,
+    module_id: SourceModuleId,
     path: Option<PathBuf>,
     is_main: bool,
 ) -> Result<mir::Module, ReidError> {
@@ -99,7 +101,7 @@ pub fn compile_module(
         is_main,
     };
 
-    Ok(ast_module.process())
+    Ok(ast_module.process(module_id))
 }
 
 pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
@@ -159,6 +161,7 @@ pub fn compile(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> 
         vec![compile_module(
             source,
             path.file_name().unwrap().to_str().unwrap().to_owned(),
+            SourceModuleId::default(),
             Some(path.clone()),
             true,
         )?],
