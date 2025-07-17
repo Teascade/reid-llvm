@@ -8,18 +8,22 @@ mod util;
 
 #[test]
 fn compiles() {
-    let _ = compile_std(Default::default());
+    let _ = compile_std(&mut Default::default());
 }
 
 #[test]
 fn passes_all_passes() {
-    let mut std = compile_std(Default::default());
+    let mut map = Default::default();
+    let mut std = compile_std(&mut map);
 
     // Needed to pass linker-pass
     std.is_main = true;
 
-    assert_err(perform_all_passes(&mut mir::Context {
-        modules: vec![std],
-        base: Default::default(),
-    }));
+    assert_err(perform_all_passes(
+        &mut mir::Context {
+            modules: vec![std],
+            base: Default::default(),
+        },
+        &mut map,
+    ));
 }

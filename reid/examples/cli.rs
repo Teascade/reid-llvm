@@ -1,6 +1,6 @@
-use std::{env, error::Error, fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
-use reid::compile;
+use reid::compile_simple;
 use reid_lib::compile::CompileOutput;
 
 fn main() -> Result<(), std::io::Error> {
@@ -15,7 +15,7 @@ fn main() -> Result<(), std::io::Error> {
         let before = std::time::SystemTime::now();
 
         let text = fs::read_to_string(&path)?;
-        match compile(&text, PathBuf::from(&path)) {
+        match compile_simple(&text, PathBuf::from(&path)) {
             Ok(CompileOutput {
                 triple,
                 assembly,

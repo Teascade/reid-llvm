@@ -279,7 +279,7 @@ impl TypeKind {
     }
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EqualsIssue {
     #[error("Function is already defined locally at {:?}", (.0).range)]
     ExistsLocally(Metadata),

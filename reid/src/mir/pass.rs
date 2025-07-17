@@ -15,10 +15,10 @@ pub enum SimplePassError {
     VariableAlreadyDefined(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Error<TErr: STDError> {
-    metadata: Metadata,
-    kind: TErr,
+    pub metadata: Metadata,
+    pub kind: TErr,
 }
 
 impl<TErr: STDError> std::fmt::Display for Error<TErr> {

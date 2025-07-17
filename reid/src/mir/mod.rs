@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::token_stream::TokenRange;
+use crate::{lexer::Position, token_stream::TokenRange};
 
 mod display;
 pub mod r#impl;
@@ -24,10 +24,11 @@ impl SourceModuleId {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Metadata {
-    pub range: TokenRange,
     pub source_module_id: SourceModuleId,
+    pub range: TokenRange,
+    pub position: Option<Position>,
 }
 
 impl std::ops::Add for Metadata {
@@ -38,6 +39,7 @@ impl std::ops::Add for Metadata {
         Metadata {
             range: self.range + rhs.range,
             source_module_id: self.source_module_id,
+            position: None,
         }
     }
 }
@@ -47,11 +49,12 @@ impl TokenRange {
         Metadata {
             range: self,
             source_module_id: module,
+            position: None,
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, PartialOrd, Ord)]
 pub enum TypeKind {
     #[error("bool")]
     Bool,
@@ -89,7 +92,7 @@ pub enum TypeKind {
     Vague(#[from] VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error, PartialOrd, Ord)]
 pub enum VagueType {
     #[error("Unknown")]
     Unknown,
@@ -125,7 +128,7 @@ impl TypeKind {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Literal {
     I8(i8),
     I16(i16),
@@ -142,7 +145,7 @@ pub enum Literal {
     Vague(VagueLiteral),
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum VagueLiteral {
     Number(u64),
 }
@@ -204,7 +207,7 @@ pub enum ReturnKind {
 #[derive(Debug)]
 pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Import(pub Vec<String>, pub Metadata);
 
 #[derive(Debug)]

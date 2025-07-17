@@ -7,7 +7,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{compile_module, ReidError};
+use crate::{compile_module, error_raporting::ModuleMap};
 
 use super::{
     pass::{Pass, PassState},
@@ -17,14 +17,14 @@ use super::{
 
 pub static STD_SOURCE: &str = include_str!("../../lib/std.reid");
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ErrorKind {
     #[error("Unable to import inner modules, not yet supported: {0}")]
     InnerModulesNotYetSupported(Import),
     #[error("No such module: {0}")]
     ModuleNotFound(String),
     #[error("Error while compiling module {0}: {1}")]
-    ModuleCompilationError(String, ReidError),
+    ModuleCompilationError(String, String),
     #[error("No such function {0} found in module {1}")]
     NoSuchFunctionInModule(String, String),
     #[error("Importing function {0}::{1} not possible: {2}")]
@@ -41,11 +41,11 @@ pub enum ErrorKind {
     FunctionIsPrivate(String, String),
 }
 
-pub fn compile_std(module_id: SourceModuleId) -> super::Module {
+pub fn compile_std(module_map: &mut ModuleMap) -> super::Module {
     let module = compile_module(
         STD_SOURCE,
         "standard_library".to_owned(),
-        module_id,
+        module_map,
         None,
         false,
     )
@@ -59,11 +59,13 @@ pub fn compile_std(module_id: SourceModuleId) -> super::Module {
 
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
-pub struct LinkerPass;
+pub struct LinkerPass<'map> {
+    pub module_map: &'map mut ModuleMap,
+}
 
 type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
-impl Pass for LinkerPass {
+impl<'map> Pass for LinkerPass<'map> {
     type Data = ();
     type TError = ErrorKind;
     fn context(&mut self, context: &mut Context, mut state: LinkerPassState) {
@@ -92,15 +94,9 @@ impl Pass for LinkerPass {
             modules.insert(module.name.clone(), Rc::new(RefCell::new(module)));
         }
 
-        let mut module_counter = modules
-            .values()
-            .map(|m| m.borrow().module_id)
-            .max()
-            .unwrap();
-
         modules.insert(
             "std".to_owned(),
-            Rc::new(RefCell::new(compile_std(module_counter.increment()))),
+            Rc::new(RefCell::new(compile_std(&mut self.module_map))),
         );
 
         let mut modules_to_process: Vec<Rc<RefCell<Module>>> = modules.values().cloned().collect();
@@ -136,7 +132,7 @@ impl Pass for LinkerPass {
                     match compile_module(
                         &source,
                         module_name.clone(),
-                        module_counter.increment(),
+                        &mut self.module_map,
                         Some(file_path),
                         false,
                     ) {
@@ -159,7 +155,10 @@ impl Pass for LinkerPass {
                         }
                         Err(err) => {
                             state.ok::<_, Infallible>(
-                                Err(ErrorKind::ModuleCompilationError(module_name.clone(), err)),
+                                Err(ErrorKind::ModuleCompilationError(
+                                    module_name.clone(),
+                                    format!("{}", err),
+                                )),
                                 import.1,
                             );
                             continue;

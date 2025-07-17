@@ -2,7 +2,7 @@ use std::{fmt::Debug, str::Chars};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub enum Token {
     /// Values
     Identifier(String),
@@ -273,10 +273,19 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
     Ok(tokens)
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     #[error("Invalid token '{}' at Ln {}, Col {}", .0, (.1).1, (.1).0)]
     InvalidToken(char, Position),
     #[error("String literal that starts at Ln {}, Col {} is never finished!", (.0).1, (.0).0)]
     MissingQuotation(Position),
+}
+
+impl Error {
+    pub fn get_position(&self) -> &Position {
+        match self {
+            Error::InvalidToken(_, pos) => pos,
+            Error::MissingQuotation(pos) => pos,
+        }
+    }
 }

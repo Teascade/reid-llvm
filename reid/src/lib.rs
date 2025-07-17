@@ -41,8 +41,9 @@
 //! - Debug Symbols
 //! ```
 
-use std::path::PathBuf;
+use std::{convert::Infallible, path::PathBuf};
 
+use error_raporting::{ErrorKind as ErrorRapKind, ModuleMap, ReidError};
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
     SourceModuleId,
@@ -53,34 +54,22 @@ use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
 mod ast;
 mod codegen;
+mod error_raporting;
 mod lexer;
 pub mod mir;
 mod pad_adapter;
 mod token_stream;
 mod util;
 
-#[derive(thiserror::Error, Debug, Clone)]
-pub enum ReidError {
-    #[error(transparent)]
-    LexerError(#[from] lexer::Error),
-    #[error(transparent)]
-    ParserError(#[from] token_stream::Error),
-    #[error("Errors during typecheck: {0:?}")]
-    TypeCheckErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
-    #[error("Errors during type inference: {0:?}")]
-    TypeInferenceErrors(Vec<mir::pass::Error<mir::typecheck::ErrorKind>>),
-    #[error("Errors during linking: {0:?}")]
-    LinkerErrors(Vec<mir::pass::Error<mir::linker::ErrorKind>>),
-}
-
-pub fn compile_module(
+pub fn compile_module<'map>(
     source: &str,
     name: String,
-    module_id: SourceModuleId,
+    map: &'map mut ModuleMap,
     path: Option<PathBuf>,
     is_main: bool,
 ) -> Result<mir::Module, ReidError> {
-    let tokens = lexer::tokenize(source)?;
+    let id = map.add_module(name.clone()).unwrap();
+    let tokens = ReidError::from_lexer(lexer::tokenize(source), map.clone(), id)?;
 
     #[cfg(debug_assertions)]
     dbg!(&tokens);
@@ -90,7 +79,8 @@ pub fn compile_module(
     let mut statements = Vec::new();
 
     while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
-        let statement = token_stream.parse::<TopLevelStatement>()?;
+        let statement =
+            ReidError::from_parser(token_stream.parse::<TopLevelStatement>(), map.clone(), id)?;
         statements.push(statement);
     }
 
@@ -101,17 +91,24 @@ pub fn compile_module(
         is_main,
     };
 
-    Ok(ast_module.process(module_id))
+    Ok(ast_module.process(id))
 }
 
-pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
+pub fn perform_all_passes<'map>(
+    context: &mut mir::Context,
+    map: &'map mut ModuleMap,
+) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
     dbg!(&context);
 
     #[cfg(debug_assertions)]
     println!("{}", &context);
 
-    let state = context.pass(&mut LinkerPass);
+    let mut module_map = (&*context).try_into().unwrap();
+
+    let state = context.pass(&mut LinkerPass {
+        module_map: &mut module_map,
+    });
 
     #[cfg(debug_assertions)]
     println!("{}", &context);
@@ -119,7 +116,10 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::LinkerErrors(state.errors));
+        return Err(ReidError::from_kind::<()>(
+            state.errors.iter().map(|e| e.clone().into()).collect(),
+            map.clone(),
+        ));
     }
 
     let refs = TypeRefs::default();
@@ -134,7 +134,14 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::TypeInferenceErrors(state.errors));
+        return Err(ReidError::from_kind::<()>(
+            state
+                .errors
+                .iter()
+                .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
+                .collect(),
+            map.clone(),
+        ));
     }
 
     let state = context.pass(&mut TypeCheck { refs: &refs });
@@ -145,7 +152,14 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::TypeCheckErrors(state.errors));
+        return Err(ReidError::from_kind::<()>(
+            state
+                .errors
+                .iter()
+                .map(|e| ErrorRapKind::TypeCheckError(e.clone()))
+                .collect(),
+            map.clone(),
+        ));
     }
 
     Ok(())
@@ -154,21 +168,24 @@ pub fn perform_all_passes(context: &mut mir::Context) -> Result<(), ReidError> {
 /// Takes in a bit of source code, parses and compiles it and produces `hello.o`
 /// and `hello.asm` from it, which can be linked using `ld` to produce an
 /// executable file.
-pub fn compile(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> {
+pub fn compile_and_pass<'map>(
+    source: &str,
+    path: PathBuf,
+    module_map: &'map mut ModuleMap,
+) -> Result<CompileOutput, ReidError> {
     let path = path.canonicalize().unwrap();
 
-    let mut mir_context = mir::Context::from(
-        vec![compile_module(
-            source,
-            path.file_name().unwrap().to_str().unwrap().to_owned(),
-            SourceModuleId::default(),
-            Some(path.clone()),
-            true,
-        )?],
-        path.parent().unwrap().to_owned(),
-    );
+    let module = compile_module(
+        source,
+        path.file_name().unwrap().to_str().unwrap().to_owned(),
+        module_map,
+        Some(path.clone()),
+        true,
+    )?;
 
-    perform_all_passes(&mut mir_context)?;
+    let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
+
+    perform_all_passes(&mut mir_context, module_map)?;
 
     let mut context = Context::new();
     let codegen_modules = mir_context.codegen(&mut context);
@@ -178,4 +195,9 @@ pub fn compile(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> 
 
     let compiled = codegen_modules.compile();
     Ok(compiled.output())
+}
+
+pub fn compile_simple(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> {
+    let mut map = ModuleMap::default();
+    compile_and_pass(source, path, &mut map)
 }

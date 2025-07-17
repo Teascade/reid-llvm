@@ -174,7 +174,7 @@ impl Drop for TokenStream<'_, '_> {
 
 /// Index-range that can be used with the original array of [`FullToken`]s to
 /// retrieve the precise location of a failure.
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TokenRange {
     pub start: usize,
     pub end: usize,
@@ -207,7 +207,7 @@ impl std::iter::Sum for TokenRange {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     #[error("Expected {} at Ln {}, Col {}, got {:?}", .0, (.2).1, (.2).0, .1)]
     Expected(String, Token, Position),
@@ -219,4 +219,15 @@ pub enum Error {
     /// Condition failed for the parse-if
     #[error("Condition failed for parse-if. Should never be returned to end-user.")]
     IfFailed,
+}
+
+impl Error {
+    pub fn get_position(&self) -> Option<&Position> {
+        match self {
+            Error::Expected(_, _, pos) => Some(pos),
+            Error::FileEmpty => None,
+            Error::Undefined => None,
+            Error::IfFailed => None,
+        }
+    }
 }
