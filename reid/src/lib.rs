@@ -68,6 +68,7 @@ pub fn parse_module<'map, T: Into<String>>(
     map: &'map mut ModuleMap,
 ) -> Result<(mir::SourceModuleId, Vec<FullToken>), ReidError> {
     let id = map.add_module(name.into()).unwrap();
+    map.set_source(id, source.to_owned());
 
     let tokens = ReidError::from_lexer(lexer::tokenize(source), map.clone(), id)?;
 
@@ -137,8 +138,6 @@ pub fn perform_all_passes<'map>(
 
     let refs = TypeRefs::default();
 
-    let mut errors = Vec::new();
-
     let state = context.pass(&mut TypeInference { refs: &refs });
 
     #[cfg(debug_assertions)]
@@ -148,13 +147,16 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&state);
 
-    errors.extend(
-        state
-            .errors
-            .iter()
-            .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
-            .collect::<Vec<_>>(),
-    );
+    if !state.errors.is_empty() {
+        return Err(ReidError::from_kind::<()>(
+            state
+                .errors
+                .iter()
+                .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
+                .collect::<Vec<_>>(),
+            module_map.clone(),
+        ));
+    }
 
     let state = context.pass(&mut TypeCheck { refs: &refs });
 
@@ -163,16 +165,15 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&state);
 
-    errors.extend(
-        state
-            .errors
-            .iter()
-            .map(|e| ErrorRapKind::TypeInferenceError(e.clone()))
-            .collect::<Vec<_>>(),
-    );
-
-    if !errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(errors, module_map.clone()));
+    if !state.errors.is_empty() {
+        return Err(ReidError::from_kind::<()>(
+            state
+                .errors
+                .iter()
+                .map(|e| ErrorRapKind::TypeCheckError(e.clone()))
+                .collect::<Vec<_>>(),
+            module_map.clone(),
+        ));
     }
 
     Ok(())

@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     ast,
-    lexer::{self, FullToken, Position},
+    lexer::{self, Cursor, FullToken, Position},
     mir::{self, pass, Metadata, SourceModuleId},
     token_stream::{self, TokenRange},
 };
@@ -79,6 +79,7 @@ impl Ord for ErrorKind {
 pub struct ErrModule {
     pub name: String,
     pub tokens: Option<Vec<FullToken>>,
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -95,6 +96,7 @@ impl ModuleMap {
             ErrModule {
                 name: name.into(),
                 tokens: None,
+                source: None,
             },
         );
         Some(id)
@@ -103,6 +105,12 @@ impl ModuleMap {
     pub fn set_tokens(&mut self, id: mir::SourceModuleId, tokens: Vec<FullToken>) {
         if let Some(module) = self.module_map.get_mut(&id) {
             module.tokens = Some(tokens);
+        }
+    }
+
+    pub fn set_source(&mut self, id: mir::SourceModuleId, source: String) {
+        if let Some(module) = self.module_map.get_mut(&id) {
+            module.source = Some(source);
         }
     }
 
@@ -179,11 +187,17 @@ impl std::fmt::Display for ReidError {
             let module = self.map.get_module(&meta.source_module_id).unwrap();
             let (position_fmt, line_fmt) = if let Some(tokens) = &module.tokens {
                 let range_tokens = meta.range.into_tokens(&tokens);
-                let position = get_position(&range_tokens).unwrap();
-                let full_lines = get_full_lines(&tokens, position);
+                let highlight_position = get_position(&range_tokens).unwrap();
+                let full_lines = get_full_lines(&tokens, highlight_position);
+                let lines_position = get_position(&full_lines).unwrap();
                 (
-                    fmt_positions(get_position(&full_lines).unwrap()),
-                    Some(fmt_tokens(&full_lines, &range_tokens)),
+                    fmt_positions(highlight_position),
+                    Some(fmt_lines(
+                        module.source.as_ref().unwrap(),
+                        lines_position,
+                        highlight_position,
+                        8,
+                    )?),
                 )
             } else if let Some(position) = meta.position {
                 (fmt_positions((position, position)), None)
@@ -209,9 +223,9 @@ impl std::fmt::Display for ReidError {
             writeln!(f)?;
             write!(f, "  Error: ")?;
             writeln!(f, "{}", color_err(format!("{}", error))?)?;
-            writeln!(f, "{:>20}{}", color_warn("At: ")?, position_fmt)?;
+            write!(f, "{:>20}{}", color_warn("At: ")?, position_fmt)?;
             if let Some(line_fmt) = line_fmt {
-                writeln!(f, "{:>20}{}", color_warn("")?, line_fmt)?;
+                writeln!(f, "{}", line_fmt)?;
             }
         }
         Ok(())
@@ -255,26 +269,37 @@ fn get_full_lines<'v>(
         .collect::<Vec<_>>()
 }
 
-fn fmt_tokens(tokens: &Vec<&FullToken>, highlighted: &Vec<&FullToken>) -> String {
-    let mut text = String::new();
-    let mut last_likes_space = false;
-    for (i, token) in tokens.iter().enumerate() {
-        if token.token.needs_space() || (token.token.likes_space() && last_likes_space) {
-            text += " ";
-        }
-        last_likes_space = token.token.likes_space();
+fn fmt_lines(
+    source: &String,
+    (line_start, line_end): (Position, Position),
+    (highlight_start, highlight_end): (Position, Position),
+    ident: usize,
+) -> Result<String, std::fmt::Error> {
+    let mut cursor = Cursor {
+        position: Position(0, 1),
+        char_stream: source.chars(),
+    };
 
-        let mut token_fmt = format!("{}", token.token.to_string());
-        if highlighted.contains(token) {
-            token_fmt = color_underline(token_fmt).unwrap();
+    let mut text = String::new();
+
+    while let Some(c) = cursor.next() {
+        if cursor.position.1 > line_end.1 {
+            break;
         }
-        text += &token_fmt;
-        if token.token.is_newline() && i > (tokens.len() - 1) {
-            text += "\n"
+        if cursor.position.1 >= line_start.1 {
+            if c == '\n' {
+                write!(text, "\n{}", " ".repeat(ident))?;
+            } else {
+                if cursor.position > highlight_start && cursor.position <= highlight_end {
+                    write!(text, "{}", color_highlight(c)?)?;
+                } else {
+                    text.write_char(c)?;
+                }
+            }
         }
     }
 
-    text
+    Ok(text)
 }
 
 fn fmt_positions((start, end): (Position, Position)) -> String {
@@ -284,54 +309,6 @@ fn fmt_positions((start, end): (Position, Position)) -> String {
         format!("ln {}, col {}-{}", start.1, start.0, end.0)
     } else {
         format!("{}:{} - {}:{}", start.1, start.0, end.1, end.0)
-    }
-}
-
-impl lexer::Token {
-    fn likes_space(&self) -> bool {
-        match self {
-            lexer::Token::Identifier(_) => true,
-            lexer::Token::DecimalValue(_) => true,
-            lexer::Token::StringLit(_) => true,
-            lexer::Token::LetKeyword => true,
-            lexer::Token::MutKeyword => true,
-            lexer::Token::ImportKeyword => true,
-            lexer::Token::ReturnKeyword => true,
-            lexer::Token::FnKeyword => true,
-            lexer::Token::PubKeyword => true,
-            lexer::Token::Arrow => true,
-            lexer::Token::If => true,
-            lexer::Token::Else => true,
-            lexer::Token::True => true,
-            lexer::Token::False => true,
-            lexer::Token::Extern => true,
-            lexer::Token::Struct => true,
-            lexer::Token::Equals => true,
-            _ => false,
-        }
-    }
-
-    fn needs_space(&self) -> bool {
-        match self {
-            lexer::Token::LetKeyword => true,
-            lexer::Token::MutKeyword => true,
-            lexer::Token::ImportKeyword => true,
-            lexer::Token::ReturnKeyword => true,
-            lexer::Token::FnKeyword => true,
-            lexer::Token::PubKeyword => true,
-            lexer::Token::Arrow => true,
-            lexer::Token::Equals => true,
-            _ => false,
-        }
-    }
-
-    fn is_newline(&self) -> bool {
-        match self {
-            lexer::Token::Semi => true,
-            lexer::Token::BraceOpen => true,
-            lexer::Token::BraceClose => true,
-            _ => false,
-        }
     }
 }
 
@@ -359,7 +336,7 @@ fn color_warn(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
     Ok(text)
 }
 
-fn color_underline(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
+fn color_highlight(elem: impl std::fmt::Display) -> Result<String, std::fmt::Error> {
     let mut text = format!("{}", elem);
 
     #[cfg(feature = "color")]

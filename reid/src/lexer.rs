@@ -167,7 +167,7 @@ impl Debug for FullToken {
 }
 
 /// (Column, Line)
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Ord)]
 pub struct Position(pub u32, pub u32);
 
 impl Position {
@@ -180,13 +180,23 @@ impl Position {
     }
 }
 
-struct Cursor<'a> {
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match self.1.partial_cmp(&other.1) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.0.partial_cmp(&other.0)
+    }
+}
+
+pub struct Cursor<'a> {
     pub position: Position,
-    char_stream: Chars<'a>,
+    pub char_stream: Chars<'a>,
 }
 
 impl<'a> Cursor<'a> {
-    fn next(&mut self) -> Option<char> {
+    pub fn next(&mut self) -> Option<char> {
         let next = self.char_stream.next();
         if let Some('\n') = next {
             self.position.1 += 1;
