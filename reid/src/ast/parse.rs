@@ -128,7 +128,7 @@ impl Parse for PrimaryExpression {
                     stream.expect(Token::BracketClose)?;
                     Expression(Kind::Array(expressions), stream.get_range().unwrap())
                 }
-                _ => Err(stream.expected_err("identifier, constant, parentheses or brackets")?)?,
+                _ => Err(stream.expected_err("expression")?)?,
             }
         } else {
             Err(stream.expected_err("expression")?)?
@@ -391,7 +391,8 @@ impl Parse for Block {
                 // Special list of expressions that are simply not warned about,
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
-                    println!("Oh no, does this statement lack ;");
+                    // In theory could ignore the missing semicolon..
+                    return Err(stream.expected_err("expected semicolon to complete statement")?);
                 }
 
                 statements.push(BlockLevelStatement::Expression(e));
@@ -445,7 +446,7 @@ impl<T: Parse + std::fmt::Debug> Parse for NamedFieldList<T> {
                     stream.next();
                 } // Consume comma
                 Some(Token::BraceClose) => break,
-                Some(_) | None => Err(stream.expected_err("another field or closing brace")?)?,
+                Some(_) | None => Err(stream.expecting_err("another field or closing brace")?)?,
             }
         }
         Ok(NamedFieldList(fields))
@@ -478,7 +479,7 @@ impl Parse for ValueIndex {
         match stream.peek() {
             Some(Token::BracketOpen) => Ok(ValueIndex::Array(stream.parse()?)),
             Some(Token::Dot) => Ok(ValueIndex::Struct(stream.parse()?)),
-            _ => Err(stream.expected_err("value or struct index")?),
+            _ => Err(stream.expecting_err("value or struct index")?),
         }
     }
 }
@@ -534,7 +535,7 @@ impl Parse for BlockLevelStatement {
                             Stmt::Return(ReturnType::Soft, e)
                         }
                     } else {
-                        Err(stream.expected_err("expression")?)?
+                        Err(stream.expecting_err("expression")?)?
                     }
                 }
             }
@@ -605,7 +606,7 @@ impl Parse for TopLevelStatement {
                     range,
                 })
             }
-            _ => Err(stream.expected_err("import or fn")?)?,
+            _ => Err(stream.expecting_err("import or fn")?)?,
         })
     }
 }

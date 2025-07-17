@@ -156,8 +156,8 @@ impl ReidError {
             let pass_err = pass::Error {
                 metadata: Metadata {
                     source_module_id: module,
-                    range: Default::default(),
-                    position: error.get_position().copied(),
+                    range: *error.get_range().unwrap_or(&Default::default()),
+                    position: None,
                 },
                 kind: error,
             };
@@ -185,24 +185,16 @@ impl std::fmt::Display for ReidError {
         for error in sorted_errors {
             let meta = error.get_meta();
             let module = self.map.get_module(&meta.source_module_id).unwrap();
-            let (position_fmt, line_fmt) = if let Some(tokens) = &module.tokens {
+            let position = if let Some(tokens) = &module.tokens {
                 let range_tokens = meta.range.into_tokens(&tokens);
-                let highlight_position = get_position(&range_tokens).unwrap();
-                let full_lines = get_full_lines(&tokens, highlight_position);
-                let lines_position = get_position(&full_lines).unwrap();
-                (
-                    fmt_positions(highlight_position),
-                    Some(fmt_lines(
-                        module.source.as_ref().unwrap(),
-                        lines_position,
-                        highlight_position,
-                        8,
-                    )?),
-                )
+
+                dbg!(&error);
+                dbg!(&meta.range, &tokens[meta.range.start]);
+                get_position(&range_tokens).or(meta.position.map(|p| (p, p)))
             } else if let Some(position) = meta.position {
-                (fmt_positions((position, position)), None)
+                Some((position, position))
             } else {
-                ("unknown".to_owned(), None)
+                None
             };
 
             if curr_module != Some(meta.source_module_id) {
@@ -223,9 +215,16 @@ impl std::fmt::Display for ReidError {
             writeln!(f)?;
             write!(f, "  Error: ")?;
             writeln!(f, "{}", color_err(format!("{}", error))?)?;
-            write!(f, "{:>20}{}", color_warn("At: ")?, position_fmt)?;
-            if let Some(line_fmt) = line_fmt {
-                writeln!(f, "{}", line_fmt)?;
+            write!(
+                f,
+                "{:>20}{}",
+                color_warn("At: ")?,
+                position
+                    .map(|p| fmt_positions(p))
+                    .unwrap_or(String::from("{unknown}")),
+            )?;
+            if let (Some(position), Some(source)) = (position, &module.source) {
+                writeln!(f, "{}", fmt_lines(source, position, 6)?)?;
             }
         }
         Ok(())
@@ -238,7 +237,7 @@ impl TokenRange {
             .iter()
             .skip(self.start)
             .by_ref()
-            .take(self.end - self.start)
+            .take(self.end + 1 - self.start)
             .collect::<Vec<_>>()
     }
 }
@@ -252,29 +251,16 @@ fn get_position(tokens: &Vec<&FullToken>) -> Option<(Position, Position)> {
     }
 }
 
-fn get_full_lines<'v>(
-    tokens: &'v Vec<FullToken>,
-    (start, end): (Position, Position),
-) -> Vec<&'v FullToken> {
-    let (first_token_pos, _) = tokens
-        .iter()
-        .enumerate()
-        .find(|(_, token)| token.position.1 == start.1)
-        .unwrap();
-    tokens
-        .iter()
-        .skip(first_token_pos)
-        .by_ref()
-        .take_while(|token| token.position.1 <= end.1)
-        .collect::<Vec<_>>()
+fn into_full_lines<'v>((start, end): (Position, Position)) -> (Position, Position) {
+    (Position(0, start.1), Position(u32::MAX, end.1))
 }
 
 fn fmt_lines(
     source: &String,
-    (line_start, line_end): (Position, Position),
     (highlight_start, highlight_end): (Position, Position),
     ident: usize,
 ) -> Result<String, std::fmt::Error> {
+    let (line_start, line_end) = into_full_lines((highlight_start, highlight_end));
     let mut cursor = Cursor {
         position: Position(0, 1),
         char_stream: source.chars(),

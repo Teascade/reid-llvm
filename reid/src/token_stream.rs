@@ -24,11 +24,31 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
+    /// Returns expected-error for the next token in-line. Useful in conjunction
+    /// with [`TokenStream::peek`]
     pub fn expected_err<T: Into<String>>(&mut self, expected: T) -> Result<Error, Error> {
+        let next_token = self.previous().unwrap_or(Token::Eof);
         Ok(Error::Expected(
             expected.into(),
-            self.peek().unwrap_or(Token::Eof),
-            self.get_next_position()?,
+            next_token,
+            TokenRange {
+                start: self.position - 1,
+                end: self.position - 1,
+            },
+        ))
+    }
+
+    /// Returns expected-error for the previous token that was already consumed.
+    /// Useful in conjunction with [`TokenStream::next`]
+    pub fn expecting_err<T: Into<String>>(&mut self, expected: T) -> Result<Error, Error> {
+        let next_token = self.peek().unwrap_or(Token::Eof);
+        Ok(Error::Expected(
+            expected.into(),
+            next_token,
+            TokenRange {
+                start: self.position,
+                end: self.position,
+            },
         ))
     }
 
@@ -38,10 +58,10 @@ impl<'a, 'b> TokenStream<'a, 'b> {
                 self.position += 1;
                 Ok(())
             } else {
-                Err(self.expected_err(token)?)
+                Err(self.expecting_err(token)?)
             }
         } else {
-            Err(self.expected_err(token)?)
+            Err(self.expecting_err(token)?)
         }
     }
 
@@ -53,6 +73,14 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         };
         self.position += 1;
         value
+    }
+
+    pub fn previous(&mut self) -> Option<Token> {
+        if (self.position as i32 - 1) < 0 {
+            None
+        } else {
+            Some(self.tokens[self.position - 1].token.clone())
+        }
     }
 
     pub fn peek(&mut self) -> Option<Token> {
@@ -147,11 +175,11 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    fn get_next_position(&self) -> Result<Position, Error> {
+    fn get_position(&self, offset: usize) -> Result<Position, Error> {
         if self.tokens.is_empty() {
             Err(Error::FileEmpty)
         } else {
-            let token_idx = self.position.min(self.tokens.len() - 1);
+            let token_idx = (self.position - 1).min(self.tokens.len() - 1);
             Ok(self.tokens[token_idx].position)
         }
     }
@@ -210,7 +238,7 @@ impl std::iter::Sum for TokenRange {
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
     #[error("Expected {} got {:?}", .0, .1)]
-    Expected(String, Token, Position),
+    Expected(String, Token, TokenRange),
     #[error("Source file contains no tokens")]
     FileEmpty,
     /// Only use this error in situations where the error never ends up for the end-user!
@@ -222,7 +250,7 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn get_position(&self) -> Option<&Position> {
+    pub fn get_range(&self) -> Option<&TokenRange> {
         match self {
             Error::Expected(_, _, pos) => Some(pos),
             Error::FileEmpty => None,
