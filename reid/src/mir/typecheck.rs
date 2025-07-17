@@ -6,7 +6,7 @@ use crate::{mir::*, util::try_all};
 use VagueType as Vague;
 
 use super::{
-    pass::{Pass, PassState, ScopeFunction, ScopeVariable, Storage},
+    pass::{Pass, PassState, ScopeFunction, ScopeVariable},
     typerefs::TypeRefs,
 };
 

@@ -68,24 +68,6 @@ pub enum StackValueKind {
     Any(InstructionValue),
 }
 
-impl StackValueKind {
-    unsafe fn get_instr(&self) -> &InstructionValue {
-        match self {
-            StackValueKind::Immutable(val) => val,
-            StackValueKind::Mutable(val) => val,
-            StackValueKind::Any(val) => val,
-        }
-    }
-
-    fn with_instr(&self, instr: InstructionValue) -> StackValueKind {
-        match self {
-            StackValueKind::Immutable(_) => StackValueKind::Immutable(instr),
-            StackValueKind::Mutable(_) => StackValueKind::Mutable(instr),
-            StackValueKind::Any(_) => StackValueKind::Any(instr),
-        }
-    }
-}
-
 impl<'ctx, 'a> Scope<'ctx, 'a> {
     fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
         Scope {

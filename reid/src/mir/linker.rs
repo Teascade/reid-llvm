@@ -2,7 +2,6 @@ use std::{
     cell::RefCell,
     collections::HashMap,
     convert::Infallible,
-    fmt::Error,
     fs::{self},
     path::PathBuf,
     rc::Rc,
