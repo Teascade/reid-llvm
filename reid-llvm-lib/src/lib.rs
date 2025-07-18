@@ -7,8 +7,7 @@ use std::{fmt::Debug, marker::PhantomData};
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
 use debug::PrintableModule;
 use debug_information::{
-    DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
-    DebugProgramValue, DebugScopeValue,
+    DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
 };
 use util::match_types;
 

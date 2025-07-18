@@ -7,8 +7,7 @@ use crate::{
     BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData, NamedStruct,
     TerminatorKind, Type, TypeData,
     debug_information::{
-        DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
-        DebugProgramValue,
+        DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
     },
     util::match_types,
 };

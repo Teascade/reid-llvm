@@ -2,10 +2,7 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{
-    collections::HashMap,
-    ptr::{null, null_mut},
-};
+use std::{collections::HashMap, ptr::null_mut};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage, LLVMValueKind,

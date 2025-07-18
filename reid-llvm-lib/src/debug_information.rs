@@ -1,7 +1,4 @@
-use std::{
-    cell::{RefCell, RefMut},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DebugScopeValue(pub Vec<usize>);
