@@ -77,42 +77,42 @@ change erratically.
 This is what worked for me, might not (probably) work for you, depending on
 various versions of various libraries.
 
-### Compiling LLVM 16.0.0
+### Compiling LLVM 20.1.8
 
 #### Context
 Context for my computer. I am on ArchLinux, and here are some libraries and
 their current versions that I have installed as of compiling, I'm not sure what
 of them are relevant, if any, but saving them here still feels like a good idea
 for the future:
-- `cmake 3.27.0-1`
-- `lib32-llvm-libs 15.0.7-1`
-- `llvm 15.0.7-3`
-- `llvm-libs 15.0.7-3`
-- `gcc 13.1.1-2`
-- `gcc-libs 13.1.1-2`
-- `lib32-gcc-libs 13.1.1-2`
-- `lld 15.0.7-2`
-- `lldb 15.0.7-3`
-- `clang 15.0.7-9`
+- `clang 19.1.7-2`
+- `cmake 4.0.2-1`
+- `extra-cmake-modules 6.14.0-1`
+- `gcc 15.1.1+r7+gf36ec88aa85a-1`
+- `gcc-libs 15.1.1+r7+gf36ec88aa85a-1`
+- `lib32-gcc-libs 15.1.1+r7+gf36ec88aa85a-1`
+- `lib32-llvm-libs 1:19.1.7-2`
+- `libgccjit 15.1.1+r7+gf36ec88aa85a-1`
+- `lld 19.1.7-1`
+- `lldb 19.1.7-2`
+- `llvm 19.1.7-2`
+- `llvm-libs 19.1.7-2`
+- `llvm14 14.0.6-5`
+- `llvm14-libs 14.0.6-5`
+- `llvm15 15.0.7-3`
+- `llvm15-libs 15.0.7-3`
 - `make 4.4.1-2`
-- `automake 1.16.5-2`
+
 
 #### Commands
 
 ```sh
-wget https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.0/llvm-16.0.0.src.tar.xz
-wget https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.0/cmake-16.0.0.src.tar.xz
+git clone https://github.com/llvm/llvm-project.git --depth=1 --branch=llvmorg-20.1.8
 
-tar xvf llvm-16.0.0.src.tar.xz
-tar xvf cmake-16.0.0.src.tar.xz
+cd llvm_project
 
-mv cmake-16.0.0.src cmake
+cmake llvm -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_BUILD_TYPE=Debug -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_BUILD_BENCHMARKS=OFF
 
-cd llvm-16.0.0.src
-
-cmake -B build -DCMAKE_INSTALL_PREFIX=$HOME/llvm-16 -DCMAKE_BUILD_TYPE=MinSizeRel -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF
-
-make -j8
+make -j23
 ```
 
 *Also Note:* Building LLVM with `Ninja` was not successful for me, but this
@@ -121,11 +121,11 @@ method was. Ninja may be successful with you, to try it, add `-G Ninja` to the
 
 ### Building this crate itself
 
-Assuming `llvm-16.0.0.src` from the previous step was at
-`/path/llvm-16.0.0.src`, building this crate can be done via the following command:
+Assuming `llvm-project` from the previous step was at
+`/path/llvm-project`, building this crate can be done via the following command:
 
 ```sh
-LLVM_SYS_160_PREFIX=/path/llvm-16.0.0.src/build cargo build
+LLVM_SYS_201_PREFIX=/path/llvm-project/build cargo build
 ```
 
 ## In conclusion
