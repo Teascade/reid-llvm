@@ -6,7 +6,7 @@ use std::{
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DebugScopeValue(pub Vec<usize>);
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugLocationValue(pub DebugProgramValue, pub usize);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]

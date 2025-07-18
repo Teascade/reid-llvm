@@ -5,7 +5,10 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*};
+use crate::{
+    CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*,
+    debug_information::DebugLocationValue,
+};
 
 impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,6 +32,7 @@ impl Debug for ModuleHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!("{}({:#?}) ", self.data.name, self.value))
             .field(&self.functions)
+            .field(&self.debug_information)
             .finish()
     }
 }
@@ -53,6 +57,7 @@ impl Debug for BlockHolder {
         ))
         .field(&self.instructions)
         .field(&self.data.terminator)
+        .field(&self.data.terminator_location)
         .finish()
     }
 }
@@ -67,7 +72,20 @@ impl Debug for InstructionHolder {
 
 impl Debug for InstructionData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.kind.fmt(f)
+        self.kind.fmt(f)?;
+        if let Some(location) = self.location {
+            write!(f, " ({:?})", location)?;
+        }
+        Ok(())
+    }
+}
+
+impl Debug for DebugLocationValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DebugLocationValue")
+            .field(&self.0)
+            .field(&self.1)
+            .finish()
     }
 }
 

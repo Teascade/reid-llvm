@@ -95,14 +95,6 @@ impl CompiledModule {
             LLVMSetTarget(self.module_ref, triple);
             LLVMSetModuleDataLayout(self.module_ref, data_layout);
 
-            let mut err = ErrorMessageHolder::null();
-            LLVMVerifyModule(
-                self.module_ref,
-                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
-                err.borrow_mut(),
-            );
-            err.into_result().unwrap();
-
             let mut asm_buffer = MemoryBufferHolder::empty("asm");
             let mut err = ErrorMessageHolder::null();
             LLVMTargetMachineEmitToMemoryBuffer(
@@ -125,14 +117,28 @@ impl CompiledModule {
             );
             err.into_result().unwrap();
 
+            let llvm_ir = from_cstring(LLVMPrintModuleToString(self.module_ref))
+                .expect("Unable to print LLVM IR to string");
+
+            let mut err = ErrorMessageHolder::null();
+            LLVMVerifyModule(
+                self.module_ref,
+                llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
+                err.borrow_mut(),
+            );
+
+            if let Err(e) = err.into_result() {
+                println!("{}", llvm_ir);
+                panic!("{}", e);
+            }
+
             CompileOutput {
                 triple: from_cstring(triple).expect("Unable to convert triple from cstring"),
                 assembly: asm_buffer
                     .as_string()
                     .expect("Error while converting assembly-buffer to string"),
                 obj_buffer: obj_buffer.as_buffer(),
-                llvm_ir: from_cstring(LLVMPrintModuleToString(self.module_ref))
-                    .expect("Unable to print LLVM IR to string"),
+                llvm_ir,
             }
         }
     }
@@ -626,7 +632,8 @@ impl BlockHolder {
                 module.values.insert(key, ret);
             }
 
-            self.data
+            let term_instr = self
+                .data
                 .terminator
                 .clone()
                 .expect(&format!(
@@ -634,6 +641,20 @@ impl BlockHolder {
                     self.data.name
                 ))
                 .compile(module, function, block_ref);
+
+            dbg!(&self.value, &self.data.terminator_location);
+            if let Some(location) = &self.data.terminator_location {
+                LLVMInstructionSetDebugLoc(
+                    term_instr.value_ref,
+                    *module
+                        .debug
+                        .as_ref()
+                        .unwrap()
+                        .locations
+                        .get(&location)
+                        .unwrap(),
+                );
+            }
         }
     }
 }
@@ -790,7 +811,20 @@ impl InstructionHolder {
                 }
             }
         };
-        if let Some(location_value) = &self.data.location {}
+        if let Some(location) = &self.data.location {
+            unsafe {
+                // LLVMInstructionSetDebugLoc(
+                //     val,
+                //     *module
+                //         .debug
+                //         .as_ref()
+                //         .unwrap()
+                //         .locations
+                //         .get(&location)
+                //         .unwrap(),
+                // );
+            }
+        }
         LLVMValue {
             _ty,
             value_ref: val,

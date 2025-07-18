@@ -1,3 +1,5 @@
+use reid_lib::debug_information::DebugLocation;
+
 use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
 
 #[derive(Debug, Clone)]
@@ -67,6 +69,14 @@ impl Block {
             .as_ref()
             .map(|(r, e)| BlockReturn::Normal(*r, e))
             .ok_or(ReturnTypeOther::NoBlockReturn(self.meta))
+    }
+
+    pub fn return_meta(&self) -> Metadata {
+        self.return_expression
+            .as_ref()
+            .map(|e| e.1 .1)
+            .or(self.statements.last().map(|s| s.1))
+            .unwrap_or(self.meta)
     }
 
     pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {

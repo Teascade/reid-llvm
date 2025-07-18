@@ -170,6 +170,7 @@ impl<'ctx> Function<'ctx> {
                     BlockData {
                         name: name.to_owned(),
                         terminator: None,
+                        terminator_location: None,
                         deleted: false,
                     },
                 ),
@@ -192,6 +193,7 @@ impl<'ctx> Function<'ctx> {
 pub struct BlockData {
     name: String,
     terminator: Option<TerminatorKind>,
+    terminator_location: Option<DebugLocationValue>,
     deleted: bool,
 }
 
@@ -231,6 +233,10 @@ impl<'builder> Block<'builder> {
 
     pub fn terminate(&mut self, instruction: TerminatorKind) -> Result<(), ()> {
         unsafe { self.builder.terminate(&self.value, instruction) }
+    }
+
+    pub fn set_terminator_location(&mut self, location: DebugLocationValue) -> Result<(), ()> {
+        unsafe { self.builder.set_terminator_location(&self.value, location) }
     }
 
     /// Delete block if it is unused. Return true if deleted, false if not.

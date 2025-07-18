@@ -321,7 +321,12 @@ impl mir::Module {
                 types: &types,
                 type_values: &type_values,
                 stack_values,
-                debug: None,
+                debug: debug_scope.and_then(|scope| {
+                    Some(Debug {
+                        info: &debug,
+                        scope,
+                    })
+                }),
                 debug_const_tys: &debug_const_types,
             };
 
@@ -336,6 +341,12 @@ impl mir::Module {
                             // wasn't unused but didn't have a terminator yet
                             scope.block.terminate(Term::RetVoid).ok();
                         }
+                    }
+
+                    if let Some(debug) = scope.debug {
+                        let location = &block.return_meta().into_debug(tokens).unwrap();
+                        let location = debug.info.location(&debug.scope, *location);
+                        scope.block.set_terminator_location(location).unwrap();
                     }
                 }
                 mir::FunctionDefinitionKind::Extern(_) => {}
@@ -668,9 +679,27 @@ impl mir::IfExpression {
         let condition = self.0.codegen(scope, state).unwrap();
 
         // Create blocks
-        let then_b = scope.function.ir.block("then");
+        let mut then_b = scope.function.ir.block("then");
         let mut else_b = scope.function.ir.block("else");
         let after_b = scope.function.ir.block("after");
+
+        if let Some(debug) = &scope.debug {
+            let before_location = self.0 .1.into_debug(scope.tokens).unwrap();
+            let before_v = debug.info.location(&debug.scope, before_location);
+            scope.block.set_terminator_location(before_v).unwrap();
+
+            let then_location = self.1.return_meta().into_debug(scope.tokens).unwrap();
+            let then_v = debug.info.location(&debug.scope, then_location);
+            then_b.set_terminator_location(then_v).unwrap();
+
+            let else_location = if let Some(else_block) = &self.2 {
+                else_block.return_meta().into_debug(scope.tokens).unwrap()
+            } else {
+                then_location
+            };
+            let else_v = debug.info.location(&debug.scope, else_location);
+            else_b.set_terminator_location(else_v).unwrap();
+        }
 
         // Store for convenience
         let then_bb = then_b.value();
@@ -684,6 +713,7 @@ impl mir::IfExpression {
 
         let else_res = if let Some(else_block) = &self.2 {
             let mut else_scope = scope.with_block(else_b);
+
             scope
                 .block
                 .terminate(Term::CondBr(condition, then_bb, else_bb))

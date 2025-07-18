@@ -228,6 +228,25 @@ impl Builder {
         }
     }
 
+    pub(crate) unsafe fn set_terminator_location(
+        &self,
+        block: &BlockValue,
+        location: DebugLocationValue,
+    ) -> Result<(), ()> {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(block.0.0.0);
+            let function = module.functions.get_unchecked_mut(block.0.1);
+            let block = function.blocks.get_unchecked_mut(block.1);
+            if let Some(_) = &block.data.terminator_location {
+                Err(())
+            } else {
+                block.data.terminator_location = Some(location);
+                Ok(())
+            }
+        }
+    }
+
     pub(crate) unsafe fn delete_block(&self, block: &BlockValue) -> Result<(), ()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();

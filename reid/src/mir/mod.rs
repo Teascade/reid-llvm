@@ -46,7 +46,7 @@ impl Metadata {
             .skip(self.range.start)
             .take(self.range.end - self.range.start);
         if let Some(first) = iter.next() {
-            let last = iter.last().unwrap();
+            let last = iter.last().unwrap_or(first);
             Some((first.position, last.position.add(last.token.len() as u32)))
         } else {
             None
