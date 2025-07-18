@@ -364,7 +364,13 @@ impl mir::Block {
         state: &State,
     ) -> Option<InstructionValue> {
         for stmt in &self.statements {
-            stmt.codegen(&mut scope, state);
+            stmt.codegen(&mut scope, state).map(|s| {
+                if let Some(debug) = &scope.debug {
+                    let location = stmt.1.into_debug(scope.tokens).unwrap();
+                    let loc_val = debug.info.location(&debug.scope, location);
+                    s.with_location(&mut scope.block, loc_val);
+                }
+            });
         }
 
         if let Some((kind, expr)) = &self.return_expression {
@@ -484,10 +490,7 @@ impl mir::Expression {
                     _ => panic!("Found an unknown-mutable variable!"),
                 })
             }
-            mir::ExprKind::Literal(lit) => Some(
-                lit.as_const(&mut scope.block)
-                    .maybe_location(&mut scope.block, location),
-            ),
+            mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
                 lhs_exp
                     .return_type()
@@ -667,6 +670,7 @@ impl mir::Expression {
                 Some(struct_ptr)
             }
         }
+        .map(|i| i.maybe_location(&mut scope.block, location))
     }
 }
 

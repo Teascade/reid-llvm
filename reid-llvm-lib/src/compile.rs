@@ -8,7 +8,7 @@ use std::{
 };
 
 use llvm_sys::{
-    LLVMIntPredicate, LLVMLinkage,
+    LLVMIntPredicate, LLVMLinkage, LLVMValueKind,
     analysis::LLVMVerifyModule,
     core::*,
     debuginfo::*,
@@ -813,16 +813,24 @@ impl InstructionHolder {
         };
         if let Some(location) = &self.data.location {
             unsafe {
-                // LLVMInstructionSetDebugLoc(
-                //     val,
-                //     *module
-                //         .debug
-                //         .as_ref()
-                //         .unwrap()
-                //         .locations
-                //         .get(&location)
-                //         .unwrap(),
-                // );
+                match LLVMGetValueKind(val) {
+                    LLVMValueKind::LLVMInstructionValueKind
+                    | LLVMValueKind::LLVMMemoryDefValueKind
+                    | LLVMValueKind::LLVMMemoryUseValueKind
+                    | LLVMValueKind::LLVMMemoryPhiValueKind => {
+                        LLVMInstructionSetDebugLoc(
+                            val,
+                            *module
+                                .debug
+                                .as_ref()
+                                .unwrap()
+                                .locations
+                                .get(&location)
+                                .unwrap(),
+                        );
+                    }
+                    _ => {}
+                }
             }
         }
         LLVMValue {
