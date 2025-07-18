@@ -89,7 +89,7 @@ pub struct Scope<'ctx, 'a> {
 #[derive(Debug, Clone)]
 pub struct Debug<'ctx> {
     info: &'ctx DebugInformation,
-    scope: Option<DebugProgramValue>,
+    scope: DebugProgramValue,
 }
 
 pub struct StackFunction<'ctx> {
@@ -440,6 +440,16 @@ impl mir::Expression {
         scope: &mut Scope<'ctx, 'a>,
         state: &State,
     ) -> Option<InstructionValue> {
+        let location = if let Some(debug) = &scope.debug {
+            Some(
+                debug
+                    .info
+                    .location(&debug.scope, self.1.into_debug(scope.tokens).unwrap()),
+            )
+        } else {
+            None
+        };
+
         match &self.0 {
             mir::ExprKind::Variable(varref) => {
                 varref.0.known().expect("variable type unknown");
@@ -463,7 +473,10 @@ impl mir::Expression {
                     _ => panic!("Found an unknown-mutable variable!"),
                 })
             }
-            mir::ExprKind::Literal(lit) => Some(lit.as_const(&mut scope.block)),
+            mir::ExprKind::Literal(lit) => Some(
+                lit.as_const(&mut scope.block)
+                    .maybe_location(&mut scope.block, location),
+            ),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
                 lhs_exp
                     .return_type()

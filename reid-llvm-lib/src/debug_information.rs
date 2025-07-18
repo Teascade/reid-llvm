@@ -6,7 +6,7 @@ use std::{
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DebugScopeValue(pub Vec<usize>);
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugLocationValue(pub DebugProgramValue, pub usize);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -54,8 +54,9 @@ pub struct DebugSubprogramHolder {
 
 #[derive(Debug, Clone)]
 pub(crate) struct DebugLocationHolder {
-    value: DebugLocationValue,
-    location: DebugLocation,
+    pub(crate) program: DebugProgramValue,
+    pub(crate) value: DebugLocationValue,
+    pub(crate) location: DebugLocation,
 }
 
 #[derive(Debug, Clone)]
@@ -118,13 +119,13 @@ impl DebugInformation {
     pub fn location(
         &self,
         program_value: &DebugProgramValue,
-        line: u32,
-        column: u32,
+        location: DebugLocation,
     ) -> DebugLocationValue {
         let value = DebugLocationValue(program_value.clone(), self.locations.borrow().len());
         let location = DebugLocationHolder {
+            program: *program_value,
             value: value.clone(),
-            location: DebugLocation { line, column },
+            location,
         };
         self.locations.borrow_mut().push(location);
         value
@@ -182,6 +183,10 @@ impl DebugInformation {
 
     pub fn get_types(&self) -> Rc<RefCell<Vec<DebugTypeHolder>>> {
         self.types.clone()
+    }
+
+    pub fn get_locations(&self) -> Rc<RefCell<Vec<DebugLocationHolder>>> {
+        self.locations.clone()
     }
 
     pub fn get_subprogram_data(&self, value: &DebugProgramValue) -> DebugSubprogramData {

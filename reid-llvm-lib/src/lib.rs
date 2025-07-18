@@ -250,6 +250,28 @@ impl<'builder> Block<'builder> {
     }
 }
 
+impl InstructionValue {
+    pub fn with_location(self, block: &Block, location: DebugLocationValue) -> InstructionValue {
+        unsafe {
+            block.builder.add_instruction_location(&self, location);
+        }
+        self
+    }
+
+    pub fn maybe_location(
+        self,
+        block: &mut Block,
+        location: Option<DebugLocationValue>,
+    ) -> InstructionValue {
+        unsafe {
+            if let Some(location) = location {
+                block.builder.add_instruction_location(&self, location);
+            }
+        }
+        self
+    }
+}
+
 #[derive(Clone)]
 pub struct InstructionData {
     kind: Instr,

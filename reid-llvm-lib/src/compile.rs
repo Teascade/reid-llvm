@@ -2,7 +2,10 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{collections::HashMap, ptr::null_mut};
+use std::{
+    collections::HashMap,
+    ptr::{null, null_mut},
+};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage,
@@ -203,6 +206,7 @@ pub struct LLVMDebugInformation<'a> {
     types: &'a mut HashMap<DebugTypeValue, LLVMMetadataRef>,
     programs: &'a mut HashMap<DebugProgramValue, LLVMMetadataRef>,
     metadata: &'a mut HashMap<DebugMetadataValue, LLVMMetadataRef>,
+    locations: &'a mut HashMap<DebugLocationValue, LLVMMetadataRef>,
 }
 
 #[derive(Clone, Copy)]
@@ -230,6 +234,7 @@ impl ModuleHolder {
             let mut types = HashMap::new();
             let mut metadata = HashMap::new();
             let mut programs = HashMap::new();
+            let mut locations = HashMap::new();
 
             let mut debug = if let Some(debug) = &self.debug_information {
                 let di_builder = LLVMCreateDIBuilder(module_ref);
@@ -293,6 +298,7 @@ impl ModuleHolder {
                     types: &mut types,
                     metadata: &mut metadata,
                     programs: &mut programs,
+                    locations: &mut locations,
                 };
 
                 for ty in debug.debug.get_types().borrow().iter() {
@@ -322,6 +328,11 @@ impl ModuleHolder {
             }
 
             if let Some(debug) = &mut debug {
+                for location in debug.debug.get_locations().borrow().iter() {
+                    let location_ref = location.compile(context, &debug);
+                    debug.locations.insert(location.value, location_ref);
+                }
+
                 for meta in debug.debug.get_metadata().borrow().iter() {
                     let meta_ref = meta.compile(&debug);
                     debug.metadata.insert(meta.value.clone(), meta_ref);
@@ -349,6 +360,24 @@ impl ModuleHolder {
             }
 
             module_ref
+        }
+    }
+}
+
+impl DebugLocationHolder {
+    unsafe fn compile(
+        &self,
+        context: &LLVMContext,
+        debug: &LLVMDebugInformation,
+    ) -> LLVMMetadataRef {
+        unsafe {
+            LLVMDIBuilderCreateDebugLocation(
+                context.context_ref,
+                self.location.line,
+                self.location.column,
+                *debug.programs.get(&self.program).unwrap(),
+                null_mut(),
+            )
         }
     }
 }
@@ -761,6 +790,7 @@ impl InstructionHolder {
                 }
             }
         };
+        if let Some(location_value) = &self.data.location {}
         LLVMValue {
             _ty,
             value_ref: val,
