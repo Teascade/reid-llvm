@@ -4,7 +4,10 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
-use crate::{lexer::Position, token_stream::TokenRange};
+use crate::{
+    lexer::{FullToken, Position},
+    token_stream::TokenRange,
+};
 
 mod display;
 pub mod r#impl;
@@ -35,6 +38,19 @@ impl Metadata {
     pub fn complete_overlap(&self, other: &Metadata) -> bool {
         (self.range.start >= other.range.start && self.range.end <= other.range.end)
             || (other.range.start >= self.range.start && other.range.end <= self.range.end)
+    }
+
+    pub fn into_positions(&self, tokens: &Vec<FullToken>) -> Option<(Position, Position)> {
+        let mut iter = tokens
+            .iter()
+            .skip(self.range.start)
+            .take(self.range.end - self.range.start);
+        if let Some(first) = iter.next() {
+            let last = iter.last().unwrap();
+            Some((first.position, last.position.add(last.token.len() as u32)))
+        } else {
+            None
+        }
     }
 }
 
@@ -248,7 +264,9 @@ pub struct FunctionCall {
 #[derive(Debug)]
 pub struct FunctionDefinition {
     pub name: String,
+    /// Whether this function is visible to outside modules
     pub is_pub: bool,
+    /// Whether this module is from an external module, and has been imported
     pub is_imported: bool,
     pub return_type: TypeKind,
     pub parameters: Vec<(String, TypeKind)>,

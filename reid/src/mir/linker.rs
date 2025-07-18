@@ -87,7 +87,7 @@ impl<'map> Pass for LinkerPass<'map> {
         for module in context.modules.drain(..) {
             let tokens = self
                 .module_map
-                .get_module(&module.module_id)
+                .module(&module.module_id)
                 .unwrap()
                 .tokens
                 .clone()

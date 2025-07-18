@@ -172,7 +172,7 @@ fn main() {
     };
     println!("test1");
 
-    let context = Context::new();
+    let context = Context::new("testcodegen");
     let codegen = mir_context.codegen(&context);
     println!("test2");
 

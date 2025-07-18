@@ -8,6 +8,7 @@ use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage,
     analysis::LLVMVerifyModule,
     core::*,
+    debuginfo::*,
     linker::LLVMLinkModules2,
     prelude::*,
     target::{
@@ -23,6 +24,7 @@ use llvm_sys::{
 use crate::{
     CustomTypeKind,
     builder::{TypeHolder, TypeValue},
+    debug_information::*,
     util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring},
 };
 
@@ -180,12 +182,34 @@ pub struct LLVMModule<'a> {
     blocks: HashMap<BlockValue, LLVMBasicBlockRef>,
     values: HashMap<InstructionValue, LLVMValue>,
     types: HashMap<TypeValue, LLVMTypeRef>,
+    debug: Option<LLVMDebugInformation<'a>>,
+}
+
+impl<'a> Drop for LLVMModule<'a> {
+    fn drop(&mut self) {
+        if let Some(LLVMDebugInformation { builder, .. }) = self.debug {
+            unsafe {
+                LLVMDisposeDIBuilder(builder);
+            }
+        }
+    }
+}
+
+pub struct LLVMDebugInformation<'a> {
+    debug: &'a DebugInformation,
+    builder: LLVMDIBuilderRef,
+    file_ref: LLVMMetadataRef,
+    scopes: &'a HashMap<DebugScopeValue, LLVMMetadataRef>,
+    types: &'a mut HashMap<DebugTypeValue, LLVMMetadataRef>,
+    subprograms: &'a mut HashMap<DebugSubprogramValue, LLVMMetadataRef>,
+    metadata: &'a mut HashMap<DebugMetadataValue, LLVMMetadataRef>,
 }
 
 #[derive(Clone, Copy)]
 pub struct LLVMFunction {
     type_ref: LLVMTypeRef,
     value_ref: LLVMValueRef,
+    metadata: Option<LLVMMetadataRef>,
 }
 
 pub struct LLVMValue {
@@ -203,6 +227,80 @@ impl ModuleHolder {
 
             // Compile the contents
 
+            let mut scopes = HashMap::new();
+            let mut types = HashMap::new();
+            let mut metadata = HashMap::new();
+            let mut subprograms = HashMap::new();
+
+            let mut debug = if let Some(debug) = &self.debug_information {
+                let di_builder = LLVMCreateDIBuilder(module_ref);
+
+                let file_ref = LLVMDIBuilderCreateFile(
+                    di_builder,
+                    into_cstring(debug.file.name.clone()).as_ptr(),
+                    debug.file.name.len(),
+                    into_cstring(debug.file.directory.clone()).as_ptr(),
+                    debug.file.directory.len(),
+                );
+
+                let flags = String::new();
+
+                let compile_unit = LLVMDIBuilderCreateCompileUnit(
+                    di_builder,
+                    LLVMDWARFSourceLanguage::LLVMDWARFSourceLanguageC,
+                    file_ref,
+                    into_cstring(builder.producer.clone()).as_ptr(),
+                    builder.producer.len(),
+                    // is optimized
+                    0,
+                    into_cstring(flags.clone()).as_ptr(),
+                    flags.len(),
+                    // Runtime version
+                    0,
+                    // Split filename
+                    into_cstring(debug.file.name.clone()).as_ptr(),
+                    debug.file.name.len(),
+                    LLVMDWARFEmissionKind::LLVMDWARFEmissionKindFull,
+                    // The DWOId if this is a split skeleton compile unit.
+                    0,
+                    // Whether to emit inline debug info.
+                    true as i32,
+                    // Whether to emit extra debug info for
+                    // profile collection.
+                    false as i32,
+                    // The clang system root (value of -isysroot).
+                    c"".as_ptr(),
+                    0,
+                    // The SDK name. On Darwin, this is the last component of
+                    // the sysroot.
+                    c"".as_ptr(),
+                    0,
+                );
+
+                let scope = debug.get_scopes();
+                scope
+                    .borrow()
+                    .compile_scope(compile_unit, file_ref, &mut scopes, di_builder);
+
+                let debug = LLVMDebugInformation {
+                    builder: di_builder,
+                    debug: debug,
+                    file_ref,
+                    types: &mut types,
+                    metadata: &mut metadata,
+                    subprograms: &mut subprograms,
+                    scopes: &scopes,
+                };
+
+                for ty in debug.debug.get_types().borrow().iter() {
+                    let meta_ref = ty.compile_debug(&debug);
+                    debug.types.insert(ty.value.clone(), meta_ref);
+                }
+                Some(debug)
+            } else {
+                None
+            };
+
             let mut types = HashMap::new();
             for ty in &self.types {
                 types.insert(ty.value, ty.compile_type(context, &types));
@@ -212,9 +310,16 @@ impl ModuleHolder {
             for function in &self.functions {
                 functions.insert(
                     function.value,
-                    function.compile_signature(context, module_ref, &types),
+                    function.compile_signature(context, module_ref, &types, &debug),
                 );
             }
+
+            // if let Some(debug) = &mut debug {
+            //     for subprogram in debug.debug.get_subprograms().borrow().iter() {
+            //         let meta_ref = subprogram.compile_debug(&functions, &debug);
+            //         debug.subprograms.insert(subprogram.value.clone(), meta_ref);
+            //     }
+            // }
 
             let mut module = LLVMModule {
                 builder,
@@ -225,14 +330,108 @@ impl ModuleHolder {
                 types,
                 blocks: HashMap::new(),
                 values: HashMap::new(),
+                debug,
             };
 
             for function in &self.functions {
                 function.compile(&mut module, self.data.is_main);
             }
 
+            if let Some(debug) = &module.debug {
+                LLVMDIBuilderFinalize(debug.builder);
+            }
+
             module_ref
         }
+    }
+}
+
+impl DebugScopeHolder {
+    unsafe fn compile_scope(
+        &self,
+        parent: LLVMMetadataRef,
+        file: LLVMMetadataRef,
+        map: &mut HashMap<DebugScopeValue, LLVMMetadataRef>,
+        di_builder: LLVMDIBuilderRef,
+    ) {
+        unsafe {
+            let scope = if let Some(location) = &self.location {
+                LLVMDIBuilderCreateLexicalBlock(
+                    di_builder,
+                    parent,
+                    file,
+                    location.line,
+                    location.column,
+                )
+            } else {
+                LLVMDIBuilderCreateLexicalBlockFile(di_builder, parent, file, 0)
+            };
+
+            for inner in &self.inner_scopes {
+                inner.compile_scope(scope, file, map, di_builder);
+            }
+
+            map.insert(self.value.clone(), scope);
+        }
+    }
+}
+
+impl DebugMetadataHolder {
+    unsafe fn compile_meta(&self, debug: &LLVMDebugInformation) -> LLVMMetadataRef {
+        unsafe {
+            match &self.data {
+                DebugMetadata::ParamVar(param) => LLVMDIBuilderCreateParameterVariable(
+                    debug.builder,
+                    *debug.scopes.get(&self.scope).unwrap(),
+                    into_cstring(param.name.clone()).as_ptr(),
+                    param.name.len(),
+                    param.arg_idx,
+                    debug.file_ref,
+                    param.location.line,
+                    *debug.types.get(&param.ty).unwrap(),
+                    param.always_preserve as i32,
+                    param.flags.as_llvm(),
+                ),
+                DebugMetadata::LocalVar(debug_local_variable) => todo!(),
+            }
+        }
+    }
+}
+
+impl DebugTypeHolder {
+    unsafe fn compile_debug(&self, debug: &LLVMDebugInformation) -> LLVMMetadataRef {
+        unsafe {
+            match &self.data {
+                DebugTypeData::Basic(ty) => LLVMDIBuilderCreateBasicType(
+                    debug.builder,
+                    into_cstring(ty.name.clone()).as_ptr(),
+                    ty.name.len(),
+                    ty.size_bits as u64,
+                    ty.encoding as u32,
+                    ty.flags.as_llvm(),
+                ),
+                DebugTypeData::Subprogram(subprogram) => {
+                    let mut params = subprogram
+                        .parameters
+                        .iter()
+                        .map(|p| *debug.types.get(p).unwrap())
+                        .collect::<Vec<_>>();
+                    LLVMDIBuilderCreateSubroutineType(
+                        debug.builder,
+                        debug.file_ref,
+                        params.as_mut_ptr(),
+                        params.len() as u32,
+                        subprogram.flags.as_llvm(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+impl DwarfFlags {
+    pub fn as_llvm(&self) -> i32 {
+        0
     }
 }
 
@@ -268,6 +467,7 @@ impl FunctionHolder {
         context: &LLVMContext,
         module_ref: LLVMModuleRef,
         types: &HashMap<TypeValue, LLVMTypeRef>,
+        debug: &Option<LLVMDebugInformation>,
     ) -> LLVMFunction {
         unsafe {
             let ret_type = self.data.ret.as_llvm(context.context_ref, types);
@@ -285,9 +485,41 @@ impl FunctionHolder {
             let function_ref =
                 LLVMAddFunction(module_ref, into_cstring(&self.data.name).as_ptr(), fn_type);
 
+            let metadata = if let Some(debug) = debug {
+                if let Some(value) = &self.data.debug {
+                    let subprogram = debug.debug.get_subprogram_data(&value);
+
+                    let mangled_length_ptr = &mut 0;
+                    let mangled_name = LLVMGetValueName2(function_ref, mangled_length_ptr);
+                    let mangled_length = *mangled_length_ptr;
+
+                    Some(LLVMDIBuilderCreateFunction(
+                        debug.builder,
+                        *debug.scopes.get(&subprogram.scope).unwrap(),
+                        into_cstring(subprogram.name.clone()).as_ptr(),
+                        subprogram.name.clone().len(),
+                        mangled_name,
+                        mangled_length,
+                        debug.file_ref,
+                        subprogram.location.line,
+                        *debug.types.get(&subprogram.ty).unwrap(),
+                        subprogram.opts.is_local as i32,
+                        subprogram.opts.is_definition as i32,
+                        subprogram.opts.scope_line,
+                        subprogram.opts.flags.as_llvm(),
+                        subprogram.opts.is_optimized as i32,
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
             LLVMFunction {
                 type_ref: fn_type,
                 value_ref: function_ref,
+                metadata,
             }
         }
     }

@@ -86,7 +86,7 @@ pub fn compile_module<'map>(
     path: Option<PathBuf>,
     is_main: bool,
 ) -> Result<mir::Module, ReidError> {
-    let module = map.get_module(&module_id).cloned().unwrap();
+    let module = map.module(&module_id).cloned().unwrap();
 
     let mut token_stream = TokenStream::from(&tokens);
 
@@ -196,8 +196,8 @@ pub fn compile_and_pass<'map>(
 
     perform_all_passes(&mut mir_context, module_map)?;
 
-    let mut context = Context::new();
-    let codegen_modules = mir_context.codegen(&mut context);
+    let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
+    let codegen_modules = mir_context.codegen(&mut context, &module_map);
 
     #[cfg(debug_assertions)]
     dbg!(&codegen_modules);

@@ -69,7 +69,7 @@ impl Ord for ErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ErrModule {
+pub struct Module {
     pub name: String,
     pub tokens: Option<Vec<FullToken>>,
     pub source: Option<String>,
@@ -77,7 +77,7 @@ pub struct ErrModule {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ModuleMap {
-    module_map: HashMap<mir::SourceModuleId, ErrModule>,
+    module_map: HashMap<mir::SourceModuleId, Module>,
     module_counter: mir::SourceModuleId,
 }
 
@@ -86,7 +86,7 @@ impl ModuleMap {
         let id = self.module_counter.increment();
         self.module_map.insert(
             id,
-            ErrModule {
+            Module {
                 name: name.into(),
                 tokens: None,
                 source: None,
@@ -107,7 +107,7 @@ impl ModuleMap {
         }
     }
 
-    pub fn get_module(&self, id: &mir::SourceModuleId) -> Option<&ErrModule> {
+    pub fn module(&self, id: &mir::SourceModuleId) -> Option<&Module> {
         self.module_map.get(id)
     }
 }
@@ -177,7 +177,7 @@ impl std::fmt::Display for ReidError {
         let mut curr_module = None;
         for error in sorted_errors {
             let meta = error.get_meta();
-            let module = self.map.get_module(&meta.source_module_id).unwrap();
+            let module = self.map.module(&meta.source_module_id).unwrap();
             let position = if let Some(tokens) = &module.tokens {
                 let range_tokens = meta.range.into_tokens(&tokens);
 

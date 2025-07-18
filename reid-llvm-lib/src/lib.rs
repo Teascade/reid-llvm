@@ -8,7 +8,7 @@ use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue,
 use debug::PrintableModule;
 use debug_information::{
     DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
-    DebugScopeValue,
+    DebugScopeValue, DebugSubprogramValue,
 };
 use util::match_types;
 
@@ -24,9 +24,9 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new() -> Context {
+    pub fn new<T: Into<String>>(producer: T) -> Context {
         Context {
-            builder: Builder::new(),
+            builder: Builder::new(producer.into()),
         }
     }
 
@@ -76,7 +76,7 @@ impl<'ctx> Module<'ctx> {
                         ret,
                         params,
                         flags,
-                        meta: None,
+                        debug: None,
                     },
                 ),
             }
@@ -131,7 +131,7 @@ pub struct FunctionData {
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,
-    meta: Option<DebugMetadataValue>,
+    debug: Option<DebugSubprogramValue>,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
@@ -177,9 +177,9 @@ impl<'ctx> Function<'ctx> {
         }
     }
 
-    pub fn set_metadata(&self, metadata: DebugMetadataValue) {
+    pub fn set_debug(&self, subprogram: DebugSubprogramValue) {
         unsafe {
-            self.builder.add_function_metadata(&self.value, metadata);
+            self.builder.set_debug_subprogram(&self.value, subprogram);
         }
     }
 

@@ -4,15 +4,22 @@ use reid_lib::{
     builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
-        AteEncoding, DebugBasicType, DebugFileData, DebugFunction, DebugInformation, DebugLocation,
-        DebugMetadata, DebugMetadataValue, DebugScopeValue,
+        DebugBasicType, DebugFileData, DebugInformation, DebugLocation, DebugMetadata,
+        DebugMetadataValue, DebugParamVariable, DebugScopeValue, DebugSubprogramData,
+        DebugSubprogramOptionals, DebugSubprogramTypeData, DebugSubprogramValue, DebugTypeData,
+        DebugTypeValue, DwarfEncoding, DwarfFlags,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
     Module, NamedStruct, TerminatorKind as Term, Type,
 };
 
-use crate::mir::{
-    self, NamedVariableRef, StructField, StructType, TypeDefinitionKind, TypeKind, VagueLiteral,
+use crate::{
+    error_raporting::ModuleMap,
+    lexer::{FullToken, Position},
+    mir::{
+        self, Metadata, NamedVariableRef, StructField, StructType, TypeDefinitionKind, TypeKind,
+        VagueLiteral,
+    },
 };
 
 /// Context that contains all of the given modules as complete codegenerated
@@ -32,10 +39,24 @@ impl<'ctx> CodegenContext<'ctx> {
 
 impl mir::Context {
     /// Compile MIR [`Context`] into [`CodegenContext`] containing LLIR.
-    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
+    pub fn codegen<'ctx>(
+        &self,
+        context: &'ctx Context,
+        mod_map: &ModuleMap,
+    ) -> CodegenContext<'ctx> {
         let mut modules = Vec::new();
         for module in &self.modules {
-            modules.push(module.codegen(context));
+            modules.push(
+                module.codegen(
+                    context,
+                    mod_map
+                        .module(&module.module_id)
+                        .unwrap()
+                        .tokens
+                        .as_ref()
+                        .unwrap(),
+                ),
+            );
         }
         CodegenContext { context }
     }
@@ -53,16 +74,22 @@ impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
 
 pub struct Scope<'ctx, 'a> {
     context: &'ctx Context,
+    tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
-    function: &'ctx Function<'ctx>,
+    function: &'ctx StackFunction<'ctx>,
     block: Block<'ctx>,
     types: &'a HashMap<TypeValue, TypeDefinitionKind>,
     type_values: &'a HashMap<String, TypeValue>,
-    functions: &'a HashMap<String, Function<'ctx>>,
+    functions: &'a HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: &'ctx DebugInformation,
     debug_scope: DebugScopeValue,
-    debug_const_tys: &'a HashMap<TypeKind, DebugMetadataValue>,
+    debug_const_tys: &'a HashMap<TypeKind, DebugTypeValue>,
+}
+
+pub struct StackFunction<'ctx> {
+    ir: Function<'ctx>,
+    debug: DebugSubprogramValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +106,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
     fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
         Scope {
             block,
+            tokens: self.tokens,
             function: self.function,
             context: self.context,
             module: self.module,
@@ -126,7 +154,11 @@ impl Default for State {
 }
 
 impl mir::Module {
-    fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
+    fn codegen<'ctx>(
+        &self,
+        context: &'ctx Context,
+        tokens: &Vec<FullToken>,
+    ) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name, self.is_main);
 
         let (debug, debug_scope) = if let Some(path) = &self.path {
@@ -147,14 +179,12 @@ impl mir::Module {
 
         debug_const_types.insert(
             TypeKind::U32,
-            debug.metadata(
-                &debug_scope,
-                DebugMetadata::BasicType(DebugBasicType {
-                    name: String::from("u32"),
-                    size_bits: 32,
-                    encoding: AteEncoding::Unsigned,
-                }),
-            ),
+            debug.debug_type(DebugTypeData::Basic(DebugBasicType {
+                name: String::from("u32"),
+                size_bits: 32,
+                encoding: DwarfEncoding::Unsigned,
+                flags: DwarfFlags,
+            })),
         );
 
         for typedef in &self.typedefs {
@@ -209,15 +239,69 @@ impl mir::Module {
                     },
                 ),
             };
-            functions.insert(function.name.clone(), func);
+
+            let fn_return_ty = debug_const_types.get(&TypeKind::U32).unwrap();
+
+            let debug_ty = debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramTypeData {
+                parameters: vec![*fn_return_ty],
+                flags: DwarfFlags,
+            }));
+
+            let subprogram = debug.subprogram(DebugSubprogramData {
+                name: function.name.clone(),
+                scope: debug_scope.clone(),
+                location: DebugLocation { line: 0, column: 0 },
+                ty: debug_ty,
+                opts: DebugSubprogramOptionals {
+                    is_local: !function.is_pub,
+                    is_definition: true,
+                    ..DebugSubprogramOptionals::default()
+                },
+            });
+
+            func.set_debug(subprogram);
+
+            functions.insert(
+                function.name.clone(),
+                StackFunction {
+                    ir: func,
+                    debug: subprogram,
+                },
+            );
         }
 
         for mir_function in &self.functions {
             let function = functions.get(&mir_function.name).unwrap();
-            let mut entry = function.block("entry");
+            let mut entry = function.ir.block("entry");
+
+            let location = match &mir_function.kind {
+                mir::FunctionDefinitionKind::Local(_, metadata) => {
+                    metadata.into_debug(tokens).unwrap()
+                }
+                mir::FunctionDefinitionKind::Extern(_) => {
+                    // TODO extern should probably still have a meta
+                    DebugLocation {
+                        ..Default::default()
+                    }
+                }
+            };
+
+            let debug_scope = debug.inner_scope(&debug_scope, location);
 
             let mut stack_values = HashMap::new();
             for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
+                debug.metadata(
+                    &debug_scope,
+                    DebugMetadata::ParamVar(DebugParamVariable {
+                        name: p_name.clone(),
+                        arg_idx: i as u32,
+                        location,
+                        ty: *debug_const_types.get(&TypeKind::U32).unwrap(),
+                        always_preserve: true,
+                        flags: DwarfFlags,
+                    }),
+                );
+
                 stack_values.insert(
                     p_name.clone(),
                     StackValue(
@@ -229,6 +313,7 @@ impl mir::Module {
 
             let mut scope = Scope {
                 context,
+                tokens,
                 module: &module,
                 function,
                 block: entry,
@@ -237,9 +322,10 @@ impl mir::Module {
                 type_values: &type_values,
                 stack_values,
                 debug: &debug,
-                debug_scope: debug_scope.clone(),
+                debug_scope: debug_scope,
                 debug_const_tys: &debug_const_types,
             };
+
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
                     let state = State::default();
@@ -252,23 +338,6 @@ impl mir::Module {
                             scope.block.terminate(Term::RetVoid).ok();
                         }
                     }
-
-                    let fn_return_ty = debug_const_types.get(&TypeKind::U32).unwrap();
-
-                    scope.function.set_metadata(scope.debug.metadata(
-                        &scope.debug_scope,
-                        DebugMetadata::Function(DebugFunction {
-                            scope: scope.debug_scope.clone(),
-                            name: mir_function.name.clone(),
-                            linkage_name: String::new(),
-                            location: DebugLocation { line: 0, column: 0 },
-                            return_ty: fn_return_ty.clone(),
-                            is_local: true,
-                            is_definition: true,
-                            is_optimized: false,
-                            scope_line: 0,
-                        }),
-                    ));
                 }
                 mir::FunctionDefinitionKind::Extern(_) => {}
             }
@@ -444,13 +513,13 @@ impl mir::Expression {
                 Some(
                     scope
                         .block
-                        .build(Instr::FunctionCall(callee.value(), params))
+                        .build(Instr::FunctionCall(callee.ir.value(), params))
                         .unwrap(),
                 )
             }
             mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state),
             mir::ExprKind::Block(block) => {
-                let mut inner_scope = scope.with_block(scope.function.block("inner"));
+                let mut inner_scope = scope.with_block(scope.function.ir.block("inner"));
                 if let Some(ret) = block.codegen(&mut inner_scope, state) {
                     inner_scope
                         .block
@@ -587,9 +656,9 @@ impl mir::IfExpression {
         let condition = self.0.codegen(scope, state).unwrap();
 
         // Create blocks
-        let then_b = scope.function.block("then");
-        let mut else_b = scope.function.block("else");
-        let after_b = scope.function.block("after");
+        let then_b = scope.function.ir.block("then");
+        let mut else_b = scope.function.ir.block("else");
+        let after_b = scope.function.ir.block("after");
 
         // Store for convenience
         let then_bb = then_b.value();
@@ -706,6 +775,25 @@ impl TypeKind {
             TypeKind::Borrow(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
+        }
+    }
+}
+
+impl Metadata {
+    pub fn into_debug(&self, tokens: &Vec<FullToken>) -> Option<DebugLocation> {
+        if let Some((start, _)) = self.into_positions(tokens) {
+            Some(start.into())
+        } else {
+            None
+        }
+    }
+}
+
+impl Into<DebugLocation> for Position {
+    fn into(self) -> DebugLocation {
+        DebugLocation {
+            line: self.1,
+            column: self.0,
         }
     }
 }

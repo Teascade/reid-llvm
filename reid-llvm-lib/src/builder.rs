@@ -8,6 +8,7 @@ use crate::{
     TerminatorKind, Type, TypeData,
     debug_information::{
         DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
+        DebugSubprogramValue,
     },
     util::match_types,
 };
@@ -65,12 +66,14 @@ pub struct InstructionHolder {
 #[derive(Clone)]
 pub(crate) struct Builder {
     modules: Rc<RefCell<Vec<ModuleHolder>>>,
+    pub(crate) producer: String,
 }
 
 impl Builder {
-    pub fn new() -> Builder {
+    pub fn new(producer: String) -> Builder {
         Builder {
             modules: Rc::new(RefCell::new(Vec::new())),
+            producer,
         }
     }
 
@@ -193,16 +196,16 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn add_function_metadata(
+    pub(crate) unsafe fn set_debug_subprogram(
         &self,
         value: &FunctionValue,
-        metadata: DebugMetadataValue,
+        subprogram: DebugSubprogramValue,
     ) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0);
             let function = module.functions.get_unchecked_mut(value.1);
-            function.data.meta = Some(metadata)
+            function.data.debug = Some(subprogram)
         }
     }
 
