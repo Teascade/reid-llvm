@@ -8,7 +8,7 @@ use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue,
 use debug::PrintableModule;
 use debug_information::{
     DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
-    DebugScopeValue, DebugSubprogramValue,
+    DebugProgramValue, DebugScopeValue,
 };
 use util::match_types;
 
@@ -106,10 +106,10 @@ impl<'ctx> Module<'ctx> {
     pub fn create_debug_info(
         &mut self,
         file: DebugFileData,
-    ) -> (DebugInformation, DebugScopeValue) {
-        let (debug_info, scope) = DebugInformation::from_file(file);
+    ) -> (DebugInformation, DebugProgramValue) {
+        let (debug_info, program_value) = DebugInformation::from_file(file);
         self.debug_info = Some(debug_info.clone());
-        (debug_info, scope)
+        (debug_info, program_value)
     }
 
     pub fn get_debug_info(&self) -> &Option<DebugInformation> {
@@ -131,7 +131,7 @@ pub struct FunctionData {
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,
-    debug: Option<DebugSubprogramValue>,
+    debug: Option<DebugProgramValue>,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
@@ -177,7 +177,7 @@ impl<'ctx> Function<'ctx> {
         }
     }
 
-    pub fn set_debug(&self, subprogram: DebugSubprogramValue) {
+    pub fn set_debug(&self, subprogram: DebugProgramValue) {
         unsafe {
             self.builder.set_debug_subprogram(&self.value, subprogram);
         }

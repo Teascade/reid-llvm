@@ -7,7 +7,7 @@ use std::{
 pub struct DebugScopeValue(pub Vec<usize>);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub struct DebugLocationValue(pub DebugScopeValue, pub usize);
+pub struct DebugLocationValue(pub DebugProgramValue, pub usize);
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugTypeValue(pub usize);
@@ -15,8 +15,9 @@ pub struct DebugTypeValue(pub usize);
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugMetadataValue(pub usize);
 
+/// Represents either a subprogram, or the compilation context
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
-pub struct DebugSubprogramValue(pub usize);
+pub struct DebugProgramValue(pub usize);
 
 #[derive(Debug, Clone)]
 pub struct DebugFileData {
@@ -34,7 +35,7 @@ pub(crate) struct DebugScopeHolder {
 
 #[derive(Debug, Clone)]
 pub struct DebugMetadataHolder {
-    pub(crate) scope: DebugScopeValue,
+    pub(crate) program: DebugProgramValue,
     pub(crate) value: DebugMetadataValue,
     pub(crate) data: DebugMetadata,
 }
@@ -47,7 +48,7 @@ pub struct DebugTypeHolder {
 
 #[derive(Debug, Clone)]
 pub struct DebugSubprogramHolder {
-    pub(crate) value: DebugSubprogramValue,
+    pub(crate) value: DebugProgramValue,
     pub(crate) data: DebugSubprogramData,
 }
 
@@ -60,80 +61,73 @@ pub(crate) struct DebugLocationHolder {
 #[derive(Debug, Clone)]
 pub struct DebugInformation {
     pub file: DebugFileData,
-    scope: Rc<RefCell<DebugScopeHolder>>,
-    subprograms: Rc<RefCell<Vec<DebugSubprogramHolder>>>,
+    // scope: Rc<RefCell<DebugScopeHolder>>,
+    locations: Rc<RefCell<Vec<DebugLocationHolder>>>,
+    programs: Rc<RefCell<Vec<DebugSubprogramHolder>>>,
     metadata: Rc<RefCell<Vec<DebugMetadataHolder>>>,
     types: Rc<RefCell<Vec<DebugTypeHolder>>>,
 }
 
 impl DebugInformation {
-    pub fn from_file(file: DebugFileData) -> (DebugInformation, DebugScopeValue) {
-        let scope_value = DebugScopeValue(Vec::new());
+    pub fn from_file(file: DebugFileData) -> (DebugInformation, DebugProgramValue) {
         (
             DebugInformation {
                 file,
-                scope: Rc::new(RefCell::new(DebugScopeHolder {
-                    value: scope_value.clone(),
-                    inner_scopes: Vec::new(),
-                    locations: Vec::new(),
-                    location: None,
-                })),
+                // scope: Rc::new(RefCell::new(DebugScopeHolder {
+                //     value: scope_value.clone(),
+                //     inner_scopes: Vec::new(),
+                //     locations: Vec::new(),
+                //     location: None,
+                // })),
+                locations: Rc::new(RefCell::new(Vec::new())),
                 metadata: Rc::new(RefCell::new(Vec::new())),
-                subprograms: Rc::new(RefCell::new(Vec::new())),
+                programs: Rc::new(RefCell::new(Vec::new())),
                 types: Rc::new(RefCell::new(Vec::new())),
             },
-            scope_value,
+            DebugProgramValue(0),
         )
     }
 
-    pub fn inner_scope(
-        &self,
-        parent: &DebugScopeValue,
-        location: DebugLocation,
-    ) -> DebugScopeValue {
-        unsafe {
-            let mut outer_scope = RefMut::map(self.scope.borrow_mut(), |mut v| {
-                for i in &parent.0 {
-                    v = v.inner_scopes.get_unchecked_mut(*i);
-                }
-                v
-            });
+    // pub fn inner_scope(
+    //     &self,
+    //     parent: &DebugScopeValue,
+    //     location: DebugLocation,
+    // ) -> DebugScopeValue {
+    //     unsafe {
+    //         let mut outer_scope = RefMut::map(self.scope.borrow_mut(), |mut v| {
+    //             for i in &parent.0 {
+    //                 v = v.inner_scopes.get_unchecked_mut(*i);
+    //             }
+    //             v
+    //         });
 
-            let mut arr = parent.0.clone();
-            arr.push(parent.0.len());
-            let value = DebugScopeValue(arr);
+    //         let mut arr = parent.0.clone();
+    //         arr.push(parent.0.len());
+    //         let value = DebugScopeValue(arr);
 
-            outer_scope.inner_scopes.push(DebugScopeHolder {
-                value: value.clone(),
-                inner_scopes: Vec::new(),
-                locations: Vec::new(),
-                location: Some(location),
-            });
-            value
-        }
-    }
+    //         outer_scope.inner_scopes.push(DebugScopeHolder {
+    //             value: value.clone(),
+    //             inner_scopes: Vec::new(),
+    //             locations: Vec::new(),
+    //             location: Some(location),
+    //         });
+    //         value
+    //     }
+    // }
 
     pub fn location(
         &self,
-        scope_value: &DebugScopeValue,
+        program_value: &DebugProgramValue,
         line: u32,
         column: u32,
     ) -> DebugLocationValue {
-        unsafe {
-            let mut scope = RefMut::map(self.scope.borrow_mut(), |mut v| {
-                for i in &scope_value.0 {
-                    v = v.inner_scopes.get_unchecked_mut(*i);
-                }
-                v
-            });
-            let value = DebugLocationValue(scope_value.clone(), scope.locations.len());
-            let location = DebugLocationHolder {
-                value: value.clone(),
-                location: DebugLocation { line, column },
-            };
-            scope.locations.push(location);
-            value
-        }
+        let value = DebugLocationValue(program_value.clone(), self.locations.borrow().len());
+        let location = DebugLocationHolder {
+            value: value.clone(),
+            location: DebugLocation { line, column },
+        };
+        self.locations.borrow_mut().push(location);
+        value
     }
 
     pub fn debug_type(&self, kind: DebugTypeData) -> DebugTypeValue {
@@ -146,11 +140,11 @@ impl DebugInformation {
         value
     }
 
-    pub fn metadata(&self, scope: &DebugScopeValue, kind: DebugMetadata) -> DebugMetadataValue {
+    pub fn metadata(&self, program: &DebugProgramValue, kind: DebugMetadata) -> DebugMetadataValue {
         let mut metadata = self.metadata.borrow_mut();
         let value = DebugMetadataValue(metadata.len());
         metadata.push(DebugMetadataHolder {
-            scope: scope.clone(),
+            program: *program,
             value: value.clone(),
             data: kind,
         });
@@ -164,9 +158,9 @@ impl DebugInformation {
         }
     }
 
-    pub fn subprogram(&self, kind: DebugSubprogramData) -> DebugSubprogramValue {
-        let mut subprogram = self.subprograms.borrow_mut();
-        let value = DebugSubprogramValue(subprogram.len());
+    pub fn subprogram(&self, kind: DebugSubprogramData) -> DebugProgramValue {
+        let mut subprogram = self.programs.borrow_mut();
+        let value = DebugProgramValue(subprogram.len() + 1);
         subprogram.push(DebugSubprogramHolder {
             value: value.clone(),
             data: kind,
@@ -178,23 +172,23 @@ impl DebugInformation {
         self.metadata.clone()
     }
 
-    pub fn get_scopes(&self) -> Rc<RefCell<DebugScopeHolder>> {
-        self.scope.clone()
-    }
+    // pub fn get_scopes(&self) -> Rc<RefCell<DebugScopeHolder>> {
+    //     self.scope.clone()
+    // }
 
     pub fn get_subprograms(&self) -> Rc<RefCell<Vec<DebugSubprogramHolder>>> {
-        self.subprograms.clone()
+        self.programs.clone()
     }
 
     pub fn get_types(&self) -> Rc<RefCell<Vec<DebugTypeHolder>>> {
         self.types.clone()
     }
 
-    pub fn get_subprogram_data(&self, value: &DebugSubprogramValue) -> DebugSubprogramData {
+    pub fn get_subprogram_data(&self, value: &DebugProgramValue) -> DebugSubprogramData {
         unsafe {
-            self.subprograms
+            self.programs
                 .borrow()
-                .get_unchecked(value.0)
+                .get_unchecked(value.0 - 1)
                 .data
                 .clone()
         }
@@ -277,7 +271,7 @@ pub struct DebugSubprogramTypeData {
 }
 
 pub struct DebugSubprogramType {
-    pub params: Vec<DebugSubprogramValue>,
+    pub params: Vec<DebugProgramValue>,
     pub flags: DwarfFlags,
 }
 
@@ -296,7 +290,7 @@ pub enum DwarfEncoding {
 pub struct DebugSubprogramData {
     /// Function name.
     pub name: String,
-    pub scope: DebugScopeValue,
+    pub outer_scope: DebugProgramValue,
     /// Used for line number.
     pub location: DebugLocation,
     /// Function type.

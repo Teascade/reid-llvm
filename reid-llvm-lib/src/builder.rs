@@ -8,7 +8,7 @@ use crate::{
     TerminatorKind, Type, TypeData,
     debug_information::{
         DebugFileData, DebugInformation, DebugLocation, DebugLocationValue, DebugMetadataValue,
-        DebugSubprogramValue,
+        DebugProgramValue,
     },
     util::match_types,
 };
@@ -199,7 +199,7 @@ impl Builder {
     pub(crate) unsafe fn set_debug_subprogram(
         &self,
         value: &FunctionValue,
-        subprogram: DebugSubprogramValue,
+        subprogram: DebugProgramValue,
     ) {
         unsafe {
             let mut modules = self.modules.borrow_mut();

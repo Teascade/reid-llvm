@@ -282,14 +282,14 @@ pub enum FunctionDefinitionKind {
 }
 
 impl FunctionDefinition {
-    fn block_meta(&self) -> Metadata {
+    pub fn block_meta(&self) -> Metadata {
         match &self.kind {
             FunctionDefinitionKind::Local(block, _) => block.meta.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
         }
     }
 
-    fn signature(&self) -> Metadata {
+    pub fn signature(&self) -> Metadata {
         match &self.kind {
             FunctionDefinitionKind::Local(_, metadata) => metadata.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),

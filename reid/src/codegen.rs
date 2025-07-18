@@ -5,8 +5,8 @@ use reid_lib::{
     compile::CompiledModule,
     debug_information::{
         DebugBasicType, DebugFileData, DebugInformation, DebugLocation, DebugMetadata,
-        DebugMetadataValue, DebugParamVariable, DebugScopeValue, DebugSubprogramData,
-        DebugSubprogramOptionals, DebugSubprogramTypeData, DebugSubprogramValue, DebugTypeData,
+        DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugScopeValue,
+        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramTypeData, DebugTypeData,
         DebugTypeValue, DwarfEncoding, DwarfFlags,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
@@ -82,14 +82,18 @@ pub struct Scope<'ctx, 'a> {
     type_values: &'a HashMap<String, TypeValue>,
     functions: &'a HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
-    debug: &'ctx DebugInformation,
-    debug_scope: DebugScopeValue,
+    debug: Option<Debug<'ctx>>,
     debug_const_tys: &'a HashMap<TypeKind, DebugTypeValue>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Debug<'ctx> {
+    info: &'ctx DebugInformation,
+    scope: Option<DebugProgramValue>,
 }
 
 pub struct StackFunction<'ctx> {
     ir: Function<'ctx>,
-    debug: DebugSubprogramValue,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,8 +118,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             types: self.types,
             type_values: self.type_values,
             stack_values: self.stack_values.clone(),
-            debug: self.debug,
-            debug_scope: self.debug_scope.clone(),
+            debug: self.debug.clone(),
             debug_const_tys: self.debug_const_tys,
         }
     }
@@ -161,7 +164,7 @@ impl mir::Module {
     ) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name, self.is_main);
 
-        let (debug, debug_scope) = if let Some(path) = &self.path {
+        let (debug, compile_unit) = if let Some(path) = &self.path {
             module.create_debug_info(DebugFileData {
                 name: path.file_name().unwrap().to_str().unwrap().to_owned(),
                 directory: path.parent().unwrap().to_str().unwrap().to_owned(),
@@ -240,68 +243,48 @@ impl mir::Module {
                 ),
             };
 
-            let fn_return_ty = debug_const_types.get(&TypeKind::U32).unwrap();
-
-            let debug_ty = debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramTypeData {
-                parameters: vec![*fn_return_ty],
-                flags: DwarfFlags,
-            }));
-
-            let subprogram = debug.subprogram(DebugSubprogramData {
-                name: function.name.clone(),
-                scope: debug_scope.clone(),
-                location: DebugLocation { line: 0, column: 0 },
-                ty: debug_ty,
-                opts: DebugSubprogramOptionals {
-                    is_local: !function.is_pub,
-                    is_definition: true,
-                    ..DebugSubprogramOptionals::default()
-                },
-            });
-
-            func.set_debug(subprogram);
-
-            functions.insert(
-                function.name.clone(),
-                StackFunction {
-                    ir: func,
-                    debug: subprogram,
-                },
-            );
+            functions.insert(function.name.clone(), StackFunction { ir: func });
         }
 
         for mir_function in &self.functions {
             let function = functions.get(&mir_function.name).unwrap();
             let mut entry = function.ir.block("entry");
 
-            let location = match &mir_function.kind {
-                mir::FunctionDefinitionKind::Local(_, metadata) => {
-                    metadata.into_debug(tokens).unwrap()
-                }
-                mir::FunctionDefinitionKind::Extern(_) => {
-                    // TODO extern should probably still have a meta
-                    DebugLocation {
-                        ..Default::default()
-                    }
-                }
+            // Insert debug information
+            let debug_scope = if let Some(location) = mir_function.signature().into_debug(tokens) {
+                // let debug_scope = debug.inner_scope(&outer_scope, location);
+
+                let fn_param_ty = debug_const_types.get(&TypeKind::U32).unwrap();
+
+                let debug_ty =
+                    debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramTypeData {
+                        parameters: vec![*fn_param_ty],
+                        flags: DwarfFlags,
+                    }));
+
+                let subprogram = debug.subprogram(DebugSubprogramData {
+                    name: mir_function.name.clone(),
+                    outer_scope: compile_unit.clone(),
+                    location,
+                    ty: debug_ty,
+                    opts: DebugSubprogramOptionals {
+                        is_local: !mir_function.is_pub,
+                        is_definition: true,
+                        ..DebugSubprogramOptionals::default()
+                    },
+                });
+
+                function.ir.set_debug(subprogram);
+
+                Some(subprogram)
+            } else {
+                None
             };
 
-            let debug_scope = debug.inner_scope(&debug_scope, location);
-
+            // Compile actual IR part
             let mut stack_values = HashMap::new();
             for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
-                debug.metadata(
-                    &debug_scope,
-                    DebugMetadata::ParamVar(DebugParamVariable {
-                        name: p_name.clone(),
-                        arg_idx: i as u32,
-                        location,
-                        ty: *debug_const_types.get(&TypeKind::U32).unwrap(),
-                        always_preserve: true,
-                        flags: DwarfFlags,
-                    }),
-                );
-
+                // Codegen actual parameters
                 stack_values.insert(
                     p_name.clone(),
                     StackValue(
@@ -309,6 +292,23 @@ impl mir::Module {
                         p_ty.get_type(&type_values, &types),
                     ),
                 );
+
+                // Generate debug info
+                if let (Some(debug_scope), Some(location)) =
+                    (&debug_scope, mir_function.signature().into_debug(tokens))
+                {
+                    debug.metadata(
+                        &debug_scope,
+                        DebugMetadata::ParamVar(DebugParamVariable {
+                            name: p_name.clone(),
+                            arg_idx: i as u32,
+                            location,
+                            ty: *debug_const_types.get(&TypeKind::U32).unwrap(),
+                            always_preserve: true,
+                            flags: DwarfFlags,
+                        }),
+                    );
+                }
             }
 
             let mut scope = Scope {
@@ -321,8 +321,7 @@ impl mir::Module {
                 types: &types,
                 type_values: &type_values,
                 stack_values,
-                debug: &debug,
-                debug_scope: debug_scope,
+                debug: None,
                 debug_const_tys: &debug_const_types,
             };
 
