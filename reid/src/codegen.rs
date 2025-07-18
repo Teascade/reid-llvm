@@ -394,6 +394,12 @@ impl mir::Statement {
         scope: &mut Scope<'ctx, 'a>,
         state: &State,
     ) -> Option<InstructionValue> {
+        let location = self.1.into_debug(scope.tokens).unwrap();
+        let location = scope
+            .debug
+            .as_ref()
+            .map(|d| d.info.location(&d.scope, location));
+
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
@@ -420,8 +426,13 @@ impl mir::Statement {
                                             name.clone(),
                                             ty.get_type(scope.type_values, scope.types),
                                         ))
-                                        .unwrap();
-                                    scope.block.build(Instr::Store(alloca, value)).unwrap();
+                                        .unwrap()
+                                        .maybe_location(&mut scope.block, location);
+                                    scope
+                                        .block
+                                        .build(Instr::Store(alloca, value))
+                                        .unwrap()
+                                        .maybe_location(&mut scope.block, location);
                                     alloca
                                 }),
                             },
@@ -442,7 +453,8 @@ impl mir::Statement {
                     scope
                         .block
                         .build(Instr::Store(lhs_value, rhs_value))
-                        .unwrap(),
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location),
                 )
             }
             mir::StmtKind::Import(_) => todo!(),
@@ -567,7 +579,8 @@ impl mir::Expression {
                 let mut ptr = scope
                     .block
                     .build(Instr::GetElemPtr(array, vec![idx]))
-                    .unwrap();
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
 
                 if state.should_load {
                     ptr = scope
@@ -576,7 +589,8 @@ impl mir::Expression {
                             ptr,
                             val_t.get_type(scope.type_values, scope.types),
                         ))
-                        .unwrap();
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
                 }
 
                 Some(ptr)
@@ -598,7 +612,8 @@ impl mir::Expression {
                         instr_t.get_type(scope.type_values, scope.types),
                         instr_list.len() as u32,
                     ))
-                    .unwrap();
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
 
                 for (index, instr) in instr_list.iter().enumerate() {
                     let index_expr = scope
@@ -608,8 +623,13 @@ impl mir::Expression {
                     let ptr = scope
                         .block
                         .build(Instr::GetElemPtr(array, vec![index_expr]))
-                        .unwrap();
-                    scope.block.build(Instr::Store(ptr, *instr)).unwrap();
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
+                    scope
+                        .block
+                        .build(Instr::Store(ptr, *instr))
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
                 }
 
                 Some(array)
@@ -634,7 +654,8 @@ impl mir::Expression {
                 let mut value = scope
                     .block
                     .build(Instr::GetStructElemPtr(struct_val, idx as u32))
-                    .unwrap();
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
 
                 if state.should_load {
                     value = scope
@@ -655,15 +676,21 @@ impl mir::Expression {
                         name.clone(),
                         Type::CustomType(*scope.type_values.get(name)?),
                     ))
-                    .unwrap();
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
 
                 for (i, (_, exp)) in items.iter().enumerate() {
                     let elem_ptr = scope
                         .block
                         .build(Instr::GetStructElemPtr(struct_ptr, i as u32))
-                        .unwrap();
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
                     if let Some(val) = exp.codegen(scope, state) {
-                        scope.block.build(Instr::Store(elem_ptr, val)).unwrap();
+                        scope
+                            .block
+                            .build(Instr::Store(elem_ptr, val))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
                     }
                 }
 

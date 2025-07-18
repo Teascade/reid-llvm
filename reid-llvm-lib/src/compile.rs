@@ -756,11 +756,14 @@ impl InstructionHolder {
                     module.values.get(&ptr).unwrap().value_ref,
                     c"load".as_ptr(),
                 ),
-                Store(ptr, val) => LLVMBuildStore(
-                    module.builder_ref,
-                    module.values.get(&val).unwrap().value_ref,
-                    module.values.get(&ptr).unwrap().value_ref,
-                ),
+                Store(ptr, val) => {
+                    let store = LLVMBuildStore(
+                        module.builder_ref,
+                        module.values.get(&val).unwrap().value_ref,
+                        module.values.get(&ptr).unwrap().value_ref,
+                    );
+                    store
+                }
                 ArrayAlloca(ty, len) => {
                     let array_len = ConstValue::U16(*len as u16).as_llvm(module);
                     LLVMBuildArrayAlloca(
@@ -810,6 +813,7 @@ impl InstructionHolder {
         };
         if let Some(location) = &self.data.location {
             unsafe {
+                // dbg!(&self.data.kind, LLVMGetValueKind(val));
                 match LLVMGetValueKind(val) {
                     LLVMValueKind::LLVMInstructionValueKind
                     | LLVMValueKind::LLVMMemoryDefValueKind
