@@ -110,9 +110,9 @@ git clone https://github.com/llvm/llvm-project.git --depth=1 --branch=llvmorg-20
 
 cd llvm_project
 
-cmake llvm -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_BUILD_TYPE=Debug -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_BUILD_BENCHMARKS=OFF
+cmake llvm -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_INCLUDE_TESTS=OFF -DLLVM_BUILD_BENCHMARKS=OFF -G Ninja -DLLVM_USE_LINKER="ld.lld" -DLLVM_PARALLEL_LINK_JOBS=8
 
-make -j23
+ninja -j23
 ```
 
 *Also Note:* Building LLVM with `Ninja` was not successful for me, but this
