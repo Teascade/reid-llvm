@@ -8,6 +8,7 @@ use crate::{
     TerminatorKind, Type, TypeData,
     debug_information::{
         DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
+        InstructionDebugRecordData,
     },
     util::match_types,
 };
@@ -60,6 +61,7 @@ pub struct BlockHolder {
 pub struct InstructionHolder {
     pub(crate) value: InstructionValue,
     pub(crate) data: InstructionData,
+    pub(crate) record: Option<InstructionDebugRecordData>,
 }
 
 #[derive(Clone)]
@@ -154,7 +156,11 @@ impl Builder {
             let function = module.functions.get_unchecked_mut(block_val.0.1);
             let block = function.blocks.get_unchecked_mut(block_val.1);
             let value = InstructionValue(block.value, block.instructions.len());
-            block.instructions.push(InstructionHolder { value, data });
+            block.instructions.push(InstructionHolder {
+                value,
+                data,
+                record: None,
+            });
 
             // Drop modules so that it is no longer mutable borrowed
             // (check_instruction requires an immutable borrow).
@@ -192,6 +198,21 @@ impl Builder {
             let block = function.blocks.get_unchecked_mut(value.0.1);
             let instr = block.instructions.get_unchecked_mut(value.1);
             instr.data.meta = Some(metadata)
+        }
+    }
+
+    pub(crate) unsafe fn add_instruction_record(
+        &self,
+        value: &InstructionValue,
+        record: InstructionDebugRecordData,
+    ) {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(value.0.0.0.0);
+            let function = module.functions.get_unchecked_mut(value.0.0.1);
+            let block = function.blocks.get_unchecked_mut(value.0.1);
+            let instr = block.instructions.get_unchecked_mut(value.1);
+            instr.record = Some(record)
         }
     }
 

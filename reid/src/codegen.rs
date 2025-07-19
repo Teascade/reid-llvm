@@ -5,9 +5,9 @@ use reid_lib::{
     compile::CompiledModule,
     debug_information::{
         DebugBasicType, DebugFileData, DebugInformation, DebugLocalVariable, DebugLocation,
-        DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugScopeValue,
-        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramTypeData, DebugTypeData,
-        DebugTypeValue, DwarfEncoding, DwarfFlags,
+        DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugRecordKind,
+        DebugScopeValue, DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramTypeData,
+        DebugTypeData, DebugTypeValue, DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
     Module, NamedStruct, TerminatorKind as Term, Type,
@@ -104,6 +104,16 @@ pub enum StackValueKind {
     Immutable(InstructionValue),
     Mutable(InstructionValue),
     Any(InstructionValue),
+}
+
+impl StackValueKind {
+    unsafe fn get_inner(&self) -> InstructionValue {
+        match &self {
+            StackValueKind::Immutable(val) => *val,
+            StackValueKind::Mutable(val) => *val,
+            StackValueKind::Any(val) => *val,
+        }
+    }
 }
 
 impl<'ctx, 'a> Scope<'ctx, 'a> {
@@ -403,56 +413,70 @@ impl mir::Statement {
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
+                let (stack_value, store) = match mutable {
+                    false => (StackValueKind::Immutable(value), value),
+                    true => match ty {
+                        // Struct is already allocated at initialization
+                        TypeKind::Array(_, _) => (StackValueKind::Mutable(value), value),
+                        TypeKind::CustomType(n) => {
+                            match scope.types.get(scope.type_values.get(n).unwrap()).unwrap() {
+                                // Struct also is allocated at initialization
+                                TypeDefinitionKind::Struct(_) => {
+                                    (StackValueKind::Mutable(value), value)
+                                }
+                            }
+                        }
+                        _ => {
+                            let alloca = scope
+                                .block
+                                .build(Instr::Alloca(
+                                    name.clone(),
+                                    ty.get_type(scope.type_values, scope.types),
+                                ))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            let store = scope
+                                .block
+                                .build(Instr::Store(alloca, value))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            (StackValueKind::Mutable(alloca), store)
+                        }
+                    },
+                };
                 scope.stack_values.insert(
                     name.clone(),
-                    StackValue(
-                        match mutable {
-                            false => StackValueKind::Immutable(value),
-                            true => match ty {
-                                // Struct is already allocated at initialization
-                                TypeKind::Array(_, _) => StackValueKind::Mutable(value),
-                                TypeKind::CustomType(n) => match scope
-                                    .types
-                                    .get(scope.type_values.get(n).unwrap())
-                                    .unwrap()
-                                {
-                                    // Struct also is allocated at initialization
-                                    TypeDefinitionKind::Struct(_) => StackValueKind::Mutable(value),
-                                },
-                                _ => StackValueKind::Mutable({
-                                    let alloca = scope
-                                        .block
-                                        .build(Instr::Alloca(
-                                            name.clone(),
-                                            ty.get_type(scope.type_values, scope.types),
-                                        ))
-                                        .unwrap()
-                                        .maybe_location(&mut scope.block, location);
-                                    scope
-                                        .block
-                                        .build(Instr::Store(alloca, value))
-                                        .unwrap()
-                                        .maybe_location(&mut scope.block, location);
-                                    alloca
-                                }),
-                            },
-                        },
-                        ty.get_type(scope.type_values, scope.types),
-                    ),
+                    StackValue(stack_value, ty.get_type(scope.type_values, scope.types)),
                 );
                 if let Some(debug) = &scope.debug {
-                    let location = self.1.into_debug(scope.tokens).unwrap();
-                    debug.info.metadata(
-                        &debug.scope,
-                        DebugMetadata::LocalVar(DebugLocalVariable {
-                            name: name.clone(),
-                            location,
-                            ty: scope.debug_const_tys.get(&TypeKind::U32).unwrap().clone(),
-                            always_preserve: true,
-                            alignment: 32,
-                            flags: DwarfFlags,
-                        }),
-                    );
+                    match stack_value {
+                        StackValueKind::Immutable(_) => {}
+                        StackValueKind::Mutable(_) => {
+                            let location = self.1.into_debug(scope.tokens).unwrap();
+                            let var = debug.info.metadata(
+                                &debug.scope,
+                                DebugMetadata::LocalVar(DebugLocalVariable {
+                                    name: name.clone(),
+                                    location,
+                                    ty: scope.debug_const_tys.get(&TypeKind::U32).unwrap().clone(),
+                                    always_preserve: true,
+                                    alignment: 32,
+                                    flags: DwarfFlags,
+                                }),
+                            );
+                            dbg!(&store);
+                            store.add_record(
+                                &mut scope.block,
+                                InstructionDebugRecordData {
+                                    variable: var,
+                                    location,
+                                    kind: DebugRecordKind::Declare(value),
+                                    scope: debug.scope,
+                                },
+                            );
+                        }
+                        StackValueKind::Any(_) => {}
+                    }
                 }
                 None
             }

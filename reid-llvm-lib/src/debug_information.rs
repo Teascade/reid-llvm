@@ -1,5 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
+use crate::builder::InstructionValue;
+
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct DebugScopeValue(pub Vec<usize>);
 
@@ -153,6 +155,7 @@ impl DebugInformation {
         match &metadata {
             DebugMetadata::ParamVar(debug_param_variable) => todo!(),
             DebugMetadata::LocalVar(debug_local_variable) => todo!(),
+            DebugMetadata::VarAssignment => todo!(),
         }
     }
 
@@ -207,6 +210,7 @@ pub struct DebugLocation {
 pub enum DebugMetadata {
     ParamVar(DebugParamVariable),
     LocalVar(DebugLocalVariable),
+    VarAssignment,
 }
 
 #[derive(Debug, Clone)]
@@ -311,4 +315,18 @@ pub struct DebugSubprogramOptionals {
     /// These flags are used to emit dwarf attributes. e.g. is this function
     /// prototyped or not.
     pub flags: DwarfFlags,
+}
+
+#[derive(Clone)]
+pub struct InstructionDebugRecordData {
+    pub scope: DebugProgramValue,
+    pub variable: DebugMetadataValue,
+    pub location: DebugLocation,
+    pub kind: DebugRecordKind,
+}
+
+#[derive(Clone, Copy)]
+pub enum DebugRecordKind {
+    Declare(InstructionValue),
+    Value(InstructionValue),
 }

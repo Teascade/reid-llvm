@@ -8,6 +8,7 @@ use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue,
 use debug::PrintableModule;
 use debug_information::{
     DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
+    InstructionDebugRecordData,
 };
 use util::match_types;
 
@@ -274,6 +275,12 @@ impl InstructionValue {
             }
         }
         self
+    }
+
+    pub fn add_record(&self, block: &mut Block, record: InstructionDebugRecordData) {
+        unsafe {
+            block.builder.add_instruction_record(self, record);
+        }
     }
 }
 

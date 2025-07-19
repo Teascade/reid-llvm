@@ -417,7 +417,6 @@ impl DebugScopeHolder {
 
 impl DebugMetadataHolder {
     unsafe fn compile(&self, debug: &LLVMDebugInformation) -> LLVMMetadataRef {
-        dbg!(&self.program);
         unsafe {
             match &self.data {
                 DebugMetadata::ParamVar(param) => LLVMDIBuilderCreateParameterVariable(
@@ -444,6 +443,7 @@ impl DebugMetadataHolder {
                     var.flags.as_llvm(),
                     var.alignment,
                 ),
+                DebugMetadata::VarAssignment => todo!(),
             }
         }
     }
@@ -822,6 +822,48 @@ impl InstructionHolder {
                 }
             }
         };
+        if let Some(record) = &self.record {
+            let debug = module.debug.as_ref().unwrap();
+
+            unsafe {
+                let mut addr = Vec::<u64>::new();
+                let expr =
+                    LLVMDIBuilderCreateExpression(debug.builder, addr.as_mut_ptr(), addr.len());
+
+                let location = LLVMDIBuilderCreateDebugLocation(
+                    module.context_ref,
+                    record.location.line,
+                    record.location.column,
+                    *debug.programs.get(&record.scope).unwrap(),
+                    null_mut(),
+                );
+
+                match record.kind {
+                    DebugRecordKind::Declare(instruction_value) => {
+                        dbg!(&self.value, &instruction_value);
+
+                        LLVMDIBuilderInsertDeclareRecordBefore(
+                            debug.builder,
+                            module.values.get(&instruction_value).unwrap().value_ref,
+                            *debug.metadata.get(&record.variable).unwrap(),
+                            expr,
+                            location,
+                            val,
+                        )
+                    }
+                    DebugRecordKind::Value(instruction_value) => {
+                        LLVMDIBuilderInsertDbgValueRecordBefore(
+                            debug.builder,
+                            module.values.get(&instruction_value).unwrap().value_ref,
+                            *debug.metadata.get(&record.variable).unwrap(),
+                            expr,
+                            location,
+                            val,
+                        )
+                    }
+                };
+            }
+        }
         if let Some(location) = &self.data.location {
             unsafe {
                 // dbg!(&self.data.kind, LLVMGetValueKind(val));
@@ -848,6 +890,26 @@ impl InstructionHolder {
         LLVMValue {
             _ty,
             value_ref: val,
+        }
+    }
+
+    fn get_inner_value(&self) -> Option<InstructionValue> {
+        match &self.data.kind {
+            crate::Instr::Param(_) => None,
+            crate::Instr::Constant(_) => None,
+            crate::Instr::Add(_, _) => None,
+            crate::Instr::Sub(_, _) => None,
+            crate::Instr::Mult(_, _) => None,
+            crate::Instr::And(_, _) => None,
+            crate::Instr::Phi(_) => None,
+            crate::Instr::Alloca(_, _) => todo!(),
+            crate::Instr::Load(_, _) => None,
+            crate::Instr::Store(_, val) => Some(*val),
+            crate::Instr::ArrayAlloca(_, _) => None,
+            crate::Instr::GetElemPtr(_, _) => None,
+            crate::Instr::GetStructElemPtr(_, _) => None,
+            crate::Instr::ICmp(_, _, _) => None,
+            crate::Instr::FunctionCall(_, _) => None,
         }
     }
 }
