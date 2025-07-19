@@ -229,9 +229,10 @@ pub struct DebugParamVariable {
 pub struct DebugLocalVariable {
     pub name: String,
     pub location: DebugLocation,
-    pub ty: DebugMetadataValue,
+    pub ty: DebugTypeValue,
     pub always_preserve: bool,
     pub alignment: u32,
+    pub flags: DwarfFlags,
 }
 
 impl Default for DebugSubprogramOptionals {

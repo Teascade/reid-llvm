@@ -4,8 +4,8 @@ use reid_lib::{
     builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
-        DebugBasicType, DebugFileData, DebugInformation, DebugLocation, DebugMetadata,
-        DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugScopeValue,
+        DebugBasicType, DebugFileData, DebugInformation, DebugLocalVariable, DebugLocation,
+        DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugScopeValue,
         DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramTypeData, DebugTypeData,
         DebugTypeValue, DwarfEncoding, DwarfFlags,
     },
@@ -440,6 +440,20 @@ impl mir::Statement {
                         ty.get_type(scope.type_values, scope.types),
                     ),
                 );
+                if let Some(debug) = &scope.debug {
+                    let location = self.1.into_debug(scope.tokens).unwrap();
+                    debug.info.metadata(
+                        &debug.scope,
+                        DebugMetadata::LocalVar(DebugLocalVariable {
+                            name: name.clone(),
+                            location,
+                            ty: scope.debug_const_tys.get(&TypeKind::U32).unwrap().clone(),
+                            always_preserve: true,
+                            alignment: 32,
+                            flags: DwarfFlags,
+                        }),
+                    );
+                }
                 None
             }
             mir::StmtKind::Set(lhs, rhs) => {

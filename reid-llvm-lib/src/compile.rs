@@ -432,7 +432,18 @@ impl DebugMetadataHolder {
                     param.always_preserve as i32,
                     param.flags.as_llvm(),
                 ),
-                DebugMetadata::LocalVar(debug_local_variable) => todo!(),
+                DebugMetadata::LocalVar(var) => LLVMDIBuilderCreateAutoVariable(
+                    debug.builder,
+                    *debug.programs.get(&self.program).unwrap(),
+                    into_cstring(var.name.clone()).as_ptr(),
+                    var.name.len(),
+                    debug.file_ref,
+                    var.location.line,
+                    *debug.types.get(&var.ty).unwrap(),
+                    var.always_preserve as i32,
+                    var.flags.as_llvm(),
+                    var.alignment,
+                ),
             }
         }
     }
