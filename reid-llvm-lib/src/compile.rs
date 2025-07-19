@@ -495,6 +495,31 @@ impl DebugTypeHolder {
                     Vec::new().as_mut_ptr(),
                     0,
                 ),
+                DebugTypeData::Struct(st) => {
+                    let mut elements = st
+                        .elements
+                        .iter()
+                        .map(|e| *debug.types.get(e).unwrap())
+                        .collect::<Vec<_>>();
+                    LLVMDIBuilderCreateStructType(
+                        debug.builder,
+                        *debug.programs.get(&st.scope).unwrap(),
+                        into_cstring(st.name.clone()).as_ptr(),
+                        st.name.len(),
+                        debug.file_ref,
+                        st.location.line,
+                        st.size_bits,
+                        st.alignment,
+                        st.flags.as_llvm(),
+                        null_mut(), // derived from
+                        elements.as_mut_ptr(),
+                        elements.len() as u32,
+                        0,          // Runtime lang
+                        null_mut(), // VTable
+                        null(),     // Unique ID
+                        0,          // Unique ID len
+                    )
+                }
             }
         }
     }

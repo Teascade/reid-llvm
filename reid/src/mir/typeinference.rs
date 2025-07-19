@@ -121,7 +121,7 @@ impl Block {
                         lhs_ref.narrow(&rhs_ref);
                     }
                 }
-                StmtKind::Import(_) => todo!(),
+                StmtKind::Import(_) => panic!(),
                 StmtKind::Expression(expr) => {
                     let expr_res = expr.infer_types(&mut state, &inner_refs);
                     state.ok(expr_res, expr.1);

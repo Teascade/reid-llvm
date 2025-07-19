@@ -315,7 +315,7 @@ pub enum StmtKind {
     Expression(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeDefinition {
     pub name: String,
     pub kind: TypeDefinitionKind,

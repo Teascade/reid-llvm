@@ -10,7 +10,7 @@ use crate::{
     builder::*,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugLocation, DebugLocationValue, DebugMetadataHolder,
-        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue,
+        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue, DebugStructType,
         DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
     },
 };
@@ -243,6 +243,7 @@ impl Debug for DebugTypeData {
             DebugTypeData::Subprogram(ty) => Debug::fmt(ty, f),
             DebugTypeData::Pointer(ty) => Debug::fmt(ty, f),
             DebugTypeData::Array(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Struct(ty) => Debug::fmt(ty, f),
         }
     }
 }
@@ -254,6 +255,20 @@ impl Debug for DebugBasicType {
             .field(&self.size_bits)
             .field(&self.encoding)
             .field(&self.flags)
+            .finish()
+    }
+}
+
+impl Debug for DebugStructType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Struct")
+            .field("name", &self.name)
+            .field("scope", &self.scope)
+            .field("location", &self.location)
+            .field("size_bit", &self.size_bits)
+            .field("alignment", &self.alignment)
+            .field("flags", &self.flags)
+            .field("elements", &self.elements)
             .finish()
     }
 }

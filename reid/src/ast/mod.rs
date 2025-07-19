@@ -159,19 +159,19 @@ pub enum BlockLevelStatement {
     Return(ReturnType, Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeDefinition {
     name: String,
     kind: TypeDefinitionKind,
     range: TokenRange,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeDefinitionKind {
     Struct(Vec<StructDefinitionField>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StructDefinitionField {
     name: String,
     ty: Type,

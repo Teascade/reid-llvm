@@ -260,6 +260,7 @@ pub enum DebugTypeData {
     Subprogram(DebugSubprogramType),
     Pointer(DebugPointerType),
     Array(DebugArrayType),
+    Struct(DebugStructType),
 }
 
 #[derive(Clone)]
@@ -286,6 +287,16 @@ pub struct DebugPointerType {
     pub name: String,
     pub pointee: DebugTypeValue,
     pub size_bits: u64,
+}
+#[derive(Clone)]
+pub struct DebugStructType {
+    pub name: String,
+    pub scope: DebugProgramValue,
+    pub location: DebugLocation,
+    pub size_bits: u64,
+    pub alignment: u32,
+    pub flags: DwarfFlags,
+    pub elements: Vec<DebugTypeValue>,
 }
 
 #[derive(Clone)]
