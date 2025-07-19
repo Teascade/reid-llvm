@@ -428,7 +428,7 @@ impl mir::Statement {
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                scope
+                let store = scope
                     .block
                     .build(Instr::Store(alloca, value))
                     .unwrap()
@@ -447,7 +447,7 @@ impl mir::Statement {
                         StackValueKind::Immutable(_) => {}
                         StackValueKind::Mutable(_) => {
                             let location = self.1.into_debug(scope.tokens).unwrap();
-                            debug.info.metadata(
+                            let var = debug.info.metadata(
                                 &debug.scope,
                                 DebugMetadata::LocalVar(DebugLocalVariable {
                                     name: name.clone(),
@@ -458,16 +458,15 @@ impl mir::Statement {
                                     flags: DwarfFlags,
                                 }),
                             );
-                            // dbg!(&store);
-                            // store.add_record(
-                            //     &mut scope.block,
-                            //     InstructionDebugRecordData {
-                            //         variable: var,
-                            //         location,
-                            //         kind: DebugRecordKind::Declare(value),
-                            //         scope: debug.scope,
-                            //     },
-                            // );
+                            store.add_record(
+                                &mut scope.block,
+                                InstructionDebugRecordData {
+                                    variable: var,
+                                    location,
+                                    kind: DebugRecordKind::Declare(value),
+                                    scope: debug.scope,
+                                },
+                            );
                         }
                         StackValueKind::Any(_) => {}
                     }
