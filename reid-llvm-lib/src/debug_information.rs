@@ -279,7 +279,7 @@ pub struct DebugArrayType {
     pub size_bits: u64,
     pub align_bits: u32,
     pub element_type: DebugTypeValue,
-    pub subscripts: Vec<DebugTypeValue>,
+    pub length: u64,
 }
 
 #[derive(Clone)]

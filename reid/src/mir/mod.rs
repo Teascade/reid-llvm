@@ -109,6 +109,8 @@ pub enum TypeKind {
     Array(Box<TypeKind>, u64),
     #[error("{0}")]
     CustomType(String),
+    #[error("Ptr({0})")]
+    Ptr(Box<TypeKind>),
     #[error(transparent)]
     Vague(#[from] VagueType),
 }

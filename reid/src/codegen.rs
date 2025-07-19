@@ -494,33 +494,27 @@ impl mir::Statement {
                     .stack_values
                     .insert(name.clone(), StackValue(stack_value, ty.clone()));
                 if let Some(debug) = &scope.debug {
-                    match stack_value {
-                        StackValueKind::Immutable(_) => {}
-                        StackValueKind::Mutable(_) => {
-                            let location = self.1.into_debug(scope.tokens).unwrap();
-                            let var = debug.info.metadata(
-                                &debug.scope,
-                                DebugMetadata::LocalVar(DebugLocalVariable {
-                                    name: name.clone(),
-                                    location,
-                                    ty: ty.get_debug_type(debug, scope),
-                                    always_preserve: true,
-                                    alignment: 32,
-                                    flags: DwarfFlags,
-                                }),
-                            );
-                            store.add_record(
-                                &mut scope.block,
-                                InstructionDebugRecordData {
-                                    variable: var,
-                                    location,
-                                    kind: DebugRecordKind::Declare(value.instr()),
-                                    scope: debug.scope,
-                                },
-                            );
-                        }
-                        StackValueKind::Literal(_) => {}
-                    }
+                    let location = self.1.into_debug(scope.tokens).unwrap();
+                    let var = debug.info.metadata(
+                        &debug.scope,
+                        DebugMetadata::LocalVar(DebugLocalVariable {
+                            name: name.clone(),
+                            location,
+                            ty: ty.get_debug_type(debug, scope),
+                            always_preserve: true,
+                            alignment: 32,
+                            flags: DwarfFlags,
+                        }),
+                    );
+                    store.add_record(
+                        &mut scope.block,
+                        InstructionDebugRecordData {
+                            variable: var,
+                            location,
+                            kind: DebugRecordKind::Declare(value.instr()),
+                            scope: debug.scope,
+                        },
+                    );
                 }
                 None
             }
@@ -971,6 +965,9 @@ impl TypeKind {
                     TypeDefinitionKind::Struct(_) => Type::Ptr(Box::new(custom_t)),
                 }
             }
+            TypeKind::Ptr(type_kind) => {
+                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
+            }
         }
     }
 }
@@ -1015,10 +1012,9 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Array(type_kind, len) => DebugTypeData::Array(DebugArrayType {
-                size_bits: type_kind.size_of() * len,
-                align_bits: type_kind.alignment(),
-                element_type: type_kind.get_debug_type_hard(
+            TypeKind::Ptr(inner) => DebugTypeData::Pointer(DebugPointerType {
+                name,
+                pointee: inner.get_debug_type_hard(
                     scope,
                     debug_info,
                     debug_types,
@@ -1026,8 +1022,24 @@ impl TypeKind {
                     types,
                     tokens,
                 ),
-                subscripts: Vec::new(),
+                size_bits: self.size_of(),
             }),
+            TypeKind::Array(type_kind, len) => {
+                let elem_ty = type_kind.get_debug_type_hard(
+                    scope,
+                    debug_info,
+                    debug_types,
+                    type_values,
+                    types,
+                    tokens,
+                );
+                DebugTypeData::Array(DebugArrayType {
+                    size_bits: type_kind.size_of() * len,
+                    align_bits: type_kind.alignment(),
+                    element_type: elem_ty,
+                    length: *len,
+                })
+            }
             TypeKind::CustomType(name) => {
                 let typedef = types.get(type_values.get(name).unwrap()).unwrap();
 
@@ -1082,7 +1094,7 @@ impl TypeKind {
                     TypeKind::StringPtr => DwarfEncoding::Address,
                     TypeKind::Array(_, _) => DwarfEncoding::Address,
                     TypeKind::CustomType(_) => DwarfEncoding::Address,
-                    TypeKind::Vague(_) => panic!("tried fetching debug-type for vague type!"),
+                    _ => panic!("tried fetching debug-type for non-supported type!"),
                 },
                 flags: DwarfFlags,
             }),

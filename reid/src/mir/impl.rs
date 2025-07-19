@@ -47,6 +47,7 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, len) => type_kind.size_of() * len,
             TypeKind::CustomType(_) => 32,
+            TypeKind::Ptr(inner) => 32,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
         }
     }
@@ -68,6 +69,7 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, _) => type_kind.alignment(),
             TypeKind::CustomType(_) => 32,
+            TypeKind::Ptr(type_kind) => 32,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
         }
     }

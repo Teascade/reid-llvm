@@ -487,14 +487,19 @@ impl DebugTypeHolder {
                     into_cstring(ptr.name.clone()).as_ptr(),
                     ptr.name.len(),
                 ),
-                DebugTypeData::Array(array) => LLVMDIBuilderCreateArrayType(
-                    debug.builder,
-                    array.size_bits,
-                    array.align_bits,
-                    *debug.types.get(&array.element_type).unwrap(),
-                    Vec::new().as_mut_ptr(),
-                    0,
-                ),
+                DebugTypeData::Array(array) => {
+                    let subrange =
+                        LLVMDIBuilderGetOrCreateSubrange(debug.builder, 0, array.length as i64);
+                    let mut elements = vec![subrange];
+                    LLVMDIBuilderCreateArrayType(
+                        debug.builder,
+                        array.size_bits,
+                        0,
+                        *debug.types.get(&array.element_type).unwrap(),
+                        elements.as_mut_ptr(),
+                        elements.len() as u32,
+                    )
+                }
                 DebugTypeData::Struct(st) => {
                     let mut elements = st
                         .elements
@@ -509,7 +514,7 @@ impl DebugTypeHolder {
                         debug.file_ref,
                         st.location.line,
                         st.size_bits,
-                        st.alignment,
+                        0,
                         st.flags.as_llvm(),
                         null_mut(), // derived from
                         elements.as_mut_ptr(),

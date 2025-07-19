@@ -292,10 +292,9 @@ impl Debug for DebugPointerType {
 
 impl Debug for DebugArrayType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct(&format!("Array<{:?}>", self.element_type))
+        f.debug_struct(&format!("Array<{:?}>[{}]", self.element_type, self.length))
             .field("size_bits", &self.size_bits)
             .field("align_bits", &self.align_bits)
-            .field("subscripts", &self.subscripts)
             .finish()
     }
 }
