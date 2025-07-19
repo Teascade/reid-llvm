@@ -1,4 +1,6 @@
-use reid_lib::debug_information::DebugLocation;
+use reid_lib::debug_information::{
+    DebugBasicType, DebugLocation, DebugTypeData, DwarfEncoding, DwarfFlags,
+};
 
 use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
 
@@ -26,6 +28,53 @@ impl TypeKind {
             BinaryOperator::And => TypeKind::Bool,
             BinaryOperator::Cmp(_) => TypeKind::Bool,
         }
+    }
+
+    pub fn size_of(&self) -> u64 {
+        match self {
+            TypeKind::Bool => 1,
+            TypeKind::I8 => 8,
+            TypeKind::U8 => 8,
+            TypeKind::I16 => 16,
+            TypeKind::U16 => 16,
+            TypeKind::I32 => 32,
+            TypeKind::U32 => 32,
+            TypeKind::I64 => 64,
+            TypeKind::U64 => 64,
+            TypeKind::I128 => 128,
+            TypeKind::U128 => 128,
+            TypeKind::Void => 0,
+            TypeKind::StringPtr => 32,
+            TypeKind::Array(type_kind, len) => 32,
+            TypeKind::Borrow(_) => todo!(),
+            TypeKind::CustomType(_) => 32,
+            TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
+        }
+    }
+
+    pub fn debug_type_data(&self) -> DebugTypeData {
+        DebugTypeData::Basic(DebugBasicType {
+            name: format!("{}", self),
+            size_bits: self.size_of(),
+            encoding: match self {
+                TypeKind::Bool => DwarfEncoding::Boolean,
+                TypeKind::I8 => DwarfEncoding::SignedChar,
+                TypeKind::U8 => DwarfEncoding::UnsignedChar,
+                TypeKind::I16 | TypeKind::I32 | TypeKind::I64 | TypeKind::I128 => {
+                    DwarfEncoding::Signed
+                }
+                TypeKind::U16 | TypeKind::U32 | TypeKind::U64 | TypeKind::U128 => {
+                    DwarfEncoding::Unsigned
+                }
+                TypeKind::Void => DwarfEncoding::Address,
+                TypeKind::StringPtr => DwarfEncoding::Address,
+                TypeKind::Array(_, _) => DwarfEncoding::Address,
+                TypeKind::Borrow(_) => DwarfEncoding::Address,
+                TypeKind::CustomType(_) => DwarfEncoding::Address,
+                TypeKind::Vague(_) => panic!("tried fetching debug-type for vague type!"),
+            },
+            flags: DwarfFlags,
+        })
     }
 }
 

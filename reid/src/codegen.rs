@@ -83,13 +83,13 @@ pub struct Scope<'ctx, 'a> {
     functions: &'a HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
-    debug_const_tys: &'a HashMap<TypeKind, DebugTypeValue>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Debug<'ctx> {
     info: &'ctx DebugInformation,
     scope: DebugProgramValue,
+    types: &'ctx HashMap<TypeKind, DebugTypeValue>,
 }
 
 pub struct StackFunction<'ctx> {
@@ -129,7 +129,6 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             type_values: self.type_values,
             stack_values: self.stack_values.clone(),
             debug: self.debug.clone(),
-            debug_const_tys: self.debug_const_tys,
         }
     }
 
@@ -143,6 +142,18 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
     fn get_typedef(&self, name: &String) -> Option<&TypeDefinitionKind> {
         self.type_values.get(name).and_then(|v| self.types.get(v))
+    }
+}
+
+impl<'ctx> Debug<'ctx> {
+    fn get_type(&self, kind: &TypeKind) -> DebugTypeValue {
+        if let Some(ty) = self.types.get(kind) {
+            *ty
+        } else {
+            let debug_data = kind.debug_type_data();
+            let ty = self.info.debug_type(debug_data);
+            ty
+        }
     }
 }
 
@@ -188,17 +199,24 @@ impl mir::Module {
 
         let mut types = HashMap::new();
         let mut type_values = HashMap::new();
-        let mut debug_const_types = HashMap::new();
+        let mut debug_types = HashMap::new();
 
-        debug_const_types.insert(
-            TypeKind::U32,
-            debug.debug_type(DebugTypeData::Basic(DebugBasicType {
-                name: String::from("u32"),
-                size_bits: 32,
-                encoding: DwarfEncoding::Unsigned,
-                flags: DwarfFlags,
-            })),
-        );
+        {
+            use TypeKind::*;
+            debug_types.insert(Bool, Bool.get_debug_type(&debug_types, &debug));
+            debug_types.insert(U8, U8.get_debug_type(&debug_types, &debug));
+            debug_types.insert(U16, U16.get_debug_type(&debug_types, &debug));
+            debug_types.insert(U32, U32.get_debug_type(&debug_types, &debug));
+            debug_types.insert(U64, U64.get_debug_type(&debug_types, &debug));
+            debug_types.insert(U128, U128.get_debug_type(&debug_types, &debug));
+            debug_types.insert(I8, I8.get_debug_type(&debug_types, &debug));
+            debug_types.insert(I16, I16.get_debug_type(&debug_types, &debug));
+            debug_types.insert(I32, I32.get_debug_type(&debug_types, &debug));
+            debug_types.insert(I64, I64.get_debug_type(&debug_types, &debug));
+            debug_types.insert(I128, I128.get_debug_type(&debug_types, &debug));
+            debug_types.insert(Void, Void.get_debug_type(&debug_types, &debug));
+            debug_types.insert(StringPtr, StringPtr.get_debug_type(&debug_types, &debug));
+        }
 
         for typedef in &self.typedefs {
             let type_value = match &typedef.kind {
@@ -264,7 +282,9 @@ impl mir::Module {
             let debug_scope = if let Some(location) = mir_function.signature().into_debug(tokens) {
                 // let debug_scope = debug.inner_scope(&outer_scope, location);
 
-                let fn_param_ty = debug_const_types.get(&TypeKind::U32).unwrap();
+                let fn_param_ty = &mir_function
+                    .return_type
+                    .get_debug_type(&debug_types, &debug);
 
                 let debug_ty =
                     debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramTypeData {
@@ -318,7 +338,7 @@ impl mir::Module {
                             name: p_name.clone(),
                             arg_idx: i as u32,
                             location,
-                            ty: *debug_const_types.get(&TypeKind::U32).unwrap(),
+                            ty: p_ty.get_debug_type(&debug_types, &debug),
                             always_preserve: true,
                             flags: DwarfFlags,
                         }),
@@ -340,9 +360,9 @@ impl mir::Module {
                     Some(Debug {
                         info: &debug,
                         scope,
+                        types: &debug_types,
                     })
                 }),
-                debug_const_tys: &debug_const_types,
             };
 
             match &mir_function.kind {
@@ -452,7 +472,7 @@ impl mir::Statement {
                                 DebugMetadata::LocalVar(DebugLocalVariable {
                                     name: name.clone(),
                                     location,
-                                    ty: scope.debug_const_tys.get(&TypeKind::U32).unwrap().clone(),
+                                    ty: debug.get_type(ty),
                                     always_preserve: true,
                                     alignment: 32,
                                     flags: DwarfFlags,
@@ -873,6 +893,20 @@ impl TypeKind {
             TypeKind::Borrow(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
+        }
+    }
+
+    fn get_debug_type(
+        &self,
+        types: &HashMap<TypeKind, DebugTypeValue>,
+        debug: &DebugInformation,
+    ) -> DebugTypeValue {
+        if let Some(ty) = types.get(self) {
+            *ty
+        } else {
+            let debug_data = self.debug_type_data();
+            let ty = debug.debug_type(debug_data);
+            ty
         }
     }
 }
