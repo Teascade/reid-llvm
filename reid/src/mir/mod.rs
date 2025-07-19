@@ -107,8 +107,6 @@ pub enum TypeKind {
     StringPtr,
     #[error("[{0}; {1}]")]
     Array(Box<TypeKind>, u64),
-    #[error("Borrow({0})")]
-    Borrow(Box<TypeKind>),
     #[error("{0}")]
     CustomType(String),
     #[error(transparent)]

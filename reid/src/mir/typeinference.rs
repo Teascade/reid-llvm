@@ -78,17 +78,17 @@ impl Block {
     fn infer_types<'s>(
         &mut self,
         state: &mut TypeInferencePassState,
-        outer_hints: &'s ScopeTypeRefs,
+        outer_refs: &'s ScopeTypeRefs,
     ) -> Result<(ReturnKind, TypeRef<'s>), ErrorKind> {
         let mut state = state.inner();
-        let inner_hints = outer_hints.inner();
+        let inner_refs = outer_refs.inner();
 
         for statement in &mut self.statements {
             match &mut statement.0 {
                 StmtKind::Let(var, mutable, expr) => {
                     // Get the TypeRef for this variable declaration
                     let mut var_ref =
-                        state.ok(inner_hints.new_var(var.1.clone(), *mutable, &var.0), var.2);
+                        state.ok(inner_refs.new_var(var.1.clone(), *mutable, &var.0), var.2);
 
                     // If ok, update the MIR type to this TypeRef
                     if let Some(var_ref) = &var_ref {
@@ -96,7 +96,7 @@ impl Block {
                     }
 
                     // Infer hints for the expression itself
-                    let inferred = expr.infer_types(&mut state, &inner_hints);
+                    let inferred = expr.infer_types(&mut state, &inner_refs);
                     let mut expr_ty_ref = state.ok(inferred, expr.1);
 
                     // Try to narrow the variable type declaration with the
@@ -105,16 +105,15 @@ impl Block {
                         (var_ref.as_mut(), expr_ty_ref.as_mut())
                     {
                         var_ref.narrow(&expr_ty_ref);
-                        dbg!(var_ref);
                     }
                 }
                 StmtKind::Set(lhs, rhs) => {
                     // Infer hints for the expression itself
-                    let lhs_infer = lhs.infer_types(&mut state, &inner_hints);
+                    let lhs_infer = lhs.infer_types(&mut state, &inner_refs);
                     let lhs_ref = state.ok(lhs_infer, rhs.1);
 
                     // Infer hints for the expression itself
-                    let rhs_infer = rhs.infer_types(&mut state, &inner_hints);
+                    let rhs_infer = rhs.infer_types(&mut state, &inner_refs);
                     let rhs_ref = state.ok(rhs_infer, rhs.1);
 
                     // Try to narrow the lhs with rhs
@@ -124,7 +123,7 @@ impl Block {
                 }
                 StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expr) => {
-                    let expr_res = expr.infer_types(&mut state, &inner_hints);
+                    let expr_res = expr.infer_types(&mut state, &inner_refs);
                     state.ok(expr_res, expr.1);
                 }
             };
@@ -132,18 +131,22 @@ impl Block {
 
         // If there is a return expression, infer it's type
         if let Some(ret_expr) = &mut self.return_expression {
-            let ret_res = ret_expr.1.infer_types(&mut state, &inner_hints);
+            let ret_res = ret_expr.1.infer_types(&mut state, &inner_refs);
             state.ok(ret_res, ret_expr.1 .1);
         }
 
         // Fetch the declared return type
-        let (kind, ty) = self.return_type().ok().unwrap_or((ReturnKind::Soft, Void));
-        let mut ret_type_ref = outer_hints.from_type(&ty).unwrap();
+        let (kind, ty) = self
+            .return_type(inner_refs.types)
+            .ok()
+            .unwrap_or((ReturnKind::Soft, Void));
+        let mut ret_type_ref = outer_refs.from_type(&ty).unwrap();
+        dbg!(&self.return_type(inner_refs.types));
 
         // Narow return type to declared type if hard return
         if kind == ReturnKind::Hard {
             if let Some(hint) = &state.scope.return_type_hint {
-                ret_type_ref.narrow(&mut outer_hints.from_type(&hint).unwrap());
+                ret_type_ref.narrow(&mut outer_refs.from_type(&hint).unwrap());
             }
         }
 
@@ -344,10 +347,8 @@ impl Expression {
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
                         let field_ty = field.1.infer_types(state, type_refs);
-                        dbg!(&field_ty, expected_field_ty);
                         if let Some(mut field_ty) = state.ok(field_ty, field.1 .1) {
                             field_ty.narrow(&type_refs.from_type(&expected_field_ty).unwrap());
-                            dbg!(&field_ty);
                         }
                     } else {
                         state.ok::<_, Infallible>(

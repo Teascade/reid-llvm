@@ -120,7 +120,7 @@ impl TypeRefs {
 
 #[derive(Debug)]
 pub struct ScopeTypeRefs<'outer> {
-    types: &'outer TypeRefs,
+    pub types: &'outer TypeRefs,
     outer: Option<&'outer ScopeTypeRefs<'outer>>,
     /// Mapping of what types variables point to
     variables: RefCell<HashMap<String, (bool, TypeIdRef)>>,

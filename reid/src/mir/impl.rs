@@ -46,7 +46,6 @@ impl TypeKind {
             TypeKind::Void => 0,
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, len) => 32,
-            TypeKind::Borrow(_) => todo!(),
             TypeKind::CustomType(_) => 32,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
         }
@@ -69,7 +68,6 @@ impl TypeKind {
                 TypeKind::Void => DwarfEncoding::Address,
                 TypeKind::StringPtr => DwarfEncoding::Address,
                 TypeKind::Array(_, _) => DwarfEncoding::Address,
-                TypeKind::Borrow(_) => DwarfEncoding::Address,
                 TypeKind::CustomType(_) => DwarfEncoding::Address,
                 TypeKind::Vague(_) => panic!("tried fetching debug-type for vague type!"),
             },
@@ -104,7 +102,7 @@ impl Block {
         let mut early_return = None;
 
         for statement in &self.statements {
-            let ret = statement.return_type();
+            let ret = statement.return_type(&Default::default());
             if let Ok((ReturnKind::Hard, _)) = ret {
                 early_return = Some(statement);
             }
@@ -128,11 +126,11 @@ impl Block {
             .unwrap_or(self.meta)
     }
 
-    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+    pub fn return_type(&self, refs: &TypeRefs) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         let mut early_return = None;
 
         for statement in &self.statements {
-            let ret = statement.return_type();
+            let ret = statement.return_type(refs);
             if let Ok((ReturnKind::Hard, _)) = ret {
                 early_return = early_return.or(ret.ok());
             }
@@ -145,7 +143,7 @@ impl Block {
         self.return_expression
             .as_ref()
             .ok_or(ReturnTypeOther::NoBlockReturn(self.meta))
-            .and_then(|(kind, stmt)| Ok((*kind, stmt.return_type()?.1)))
+            .and_then(|(kind, stmt)| Ok((*kind, stmt.return_type(refs)?.1)))
     }
 
     pub fn backing_var(&self) -> Option<&NamedVariableRef> {
@@ -163,16 +161,19 @@ impl Block {
 }
 
 impl Statement {
-    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+    pub fn return_type(&self, refs: &TypeRefs) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         use StmtKind::*;
         match &self.0 {
             Let(var, _, expr) => if_hard(
-                expr.return_type()?,
+                expr.return_type(refs)?,
                 Err(ReturnTypeOther::Let(var.2 + expr.1)),
             ),
-            Set(lhs, rhs) => if_hard(rhs.return_type()?, Err(ReturnTypeOther::Set(lhs.1 + rhs.1))),
+            Set(lhs, rhs) => if_hard(
+                rhs.return_type(refs)?,
+                Err(ReturnTypeOther::Set(lhs.1 + rhs.1)),
+            ),
             Import(_) => todo!(),
-            Expression(expression) => expression.return_type(),
+            Expression(expression) => expression.return_type(refs),
         }
     }
 
@@ -187,24 +188,25 @@ impl Statement {
 }
 
 impl Expression {
-    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+    pub fn return_type(&self, refs: &TypeRefs) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         use ExprKind::*;
         match &self.0 {
             Literal(lit) => Ok((ReturnKind::Soft, lit.as_type())),
             Variable(var) => var.return_type(),
             BinOp(_, then_e, else_e) => {
-                let then_r = then_e.return_type()?;
-                let else_r = else_e.return_type()?;
+                let then_r = then_e.return_type(refs)?;
+                let else_r = else_e.return_type(refs)?;
 
                 Ok(pick_return(then_r, else_r))
             }
-            Block(block) => block.return_type(),
+            Block(block) => block.return_type(refs),
             FunctionCall(fcall) => fcall.return_type(),
-            If(expr) => expr.return_type(),
+            If(expr) => expr.return_type(refs),
             Indexed(expression, _, _) => {
-                let expr_type = expression.return_type()?;
-                if let (_, TypeKind::Array(elem_ty, _)) = expr_type {
-                    Ok((ReturnKind::Soft, TypeKind::Borrow(Box::new(*elem_ty))))
+                let expr_type = expression.return_type(refs)?;
+                dbg!(&expr_type);
+                if let TypeKind::Array(elem_ty, _) = expr_type.1.resolve_weak(refs) {
+                    Ok((ReturnKind::Soft, *elem_ty))
                 } else {
                     Err(ReturnTypeOther::IndexingNonArray(expression.1))
                 }
@@ -213,17 +215,14 @@ impl Expression {
                 let first = expressions
                     .iter()
                     .next()
-                    .map(|e| e.return_type())
+                    .map(|e| e.return_type(refs))
                     .unwrap_or(Ok((ReturnKind::Soft, TypeKind::Void)))?;
                 Ok((
                     ReturnKind::Soft,
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
                 ))
             }
-            Accessed(_, type_kind, _) => Ok((
-                ReturnKind::Soft,
-                TypeKind::Borrow(Box::new(type_kind.clone())),
-            )),
+            Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
         }
     }
@@ -245,10 +244,10 @@ impl Expression {
 }
 
 impl IfExpression {
-    pub fn return_type(&self) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
-        let then_r = self.1.return_type()?;
+    pub fn return_type(&self, refs: &TypeRefs) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
+        let then_r = self.1.return_type(refs)?;
         if let Some(else_b) = &self.2 {
-            let else_r = else_b.return_type()?;
+            let else_r = else_b.return_type(refs)?;
 
             let kind = if then_r.0 == ReturnKind::Hard && else_r.0 == ReturnKind::Hard {
                 ReturnKind::Hard
@@ -315,21 +314,18 @@ impl TypeKind {
         }
     }
 
-    pub fn resolve_ref(&self, refs: &TypeRefs) -> TypeKind {
-        let resolved = match self {
+    pub fn resolve_weak(&self, refs: &TypeRefs) -> TypeKind {
+        match self {
             TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_type(*idx).unwrap(),
             _ => self.clone(),
-        };
-        match resolved {
-            TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
-            _ => resolved,
         }
     }
 
-    pub fn deref_borrow(&self) -> TypeKind {
-        match self {
-            TypeKind::Borrow(type_kind) => *type_kind.clone(),
-            _ => self.clone(),
+    pub fn resolve_ref(&self, refs: &TypeRefs) -> TypeKind {
+        let resolved = self.resolve_weak(refs);
+        match resolved {
+            TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
+            _ => resolved,
         }
     }
 }

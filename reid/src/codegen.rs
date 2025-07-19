@@ -578,19 +578,6 @@ impl mir::Expression {
                 lit.as_type(),
             )),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
-                lhs_exp
-                    .return_type()
-                    .expect("No ret type in lhs?")
-                    .1
-                    .known()
-                    .expect("lhs ret type is unknown");
-                rhs_exp
-                    .return_type()
-                    .expect("No ret type in rhs?")
-                    .1
-                    .known()
-                    .expect("rhs ret type is unknown");
-
                 let lhs = lhs_exp
                     .codegen(scope, state)
                     .expect("lhs has no return value")
@@ -741,7 +728,7 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, &mut state.load(true)).unwrap();
 
-                let TypeKind::CustomType(name) = struct_val.1.deref_borrow() else {
+                let TypeKind::CustomType(name) = &struct_val.1 else {
                     panic!("tried accessing non-custom-type");
                 };
                 let TypeDefinitionKind::Struct(struct_ty) =
@@ -968,9 +955,6 @@ impl TypeKind {
                 match typedefs.get(&type_val).unwrap() {
                     TypeDefinitionKind::Struct(_) => Type::Ptr(Box::new(custom_t)),
                 }
-            }
-            TypeKind::Borrow(type_kind) => {
-                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
         }
     }

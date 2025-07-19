@@ -299,7 +299,7 @@ impl Block {
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, &typerefs, None);
                     state.or_else(res, TypeKind::Void, expression.1);
-                    if let Ok((kind, _)) = expression.return_type() {
+                    if let Ok((kind, _)) = expression.return_type(typerefs) {
                         Some((kind, expression))
                     } else {
                         None
