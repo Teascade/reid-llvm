@@ -2,20 +2,20 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::builder::InstructionValue;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct DebugScopeValue(pub Vec<usize>);
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugLocationValue(pub DebugProgramValue, pub usize);
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugTypeValue(pub usize);
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugMetadataValue(pub usize);
 
 /// Represents either a subprogram, or the compilation context
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct DebugProgramValue(pub usize);
 
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ pub struct DebugMetadataHolder {
     pub(crate) data: DebugMetadata,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DebugTypeHolder {
     pub(crate) value: DebugTypeValue,
     pub(crate) data: DebugTypeData,
@@ -200,7 +200,7 @@ impl DebugInformation {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Clone, Copy, Default)]
 pub struct DebugLocation {
     pub line: u32,
     pub column: u32,
@@ -254,13 +254,13 @@ impl Default for DebugSubprogramOptionals {
 #[derive(Debug, Clone)]
 pub struct DwarfFlags;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum DebugTypeData {
     Basic(DebugBasicType),
     Subprogram(DebugSubprogramTypeData),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DebugBasicType {
     pub name: String,
     /// Size of the type.

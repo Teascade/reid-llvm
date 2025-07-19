@@ -6,8 +6,13 @@ use std::{
 };
 
 use crate::{
-    CmpPredicate, Instr, InstructionData, TerminatorKind, builder::*,
-    debug_information::DebugLocationValue,
+    CmpPredicate, Instr, InstructionData, TerminatorKind,
+    builder::*,
+    debug_information::{
+        DebugBasicType, DebugLocation, DebugLocationValue, DebugMetadataHolder, DebugMetadataValue,
+        DebugProgramValue, DebugScopeValue, DebugSubprogramType, DebugTypeData, DebugTypeHolder,
+        DebugTypeValue,
+    },
 };
 
 impl Debug for Builder {
@@ -77,15 +82,6 @@ impl Debug for InstructionData {
             write!(f, " ({:?})", location)?;
         }
         Ok(())
-    }
-}
-
-impl Debug for DebugLocationValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("DebugLocationValue")
-            .field(&self.0)
-            .field(&self.1)
-            .finish()
     }
 }
 
@@ -227,5 +223,86 @@ impl Debug for TerminatorKind {
                 Ok(())
             }
         }
+    }
+}
+
+impl Debug for DebugTypeHolder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple(&format!("DebugTypeHolder {:?}", self.value))
+            .field(&self.data)
+            .finish()
+    }
+}
+
+impl Debug for DebugTypeData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Basic(basic) => Debug::fmt(basic, f),
+            Self::Subprogram(subprogram) => Debug::fmt(subprogram, f),
+        }
+    }
+}
+
+impl Debug for DebugBasicType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("BasicType")
+            .field(&self.name)
+            .field(&self.size_bits)
+            .field(&self.encoding)
+            .field(&self.flags)
+            .finish()
+    }
+}
+
+impl Debug for DebugSubprogramType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Subprogram")
+            .field(&self.params)
+            .field(&self.flags)
+            .finish()
+    }
+}
+
+impl Debug for DebugMetadataValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Meta[{}]", self.0)
+    }
+}
+
+impl Debug for DebugScopeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Scope[{}]",
+            self.0
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
+}
+
+impl Debug for DebugTypeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Type[{}]", self.0)
+    }
+}
+
+impl Debug for DebugProgramValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Subprogram[{}]", self.0)
+    }
+}
+
+impl Debug for DebugLocationValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Value[{:?}][{}]", self.0, self.1)
+    }
+}
+
+impl Debug for DebugLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ln {}, col {}", self.line, self.column)
     }
 }
