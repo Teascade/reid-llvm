@@ -413,7 +413,7 @@ impl mir::Statement {
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
-                let (stack_value, store) = match mutable {
+                let (stack_value, _) = match mutable {
                     false => (StackValueKind::Immutable(value), value),
                     true => match ty {
                         // Struct is already allocated at initialization
@@ -464,16 +464,16 @@ impl mir::Statement {
                                     flags: DwarfFlags,
                                 }),
                             );
-                            dbg!(&store);
-                            store.add_record(
-                                &mut scope.block,
-                                InstructionDebugRecordData {
-                                    variable: var,
-                                    location,
-                                    kind: DebugRecordKind::Declare(value),
-                                    scope: debug.scope,
-                                },
-                            );
+                            // dbg!(&store);
+                            // store.add_record(
+                            //     &mut scope.block,
+                            //     InstructionDebugRecordData {
+                            //         variable: var,
+                            //         location,
+                            //         kind: DebugRecordKind::Declare(value),
+                            //         scope: debug.scope,
+                            //     },
+                            // );
                         }
                         StackValueKind::Any(_) => {}
                     }
