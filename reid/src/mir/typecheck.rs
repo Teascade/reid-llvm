@@ -26,9 +26,9 @@ pub enum ErrorKind {
     FunctionNotDefined(String),
     #[error("Expected a return type of {0}, got {1} instead")]
     ReturnTypeMismatch(TypeKind, TypeKind),
-    #[error("Function not defined: {0}")]
+    #[error("Function already defined: {0}")]
     FunctionAlreadyDefined(String),
-    #[error("Variable not defined: {0}")]
+    #[error("Variable already defined: {0}")]
     VariableAlreadyDefined(String),
     #[error("Variable {0} is not declared as mutable")]
     VariableNotMutable(String),
