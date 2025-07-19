@@ -271,6 +271,31 @@ pub struct DebugBasicType {
     pub flags: DwarfFlags,
 }
 
+#[derive(Clone)]
+pub struct DebugArrayType {
+    pub length: u64,
+    /// Alignment
+    pub align_bits: u32,
+    pub array_type: DebugTypeValue,
+    pub elements: Vec<DebugTypeValue>,
+}
+
+#[derive(Clone)]
+pub struct DebugPointerType {
+    pub name: String,
+    pub pointee: DebugTypeValue,
+    pub size_bits: u64,
+    pub align_bits: u64,
+}
+
+#[derive(Clone)]
+pub struct DebugStructType {
+    location: DebugLocationValue,
+    pub size_bits: u64,
+    pub align_bits: u64,
+    pub flags: DwarfFlags,
+}
+
 #[derive(Debug, Clone)]
 pub struct DebugSubprogramTypeData {
     pub parameters: Vec<DebugTypeValue>,
