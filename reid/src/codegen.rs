@@ -97,7 +97,7 @@ pub struct StackFunction<'ctx> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StackValue(StackValueKind, Type);
+pub struct StackValue(StackValueKind, TypeKind);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StackValueKind {
@@ -295,12 +295,17 @@ impl mir::Module {
             let mut stack_values = HashMap::new();
             for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
                 // Codegen actual parameters
+                let param = entry.build(Instr::Param(i)).unwrap();
+                let alloca = entry
+                    .build(Instr::Alloca(
+                        p_name.clone(),
+                        p_ty.get_type(&type_values, &types),
+                    ))
+                    .unwrap();
+                entry.build(Instr::Store(alloca, param)).unwrap();
                 stack_values.insert(
                     p_name.clone(),
-                    StackValue(
-                        StackValueKind::Immutable(entry.build(Instr::Param(i)).unwrap()),
-                        p_ty.get_type(&type_values, &types),
-                    ),
+                    StackValue(StackValueKind::Immutable(alloca), p_ty.clone()),
                 );
 
                 // Generate debug info
@@ -413,47 +418,36 @@ impl mir::Statement {
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
-                let (stack_value, _) = match mutable {
-                    false => (StackValueKind::Immutable(value), value),
-                    true => match ty {
-                        // Struct is already allocated at initialization
-                        TypeKind::Array(_, _) => (StackValueKind::Mutable(value), value),
-                        TypeKind::CustomType(n) => {
-                            match scope.types.get(scope.type_values.get(n).unwrap()).unwrap() {
-                                // Struct also is allocated at initialization
-                                TypeDefinitionKind::Struct(_) => {
-                                    (StackValueKind::Mutable(value), value)
-                                }
-                            }
-                        }
-                        _ => {
-                            let alloca = scope
-                                .block
-                                .build(Instr::Alloca(
-                                    name.clone(),
-                                    ty.get_type(scope.type_values, scope.types),
-                                ))
-                                .unwrap()
-                                .maybe_location(&mut scope.block, location);
-                            let store = scope
-                                .block
-                                .build(Instr::Store(alloca, value))
-                                .unwrap()
-                                .maybe_location(&mut scope.block, location);
-                            (StackValueKind::Mutable(alloca), store)
-                        }
-                    },
+
+                let alloca = scope
+                    .block
+                    .build(Instr::Alloca(
+                        name.clone(),
+                        ty.get_type(scope.type_values, scope.types),
+                    ))
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
+
+                scope
+                    .block
+                    .build(Instr::Store(alloca, value))
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
+
+                let stack_value = match mutable {
+                    true => StackValueKind::Mutable(alloca),
+                    false => StackValueKind::Immutable(alloca),
                 };
-                scope.stack_values.insert(
-                    name.clone(),
-                    StackValue(stack_value, ty.get_type(scope.type_values, scope.types)),
-                );
+
+                scope
+                    .stack_values
+                    .insert(name.clone(), StackValue(stack_value, ty.clone()));
                 if let Some(debug) = &scope.debug {
                     match stack_value {
                         StackValueKind::Immutable(_) => {}
                         StackValueKind::Mutable(_) => {
                             let location = self.1.into_debug(scope.tokens).unwrap();
-                            let var = debug.info.metadata(
+                            debug.info.metadata(
                                 &debug.scope,
                                 DebugMetadata::LocalVar(DebugLocalVariable {
                                     name: name.clone(),
@@ -524,19 +518,15 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
+                dbg!(varref);
                 Some(match v.0 {
-                    StackValueKind::Immutable(val) => val.clone(),
-                    StackValueKind::Mutable(val) => {
-                        if state.should_load {
-                            match v.1 {
-                                // TODO probably wrong ..?
-                                Type::Ptr(_) => val,
-                                _ => scope.block.build(Instr::Load(val, v.1.clone())).unwrap(),
-                            }
-                        } else {
-                            val
-                        }
-                    }
+                    StackValueKind::Immutable(val) | StackValueKind::Mutable(val) => scope
+                        .block
+                        .build(Instr::Load(
+                            val,
+                            v.1.get_type(scope.type_values, scope.types),
+                        ))
+                        .unwrap(),
                     _ => panic!("Found an unknown-mutable variable!"),
                 })
             }
@@ -687,8 +677,6 @@ impl mir::Expression {
                 let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&name).unwrap();
                 let idx = struct_ty.find_index(field).unwrap();
 
-                dbg!(&scope.context);
-                dbg!(&struct_val);
                 let mut value = scope
                     .block
                     .build(Instr::GetStructElemPtr(struct_val, idx as u32))
