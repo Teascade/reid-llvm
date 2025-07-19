@@ -257,7 +257,9 @@ pub struct DwarfFlags;
 #[derive(Clone)]
 pub enum DebugTypeData {
     Basic(DebugBasicType),
-    Subprogram(DebugSubprogramTypeData),
+    Subprogram(DebugSubprogramType),
+    Pointer(DebugPointerType),
+    Array(DebugArrayType),
 }
 
 #[derive(Clone)]
@@ -273,11 +275,10 @@ pub struct DebugBasicType {
 
 #[derive(Clone)]
 pub struct DebugArrayType {
-    pub length: u64,
-    /// Alignment
+    pub size_bits: u64,
     pub align_bits: u32,
-    pub array_type: DebugTypeValue,
-    pub elements: Vec<DebugTypeValue>,
+    pub element_type: DebugTypeValue,
+    pub subscripts: Vec<DebugTypeValue>,
 }
 
 #[derive(Clone)]
@@ -285,25 +286,11 @@ pub struct DebugPointerType {
     pub name: String,
     pub pointee: DebugTypeValue,
     pub size_bits: u64,
-    pub align_bits: u64,
 }
 
 #[derive(Clone)]
-pub struct DebugStructType {
-    location: DebugLocationValue,
-    pub size_bits: u64,
-    pub align_bits: u64,
-    pub flags: DwarfFlags,
-}
-
-#[derive(Debug, Clone)]
-pub struct DebugSubprogramTypeData {
-    pub parameters: Vec<DebugTypeValue>,
-    pub flags: DwarfFlags,
-}
-
 pub struct DebugSubprogramType {
-    pub params: Vec<DebugProgramValue>,
+    pub parameters: Vec<DebugTypeValue>,
     pub flags: DwarfFlags,
 }
 

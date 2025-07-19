@@ -6,7 +6,7 @@ use reid_lib::{
     debug_information::{
         DebugBasicType, DebugFileData, DebugInformation, DebugLocalVariable, DebugLocation,
         DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugProgramValue, DebugRecordKind,
-        DebugScopeValue, DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramTypeData,
+        DebugScopeValue, DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType,
         DebugTypeData, DebugTypeValue, DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
@@ -307,11 +307,10 @@ impl mir::Module {
                     .return_type
                     .get_debug_type(&debug_types, &debug);
 
-                let debug_ty =
-                    debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramTypeData {
-                        parameters: vec![*fn_param_ty],
-                        flags: DwarfFlags,
-                    }));
+                let debug_ty = debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
+                    parameters: vec![*fn_param_ty],
+                    flags: DwarfFlags,
+                }));
 
                 let subprogram = debug.subprogram(DebugSubprogramData {
                     name: mir_function.name.clone(),

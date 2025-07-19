@@ -9,9 +9,9 @@ use crate::{
     CmpPredicate, Instr, InstructionData, TerminatorKind,
     builder::*,
     debug_information::{
-        DebugBasicType, DebugLocation, DebugLocationValue, DebugMetadataHolder, DebugMetadataValue,
-        DebugProgramValue, DebugScopeValue, DebugSubprogramType, DebugTypeData, DebugTypeHolder,
-        DebugTypeValue,
+        DebugArrayType, DebugBasicType, DebugLocation, DebugLocationValue, DebugMetadataHolder,
+        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue,
+        DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
     },
 };
 
@@ -237,8 +237,12 @@ impl Debug for DebugTypeHolder {
 impl Debug for DebugTypeData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Basic(basic) => Debug::fmt(basic, f),
-            Self::Subprogram(subprogram) => Debug::fmt(subprogram, f),
+            DebugTypeData::Basic(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Subprogram(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Basic(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Subprogram(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Pointer(ty) => Debug::fmt(ty, f),
+            DebugTypeData::Array(ty) => Debug::fmt(ty, f),
         }
     }
 }
@@ -257,8 +261,26 @@ impl Debug for DebugBasicType {
 impl Debug for DebugSubprogramType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Subprogram")
-            .field(&self.params)
+            .field(&self.parameters)
             .field(&self.flags)
+            .finish()
+    }
+}
+
+impl Debug for DebugPointerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple(&format!("Pointer<{:?}>({})", self.pointee, self.name))
+            .field(&self.size_bits)
+            .finish()
+    }
+}
+
+impl Debug for DebugArrayType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(&format!("Array<{:?}>", self.element_type))
+            .field("size_bits", &self.size_bits)
+            .field("align_bits", &self.align_bits)
+            .field("subscripts", &self.subscripts)
             .finish()
     }
 }

@@ -2,7 +2,10 @@
 //! LLIR ([`Context`]) into LLVM IR. This module is the only one that interfaces
 //! with the LLVM API.
 
-use std::{collections::HashMap, ptr::null_mut};
+use std::{
+    collections::HashMap,
+    ptr::{null, null_mut},
+};
 
 use llvm_sys::{
     LLVMIntPredicate, LLVMLinkage, LLVMValueKind,
@@ -475,6 +478,23 @@ impl DebugTypeHolder {
                         subprogram.flags.as_llvm(),
                     )
                 }
+                DebugTypeData::Pointer(ptr) => LLVMDIBuilderCreatePointerType(
+                    debug.builder,
+                    *debug.types.get(&ptr.pointee).unwrap(),
+                    ptr.size_bits,
+                    0,
+                    0,
+                    into_cstring(ptr.name.clone()).as_ptr(),
+                    ptr.name.len(),
+                ),
+                DebugTypeData::Array(array) => LLVMDIBuilderCreateArrayType(
+                    debug.builder,
+                    array.size_bits,
+                    array.align_bits,
+                    *debug.types.get(&array.element_type).unwrap(),
+                    Vec::new().as_mut_ptr(),
+                    0,
+                ),
             }
         }
     }
