@@ -9,7 +9,7 @@ use crate::{
     token_stream::TokenRange,
 };
 
-mod display;
+mod fmt;
 pub mod r#impl;
 pub mod linker;
 pub mod pass;

@@ -47,7 +47,7 @@ pub struct DebugTypeHolder {
 
 #[derive(Debug, Clone)]
 pub struct DebugSubprogramHolder {
-    pub(crate) value: DebugProgramValue,
+    pub(crate) _value: DebugProgramValue,
     pub(crate) data: DebugSubprogramData,
 }
 
@@ -151,19 +151,11 @@ impl DebugInformation {
         value
     }
 
-    fn check_metadata(&self, scope: &DebugScopeValue, metadata: &DebugMetadata) {
-        match &metadata {
-            DebugMetadata::ParamVar(debug_param_variable) => todo!(),
-            DebugMetadata::LocalVar(debug_local_variable) => todo!(),
-            DebugMetadata::VarAssignment => todo!(),
-        }
-    }
-
     pub fn subprogram(&self, kind: DebugSubprogramData) -> DebugProgramValue {
         let mut subprogram = self.programs.borrow_mut();
         let value = DebugProgramValue(subprogram.len() + 1);
         subprogram.push(DebugSubprogramHolder {
-            value: value.clone(),
+            _value: value.clone(),
             data: kind,
         });
         value
@@ -185,7 +177,7 @@ impl DebugInformation {
         self.types.clone()
     }
 
-    pub fn get_locations(&self) -> Rc<RefCell<Vec<DebugLocationHolder>>> {
+    pub(crate) fn get_locations(&self) -> Rc<RefCell<Vec<DebugLocationHolder>>> {
         self.locations.clone()
     }
 

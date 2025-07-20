@@ -5,17 +5,17 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
-use debug::PrintableModule;
 use debug_information::{
     DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
     InstructionDebugRecordData,
 };
+use fmt::PrintableModule;
 use util::match_types;
 
 pub mod builder;
 pub mod compile;
-mod debug;
 pub mod debug_information;
+mod fmt;
 mod util;
 
 #[derive(Debug)]

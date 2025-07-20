@@ -10,9 +10,8 @@ use crate::{
     builder::*,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugLocation, DebugLocationValue,
-        DebugMetadataHolder, DebugMetadataValue, DebugPointerType, DebugProgramValue,
-        DebugScopeValue, DebugStructType, DebugSubprogramType, DebugTypeData, DebugTypeHolder,
-        DebugTypeValue,
+        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue, DebugStructType,
+        DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
     },
 };
 
@@ -244,8 +243,6 @@ impl Debug for DebugTypeHolder {
 impl Debug for DebugTypeData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DebugTypeData::Basic(ty) => Debug::fmt(ty, f),
-            DebugTypeData::Subprogram(ty) => Debug::fmt(ty, f),
             DebugTypeData::Basic(ty) => Debug::fmt(ty, f),
             DebugTypeData::Subprogram(ty) => Debug::fmt(ty, f),
             DebugTypeData::Pointer(ty) => Debug::fmt(ty, f),

@@ -144,8 +144,6 @@ impl Block {
         let mut ret_type_ref = outer_refs.from_type(&ty).unwrap();
 
         // Narow return type to declared type if hard return
-        dbg!(&kind, ty);
-
         if kind == ReturnKind::Hard {
             if let Some(hint) = &state.scope.return_type_hint {
                 ret_type_ref.narrow(&mut outer_refs.from_type(&hint).unwrap());
@@ -394,16 +392,10 @@ impl Expression {
                     var.0 = hint.as_type();
                 }
 
-                dbg!(&var.0);
-                dbg!(&var.0.resolve_weak(type_refs.types));
-                let a = match &var.0.resolve_weak(type_refs.types) {
+                match &var.0.resolve_weak(type_refs.types) {
                     Borrow(type_kind) => Ok(type_refs.from_type(&type_kind).unwrap()),
                     _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
-                };
-
-                dbg!(&a);
-
-                a
+                }
             }
         }
     }

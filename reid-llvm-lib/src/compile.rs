@@ -1029,7 +1029,7 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::StringPtr(val) => LLVMBuildGlobalStringPtr(
+                ConstValue::StringPtr(val) => LLVMBuildGlobalString(
                     module.builder_ref,
                     into_cstring(val).as_ptr(),
                     c"string".as_ptr(),

@@ -1,14 +1,14 @@
-use std::{array, collections::HashMap, fmt::format, mem};
+use std::{collections::HashMap, mem};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugFileData, DebugInformation,
-        DebugLocalVariable, DebugLocation, DebugMetadata, DebugMetadataValue, DebugParamVariable,
-        DebugPointerType, DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType,
-        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData,
-        DebugTypeValue, DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
+        DebugLocalVariable, DebugLocation, DebugMetadata, DebugParamVariable, DebugPointerType,
+        DebugProgramValue, DebugRecordKind, DebugStructType, DebugSubprogramData,
+        DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DebugTypeValue,
+        DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
     Module, NamedStruct, TerminatorKind as Term, Type,
@@ -130,6 +130,7 @@ impl StackValueKind {
         }
     }
 
+    #[allow(dead_code)]
     fn map<F>(&self, lambda: F) -> StackValueKind
     where
         F: FnOnce(InstructionValue) -> InstructionValue,
@@ -478,7 +479,6 @@ impl mir::Statement {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
 
-                dbg!(&name);
                 let alloca = scope
                     .block
                     .build(
@@ -664,7 +664,6 @@ impl mir::Expression {
                     .functions
                     .get(&call.name)
                     .expect("function not found!");
-                dbg!(&self, &callee.ir.value());
 
                 let val = scope
                     .block

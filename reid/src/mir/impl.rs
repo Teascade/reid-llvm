@@ -1,7 +1,3 @@
-use reid_lib::debug_information::{
-    DebugBasicType, DebugLocation, DebugTypeData, DwarfEncoding, DwarfFlags,
-};
-
 use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
 
 #[derive(Debug, Clone)]

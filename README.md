@@ -43,6 +43,7 @@ Currently missing relevant features (TODOs) are:
 
 Smaller features:
 - Easier way to initialize arrays with a single value
+- Lexical scopes for Debug Information
 
 ### Why "Reid"
 
