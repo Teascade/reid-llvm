@@ -627,6 +627,8 @@ impl Expression {
                 }
                 Ok(TypeKind::CustomType(struct_name.clone()))
             }
+            ExprKind::Borrow(named_variable_ref) => todo!(),
+            ExprKind::Deref(named_variable_ref) => todo!(),
         }
     }
 }

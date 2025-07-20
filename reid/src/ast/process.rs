@@ -225,8 +225,16 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
             ),
-            ast::ExpressionKind::Borrow(_) => todo!(),
-            ast::ExpressionKind::Deref(_) => todo!(),
+            ast::ExpressionKind::Borrow(name) => mir::ExprKind::Borrow(NamedVariableRef(
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
+                name.clone(),
+                self.1.as_meta(module_id),
+            )),
+            ast::ExpressionKind::Deref(name) => mir::ExprKind::Deref(NamedVariableRef(
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
+                name.clone(),
+                self.1.as_meta(module_id),
+            )),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

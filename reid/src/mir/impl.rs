@@ -12,6 +12,7 @@ pub enum ReturnTypeOther {
     EmptyBlock(Metadata),
     NoBlockReturn(Metadata),
     IndexingNonArray(Metadata),
+    DerefNonBorrow(Metadata),
 }
 
 impl TypeKind {
@@ -47,8 +48,9 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, len) => type_kind.size_of() * len,
             TypeKind::CustomType(_) => 32,
-            TypeKind::Ptr(inner) => 64,
+            TypeKind::Ptr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
+            TypeKind::Borrow(_) => 64,
         }
     }
 
@@ -69,8 +71,9 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, _) => type_kind.alignment(),
             TypeKind::CustomType(_) => 32,
-            TypeKind::Ptr(type_kind) => 64,
+            TypeKind::Ptr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
+            TypeKind::Borrow(_) => 64,
         }
     }
 }
@@ -222,6 +225,17 @@ impl Expression {
             }
             Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
+            Borrow(var) => {
+                let ret_type = var.return_type()?;
+                Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1))))
+            }
+            Deref(var) => {
+                let ret_type = var.return_type()?;
+                match ret_type {
+                    (_, TypeKind::Borrow(type_kind)) => Ok((ret_type.0, *type_kind)),
+                    _ => Err(ReturnTypeOther::DerefNonBorrow(var.2)),
+                }
+            }
         }
     }
 
@@ -230,13 +244,15 @@ impl Expression {
             ExprKind::Variable(var_ref) => Some(var_ref),
             ExprKind::Indexed(lhs, _, _) => lhs.backing_var(),
             ExprKind::Accessed(lhs, _, _) => lhs.backing_var(),
+            ExprKind::Borrow(var) => Some(var),
+            ExprKind::Deref(var) => Some(var),
+            ExprKind::Block(block) => block.backing_var(),
             ExprKind::Array(_) => None,
             ExprKind::Struct(_, _) => None,
             ExprKind::Literal(_) => None,
             ExprKind::BinOp(_, _, _) => None,
             ExprKind::FunctionCall(_) => None,
             ExprKind::If(_) => None,
-            ExprKind::Block(block) => block.backing_var(),
         }
     }
 }

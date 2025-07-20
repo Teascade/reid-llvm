@@ -110,6 +110,8 @@ pub enum TypeKind {
     #[error("{0}")]
     CustomType(String),
     #[error("Ptr({0})")]
+    Borrow(Box<TypeKind>),
+    #[error("Ptr({0})")]
     Ptr(Box<TypeKind>),
     #[error(transparent)]
     Vague(#[from] VagueType),
@@ -245,6 +247,8 @@ pub enum ExprKind {
     FunctionCall(FunctionCall),
     If(IfExpression),
     Block(Block),
+    Borrow(NamedVariableRef),
+    Deref(NamedVariableRef),
 }
 
 #[derive(Debug)]

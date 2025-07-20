@@ -935,6 +935,8 @@ impl mir::Expression {
                     TypeKind::CustomType(name.clone()),
                 ))
             }
+            mir::ExprKind::Borrow(named_variable_ref) => todo!(),
+            mir::ExprKind::Deref(named_variable_ref) => todo!(),
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
@@ -1109,6 +1111,9 @@ impl TypeKind {
                 Type::CustomType(type_val)
             }
             TypeKind::Ptr(type_kind) => {
+                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
+            }
+            TypeKind::Borrow(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
         }
