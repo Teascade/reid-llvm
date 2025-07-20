@@ -230,9 +230,9 @@ impl Expression {
                 Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1))))
             }
             Deref(var) => {
-                let ret_type = var.return_type()?;
-                match ret_type {
-                    (_, TypeKind::Borrow(type_kind)) => Ok((ret_type.0, *type_kind)),
+                let (kind, ret_type) = var.return_type()?;
+                match ret_type.resolve_weak(refs) {
+                    TypeKind::Borrow(type_kind) => Ok((kind, *type_kind)),
                     _ => Err(ReturnTypeOther::DerefNonBorrow(var.2)),
                 }
             }

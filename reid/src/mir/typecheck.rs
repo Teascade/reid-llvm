@@ -677,6 +677,8 @@ impl Expression {
                     return Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone()));
                 };
 
+                var_ref.0 = TypeKind::Borrow(inner.clone());
+
                 Ok(*inner)
             }
         }
