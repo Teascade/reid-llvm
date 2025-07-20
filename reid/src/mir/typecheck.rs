@@ -629,8 +629,57 @@ impl Expression {
                 }
                 Ok(TypeKind::CustomType(struct_name.clone()))
             }
-            ExprKind::Borrow(named_variable_ref) => todo!(),
-            ExprKind::Deref(named_variable_ref) => todo!(),
+            ExprKind::Borrow(var_ref) => {
+                let existing = state
+                    .or_else(
+                        state
+                            .scope
+                            .variables
+                            .get(&var_ref.1)
+                            .map(|var| &var.ty)
+                            .cloned()
+                            .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
+                        TypeKind::Vague(Vague::Unknown),
+                        var_ref.2,
+                    )
+                    .resolve_ref(typerefs);
+
+                // Update typing to be more accurate
+                var_ref.0 = state.or_else(
+                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
+                    TypeKind::Vague(Vague::Unknown),
+                    var_ref.2,
+                );
+
+                Ok(TypeKind::Borrow(Box::new(var_ref.0.clone())))
+            }
+            ExprKind::Deref(var_ref) => {
+                let existing = state
+                    .or_else(
+                        state
+                            .scope
+                            .variables
+                            .get(&var_ref.1)
+                            .map(|var| &var.ty)
+                            .cloned()
+                            .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
+                        TypeKind::Vague(Vague::Unknown),
+                        var_ref.2,
+                    )
+                    .resolve_ref(typerefs);
+
+                // Update typing to be more accurate
+                var_ref.0 = state.or_else(
+                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
+                    TypeKind::Vague(Vague::Unknown),
+                    var_ref.2,
+                );
+
+                match &var_ref.0 {
+                    TypeKind::Borrow(type_kind) => Ok(*type_kind.clone()),
+                    _ => Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone())),
+                }
+            }
         }
     }
 }
