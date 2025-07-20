@@ -311,3 +311,13 @@ fn write_access(f: &mut std::fmt::Formatter<'_>, name: &String) -> std::fmt::Res
     f.write_char('.')?;
     Display::fmt(name, f)
 }
+
+impl std::fmt::Display for VagueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VagueType::Unknown => write!(f, "Unknown"),
+            VagueType::Number => write!(f, "Number"),
+            VagueType::TypeRef(_) => write!(f, "{{unknown}}"),
+        }
+    }
+}

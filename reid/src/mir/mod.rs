@@ -113,17 +113,14 @@ pub enum TypeKind {
     Borrow(Box<TypeKind>),
     #[error("Ptr({0})")]
     Ptr(Box<TypeKind>),
-    #[error(transparent)]
-    Vague(#[from] VagueType),
+    #[error("{0}")]
+    Vague(VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VagueType {
-    #[error("Unknown")]
     Unknown,
-    #[error("Number")]
     Number,
-    #[error("TypeRef({0})")]
     TypeRef(usize),
 }
 
