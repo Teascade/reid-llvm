@@ -1,0 +1,12 @@
+
+import std::print;
+import std::intdiv;
+
+fn main() {
+    let hello = "hello world";
+
+    print(intdiv(10, 5).quot);
+
+    print(hello);
+
+}

@@ -121,7 +121,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{}", &context);
 
-    let state = context.pass(&mut LinkerPass { module_map });
+    let state = context.pass(&mut LinkerPass { module_map })?;
 
     #[cfg(debug_assertions)]
     println!("{}", &context);
@@ -137,7 +137,7 @@ pub fn perform_all_passes<'map>(
 
     let refs = TypeRefs::default();
 
-    let state = context.pass(&mut TypeInference { refs: &refs });
+    let state = context.pass(&mut TypeInference { refs: &refs })?;
 
     #[cfg(debug_assertions)]
     dbg!(&refs);
@@ -157,7 +157,7 @@ pub fn perform_all_passes<'map>(
         ));
     }
 
-    let state = context.pass(&mut TypeCheck { refs: &refs });
+    let state = context.pass(&mut TypeCheck { refs: &refs })?;
 
     #[cfg(debug_assertions)]
     println!("{}", &context);
@@ -189,12 +189,18 @@ pub fn compile_and_pass<'map>(
     let path = path.canonicalize().unwrap();
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-    let (id, tokens) = parse_module(source, name, module_map).unwrap();
+    let (id, tokens) = parse_module(source, name, module_map)?;
     let module = compile_module(id, &tokens, module_map, Some(path.clone()), true)?;
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
 
+    dbg!(&mir_context);
+    println!("Context: {}", &mir_context);
+
     perform_all_passes(&mut mir_context, module_map)?;
+
+    dbg!(&mir_context);
+    println!("Context: {}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
     let codegen_modules = mir_context.codegen(&mut context, &module_map);

@@ -6,7 +6,7 @@ use crate::{mir::*, util::try_all};
 use VagueType as Vague;
 
 use super::{
-    pass::{Pass, PassState, ScopeFunction, ScopeVariable},
+    pass::{Pass, PassResult, PassState, ScopeFunction, ScopeVariable},
     typerefs::TypeRefs,
 };
 
@@ -70,7 +70,7 @@ impl<'t> Pass for TypeCheck<'t> {
     type Data = ();
     type TError = ErrorKind;
 
-    fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) {
+    fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) -> PassResult {
         let mut defmap = HashMap::new();
         for typedef in &module.typedefs {
             let TypeDefinition { name, kind, meta } = &typedef;
@@ -107,6 +107,7 @@ impl<'t> Pass for TypeCheck<'t> {
             let res = function.typecheck(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
         }
+        Ok(())
     }
 }
 

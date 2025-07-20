@@ -1,8 +1,19 @@
 
 extern fn puts(message: string) -> i32;
 
+struct DivT {
+    quot: i32,
+    rem: i32,
+}
+
+extern fn div(numerator: i32, denominator: i32) -> DivT;
+
 pub fn print(message: string) {
     puts(message);
+}
+
+pub fn intdiv(numerator: i32, denominator: i32) -> DivT {
+    return div(numerator, denominator);
 }
 
 fn main() -> u16 {

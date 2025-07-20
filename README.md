@@ -41,6 +41,9 @@ Currently missing relevant features (TODOs) are:
 - Debug Information
 - Borrows+Pointers
 
+Smaller features:
+- Easier way to initialize arrays with a single value
+
 ### Why "Reid"
 
 [ᚱ is an Elder Futhark rune](https://en.wikipedia.org/wiki/Raido) which means

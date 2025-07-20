@@ -7,10 +7,15 @@ use std::{
     rc::Rc,
 };
 
-use crate::{compile_module, error_raporting::ModuleMap, lexer::FullToken, parse_module};
+use crate::{
+    compile_module,
+    error_raporting::{ModuleMap, ReidError},
+    lexer::FullToken,
+    parse_module,
+};
 
 use super::{
-    pass::{Pass, PassState},
+    pass::{Pass, PassResult, PassState},
     r#impl::EqualsIssue,
     Context, FunctionDefinition, Import, Metadata, Module,
 };
@@ -41,14 +46,16 @@ pub enum ErrorKind {
     FunctionIsPrivate(String, String),
 }
 
-pub fn compile_std(module_map: &mut ModuleMap) -> (super::Module, Vec<FullToken>) {
-    let (id, tokens) = parse_module(STD_SOURCE, "standard_library", module_map).unwrap();
-    let module = compile_module(id, &tokens, module_map, None, false).unwrap();
+pub fn compile_std(
+    module_map: &mut ModuleMap,
+) -> Result<(super::Module, Vec<FullToken>), ReidError> {
+    let (id, tokens) = parse_module(STD_SOURCE, "standard_library", module_map)?;
+    let module = compile_module(id, &tokens, module_map, None, false)?;
 
     let mut mir_context = super::Context::from(vec![module], Default::default());
 
     let std_compiled = mir_context.modules.remove(0);
-    (std_compiled, tokens)
+    Ok((std_compiled, tokens))
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -62,7 +69,7 @@ type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 impl<'map> Pass for LinkerPass<'map> {
     type Data = ();
     type TError = ErrorKind;
-    fn context(&mut self, context: &mut Context, mut state: LinkerPassState) {
+    fn context(&mut self, context: &mut Context, mut state: LinkerPassState) -> PassResult {
         let mains = context
             .modules
             .iter()
@@ -70,16 +77,16 @@ impl<'map> Pass for LinkerPass<'map> {
             .collect::<Vec<_>>();
         if mains.len() > 1 {
             state.note_errors(&vec![ErrorKind::MultipleMainsAtStart], Metadata::default());
-            return;
+            return Ok(());
         }
         let Some(main) = mains.first() else {
             state.note_errors(&vec![ErrorKind::NoMainDefined], Metadata::default());
-            return;
+            return Ok(());
         };
 
         let Some(_) = main.functions.iter().find(|f| f.name == "main") else {
             state.note_errors(&vec![ErrorKind::NoMainFunction], Metadata::default());
-            return;
+            return Ok(());
         };
 
         let mut modules = HashMap::<String, Rc<RefCell<_>>>::new();
@@ -95,10 +102,10 @@ impl<'map> Pass for LinkerPass<'map> {
             modules.insert(module.name.clone(), Rc::new(RefCell::new((module, tokens))));
         }
 
-        // modules.insert(
-        //     "std".to_owned(),
-        //     Rc::new(RefCell::new(compile_std(&mut self.module_map))),
-        // );
+        modules.insert(
+            "std".to_owned(),
+            Rc::new(RefCell::new(compile_std(&mut self.module_map)?)),
+        );
 
         let mut modules_to_process: Vec<Rc<RefCell<(Module, Vec<FullToken>)>>> =
             modules.values().cloned().collect();
@@ -243,5 +250,7 @@ impl<'map> Pass for LinkerPass<'map> {
             .into_values()
             .map(|v| Rc::into_inner(v).unwrap().into_inner().0)
             .collect();
+
+        Ok(())
     }
 }

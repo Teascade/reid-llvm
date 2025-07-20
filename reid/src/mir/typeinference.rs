@@ -9,7 +9,7 @@ use std::{convert::Infallible, iter};
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{Pass, PassState},
+    pass::{Pass, PassResult, PassState},
     r#impl::pick_return,
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
@@ -32,11 +32,12 @@ impl<'t> Pass for TypeInference<'t> {
     type Data = ();
     type TError = ErrorKind;
 
-    fn module(&mut self, module: &mut Module, mut state: TypeInferencePassState) {
+    fn module(&mut self, module: &mut Module, mut state: TypeInferencePassState) -> PassResult {
         for function in &mut module.functions {
             let res = function.infer_types(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
         }
+        Ok(())
     }
 }
 

@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::error::Error as STDError;
 
+use crate::error_raporting::ReidError;
+
 use super::*;
 
 #[derive(thiserror::Error, Debug, Clone)]
@@ -205,33 +207,65 @@ impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, '
     }
 }
 
+pub type PassResult = Result<(), ReidError>;
+
 pub trait Pass {
     type Data: Clone + Default;
     type TError: STDError + Clone;
 
-    fn context(&mut self, _context: &mut Context, mut _state: PassState<Self::Data, Self::TError>) {
+    fn context(
+        &mut self,
+        _context: &mut Context,
+        mut _state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        Ok(())
     }
-    fn module(&mut self, _module: &mut Module, mut _state: PassState<Self::Data, Self::TError>) {}
+    fn module(
+        &mut self,
+        _module: &mut Module,
+        mut _state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        Ok(())
+    }
     fn function(
         &mut self,
         _function: &mut FunctionDefinition,
         mut _state: PassState<Self::Data, Self::TError>,
-    ) {
+    ) -> PassResult {
+        Ok(())
     }
-    fn block(&mut self, _block: &mut Block, mut _state: PassState<Self::Data, Self::TError>) {}
-    fn stmt(&mut self, _stmt: &mut Statement, mut _state: PassState<Self::Data, Self::TError>) {}
-    fn expr(&mut self, _expr: &mut Expression, mut _state: PassState<Self::Data, Self::TError>) {}
+    fn block(
+        &mut self,
+        _block: &mut Block,
+        mut _state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        Ok(())
+    }
+    fn stmt(
+        &mut self,
+        _stmt: &mut Statement,
+        mut _state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        Ok(())
+    }
+    fn expr(
+        &mut self,
+        _expr: &mut Expression,
+        mut _state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        Ok(())
+    }
 }
 
 impl Context {
-    pub fn pass<T: Pass>(&mut self, pass: &mut T) -> State<T::TError> {
+    pub fn pass<T: Pass>(&mut self, pass: &mut T) -> Result<State<T::TError>, ReidError> {
         let mut state = State::new();
         let mut scope = Scope::default();
-        pass.context(self, PassState::from(&mut state, &mut scope));
+        pass.context(self, PassState::from(&mut state, &mut scope))?;
         for module in &mut self.modules {
-            module.pass(pass, &mut state, &mut scope.inner());
+            module.pass(pass, &mut state, &mut scope.inner())?;
         }
-        state
+        Ok(state)
     }
 }
 
@@ -241,7 +275,7 @@ impl Module {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
-    ) {
+    ) -> PassResult {
         for typedef in &self.typedefs {
             let kind = match &typedef.kind {
                 TypeDefinitionKind::Struct(fields) => TypeDefinitionKind::Struct(fields.clone()),
@@ -262,11 +296,12 @@ impl Module {
                 .ok();
         }
 
-        pass.module(self, PassState::from(state, scope));
+        pass.module(self, PassState::from(state, scope))?;
 
         for function in &mut self.functions {
-            function.pass(pass, state, &mut scope.inner());
+            function.pass(pass, state, &mut scope.inner())?;
         }
+        Ok(())
     }
 }
 
@@ -276,7 +311,7 @@ impl FunctionDefinition {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
-    ) {
+    ) -> PassResult {
         for param in &self.parameters {
             scope
                 .variables
@@ -290,15 +325,16 @@ impl FunctionDefinition {
                 .ok();
         }
 
-        pass.function(self, PassState::from(state, scope));
+        pass.function(self, PassState::from(state, scope))?;
 
         match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 scope.return_type_hint = Some(self.return_type.clone());
-                block.pass(pass, state, scope);
+                block.pass(pass, state, scope)?;
             }
             FunctionDefinitionKind::Extern(_) => {}
         };
+        Ok(())
     }
 }
 
@@ -308,14 +344,14 @@ impl Block {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
-    ) {
+    ) -> PassResult {
         let mut scope = scope.inner();
 
         for statement in &mut self.statements {
-            statement.pass(pass, state, &mut scope);
+            statement.pass(pass, state, &mut scope)?;
         }
 
-        pass.block(self, PassState::from(state, &mut scope));
+        pass.block(self, PassState::from(state, &mut scope))
     }
 }
 
@@ -325,21 +361,21 @@ impl Statement {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
-    ) {
+    ) -> PassResult {
         match &mut self.0 {
             StmtKind::Let(_, _, expression) => {
-                expression.pass(pass, state, scope);
+                expression.pass(pass, state, scope)?;
             }
             StmtKind::Set(_, expression) => {
-                expression.pass(pass, state, scope);
+                expression.pass(pass, state, scope)?;
             }
             StmtKind::Import(_) => {} // Never exists at this stage
             StmtKind::Expression(expression) => {
-                expression.pass(pass, state, scope);
+                expression.pass(pass, state, scope)?;
             }
         }
 
-        pass.stmt(self, PassState::from(state, scope));
+        pass.stmt(self, PassState::from(state, scope))?;
 
         match &mut self.0 {
             StmtKind::Let(variable_reference, mutable, _) => {
@@ -358,6 +394,7 @@ impl Statement {
             StmtKind::Import(_) => {} // Never exists at this stage
             StmtKind::Expression(_) => {}
         };
+        Ok(())
     }
 }
 
@@ -367,7 +404,8 @@ impl Expression {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
-    ) {
-        pass.expr(self, PassState::from(state, scope));
+    ) -> PassResult {
+        pass.expr(self, PassState::from(state, scope))?;
+        Ok(())
     }
 }
