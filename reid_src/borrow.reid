@@ -1,0 +1,11 @@
+// Arithmetic, function calls and imports!
+
+
+fn main() -> u32 {
+  let mut value = 6;
+
+  let mut borrow = &value;
+  *borrow = 17;
+
+  return borrow;
+}

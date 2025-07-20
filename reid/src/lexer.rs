@@ -49,7 +49,7 @@ pub enum Token {
     /// `+`
     Plus,
     /// `*`
-    Times,
+    Star,
     /// `-`
     Minus,
 
@@ -87,7 +87,7 @@ impl Token {
         match &self {
             Token::Plus => 10,
             Token::Minus => 10,
-            Token::Times => 20,
+            Token::Star => 20,
             _ => -1,
         }
     }
@@ -128,7 +128,7 @@ impl ToString for Token {
             Token::Equals => String::from('='),
             Token::Colon => String::from(':'),
             Token::Plus => String::from('+'),
-            Token::Times => String::from('*'),
+            Token::Star => String::from('*'),
             Token::Minus => String::from('-'),
             Token::GreaterThan => String::from('>'),
             Token::LessThan => String::from('<'),
@@ -311,7 +311,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             ';' => Token::Semi,
             ':' => Token::Colon,
             '+' => Token::Plus,
-            '*' => Token::Times,
+            '*' => Token::Star,
             '-' => Token::Minus,
             '>' => Token::GreaterThan,
             '<' => Token::LessThan,

@@ -42,6 +42,8 @@ pub struct Expression(pub ExpressionKind, pub TokenRange);
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
     VariableName(String),
+    Borrow(String),
+    Deref(String),
     Literal(Literal),
     Array(Vec<Expression>),
     /// Array-indexed, e.g. <expr>[<expr>]

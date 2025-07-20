@@ -83,6 +83,18 @@ impl Parse for PrimaryExpression {
                 Kind::StructExpression(stream.parse()?),
                 stream.get_range().unwrap(),
             )
+        } else if let (Some(Token::Et), Some(Token::Identifier(name))) =
+            (stream.peek(), stream.peek2())
+        {
+            stream.next(); // Consume Et
+            stream.next(); // Consume identifier
+            Expression(Kind::Borrow(name), stream.get_range().unwrap())
+        } else if let (Some(Token::Star), Some(Token::Identifier(name))) =
+            (stream.peek(), stream.peek2())
+        {
+            stream.next(); // Consume Et
+            stream.next(); // Consume identifier
+            Expression(Kind::Deref(name), stream.get_range().unwrap())
         } else if let Some(token) = stream.next() {
             match &token {
                 Token::Identifier(v) => {
@@ -229,7 +241,7 @@ impl Parse for BinaryOperator {
 
             (Some(Token::Plus), _) => BinaryOperator::Add,
             (Some(Token::Minus), _) => BinaryOperator::Minus,
-            (Some(Token::Times), _) => BinaryOperator::Mult,
+            (Some(Token::Star), _) => BinaryOperator::Mult,
             (_, _) => Err(stream.expected_err("expected operator")?)?,
         })
     }

@@ -225,6 +225,8 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
             ),
+            ast::ExpressionKind::Borrow(_) => todo!(),
+            ast::ExpressionKind::Deref(_) => todo!(),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))
