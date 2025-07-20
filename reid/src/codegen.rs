@@ -685,24 +685,31 @@ impl mir::Expression {
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                let TypeKind::Array(elem_ty, _) = array_ty else {
+                dbg!(&array_ty);
+                let TypeKind::Ptr(inner) = array_ty else {
+                    panic!();
+                };
+                let TypeKind::Array(elem_ty, _) = *inner else {
                     panic!();
                 };
 
-                let elem_value = if state.should_load {
-                    scope
-                        .block
-                        .build(Instr::Load(
-                            ptr,
-                            val_t.get_type(scope.type_values, scope.types),
-                        ))
-                        .unwrap()
-                        .maybe_location(&mut scope.block, location)
+                if state.should_load {
+                    Some(StackValue(
+                        kind.derive(
+                            scope
+                                .block
+                                .build(Instr::Load(
+                                    ptr,
+                                    val_t.get_type(scope.type_values, scope.types),
+                                ))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location),
+                        ),
+                        *elem_ty,
+                    ))
                 } else {
-                    ptr
-                };
-
-                Some(StackValue(kind.derive(elem_value), *elem_ty))
+                    Some(StackValue(kind.derive(ptr), TypeKind::Ptr(elem_ty)))
+                }
             }
             mir::ExprKind::Array(expressions) => {
                 let stack_value_list = expressions
@@ -766,14 +773,17 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, state).unwrap();
 
-                let TypeKind::CustomType(name) = &struct_val.1 else {
+                let TypeKind::Ptr(inner) = &struct_val.1 else {
+                    panic!("tried accessing non-pointer");
+                };
+                let TypeKind::CustomType(name) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };
                 let TypeDefinitionKind::Struct(struct_ty) =
                     scope.get_typedef(&name).unwrap().kind.clone();
                 let idx = struct_ty.find_index(field).unwrap();
 
-                let mut value = scope
+                let value = scope
                     .block
                     .build(Instr::GetStructElemPtr(struct_val.instr(), idx as u32))
                     .unwrap();
@@ -781,19 +791,24 @@ impl mir::Expression {
                 // value.maybe_location(&mut scope.block, location);
 
                 if state.should_load {
-                    value = scope
-                        .block
-                        .build(Instr::Load(
-                            value,
-                            type_kind.get_type(scope.type_values, scope.types),
-                        ))
-                        .unwrap();
+                    Some(StackValue(
+                        struct_val.0.derive(
+                            scope
+                                .block
+                                .build(Instr::Load(
+                                    value,
+                                    type_kind.get_type(scope.type_values, scope.types),
+                                ))
+                                .unwrap(),
+                        ),
+                        struct_ty.get_field_ty(&field).unwrap().clone(),
+                    ))
+                } else {
+                    Some(StackValue(
+                        struct_val.0.derive(value),
+                        TypeKind::Ptr(Box::new(struct_ty.get_field_ty(&field).unwrap().clone())),
+                    ))
                 }
-
-                Some(StackValue(
-                    struct_val.0.derive(value),
-                    struct_ty.get_field_ty(&field).unwrap().clone(),
-                ))
             }
             mir::ExprKind::Struct(name, items) => {
                 let struct_ty = Type::CustomType(*scope.type_values.get(name)?);
