@@ -343,11 +343,19 @@ impl mir::Module {
             let mut stack_values = HashMap::new();
             for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
                 // Codegen actual parameters
-                let param = entry.build(Instr::Param(i)).unwrap();
-                let alloca = entry
-                    .build(Instr::Alloca(p_ty.get_type(&type_values, &types)))
+                let arg_name = format!("arg.{}", p_name);
+                let param = entry
+                    .build(format!("{}.get", arg_name), Instr::Param(i))
                     .unwrap();
-                entry.build(Instr::Store(alloca, param)).unwrap();
+                let alloca = entry
+                    .build(
+                        &arg_name,
+                        Instr::Alloca(p_ty.get_type(&type_values, &types)),
+                    )
+                    .unwrap();
+                entry
+                    .build(format!("{}.store", arg_name), Instr::Store(alloca, param))
+                    .unwrap();
                 stack_values.insert(
                     p_name.clone(),
                     StackValue(
@@ -470,15 +478,22 @@ impl mir::Statement {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
 
+                dbg!(&name);
                 let alloca = scope
                     .block
-                    .build(Instr::Alloca(ty.get_type(scope.type_values, scope.types)))
+                    .build(
+                        name,
+                        Instr::Alloca(ty.get_type(scope.type_values, scope.types)),
+                    )
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
                 let store = scope
                     .block
-                    .build(Instr::Store(alloca, value.instr()))
+                    .build(
+                        format!("{}.store", name),
+                        Instr::Store(alloca, value.instr()),
+                    )
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -522,6 +537,12 @@ impl mir::Statement {
 
                 let rhs_value = rhs.codegen(scope, state)?;
 
+                let backing_var = if let Some(var) = lhs.backing_var() {
+                    &format!("store.{}", var.1)
+                } else {
+                    "store"
+                };
+
                 match lhs_value.0 {
                     StackValueKind::Immutable(_) => {
                         panic!("Tried to assign to immutable!")
@@ -529,7 +550,7 @@ impl mir::Statement {
                     StackValueKind::Mutable(instr) => {
                         scope
                             .block
-                            .build(Instr::Store(instr, rhs_value.instr()))
+                            .build(backing_var, Instr::Store(instr, rhs_value.instr()))
                             .unwrap()
                             .maybe_location(&mut scope.block, location);
                     }
@@ -572,10 +593,13 @@ impl mir::Expression {
                                 v.0.derive(
                                     scope
                                         .block
-                                        .build(Instr::Load(
-                                            v.0.instr(),
-                                            inner.get_type(scope.type_values, scope.types),
-                                        ))
+                                        .build(
+                                            format!("{}", varref.1),
+                                            Instr::Load(
+                                                v.0.instr(),
+                                                inner.get_type(scope.type_values, scope.types),
+                                            ),
+                                        )
                                         .unwrap(),
                                 ),
                                 *inner.clone(),
@@ -604,20 +628,20 @@ impl mir::Expression {
                 Some(StackValue(
                     StackValueKind::Immutable(match binop {
                         mir::BinaryOperator::Add => {
-                            scope.block.build(Instr::Add(lhs, rhs)).unwrap()
+                            scope.block.build("add", Instr::Add(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::Minus => {
-                            scope.block.build(Instr::Sub(lhs, rhs)).unwrap()
+                            scope.block.build("sub", Instr::Sub(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::Mult => {
-                            scope.block.build(Instr::Mult(lhs, rhs)).unwrap()
+                            scope.block.build("mul", Instr::Mult(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::And => {
-                            scope.block.build(Instr::And(lhs, rhs)).unwrap()
+                            scope.block.build("and", Instr::And(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::Cmp(l) => scope
                             .block
-                            .build(Instr::ICmp(l.int_predicate(), lhs, rhs))
+                            .build("cmp", Instr::ICmp(l.int_predicate(), lhs, rhs))
                             .unwrap(),
                     }),
                     TypeKind::U32,
@@ -643,7 +667,10 @@ impl mir::Expression {
                     StackValueKind::Immutable(
                         scope
                             .block
-                            .build(Instr::FunctionCall(callee.ir.value(), params))
+                            .build(
+                                call.name.clone(),
+                                Instr::FunctionCall(callee.ir.value(), params),
+                            )
                             .unwrap(),
                     ),
                     ret_type,
@@ -673,12 +700,15 @@ impl mir::Expression {
 
                 let first = scope
                     .block
-                    .build(Instr::Constant(ConstValue::U32(0)))
+                    .build("array.zero", Instr::Constant(ConstValue::U32(0)))
                     .unwrap();
 
                 let ptr = scope
                     .block
-                    .build(Instr::GetElemPtr(kind.instr(), vec![first, idx]))
+                    .build(
+                        format!("array.gep"),
+                        Instr::GetElemPtr(kind.instr(), vec![first, idx]),
+                    )
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -694,10 +724,13 @@ impl mir::Expression {
                         kind.derive(
                             scope
                                 .block
-                                .build(Instr::Load(
-                                    ptr,
-                                    val_t.get_type(scope.type_values, scope.types),
-                                ))
+                                .build(
+                                    "array.load",
+                                    Instr::Load(
+                                        ptr,
+                                        val_t.get_type(scope.type_values, scope.types),
+                                    ),
+                                )
                                 .unwrap()
                                 .maybe_location(&mut scope.block, location),
                         ),
@@ -727,37 +760,45 @@ impl mir::Expression {
                     Box::new(elem_ty_kind.get_type(scope.type_values, scope.types)),
                     instr_list.len() as u64,
                 );
+                let array_name = format!("{}.{}", elem_ty_kind, instr_list.len());
+                let load_n = format!("{}.load", array_name);
 
                 let array = scope
                     .block
-                    .build(Instr::Alloca(array_ty.clone()))
+                    .build(&array_name, Instr::Alloca(array_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
                 for (index, instr) in instr_list.iter().enumerate() {
+                    let gep_n = format!("{}.{}.gep", array_name, index);
+                    let store_n = format!("{}.{}.store", array_name, index);
+
                     let index_expr = scope
                         .block
-                        .build(Instr::Constant(ConstValue::U32(index as u32)))
+                        .build(
+                            index.to_string(),
+                            Instr::Constant(ConstValue::U32(index as u32)),
+                        )
                         .unwrap();
                     let first = scope
                         .block
-                        .build(Instr::Constant(ConstValue::U32(0)))
+                        .build("zero", Instr::Constant(ConstValue::U32(0)))
                         .unwrap();
                     let ptr = scope
                         .block
-                        .build(Instr::GetElemPtr(array, vec![first, index_expr]))
+                        .build(gep_n, Instr::GetElemPtr(array, vec![first, index_expr]))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                     scope
                         .block
-                        .build(Instr::Store(ptr, *instr))
+                        .build(store_n, Instr::Store(ptr, *instr))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                 }
 
                 let array_val = scope
                     .block
-                    .build(Instr::Load(array, array_ty))
+                    .build(load_n, Instr::Load(array, array_ty))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -779,9 +820,15 @@ impl mir::Expression {
                     scope.get_typedef(&name).unwrap().kind.clone();
                 let idx = struct_ty.find_index(field).unwrap();
 
+                let gep_n = format!("{}.{}.gep", name, field);
+                let load_n = format!("{}.{}.load", name, field);
+
                 let value = scope
                     .block
-                    .build(Instr::GetStructElemPtr(struct_val.instr(), idx as u32))
+                    .build(
+                        gep_n,
+                        Instr::GetStructElemPtr(struct_val.instr(), idx as u32),
+                    )
                     .unwrap();
 
                 // value.maybe_location(&mut scope.block, location);
@@ -791,10 +838,13 @@ impl mir::Expression {
                         struct_val.0.derive(
                             scope
                                 .block
-                                .build(Instr::Load(
-                                    value,
-                                    type_kind.get_type(scope.type_values, scope.types),
-                                ))
+                                .build(
+                                    load_n,
+                                    Instr::Load(
+                                        value,
+                                        type_kind.get_type(scope.type_values, scope.types),
+                                    ),
+                                )
                                 .unwrap(),
                         ),
                         struct_ty.get_field_ty(&field).unwrap().clone(),
@@ -808,22 +858,28 @@ impl mir::Expression {
             }
             mir::ExprKind::Struct(name, items) => {
                 let struct_ty = Type::CustomType(*scope.type_values.get(name)?);
+
+                let load_n = format!("{}.load", name);
+
                 let struct_ptr = scope
                     .block
-                    .build(Instr::Alloca(struct_ty.clone()))
+                    .build(name, Instr::Alloca(struct_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                for (i, (_, exp)) in items.iter().enumerate() {
+                for (i, (field_n, exp)) in items.iter().enumerate() {
+                    let gep_n = format!("{}.{}.gep", name, field_n);
+                    let store_n = format!("{}.{}.store", name, field_n);
+
                     let elem_ptr = scope
                         .block
-                        .build(Instr::GetStructElemPtr(struct_ptr, i as u32))
+                        .build(gep_n, Instr::GetStructElemPtr(struct_ptr, i as u32))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                     if let Some(val) = exp.codegen(scope, state) {
                         scope
                             .block
-                            .build(Instr::Store(elem_ptr, val.instr()))
+                            .build(store_n, Instr::Store(elem_ptr, val.instr()))
                             .unwrap()
                             .maybe_location(&mut scope.block, location);
                     }
@@ -831,7 +887,7 @@ impl mir::Expression {
 
                 let struct_val = scope
                     .block
-                    .build(Instr::Load(struct_ptr, struct_ty))
+                    .build(load_n, Instr::Load(struct_ptr, struct_ty))
                     .unwrap();
 
                 Some(StackValue(
@@ -919,7 +975,10 @@ impl mir::IfExpression {
             incoming.extend(else_res.clone());
             let instr = scope
                 .block
-                .build(Instr::Phi(incoming.iter().map(|i| i.instr()).collect()))
+                .build(
+                    "phi",
+                    Instr::Phi(incoming.iter().map(|i| i.instr()).collect()),
+                )
                 .unwrap();
 
             use StackValueKind::*;
@@ -957,7 +1016,9 @@ impl mir::CmpOperator {
 
 impl mir::Literal {
     fn as_const(&self, block: &mut Block) -> InstructionValue {
-        block.build(self.as_const_kind()).unwrap()
+        block
+            .build(format!("{}", self), self.as_const_kind())
+            .unwrap()
     }
 
     fn as_const_kind(&self) -> Instr {

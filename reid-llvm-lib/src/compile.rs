@@ -743,6 +743,7 @@ impl InstructionHolder {
         _block: LLVMBasicBlockRef,
     ) -> LLVMValue {
         let _ty = self.value.get_type(module.builder).unwrap();
+        let name = into_cstring(self.name.clone());
         let val = unsafe {
             use super::Instr::*;
             match &self.data.kind {
@@ -751,22 +752,22 @@ impl InstructionHolder {
                 Add(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
-                    LLVMBuildAdd(module.builder_ref, lhs_val, rhs_val, c"add".as_ptr())
+                    LLVMBuildAdd(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 Sub(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
-                    LLVMBuildSub(module.builder_ref, lhs_val, rhs_val, c"sub".as_ptr())
+                    LLVMBuildSub(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 Mult(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
-                    LLVMBuildMul(module.builder_ref, lhs_val, rhs_val, c"mul".as_ptr())
+                    LLVMBuildMul(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 And(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
-                    LLVMBuildAnd(module.builder_ref, lhs_val, rhs_val, c"and".as_ptr())
+                    LLVMBuildAnd(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 ICmp(pred, lhs, rhs) => {
                     let lhs = module.values.get(&lhs).unwrap();
@@ -777,7 +778,7 @@ impl InstructionHolder {
                         pred.as_llvm_int(lhs._ty.signed()),
                         lhs.value_ref,
                         rhs_val,
-                        c"icmp".as_ptr(),
+                        name.as_ptr(),
                     )
                 }
                 FunctionCall(function_value, instruction_values) => {
@@ -797,7 +798,7 @@ impl InstructionHolder {
                         fun.value_ref,
                         param_list.as_mut_ptr(),
                         param_list.len() as u32,
-                        c"call".as_ptr(),
+                        name.as_ptr(),
                     );
                     if is_void {
                         LLVMContextSetDiscardValueNames(module.context_ref, 0);
@@ -814,7 +815,7 @@ impl InstructionHolder {
                     let phi = LLVMBuildPhi(
                         module.builder_ref,
                         _ty.as_llvm(module.context_ref, &module.types),
-                        c"phi".as_ptr(),
+                        name.as_ptr(),
                     );
                     LLVMAddIncoming(
                         phi,
@@ -827,13 +828,13 @@ impl InstructionHolder {
                 Alloca(ty) => LLVMBuildAlloca(
                     module.builder_ref,
                     ty.as_llvm(module.context_ref, &module.types),
-                    c"alloca".as_ptr(),
+                    name.as_ptr(),
                 ),
                 Load(ptr, ty) => LLVMBuildLoad2(
                     module.builder_ref,
                     ty.as_llvm(module.context_ref, &module.types),
                     module.values.get(&ptr).unwrap().value_ref,
-                    c"load".as_ptr(),
+                    name.as_ptr(),
                 ),
                 Store(ptr, val) => {
                     let store = LLVMBuildStore(
@@ -849,7 +850,7 @@ impl InstructionHolder {
                         module.builder_ref,
                         ty.as_llvm(module.context_ref, &module.types),
                         array_len,
-                        c"array_alloca".as_ptr(),
+                        name.as_ptr(),
                     )
                 }
                 GetElemPtr(arr, indices) => {
@@ -867,32 +868,26 @@ impl InstructionHolder {
                         module.values.get(arr).unwrap().value_ref,
                         llvm_indices.as_mut_ptr(),
                         llvm_indices.len() as u32,
-                        into_cstring(format!("array_gep")).as_ptr(),
+                        name.as_ptr(),
                     )
                 }
                 GetStructElemPtr(struct_val, idx) => {
                     let t = struct_val.get_type(module.builder).unwrap();
                     let Type::Ptr(struct_t) = t else { panic!() };
 
-                    let type_fmt = if let Type::CustomType(type_val) = *struct_t {
-                        format!("M{}T{}", type_val.0.0, type_val.1)
-                    } else {
-                        format!("{:?}", struct_t)
-                    };
-
                     LLVMBuildStructGEP2(
                         module.builder_ref,
                         struct_t.as_llvm(module.context_ref, &module.types),
                         module.values.get(struct_val).unwrap().value_ref,
                         *idx,
-                        into_cstring(format!("struct.{}.{}.gep", type_fmt, idx)).as_ptr(),
+                        name.as_ptr(),
                     )
                 }
                 ExtractValue(agg_val, idx) => LLVMBuildExtractValue(
                     module.builder_ref,
                     module.values.get(agg_val).unwrap().value_ref,
                     *idx,
-                    c"extract".as_ptr(),
+                    name.as_ptr(),
                 ),
             }
         };

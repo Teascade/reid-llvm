@@ -204,7 +204,11 @@ pub struct Block<'builder> {
 }
 
 impl<'builder> Block<'builder> {
-    pub fn build(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
+    pub fn build<T: Into<String>>(
+        &mut self,
+        name: T,
+        instruction: Instr,
+    ) -> Result<InstructionValue, ()> {
         unsafe {
             self.builder.add_instruction(
                 &self.value,
@@ -213,6 +217,7 @@ impl<'builder> Block<'builder> {
                     location: None,
                     meta: None,
                 },
+                name.into(),
             )
         }
     }

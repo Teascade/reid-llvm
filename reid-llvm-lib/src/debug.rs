@@ -71,6 +71,7 @@ impl Debug for BlockHolder {
 impl Debug for InstructionHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.value.fmt(f)?;
+        write!(f, " ({})", self.name)?;
         f.write_str(" = ")?;
         self.data.fmt(f)
     }

@@ -61,6 +61,7 @@ pub struct BlockHolder {
 pub struct InstructionHolder {
     pub(crate) value: InstructionValue,
     pub(crate) data: InstructionData,
+    pub(crate) name: String,
     pub(crate) record: Option<InstructionDebugRecordData>,
 }
 
@@ -149,6 +150,7 @@ impl Builder {
         &self,
         block_val: &BlockValue,
         data: InstructionData,
+        name: String,
     ) -> Result<InstructionValue, ()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
@@ -159,6 +161,7 @@ impl Builder {
             block.instructions.push(InstructionHolder {
                 value,
                 data,
+                name,
                 record: None,
             });
 
