@@ -365,6 +365,7 @@ impl Builder {
                 }
                 Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
+                    dbg!(&param_types, &params);
                     if param_types.len() != params.len() {
                         return Err(()); // TODO error: invalid amount of params
                     }
@@ -413,7 +414,6 @@ impl Builder {
                 Instr::ArrayAlloca(_, _) => Ok(()),
                 Instr::GetElemPtr(ptr_val, _) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
-                    dbg!(&ptr_ty);
                     match ptr_ty {
                         Type::Ptr(_) => Ok(()),
                         _ => Err(()),

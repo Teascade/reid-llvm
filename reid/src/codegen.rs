@@ -353,7 +353,10 @@ impl mir::Module {
                 entry.build(Instr::Store(alloca, param)).unwrap();
                 stack_values.insert(
                     p_name.clone(),
-                    StackValue(StackValueKind::Immutable(alloca), p_ty.clone()),
+                    StackValue(
+                        StackValueKind::Immutable(alloca),
+                        TypeKind::Ptr(Box::new(p_ty.clone())),
+                    ),
                 );
 
                 // Generate debug info
@@ -585,7 +588,7 @@ impl mir::Expression {
                                 *inner.clone(),
                             )
                         } else {
-                            v.clone()
+                            panic!("Variable was not a pointer?!?")
                         }
                     } else {
                         v.clone()
@@ -636,12 +639,13 @@ impl mir::Expression {
                 let params = call
                     .parameters
                     .iter()
-                    .map(|e| e.codegen(scope, state).unwrap().instr())
+                    .map(|e| e.codegen(scope, &mut state.load(true)).unwrap().instr())
                     .collect();
                 let callee = scope
                     .functions
                     .get(&call.name)
                     .expect("function not found!");
+                dbg!(&self, &callee.ir.value());
                 Some(StackValue(
                     StackValueKind::Immutable(
                         scope
@@ -1069,11 +1073,7 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Array(type_kind, len) => {
-                let elem_ty = match **type_kind {
-                    TypeKind::CustomType(_) => TypeKind::Ptr(Box::new(*type_kind.clone())),
-                    _ => *type_kind.clone(),
-                };
+            TypeKind::Array(elem_ty, len) => {
                 let elem_ty = elem_ty.clone().get_debug_type_hard(
                     scope,
                     debug_info,
@@ -1097,17 +1097,13 @@ impl TypeKind {
                         let mut fields = Vec::new();
                         let mut size_bits = 0;
                         for field in &struct_type.0 {
-                            let ty = match &field.1 {
-                                TypeKind::Array(elem_ty, len) => field.1.clone(),
-                                _ => field.1.clone(),
-                            };
                             fields.push(DebugFieldType {
                                 name: field.0.clone(),
                                 location: field.2.into_debug(tokens).unwrap(),
-                                size_bits: ty.size_of(),
+                                size_bits: field.1.size_of(),
                                 offset: size_bits,
                                 flags: DwarfFlags,
-                                ty: ty.get_debug_type_hard(
+                                ty: field.1.get_debug_type_hard(
                                     scope,
                                     debug_info,
                                     debug_types,
