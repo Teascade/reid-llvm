@@ -411,10 +411,10 @@ impl InstructionValue {
                     let Type::Ptr(inner_ty) = instr_ty else {
                         panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
                     };
-                    let Type::Array(elem_ty, _) = *inner_ty else {
-                        panic!("GetStructElemPtr on non-struct! ({:?})", &inner_ty)
-                    };
-                    Ok(Type::Ptr(Box::new(*elem_ty.clone())))
+                    match *inner_ty {
+                        Type::Array(elem_ty, _) => Ok(Type::Ptr(Box::new(*elem_ty.clone()))),
+                        _ => Ok(*inner_ty),
+                    }
                 }
                 GetStructElemPtr(instr, idx) => {
                     let instr_ty = instr.get_type(builder)?;

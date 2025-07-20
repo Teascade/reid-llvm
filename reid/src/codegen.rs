@@ -645,7 +645,7 @@ impl mir::Expression {
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
                 let StackValue(kind, array_ty) = expression
-                    .codegen(scope, &state.load(true))
+                    .codegen(scope, &state.load(false))
                     .expect("array returned none!");
                 let idx = idx_expr
                     .codegen(scope, &state.load(true))
@@ -657,6 +657,7 @@ impl mir::Expression {
                     .build(Instr::Constant(ConstValue::U32(0)))
                     .unwrap();
 
+                dbg!(&self, &val_t);
                 let ptr = scope
                     .block
                     .build(Instr::GetElemPtr(kind.instr(), vec![first, idx]))
@@ -667,14 +668,18 @@ impl mir::Expression {
                     panic!();
                 };
 
-                let elem_value = scope
-                    .block
-                    .build(Instr::Load(
-                        ptr,
-                        val_t.get_type(scope.type_values, scope.types),
-                    ))
-                    .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                let elem_value = if state.should_load {
+                    scope
+                        .block
+                        .build(Instr::Load(
+                            ptr,
+                            val_t.get_type(scope.type_values, scope.types),
+                        ))
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location)
+                } else {
+                    ptr
+                };
 
                 Some(StackValue(kind.derive(elem_value), *elem_ty))
             }
