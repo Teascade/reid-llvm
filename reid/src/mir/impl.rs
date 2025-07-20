@@ -339,6 +339,7 @@ impl TypeKind {
         let resolved = self.resolve_weak(refs);
         match resolved {
             TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
+            TypeKind::Borrow(inner) => TypeKind::Borrow(Box::new(inner.resolve_ref(refs))),
             _ => resolved,
         }
     }

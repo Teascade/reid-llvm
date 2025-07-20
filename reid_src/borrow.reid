@@ -7,5 +7,5 @@ fn main() -> u32 {
   let mut borrow = &value;
   *borrow = 17;
 
-  return borrow;
+  return *borrow;
 }

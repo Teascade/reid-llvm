@@ -669,16 +669,15 @@ impl Expression {
                     .resolve_ref(typerefs);
 
                 // Update typing to be more accurate
-                var_ref.0 = state.or_else(
+                let TypeKind::Borrow(inner) = state.or_else(
                     var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
-                );
+                ) else {
+                    return Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone()));
+                };
 
-                match &var_ref.0 {
-                    TypeKind::Borrow(type_kind) => Ok(*type_kind.clone()),
-                    _ => Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone())),
-                }
+                Ok(*inner)
             }
         }
     }
@@ -759,6 +758,9 @@ impl Collapsable for TypeKind {
             }
             (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
                 Ok(other.clone())
+            }
+            (TypeKind::Borrow(val1), TypeKind::Borrow(val2)) => {
+                Ok(TypeKind::Borrow(Box::new(val1.collapse_into(val2)?)))
             }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
