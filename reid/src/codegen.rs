@@ -444,13 +444,13 @@ impl mir::Block {
         }
 
         if let Some((kind, expr)) = &self.return_expression {
+            let ret = expr.codegen(&mut scope, &mut state.load(true));
             match kind {
                 mir::ReturnKind::Hard => {
-                    let ret = expr.codegen(&mut scope, &state)?;
-                    scope.block.terminate(Term::Ret(ret.instr())).unwrap();
+                    scope.block.terminate(Term::Ret(ret?.instr())).unwrap();
                     None
                 }
-                mir::ReturnKind::Soft => expr.codegen(&mut scope, state),
+                mir::ReturnKind::Soft => ret,
             }
         } else {
             None
@@ -490,9 +490,10 @@ impl mir::Statement {
                     false => StackValueKind::Immutable(alloca),
                 };
 
-                scope
-                    .stack_values
-                    .insert(name.clone(), StackValue(stack_value, ty.clone()));
+                scope.stack_values.insert(
+                    name.clone(),
+                    StackValue(stack_value, TypeKind::Ptr(Box::new(value.clone().1))),
+                );
                 if let Some(debug) = &scope.debug {
                     let location = self.1.into_debug(scope.tokens).unwrap();
                     let var = debug.info.metadata(
@@ -568,7 +569,28 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
-                Some(StackValue(v.0, varref.0.clone()))
+                Some({
+                    if state.should_load {
+                        if let TypeKind::Ptr(inner) = &v.1 {
+                            StackValue(
+                                v.0.derive(
+                                    scope
+                                        .block
+                                        .build(Instr::Load(
+                                            v.0.instr(),
+                                            inner.get_type(scope.type_values, scope.types),
+                                        ))
+                                        .unwrap(),
+                                ),
+                                *inner.clone(),
+                            )
+                        } else {
+                            v.clone()
+                        }
+                    } else {
+                        v.clone()
+                    }
+                })
             }
             mir::ExprKind::Literal(lit) => Some(StackValue(
                 StackValueKind::Literal(lit.as_const(&mut scope.block)),
@@ -657,7 +679,6 @@ impl mir::Expression {
                     .build(Instr::Constant(ConstValue::U32(0)))
                     .unwrap();
 
-                dbg!(&self, &val_t);
                 let ptr = scope
                     .block
                     .build(Instr::GetElemPtr(kind.instr(), vec![first, idx]))
@@ -743,7 +764,7 @@ impl mir::Expression {
                 ))
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
-                let struct_val = expression.codegen(scope, &mut state.load(true)).unwrap();
+                let struct_val = expression.codegen(scope, state).unwrap();
 
                 let TypeKind::CustomType(name) = &struct_val.1 else {
                     panic!("tried accessing non-custom-type");
