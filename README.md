@@ -38,7 +38,7 @@ Currently missing relevant features (TODOs) are:
 - ~~Extern functions~~ (DONE)
 - ~~Strings~~ (DONE)
 - Loops
-- Debug Information
+- Debug Information (PARTIALLY DONE)
 - Borrows+Pointers
 
 Smaller features:
