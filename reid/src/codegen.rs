@@ -1024,7 +1024,11 @@ impl TypeKind {
                 size_bits: self.size_of(),
             }),
             TypeKind::Array(type_kind, len) => {
-                let elem_ty = type_kind.get_debug_type_hard(
+                let elem_ty = match **type_kind {
+                    TypeKind::CustomType(_) => TypeKind::Ptr(Box::new(*type_kind.clone())),
+                    _ => *type_kind.clone(),
+                };
+                let elem_ty = elem_ty.clone().get_debug_type_hard(
                     scope,
                     debug_info,
                     debug_types,
@@ -1033,8 +1037,8 @@ impl TypeKind {
                     tokens,
                 );
                 DebugTypeData::Array(DebugArrayType {
-                    size_bits: type_kind.size_of() * len,
-                    align_bits: type_kind.alignment(),
+                    size_bits: self.size_of(),
+                    align_bits: self.alignment(),
                     element_type: elem_ty,
                     length: *len,
                 })
@@ -1047,13 +1051,17 @@ impl TypeKind {
                         let mut fields = Vec::new();
                         let mut size_bits = 0;
                         for field in &struct_type.0 {
+                            let ty = match &field.1 {
+                                TypeKind::Array(elem_ty, len) => field.1.clone(),
+                                _ => field.1.clone(),
+                            };
                             fields.push(DebugFieldType {
                                 name: field.0.clone(),
                                 location: field.2.into_debug(tokens).unwrap(),
-                                size_bits: field.1.size_of(),
+                                size_bits: ty.size_of(),
                                 offset: size_bits,
                                 flags: DwarfFlags,
-                                ty: field.1.get_debug_type_hard(
+                                ty: ty.get_debug_type_hard(
                                     scope,
                                     debug_info,
                                     debug_types,
