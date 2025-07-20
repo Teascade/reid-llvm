@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::format, mem};
+use std::{array, collections::HashMap, fmt::format, mem};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
@@ -568,18 +568,7 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
-                Some(StackValue(
-                    v.0.map(|val| {
-                        scope
-                            .block
-                            .build(Instr::Load(
-                                val,
-                                v.1.get_type(scope.type_values, scope.types),
-                            ))
-                            .unwrap()
-                    }),
-                    varref.0.clone(),
-                ))
+                Some(StackValue(v.0, varref.0.clone()))
             }
             mir::ExprKind::Literal(lit) => Some(StackValue(
                 StackValueKind::Literal(lit.as_const(&mut scope.block)),
@@ -655,7 +644,7 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
-                let StackValue(kind, ty) = expression
+                let StackValue(kind, array_ty) = expression
                     .codegen(scope, &state.load(true))
                     .expect("array returned none!");
                 let idx = idx_expr
@@ -663,28 +652,31 @@ impl mir::Expression {
                     .expect("index returned none!")
                     .instr();
 
-                let mut ptr = scope
+                let first = scope
                     .block
-                    .build(Instr::GetElemPtr(kind.instr(), vec![idx]))
+                    .build(Instr::Constant(ConstValue::U32(0)))
+                    .unwrap();
+
+                let ptr = scope
+                    .block
+                    .build(Instr::GetElemPtr(kind.instr(), vec![first, idx]))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                if state.should_load {
-                    ptr = scope
-                        .block
-                        .build(Instr::Load(
-                            ptr,
-                            val_t.get_type(scope.type_values, scope.types),
-                        ))
-                        .unwrap()
-                        .maybe_location(&mut scope.block, location);
-                }
-
-                let TypeKind::Array(elem_ty, _) = ty else {
+                let TypeKind::Array(elem_ty, _) = array_ty else {
                     panic!();
                 };
 
-                Some(StackValue(kind.derive(ptr), *elem_ty))
+                let elem_value = scope
+                    .block
+                    .build(Instr::Load(
+                        ptr,
+                        val_t.get_type(scope.type_values, scope.types),
+                    ))
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
+
+                Some(StackValue(kind.derive(elem_value), *elem_ty))
             }
             mir::ExprKind::Array(expressions) => {
                 let stack_value_list = expressions
@@ -696,18 +688,20 @@ impl mir::Expression {
                     .map(|s| s.instr())
                     .collect::<Vec<_>>();
 
-                let instr_t = stack_value_list
+                let elem_ty_kind = stack_value_list
                     .iter()
                     .map(|s| s.1.clone())
                     .next()
                     .unwrap_or(TypeKind::Void);
 
+                let array_ty = Type::Array(
+                    Box::new(elem_ty_kind.get_type(scope.type_values, scope.types)),
+                    instr_list.len() as u64,
+                );
+
                 let array = scope
                     .block
-                    .build(Instr::ArrayAlloca(
-                        instr_t.get_type(scope.type_values, scope.types),
-                        instr_list.len() as u32,
-                    ))
+                    .build(Instr::Alloca("array".to_owned(), array_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -716,9 +710,13 @@ impl mir::Expression {
                         .block
                         .build(Instr::Constant(ConstValue::U32(index as u32)))
                         .unwrap();
+                    let first = scope
+                        .block
+                        .build(Instr::Constant(ConstValue::U32(0)))
+                        .unwrap();
                     let ptr = scope
                         .block
-                        .build(Instr::GetElemPtr(array, vec![index_expr]))
+                        .build(Instr::GetElemPtr(array, vec![first, index_expr]))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                     scope
@@ -728,9 +726,15 @@ impl mir::Expression {
                         .maybe_location(&mut scope.block, location);
                 }
 
+                let array_val = scope
+                    .block
+                    .build(Instr::Load(array, array_ty))
+                    .unwrap()
+                    .maybe_location(&mut scope.block, location);
+
                 Some(StackValue(
-                    StackValueKind::Literal(array),
-                    TypeKind::Array(Box::new(instr_t), instr_list.len() as u64),
+                    StackValueKind::Literal(array_val),
+                    TypeKind::Array(Box::new(elem_ty_kind), instr_list.len() as u64),
                 ))
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
@@ -766,12 +770,10 @@ impl mir::Expression {
                 ))
             }
             mir::ExprKind::Struct(name, items) => {
+                let struct_ty = Type::CustomType(*scope.type_values.get(name)?);
                 let struct_ptr = scope
                     .block
-                    .build(Instr::Alloca(
-                        name.clone(),
-                        Type::CustomType(*scope.type_values.get(name)?),
-                    ))
+                    .build(Instr::Alloca(name.clone(), struct_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -790,8 +792,13 @@ impl mir::Expression {
                     }
                 }
 
+                let struct_val = scope
+                    .block
+                    .build(Instr::Load(struct_ptr, struct_ty))
+                    .unwrap();
+
                 Some(StackValue(
-                    StackValueKind::Literal(struct_ptr),
+                    StackValueKind::Literal(struct_val),
                     TypeKind::CustomType(name.clone()),
                 ))
             }
@@ -954,15 +961,14 @@ impl TypeKind {
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
             TypeKind::StringPtr => Type::Ptr(Box::new(Type::I8)),
-            TypeKind::Array(elem_t, _) => Type::Ptr(Box::new(elem_t.get_type(type_vals, typedefs))),
+            TypeKind::Array(elem_t, len) => {
+                Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)
+            }
             TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
             TypeKind::CustomType(n) => {
                 let type_val = type_vals.get(n).unwrap().clone();
-                let custom_t = Type::CustomType(type_val);
-                match typedefs.get(&type_val).unwrap().kind {
-                    TypeDefinitionKind::Struct(_) => Type::Ptr(Box::new(custom_t)),
-                }
+                Type::CustomType(type_val)
             }
             TypeKind::Ptr(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))

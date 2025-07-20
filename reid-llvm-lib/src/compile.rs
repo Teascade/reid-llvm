@@ -861,7 +861,7 @@ impl InstructionHolder {
                         .map(|idx_elem| module.values.get(idx_elem).unwrap().value_ref)
                         .collect();
 
-                    LLVMBuildGEP2(
+                    LLVMBuildInBoundsGEP2(
                         module.builder_ref,
                         elem_t.as_llvm(module.context_ref, &module.types),
                         module.values.get(arr).unwrap().value_ref,
@@ -888,6 +888,12 @@ impl InstructionHolder {
                         into_cstring(format!("struct.{}.{}.gep", type_fmt, idx)).as_ptr(),
                     )
                 }
+                ExtractValue(agg_val, idx) => LLVMBuildExtractValue(
+                    module.builder_ref,
+                    module.values.get(agg_val).unwrap().value_ref,
+                    *idx,
+                    c"extract".as_ptr(),
+                ),
             }
         };
         if let Some(record) = &self.record {
@@ -932,7 +938,6 @@ impl InstructionHolder {
         }
         if let Some(location) = &self.data.location {
             unsafe {
-                // dbg!(&self.data.kind, LLVMGetValueKind(val));
                 match LLVMGetValueKind(val) {
                     LLVMValueKind::LLVMInstructionValueKind
                     | LLVMValueKind::LLVMMemoryDefValueKind
@@ -956,26 +961,6 @@ impl InstructionHolder {
         LLVMValue {
             _ty,
             value_ref: val,
-        }
-    }
-
-    fn get_inner_value(&self) -> Option<InstructionValue> {
-        match &self.data.kind {
-            crate::Instr::Param(_) => None,
-            crate::Instr::Constant(_) => None,
-            crate::Instr::Add(_, _) => None,
-            crate::Instr::Sub(_, _) => None,
-            crate::Instr::Mult(_, _) => None,
-            crate::Instr::And(_, _) => None,
-            crate::Instr::Phi(_) => None,
-            crate::Instr::Alloca(_, _) => todo!(),
-            crate::Instr::Load(_, _) => None,
-            crate::Instr::Store(_, val) => Some(*val),
-            crate::Instr::ArrayAlloca(_, _) => None,
-            crate::Instr::GetElemPtr(_, _) => None,
-            crate::Instr::GetStructElemPtr(_, _) => None,
-            crate::Instr::ICmp(_, _, _) => None,
-            crate::Instr::FunctionCall(_, _) => None,
         }
     }
 }
@@ -1077,6 +1062,7 @@ impl Type {
                 Void => LLVMVoidTypeInContext(context),
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context, typemap), 0),
                 CustomType(struct_ty) => *typemap.get(struct_ty).unwrap(),
+                Array(r#type, len) => LLVMArrayType2(r#type.as_llvm(context, typemap), *len),
             }
         }
     }

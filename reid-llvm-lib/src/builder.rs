@@ -392,6 +392,7 @@ impl Builder {
                 Instr::Alloca(_, _) => Ok(()),
                 Instr::Load(ptr, load_ty) => {
                     let ptr_ty = ptr.get_type(&self)?;
+                    dbg!(&ptr_ty, &load_ty);
                     if let Type::Ptr(ptr_ty_inner) = ptr_ty {
                         if *ptr_ty_inner == load_ty {
                             Ok(())
@@ -414,10 +415,10 @@ impl Builder {
                 Instr::GetElemPtr(ptr_val, _) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
                     match ptr_ty {
-                        Type::CustomType(custom) => match self.type_data(&custom).kind {
-                            CustomTypeKind::NamedStruct(_) => Ok(()),
+                        Type::Ptr(inner) => match *inner {
+                            Type::Array(_, _) => Ok(()),
+                            _ => Err(()),
                         },
-                        Type::Ptr(_) => Ok(()),
                         _ => Err(()),
                     }
                 }
@@ -438,6 +439,16 @@ impl Builder {
                         }
                     } else {
                         Err(()) // TODO error: not a pointer
+                    }
+                }
+                Instr::ExtractValue(val, _) => {
+                    let val_ty = val.get_type(&self)?;
+                    match val_ty {
+                        Type::CustomType(custom) => match self.type_data(&custom).kind {
+                            CustomTypeKind::NamedStruct(_) => Ok(()),
+                        },
+                        Type::Array(_, _) => Ok(()),
+                        _ => Err(()),
                     }
                 }
             }

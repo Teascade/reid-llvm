@@ -194,13 +194,12 @@ pub fn compile_and_pass<'map>(
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
 
-    dbg!(&mir_context);
-    println!("Context: {}", &mir_context);
-
     perform_all_passes(&mut mir_context, module_map)?;
 
+    #[cfg(debug_assertions)]
     dbg!(&mir_context);
-    println!("Context: {}", &mir_context);
+    #[cfg(debug_assertions)]
+    println!("{}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
     let codegen_modules = mir_context.codegen(&mut context, &module_map);

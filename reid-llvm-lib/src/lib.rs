@@ -318,6 +318,7 @@ pub enum Instr {
     ArrayAlloca(Type, u32),
     GetElemPtr(InstructionValue, Vec<InstructionValue>),
     GetStructElemPtr(InstructionValue, u32),
+    ExtractValue(InstructionValue, u32),
 
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
@@ -340,6 +341,7 @@ pub enum Type {
     Bool,
     Void,
     CustomType(TypeValue),
+    Array(Box<Type>, u64),
     Ptr(Box<Type>),
 }
 
@@ -404,7 +406,16 @@ impl InstructionValue {
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
                 ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
-                GetElemPtr(ptr, _) => ptr.get_type(builder),
+                GetElemPtr(instr, _) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    let Type::Ptr(inner_ty) = instr_ty else {
+                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
+                    };
+                    let Type::Array(elem_ty, _) = *inner_ty else {
+                        panic!("GetStructElemPtr on non-struct! ({:?})", &inner_ty)
+                    };
+                    Ok(Type::Ptr(Box::new(*elem_ty.clone())))
+                }
                 GetStructElemPtr(instr, idx) => {
                     let instr_ty = instr.get_type(builder)?;
                     let Type::Ptr(inner_ty) = instr_ty else {
@@ -419,6 +430,21 @@ impl InstructionValue {
                         }
                     };
                     Ok(Type::Ptr(Box::new(field_ty)))
+                }
+                ExtractValue(instr, idx) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    Ok(match instr_ty {
+                        Type::CustomType(struct_ty) => {
+                            let data = builder.type_data(&struct_ty);
+                            match data.kind {
+                                CustomTypeKind::NamedStruct(named_struct) => {
+                                    named_struct.1.get(*idx as usize).unwrap().clone()
+                                }
+                            }
+                        }
+                        Type::Array(elem_ty, _) => *elem_ty.clone(),
+                        _ => return Err(()),
+                    })
                 }
             }
         }
@@ -462,6 +488,7 @@ impl Type {
             Type::Void => false,
             Type::Ptr(_) => false,
             Type::CustomType(_) => false,
+            Type::Array(_, _) => false,
         }
     }
 
@@ -481,6 +508,7 @@ impl Type {
             Type::Void => false,
             Type::Ptr(_) => false,
             Type::CustomType(_) => false,
+            Type::Array(_, _) => false,
         }
     }
 }

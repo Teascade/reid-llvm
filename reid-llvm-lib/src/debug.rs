@@ -148,6 +148,11 @@ impl Debug for Instr {
                     .join(", "),
             ),
             Instr::GetStructElemPtr(instruction_value, index) => {
+                write!(f, "GEP(")?;
+                fmt_index(f, instruction_value, &index.to_string())?;
+                write!(f, ")")
+            }
+            Instr::ExtractValue(instruction_value, index) => {
                 fmt_index(f, instruction_value, &index.to_string())
             }
         }
