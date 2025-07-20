@@ -111,7 +111,7 @@ impl Block {
                 StmtKind::Set(lhs, rhs) => {
                     // Infer hints for the expression itself
                     let lhs_infer = lhs.infer_types(&mut state, &inner_refs);
-                    let lhs_ref = state.ok(lhs_infer, rhs.1);
+                    let lhs_ref = state.ok(lhs_infer, lhs.1);
 
                     // Infer hints for the expression itself
                     let rhs_infer = rhs.infer_types(&mut state, &inner_refs);
@@ -364,8 +364,39 @@ impl Expression {
                     .from_type(&TypeKind::CustomType(struct_name.clone()))
                     .unwrap())
             }
-            ExprKind::Borrow(named_variable_ref) => todo!(),
-            ExprKind::Deref(named_variable_ref) => todo!(),
+            ExprKind::Borrow(var) => {
+                // Find variable type
+                let type_ref = type_refs
+                    .find_var(&var.1)
+                    .map(|(_, hint)| hint)
+                    .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
+
+                // Update MIR type to TypeRef if found
+                if let Ok(hint) = &type_ref {
+                    var.0 = hint.as_type();
+                }
+
+                Ok(type_refs
+                    .from_type(&TypeKind::Borrow(Box::new(var.0.clone())))
+                    .unwrap())
+            }
+            ExprKind::Deref(var) => {
+                // Find variable type
+                let type_ref = type_refs
+                    .find_var(&var.1)
+                    .map(|(_, hint)| hint)
+                    .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
+
+                // Update MIR type to TypeRef if found
+                if let Ok(hint) = &type_ref {
+                    var.0 = hint.as_type();
+                }
+
+                match &var.0.resolve_weak(type_refs.types) {
+                    Borrow(type_kind) => Ok(type_refs.from_type(&type_kind).unwrap()),
+                    _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
+                }
+            }
         }
     }
 }

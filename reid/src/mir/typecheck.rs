@@ -56,6 +56,8 @@ pub enum ErrorKind {
     RecursiveTypeDefinition(String, String),
     #[error("This type of expression can not be used for assignment")]
     InvalidSetExpression,
+    #[error("Can not deref {0}, as it is not a borrow")]
+    AttemptedDerefNonBorrow(String),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
