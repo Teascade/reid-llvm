@@ -349,16 +349,32 @@ impl Parse for FunctionDefinition {
     }
 }
 
+#[derive(Debug)]
+struct FunctionParam(String, Type);
+
+impl Parse for FunctionParam {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let Some(Token::Identifier(arg_name)) = stream.next() else {
+            return Err(stream.expected_err("parameter name")?);
+        };
+        stream.expect(Token::Colon)?;
+        Ok(FunctionParam(arg_name, stream.parse()?))
+    }
+}
+
 impl Parse for FunctionSignature {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
             stream.expect(Token::ParenOpen)?;
             let mut args = Vec::new();
 
-            while let Some(Token::Identifier(arg_name)) = stream.peek() {
-                stream.next();
-                stream.expect(Token::Colon)?;
-                args.push((arg_name, stream.parse()?));
+            if let Ok(param) = stream.parse::<FunctionParam>() {
+                args.push((param.0, param.1));
+                while let Some(Token::Comma) = stream.peek() {
+                    stream.next();
+                    let param = stream.parse::<FunctionParam>()?;
+                    args.push((param.0, param.1));
+                }
             }
 
             stream.expect(Token::ParenClose)?;
