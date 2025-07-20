@@ -18,7 +18,7 @@ use crate::{
     error_raporting::ModuleMap,
     lexer::{FullToken, Position},
     mir::{
-        self, Metadata, NamedVariableRef, StructField, StructType, TypeDefinition,
+        self, ExprKind, Metadata, NamedVariableRef, StructField, StructType, TypeDefinition,
         TypeDefinitionKind, TypeKind, VagueLiteral,
     },
 };
@@ -479,33 +479,37 @@ impl mir::Statement {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
                 let value = expression.codegen(scope, &state).unwrap();
 
-                let alloca = scope
-                    .block
-                    .build(
-                        name,
-                        Instr::Alloca(ty.get_type(scope.type_values, scope.types)),
-                    )
-                    .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                let stack_value = if let mir::Expression(ExprKind::Borrow(_), _) = expression {
+                    value
+                } else {
+                    let alloca = scope
+                        .block
+                        .build(
+                            name,
+                            Instr::Alloca(ty.get_type(scope.type_values, scope.types)),
+                        )
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
 
-                let store = scope
-                    .block
-                    .build(
-                        format!("{}.store", name),
-                        Instr::Store(alloca, value.instr()),
-                    )
-                    .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                    scope
+                        .block
+                        .build(
+                            format!("{}.store", name),
+                            Instr::Store(alloca, value.instr()),
+                        )
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location);
 
-                let stack_value = match mutable {
-                    true => StackValueKind::Mutable(alloca),
-                    false => StackValueKind::Immutable(alloca),
+                    StackValue(
+                        match mutable {
+                            true => StackValueKind::Mutable(alloca),
+                            false => StackValueKind::Immutable(alloca),
+                        },
+                        TypeKind::Ptr(Box::new(value.clone().1)),
+                    )
                 };
 
-                scope.stack_values.insert(
-                    name.clone(),
-                    StackValue(stack_value, TypeKind::Ptr(Box::new(value.clone().1))),
-                );
+                scope.stack_values.insert(name.clone(), stack_value.clone());
                 if let Some(debug) = &scope.debug {
                     let location = self.1.into_debug(scope.tokens).unwrap();
                     let var = debug.info.metadata(
@@ -518,15 +522,15 @@ impl mir::Statement {
                             flags: DwarfFlags,
                         }),
                     );
-                    store.add_record(
-                        &mut scope.block,
-                        InstructionDebugRecordData {
-                            variable: var,
-                            location,
-                            kind: DebugRecordKind::Declare(value.instr()),
-                            scope: debug.scope,
-                        },
-                    );
+                    // value.instr().add_record(
+                    //     &mut scope.block,
+                    //     InstructionDebugRecordData {
+                    //         variable: var,
+                    //         location,
+                    //         kind: DebugRecordKind::Declare(value.instr()),
+                    //         scope: debug.scope,
+                    //     },
+                    // );
                 }
                 None
             }
@@ -934,8 +938,47 @@ impl mir::Expression {
                     TypeKind::CustomType(name.clone()),
                 ))
             }
-            mir::ExprKind::Borrow(named_variable_ref) => todo!(),
-            mir::ExprKind::Deref(named_variable_ref) => todo!(),
+            mir::ExprKind::Borrow(varref) => {
+                varref.0.known().expect("variable type unknown");
+                let v = scope
+                    .stack_values
+                    .get(&varref.1)
+                    .expect("Variable reference not found?!");
+                Some(v.clone())
+            }
+            mir::ExprKind::Deref(varref) => {
+                varref.0.known().expect("variable type unknown");
+                let v = scope
+                    .stack_values
+                    .get(&varref.1)
+                    .expect("Variable reference not found?!");
+
+                Some({
+                    if state.should_load {
+                        if let TypeKind::Ptr(inner) = &v.1 {
+                            StackValue(
+                                v.0.derive(
+                                    scope
+                                        .block
+                                        .build(
+                                            format!("{}.load2", varref.1),
+                                            Instr::Load(
+                                                v.instr(),
+                                                inner.get_type(scope.type_values, scope.types),
+                                            ),
+                                        )
+                                        .unwrap(),
+                                ),
+                                *inner.clone(),
+                            )
+                        } else {
+                            panic!("Variable was not a pointer?!?")
+                        }
+                    } else {
+                        v.clone()
+                    }
+                })
+            }
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
@@ -1159,18 +1202,20 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Ptr(inner) => DebugTypeData::Pointer(DebugPointerType {
-                name,
-                pointee: inner.get_debug_type_hard(
-                    scope,
-                    debug_info,
-                    debug_types,
-                    type_values,
-                    types,
-                    tokens,
-                ),
-                size_bits: self.size_of(),
-            }),
+            TypeKind::Ptr(inner) | TypeKind::Borrow(inner) => {
+                DebugTypeData::Pointer(DebugPointerType {
+                    name,
+                    pointee: inner.get_debug_type_hard(
+                        scope,
+                        debug_info,
+                        debug_types,
+                        type_values,
+                        types,
+                        tokens,
+                    ),
+                    size_bits: self.size_of(),
+                })
+            }
             TypeKind::Array(elem_ty, len) => {
                 let elem_ty = elem_ty.clone().get_debug_type_hard(
                     scope,
