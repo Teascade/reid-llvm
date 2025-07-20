@@ -9,9 +9,10 @@ use crate::{
     CmpPredicate, Instr, InstructionData, TerminatorKind,
     builder::*,
     debug_information::{
-        DebugArrayType, DebugBasicType, DebugLocation, DebugLocationValue, DebugMetadataHolder,
-        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue, DebugStructType,
-        DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
+        DebugArrayType, DebugBasicType, DebugFieldType, DebugLocation, DebugLocationValue,
+        DebugMetadataHolder, DebugMetadataValue, DebugPointerType, DebugProgramValue,
+        DebugScopeValue, DebugStructType, DebugSubprogramType, DebugTypeData, DebugTypeHolder,
+        DebugTypeValue,
     },
 };
 
@@ -267,7 +268,19 @@ impl Debug for DebugStructType {
             .field("location", &self.location)
             .field("size_bit", &self.size_bits)
             .field("flags", &self.flags)
-            .field("elements", &self.elements)
+            .field("elements", &self.fields)
+            .finish()
+    }
+}
+
+impl Debug for DebugFieldType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct(&format!("Field({})", self.name))
+            .field("location", &self.location)
+            .field("size_bits", &self.size_bits)
+            .field("offset", &self.offset)
+            .field("flags", &self.flags)
+            .field("ty", &self.ty)
             .finish()
     }
 }

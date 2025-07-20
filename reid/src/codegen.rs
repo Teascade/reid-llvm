@@ -4,11 +4,11 @@ use reid_lib::{
     builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
-        DebugArrayType, DebugBasicType, DebugFileData, DebugInformation, DebugLocalVariable,
-        DebugLocation, DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugPointerType,
-        DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType, DebugSubprogramData,
-        DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DebugTypeValue,
-        DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
+        DebugArrayType, DebugBasicType, DebugFieldType, DebugFileData, DebugInformation,
+        DebugLocalVariable, DebugLocation, DebugMetadata, DebugMetadataValue, DebugParamVariable,
+        DebugPointerType, DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType,
+        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData,
+        DebugTypeValue, DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
     Block, CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr,
     Module, NamedStruct, TerminatorKind as Term, Type,
@@ -1044,24 +1044,26 @@ impl TypeKind {
 
                 match &typedef.kind {
                     TypeDefinitionKind::Struct(struct_type) => {
-                        let (elements, sizes): (Vec<_>, Vec<_>) = struct_type
-                            .0
-                            .iter()
-                            .map(|t| {
-                                (
-                                    t.1.clone().get_debug_type_hard(
-                                        scope,
-                                        debug_info,
-                                        debug_types,
-                                        type_values,
-                                        types,
-                                        tokens,
-                                    ),
-                                    t.1.size_of(),
-                                )
-                            })
-                            .unzip();
-                        let size_bits: u64 = sizes.iter().sum();
+                        let mut fields = Vec::new();
+                        let mut size_bits = 0;
+                        for field in &struct_type.0 {
+                            fields.push(DebugFieldType {
+                                name: field.0.clone(),
+                                location: field.2.into_debug(tokens).unwrap(),
+                                size_bits: field.1.size_of(),
+                                offset: size_bits,
+                                flags: DwarfFlags,
+                                ty: field.1.get_debug_type_hard(
+                                    scope,
+                                    debug_info,
+                                    debug_types,
+                                    type_values,
+                                    types,
+                                    tokens,
+                                ),
+                            });
+                            size_bits += field.1.size_of();
+                        }
                         {
                             DebugTypeData::Struct(DebugStructType {
                                 name: name.clone(),
@@ -1069,7 +1071,7 @@ impl TypeKind {
                                 location: typedef.meta.into_debug(tokens).unwrap(),
                                 size_bits,
                                 flags: DwarfFlags,
-                                elements,
+                                fields,
                             })
                         }
                     }

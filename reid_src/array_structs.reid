@@ -1,8 +1,7 @@
 // Arithmetic, function calls and imports!
 
 struct Test {
-    field: i32,
-    second: [u32; 4]
+  field : i32, second : [u32; 4]
 }
 
 fn test() -> [Test; 1] {
@@ -14,15 +13,15 @@ fn test() -> [Test; 1] {
 }
 
 fn main() -> u32 {
-    let mut value = test();
+  let mut value = test();
 
-    let val1 = 0;
-    let val2 = 1;
+  let val1 = 0;
+  let val2 = 1;
 
-    // value[val1].second[val2 + 1] = 99;
+  // value[val1].second[val2 + 1] = 99;
 
-    let mut b = value[val1];
-    b.second[2] = 99;
+  let mut b = value[val1];
+  b.second[2] = 99;
 
-    return value[val1].second[2];
+  return value[val1].second[2];
 }

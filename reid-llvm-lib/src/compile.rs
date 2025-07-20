@@ -502,9 +502,23 @@ impl DebugTypeHolder {
                 }
                 DebugTypeData::Struct(st) => {
                     let mut elements = st
-                        .elements
+                        .fields
                         .iter()
-                        .map(|e| *debug.types.get(e).unwrap())
+                        .map(|field| {
+                            LLVMDIBuilderCreateMemberType(
+                                debug.builder,
+                                *debug.programs.get(&st.scope).unwrap(),
+                                into_cstring(field.name.clone()).as_ptr(),
+                                field.name.len(),
+                                debug.file_ref,
+                                field.location.line,
+                                field.size_bits,
+                                0,
+                                1,
+                                field.flags.as_llvm(),
+                                *debug.types.get(&field.ty).unwrap(),
+                            )
+                        })
                         .collect::<Vec<_>>();
                     LLVMDIBuilderCreateStructType(
                         debug.builder,

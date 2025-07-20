@@ -295,7 +295,17 @@ pub struct DebugStructType {
     pub location: DebugLocation,
     pub size_bits: u64,
     pub flags: DwarfFlags,
-    pub elements: Vec<DebugTypeValue>,
+    pub fields: Vec<DebugFieldType>,
+}
+
+#[derive(Clone)]
+pub struct DebugFieldType {
+    pub name: String,
+    pub location: DebugLocation,
+    pub size_bits: u64,
+    pub offset: u64,
+    pub flags: DwarfFlags,
+    pub ty: DebugTypeValue,
 }
 
 #[derive(Clone)]
