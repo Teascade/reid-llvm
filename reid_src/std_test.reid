@@ -2,11 +2,11 @@
 import std::print;
 import std::intdiv;
 
-fn main() {
+fn main() -> i32 {
     let hello = "hello world";
 
-    print(intdiv(10, 5).quot);
 
     print(hello);
 
+    return intdiv(10, 5).quot;
 }

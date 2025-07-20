@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     convert::Infallible,
     fs::{self},
     path::PathBuf,
@@ -11,6 +11,7 @@ use crate::{
     compile_module,
     error_raporting::{ModuleMap, ReidError},
     lexer::FullToken,
+    mir::{TypeDefinition, TypeKind},
     parse_module,
 };
 
@@ -187,6 +188,8 @@ impl<'map> Pass for LinkerPass<'map> {
                 .borrow_mut();
 
                 let func_name = unsafe { path.get_unchecked(1) };
+                let imported_mod_name = imported.0.name.clone();
+                let imported_mod_typedefs = imported.0.typedefs.clone();
 
                 let Some(func) = imported
                     .0
@@ -235,12 +238,92 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
 
+                fn import_type(base: &String, ty: &TypeKind) -> (TypeKind, Vec<String>) {
+                    let mut imported_types = Vec::new();
+                    let ty = match &ty {
+                        TypeKind::CustomType(name) => {
+                            imported_types.push(name.clone());
+
+                            let name = format!("{}::{}", base, name);
+                            TypeKind::CustomType(name)
+                        }
+                        _ => ty.clone(),
+                    };
+                    (ty, imported_types)
+                }
+
+                let mut imported_types = Vec::new();
+
+                let (return_type, types) = import_type(&imported_mod_name, &func.return_type);
+                imported_types.extend(types);
+
+                let mut param_tys = Vec::new();
+                for (param_name, param_ty) in &func.parameters {
+                    let (param_type, types) = import_type(&imported_mod_name, &param_ty);
+                    imported_types.extend(types);
+                    param_tys.push((param_name.clone(), param_type));
+                }
+
+                fn find_inner_types(
+                    typedef: &TypeDefinition,
+                    mut seen: HashSet<String>,
+                ) -> Vec<String> {
+                    match &typedef.kind {
+                        crate::mir::TypeDefinitionKind::Struct(struct_type) => {
+                            let typenames = struct_type
+                                .0
+                                .iter()
+                                .filter(|t| matches!(t.1, TypeKind::CustomType(_)))
+                                .map(|t| match &t.1 {
+                                    TypeKind::CustomType(t) => t,
+                                    _ => panic!(),
+                                })
+                                .cloned()
+                                .collect::<Vec<_>>();
+
+                            for typename in typenames {
+                                if seen.contains(&typename) {
+                                    continue;
+                                }
+                                let inner = find_inner_types(typedef, seen.clone());
+                                seen.insert(typename);
+                                seen.extend(inner);
+                            }
+
+                            seen.into_iter().collect()
+                        }
+                    }
+                }
+
+                let mut seen = HashSet::new();
+                seen.extend(imported_types.clone());
+
+                for typename in imported_types.clone() {
+                    let typedef = imported_mod_typedefs
+                        .iter()
+                        .find(|ty| ty.name == typename)
+                        .unwrap();
+                    let inner = find_inner_types(typedef, seen.clone());
+                    seen.extend(inner);
+                }
+
+                for typename in seen.into_iter() {
+                    let mut typedef = imported_mod_typedefs
+                        .iter()
+                        .find(|ty| ty.name == typename)
+                        .unwrap()
+                        .clone();
+
+                    typedef.name = format!("{}::{}", imported_mod_name, typedef.name);
+                    importer_module.0.typedefs.push(typedef);
+                }
+
                 importer_module.0.functions.push(FunctionDefinition {
                     name: func.name.clone(),
                     is_pub: false,
                     is_imported: false,
-                    return_type: func.return_type.clone(),
-                    parameters: func.parameters.clone(),
+                    return_type: return_type,
+                    parameters: param_tys,
                     kind: super::FunctionDefinitionKind::Extern(true),
                 });
             }
