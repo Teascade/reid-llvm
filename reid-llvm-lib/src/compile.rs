@@ -444,7 +444,7 @@ impl DebugMetadataHolder {
                     *debug.types.get(&var.ty).unwrap(),
                     var.always_preserve as i32,
                     var.flags.as_llvm(),
-                    var.alignment,
+                    0,
                 ),
                 DebugMetadata::VarAssignment => todo!(),
             }
@@ -824,10 +824,10 @@ impl InstructionHolder {
                     );
                     phi
                 }
-                Alloca(name, ty) => LLVMBuildAlloca(
+                Alloca(ty) => LLVMBuildAlloca(
                     module.builder_ref,
                     ty.as_llvm(module.context_ref, &module.types),
-                    into_cstring(name).as_ptr(),
+                    c"alloca".as_ptr(),
                 ),
                 Load(ptr, ty) => LLVMBuildLoad2(
                     module.builder_ref,

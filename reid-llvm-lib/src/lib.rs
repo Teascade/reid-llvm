@@ -312,7 +312,7 @@ pub enum Instr {
     And(InstructionValue, InstructionValue),
     Phi(Vec<InstructionValue>),
 
-    Alloca(String, Type),
+    Alloca(Type),
     Load(InstructionValue, Type),
     Store(InstructionValue, InstructionValue),
     ArrayAlloca(Type, u32),
@@ -402,7 +402,7 @@ impl InstructionValue {
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
-                Alloca(_, ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
                 ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),

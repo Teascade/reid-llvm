@@ -390,7 +390,7 @@ impl Builder {
                     }
                     Ok(())
                 }
-                Instr::Alloca(_, _) => Ok(()),
+                Instr::Alloca(_) => Ok(()),
                 Instr::Load(ptr, load_ty) => {
                     let ptr_ty = ptr.get_type(&self)?;
                     if let Type::Ptr(ptr_ty_inner) = ptr_ty {

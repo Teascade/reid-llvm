@@ -235,7 +235,6 @@ pub struct DebugLocalVariable {
     pub location: DebugLocation,
     pub ty: DebugTypeValue,
     pub always_preserve: bool,
-    pub alignment: u32,
     pub flags: DwarfFlags,
 }
 

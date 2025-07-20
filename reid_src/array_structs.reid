@@ -5,17 +5,21 @@ struct Test {
   second: [u32; 4]
 }
 
-fn test() -> [Test; 1] {
-  let value = [Test {
+fn test() -> Test {
+  let value = Test {
     field: 5,
     second: [6, 3, 4, 8],
-  }];
+  };
   return value;
 }
 
 fn main() -> u32 {
   let mut value = test();
 
+  let mut a = value.second;
 
-  return value[0].second[2];
+  a[2] = 15;
+
+
+  return value.second[2];
 }

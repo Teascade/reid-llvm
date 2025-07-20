@@ -345,10 +345,7 @@ impl mir::Module {
                 // Codegen actual parameters
                 let param = entry.build(Instr::Param(i)).unwrap();
                 let alloca = entry
-                    .build(Instr::Alloca(
-                        p_name.clone(),
-                        p_ty.get_type(&type_values, &types),
-                    ))
+                    .build(Instr::Alloca(p_ty.get_type(&type_values, &types)))
                     .unwrap();
                 entry.build(Instr::Store(alloca, param)).unwrap();
                 stack_values.insert(
@@ -475,10 +472,7 @@ impl mir::Statement {
 
                 let alloca = scope
                     .block
-                    .build(Instr::Alloca(
-                        name.clone(),
-                        ty.get_type(scope.type_values, scope.types),
-                    ))
+                    .build(Instr::Alloca(ty.get_type(scope.type_values, scope.types)))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -504,9 +498,8 @@ impl mir::Statement {
                         DebugMetadata::LocalVar(DebugLocalVariable {
                             name: name.clone(),
                             location,
-                            ty: ty.clone().get_debug_type(debug, scope),
+                            ty: TypeKind::Ptr(Box::new(ty.clone())).get_debug_type(debug, scope),
                             always_preserve: true,
-                            alignment: 32,
                             flags: DwarfFlags,
                         }),
                     );
@@ -737,7 +730,7 @@ impl mir::Expression {
 
                 let array = scope
                     .block
-                    .build(Instr::Alloca("array".to_owned(), array_ty.clone()))
+                    .build(Instr::Alloca(array_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -817,7 +810,7 @@ impl mir::Expression {
                 let struct_ty = Type::CustomType(*scope.type_values.get(name)?);
                 let struct_ptr = scope
                     .block
-                    .build(Instr::Alloca(name.clone(), struct_ty.clone()))
+                    .build(Instr::Alloca(struct_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 

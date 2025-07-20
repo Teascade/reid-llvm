@@ -132,7 +132,7 @@ impl Debug for Instr {
             Instr::Phi(val) => fmt_call(f, &"Phi", &val),
             Instr::ICmp(cmp, lhs, rhs) => fmt_binop(f, lhs, cmp, rhs),
             Instr::FunctionCall(fun, params) => fmt_call(f, fun, params),
-            Instr::Alloca(name, ty) => write!(f, "alloca<{:?}>({})", ty, name),
+            Instr::Alloca(ty) => write!(f, "alloca<{:?}>", ty),
             Instr::Load(val, ty) => write!(f, "load<{:?}>({:?})", ty, val),
             Instr::Store(ptr, val) => write!(f, "store({:?} = {:?})", ptr, val),
             Instr::ArrayAlloca(ty, instruction_value) => {
