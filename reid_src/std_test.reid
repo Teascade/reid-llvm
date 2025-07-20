@@ -5,8 +5,7 @@ import std::intdiv;
 fn main() -> i32 {
     let hello = "hello world";
 
-
     print(hello);
 
-    return intdiv(10, 5).quot;
+    return intdiv(15, 5).quotient;
 }

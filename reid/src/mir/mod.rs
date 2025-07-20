@@ -259,6 +259,7 @@ pub struct FunctionCall {
     pub name: String,
     pub return_type: TypeKind,
     pub parameters: Vec<Expression>,
+    pub meta: Metadata,
 }
 
 #[derive(Debug)]

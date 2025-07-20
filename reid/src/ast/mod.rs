@@ -89,11 +89,7 @@ impl BinaryOperator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallExpression(
-    pub String,
-    pub Vec<Expression>,
-    #[allow(dead_code)] pub TokenRange,
-);
+pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRange);
 
 #[derive(Debug, Clone)]
 pub struct IfExpression(

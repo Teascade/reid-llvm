@@ -188,6 +188,7 @@ impl ast::Expression {
                         .iter()
                         .map(|e| e.process(module_id))
                         .collect(),
+                    meta: fn_call_expr.2.as_meta(module_id),
                 })
             }
             ast::ExpressionKind::BlockExpr(block) => {

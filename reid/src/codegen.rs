@@ -648,10 +648,12 @@ impl mir::Expression {
                 ))
             }
             mir::ExprKind::FunctionCall(call) => {
-                let ret_type = call
+                let ret_type_kind = call
                     .return_type
                     .known()
                     .expect("function return type unknown");
+
+                let ret_type = ret_type_kind.get_type(scope.type_values, scope.types);
 
                 let params = call
                     .parameters
@@ -663,18 +665,56 @@ impl mir::Expression {
                     .get(&call.name)
                     .expect("function not found!");
                 dbg!(&self, &callee.ir.value());
-                Some(StackValue(
-                    StackValueKind::Immutable(
-                        scope
-                            .block
-                            .build(
-                                call.name.clone(),
-                                Instr::FunctionCall(callee.ir.value(), params),
-                            )
-                            .unwrap(),
-                    ),
-                    ret_type,
-                ))
+
+                let val = scope
+                    .block
+                    .build(
+                        call.name.clone(),
+                        Instr::FunctionCall(callee.ir.value(), params),
+                    )
+                    .unwrap();
+
+                if let Some(debug) = &scope.debug {
+                    let location = call.meta.into_debug(scope.tokens).unwrap();
+                    let location_val = debug.info.location(&debug.scope, location);
+                    val.with_location(&mut scope.block, location_val);
+                }
+
+                let ptr = if ret_type_kind != TypeKind::Void {
+                    let ptr = scope
+                        .block
+                        .build(&call.name, Instr::Alloca(ret_type.clone()))
+                        .unwrap();
+                    scope
+                        .block
+                        .build(format!("{}.store", call.name), Instr::Store(ptr, val))
+                        .unwrap();
+
+                    Some(ptr)
+                } else {
+                    None
+                };
+
+                if let Some(ptr) = ptr {
+                    if state.should_load {
+                        Some(StackValue(
+                            StackValueKind::Immutable(
+                                scope
+                                    .block
+                                    .build(call.name.clone(), Instr::Load(ptr, ret_type))
+                                    .unwrap(),
+                            ),
+                            ret_type_kind,
+                        ))
+                    } else {
+                        Some(StackValue(
+                            StackValueKind::Immutable(ptr),
+                            TypeKind::Ptr(Box::new(ret_type_kind)),
+                        ))
+                    }
+                } else {
+                    None
+                }
             }
             mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state),
             mir::ExprKind::Block(block) => {

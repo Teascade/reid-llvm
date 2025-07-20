@@ -2,8 +2,8 @@
 extern fn puts(message: string) -> i32;
 
 struct DivT {
-    quot: i32,
-    rem: i32,
+    quotient: i32,
+    remainder: i32,
 }
 
 extern fn div(numerator: i32, denominator: i32) -> DivT;
