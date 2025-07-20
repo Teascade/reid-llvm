@@ -10,7 +10,7 @@ clean:
 	rm -f $(BIN) $(SRC:.reid=.o) $(SRC:.reid=.asm) $(SRC:.reid=.ll)
 
 $(BIN): $(SRC:.reid=.o)
-	$(LD) -O0 -dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o -lc $(LDFLAGS) $< -o$@
+	$(LD) -dynamic-linker /lib64/ld-linux-x86-64.so.2 /usr/lib/crt1.o -lc $(LDFLAGS) $< -o$@
 
 .SUFFIXES: .o .reid
 .reid.o:

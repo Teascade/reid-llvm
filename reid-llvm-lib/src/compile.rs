@@ -563,8 +563,12 @@ impl TypeHolder {
                     for ty in &named_struct.1 {
                         elem_types.push(ty.as_llvm(context.context_ref, types));
                     }
-                    let struct_ty = LLVMStructTypeInContext(
+                    let struct_ty = LLVMStructCreateNamed(
                         context.context_ref,
+                        into_cstring(named_struct.0.clone()).as_ptr(),
+                    );
+                    LLVMStructSetBody(
+                        struct_ty,
                         elem_types.as_mut_ptr(),
                         elem_types.len() as u32,
                         0,
