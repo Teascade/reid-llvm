@@ -181,8 +181,6 @@ impl std::fmt::Display for ReidError {
             let position = if let Some(tokens) = &module.tokens {
                 let range_tokens = meta.range.into_tokens(&tokens);
 
-                dbg!(&error);
-                dbg!(&meta.range, &tokens[meta.range.start]);
                 get_position(&range_tokens).or(meta.position.map(|p| (p, p)))
             } else if let Some(position) = meta.position {
                 Some((position, position))

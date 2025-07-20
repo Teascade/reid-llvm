@@ -890,8 +890,6 @@ impl InstructionHolder {
 
                 match record.kind {
                     DebugRecordKind::Declare(instruction_value) => {
-                        dbg!(&self.value, &instruction_value);
-
                         LLVMDIBuilderInsertDeclareRecordBefore(
                             debug.builder,
                             module.values.get(&instruction_value).unwrap().value_ref,

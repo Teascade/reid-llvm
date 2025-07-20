@@ -37,7 +37,7 @@ impl Debug for ModuleHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple(&format!("{}({:#?}) ", self.data.name, self.value))
             .field(&self.functions)
-            .field(&self.debug_information)
+            // .field(&self.debug_information)
             .finish()
     }
 }
@@ -266,7 +266,6 @@ impl Debug for DebugStructType {
             .field("scope", &self.scope)
             .field("location", &self.location)
             .field("size_bit", &self.size_bits)
-            .field("alignment", &self.alignment)
             .field("flags", &self.flags)
             .field("elements", &self.elements)
             .finish()

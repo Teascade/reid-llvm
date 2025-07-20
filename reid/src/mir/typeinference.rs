@@ -141,7 +141,6 @@ impl Block {
             .ok()
             .unwrap_or((ReturnKind::Soft, Void));
         let mut ret_type_ref = outer_refs.from_type(&ty).unwrap();
-        dbg!(&self.return_type(inner_refs.types));
 
         // Narow return type to declared type if hard return
         if kind == ReturnKind::Hard {

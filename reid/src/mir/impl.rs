@@ -203,7 +203,6 @@ impl Expression {
             If(expr) => expr.return_type(refs),
             Indexed(expression, _, _) => {
                 let expr_type = expression.return_type(refs)?;
-                dbg!(&expr_type);
                 if let TypeKind::Array(elem_ty, _) = expr_type.1.resolve_weak(refs) {
                     Ok((ReturnKind::Soft, *elem_ty))
                 } else {

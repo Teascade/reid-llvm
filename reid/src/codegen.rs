@@ -500,7 +500,7 @@ impl mir::Statement {
                         DebugMetadata::LocalVar(DebugLocalVariable {
                             name: name.clone(),
                             location,
-                            ty: ty.get_debug_type(debug, scope),
+                            ty: ty.clone().get_debug_type(debug, scope),
                             always_preserve: true,
                             alignment: 32,
                             flags: DwarfFlags,
@@ -568,7 +568,6 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
-                dbg!(varref);
                 Some(StackValue(
                     v.0.map(|val| {
                         scope
@@ -1050,7 +1049,7 @@ impl TypeKind {
                             .iter()
                             .map(|t| {
                                 (
-                                    t.1.get_debug_type_hard(
+                                    t.1.clone().get_debug_type_hard(
                                         scope,
                                         debug_info,
                                         debug_types,
@@ -1066,10 +1065,9 @@ impl TypeKind {
                         {
                             DebugTypeData::Struct(DebugStructType {
                                 name: name.clone(),
-                                scope: scope,
+                                scope,
                                 location: typedef.meta.into_debug(tokens).unwrap(),
                                 size_bits,
-                                alignment: 32,
                                 flags: DwarfFlags,
                                 elements,
                             })

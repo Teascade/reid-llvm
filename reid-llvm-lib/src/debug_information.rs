@@ -294,7 +294,6 @@ pub struct DebugStructType {
     pub scope: DebugProgramValue,
     pub location: DebugLocation,
     pub size_bits: u64,
-    pub alignment: u32,
     pub flags: DwarfFlags,
     pub elements: Vec<DebugTypeValue>,
 }
