@@ -685,7 +685,6 @@ impl mir::Expression {
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                dbg!(&array_ty);
                 let TypeKind::Ptr(inner) = array_ty else {
                     panic!();
                 };
@@ -771,7 +770,7 @@ impl mir::Expression {
                 ))
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
-                let struct_val = expression.codegen(scope, state).unwrap();
+                let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
 
                 let TypeKind::Ptr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
