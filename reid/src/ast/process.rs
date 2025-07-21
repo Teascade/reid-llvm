@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process};
 
 use crate::{
     ast::{self},
@@ -287,6 +287,9 @@ impl From<ast::TypeKind> for mir::TypeKind {
             }
             ast::TypeKind::String => mir::TypeKind::StringPtr,
             ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(name.clone()),
+            ast::TypeKind::Borrow(type_kind) => {
+                mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())))
+            }
         }
     }
 }

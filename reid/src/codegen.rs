@@ -360,7 +360,7 @@ impl mir::Module {
                 stack_values.insert(
                     p_name.clone(),
                     StackValue(
-                        StackValueKind::Immutable(alloca),
+                        StackValueKind::Mutable(alloca),
                         TypeKind::Ptr(Box::new(p_ty.clone())),
                     ),
                 );

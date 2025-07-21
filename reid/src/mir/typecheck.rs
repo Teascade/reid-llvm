@@ -162,7 +162,7 @@ impl FunctionDefinition {
                     param.0.clone(),
                     ScopeVariable {
                         ty: param_t,
-                        mutable: false,
+                        mutable: true,
                     },
                 )
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));

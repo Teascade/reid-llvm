@@ -1,0 +1,13 @@
+// Arithmetic, function calls and imports!
+
+fn changer(param: &u32) {
+  *param = 17;
+}
+
+fn main() -> u32 {
+  let mut value = 6;
+
+  changer(&value);
+
+  return value;
+}

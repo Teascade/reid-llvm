@@ -24,6 +24,10 @@ impl Parse for Type {
             };
             stream.expect(Token::BracketClose)?;
             TypeKind::Array(Box::new(inner.0), length)
+        } else if let Some(Token::Et) = stream.peek() {
+            stream.expect(Token::Et)?;
+            let inner = stream.parse::<Type>()?;
+            TypeKind::Borrow(Box::new(inner.0))
         } else {
             if let Some(Token::Identifier(ident)) = stream.next() {
                 match &*ident {
