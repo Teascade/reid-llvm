@@ -487,13 +487,13 @@ impl ConstValue {
             ConstValue::U128(_) => U128,
             ConstValue::StringPtr(_) => Ptr(Box::new(I8)),
             ConstValue::Bool(_) => Bool,
-            ConstValue::F16(_) => todo!(),
-            ConstValue::F32B(_) => todo!(),
-            ConstValue::F32(_) => todo!(),
-            ConstValue::F64(_) => todo!(),
-            ConstValue::F80(_) => todo!(),
-            ConstValue::F128(_) => todo!(),
-            ConstValue::F128PPC(_) => todo!(),
+            ConstValue::F16(_) => F16,
+            ConstValue::F32B(_) => F32B,
+            ConstValue::F32(_) => F32,
+            ConstValue::F64(_) => F64,
+            ConstValue::F80(_) => F80,
+            ConstValue::F128(_) => F128,
+            ConstValue::F128PPC(_) => F128PPC,
         }
     }
 }

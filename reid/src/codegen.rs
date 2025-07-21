@@ -1353,6 +1353,13 @@ impl TypeKind {
                     TypeKind::U16 | TypeKind::U32 | TypeKind::U64 | TypeKind::U128 => {
                         DwarfEncoding::Unsigned
                     }
+                    TypeKind::F16
+                    | TypeKind::F32
+                    | TypeKind::F32B
+                    | TypeKind::F64
+                    | TypeKind::F80
+                    | TypeKind::F128
+                    | TypeKind::F128PPC => DwarfEncoding::Float,
                     TypeKind::Void => DwarfEncoding::Address,
                     TypeKind::StringPtr => DwarfEncoding::Address,
                     TypeKind::Array(_, _) => DwarfEncoding::Address,
