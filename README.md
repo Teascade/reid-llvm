@@ -40,7 +40,7 @@ Currently missing big features (TODOs) are:
 - ~~Borrows~~ (DONE)
 - ~~Pointers~~ (DONE)
 - ~~Unary operators~~
-- Floats
+- ~~Floats~~ (DONE)
 - Type casting
 - Loops
 - Debug Information (PARTIALLY DONE)
