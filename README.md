@@ -39,7 +39,7 @@ Currently missing big features (TODOs) are:
 - ~~Strings~~ (DONE)
 - ~~Borrows~~ (DONE)
 - ~~Pointers~~ (DONE)
-- Unary operators
+- ~~Unary operators~~
 - Floats
 - Loops
 - Debug Information (PARTIALLY DONE)
@@ -53,7 +53,7 @@ Big features that I want later but are not necessary:
 Smaller features:
 - Easier way to initialize arrays with a single value
 - Lexical scopes for Debug Information
-- Only include standard library at all if it is imported
+- ~~Only include standard library at all if it is imported~~
 
 ### Why "Reid"
 

@@ -68,10 +68,6 @@ pub struct CompileOutput {
 impl CompiledModule {
     pub fn output(&self) -> CompileOutput {
         unsafe {
-            let llvm_ir = from_cstring(LLVMPrintModuleToString(self.module_ref))
-                .expect("Unable to print LLVM IR to string");
-            println!("{}", llvm_ir);
-
             LLVM_InitializeAllTargets();
             LLVM_InitializeAllTargetInfos();
             LLVM_InitializeAllTargetMCs();
