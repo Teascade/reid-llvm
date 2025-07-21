@@ -110,13 +110,9 @@ impl Parse for PrimaryExpression {
                 Kind::BlockExpr(Box::new(block)),
                 stream.get_range().unwrap(),
             )
-        } else if let Ok(ifexpr) = stream.parse() {
-            Expression(Kind::IfExpr(Box::new(ifexpr)), stream.get_range().unwrap())
-        } else if let (Some(Token::Identifier(_)), Some(Token::BraceOpen)) =
-            (stream.peek(), stream.peek2())
-        {
+        } else if let Some(Token::If) = stream.peek() {
             Expression(
-                Kind::StructExpression(stream.parse()?),
+                Kind::IfExpr(Box::new(stream.parse()?)),
                 stream.get_range().unwrap(),
             )
         } else if let (Some(Token::Et), Some(Token::MutKeyword)) = (stream.peek(), stream.peek2()) {
@@ -143,19 +139,19 @@ impl Parse for PrimaryExpression {
                 Kind::UnaryOperation(unary, Box::new(stream.parse()?)),
                 stream.get_range().unwrap(),
             )
-        } else if let Some(token) = stream.next() {
+        } else if let Some(token) = stream.peek() {
             match &token {
                 Token::Identifier(v) => {
-                    if let Some(Token::BraceOpen) = stream.peek() {
-                        Expression(
-                            Kind::StructExpression(stream.parse()?),
-                            stream.get_range().unwrap(),
-                        )
+                    if let Ok(struct_expr) = stream.parse::<StructExpression>() {
+                        let range = struct_expr.range.clone();
+                        Expression(Kind::StructExpression(struct_expr), range)
                     } else {
+                        stream.next(); // Consume ident
                         Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                     }
                 }
                 Token::DecimalValue(v) => {
+                    stream.next(); // Consume decimal
                     if let Some(Token::Dot) = stream.peek() {
                         stream.next(); // Consume dot
                         let Some(Token::DecimalValue(fractional)) = stream.next() else {
@@ -174,24 +170,35 @@ impl Parse for PrimaryExpression {
                         )
                     }
                 }
-                Token::StringLit(v) => Expression(
-                    Kind::Literal(Literal::String(v.clone())),
-                    stream.get_range().unwrap(),
-                ),
-                Token::True => Expression(
-                    Kind::Literal(Literal::Bool(true)),
-                    stream.get_range().unwrap(),
-                ),
-                Token::False => Expression(
-                    Kind::Literal(Literal::Bool(false)),
-                    stream.get_range().unwrap(),
-                ),
+                Token::StringLit(v) => {
+                    stream.next(); // Consume
+                    Expression(
+                        Kind::Literal(Literal::String(v.clone())),
+                        stream.get_range().unwrap(),
+                    )
+                }
+                Token::True => {
+                    stream.next(); // Consume
+                    Expression(
+                        Kind::Literal(Literal::Bool(true)),
+                        stream.get_range().unwrap(),
+                    )
+                }
+                Token::False => {
+                    stream.next(); // Consume
+                    Expression(
+                        Kind::Literal(Literal::Bool(false)),
+                        stream.get_range().unwrap(),
+                    )
+                }
                 Token::ParenOpen => {
+                    stream.next(); // Consume
                     let exp = stream.parse()?;
                     stream.expect(Token::ParenClose)?;
                     exp
                 }
                 Token::BracketOpen => {
+                    stream.next(); // Consume
                     let mut expressions = Vec::new();
                     if let Ok(exp) = stream.parse() {
                         expressions.push(exp);
@@ -521,7 +528,11 @@ impl Parse for StructExpression {
 
         stream.expect(Token::BraceClose)?;
 
-        Ok(StructExpression { name, fields })
+        Ok(StructExpression {
+            name,
+            fields,
+            range: stream.get_range().unwrap(),
+        })
     }
 }
 

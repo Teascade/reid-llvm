@@ -120,17 +120,14 @@ impl CompiledModule {
             let llvm_ir = from_cstring(LLVMPrintModuleToString(self.module_ref))
                 .expect("Unable to print LLVM IR to string");
 
+            println!("{}", llvm_ir);
+
             let mut err = ErrorMessageHolder::null();
             LLVMVerifyModule(
                 self.module_ref,
                 llvm_sys::analysis::LLVMVerifierFailureAction::LLVMPrintMessageAction,
                 err.borrow_mut(),
             );
-
-            if let Err(e) = err.into_result() {
-                println!("{}", llvm_ir);
-                panic!("{}", e);
-            }
 
             CompileOutput {
                 triple: from_cstring(triple).expect("Unable to convert triple from cstring"),
@@ -829,6 +826,7 @@ impl InstructionHolder {
                 FCmp(pred, lhs, rhs) => {
                     let lhs = module.values.get(&lhs).unwrap();
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    dbg!(pred.as_llvm_unsorted_float());
                     LLVMBuildFCmp(
                         module.builder_ref,
                         pred.as_llvm_unsorted_float(),
@@ -1072,12 +1070,12 @@ impl CmpPredicate {
         use CmpPredicate::*;
         use LLVMRealPredicate::*;
         match self {
-            LT => LLVMRealULT,
-            LE => LLVMRealULE,
-            GT => LLVMRealUGT,
-            GE => LLVMRealUGE,
-            EQ => LLVMRealUEQ,
-            NE => LLVMRealUNE,
+            LT => LLVMRealOLT,
+            LE => LLVMRealOLE,
+            GT => LLVMRealOGT,
+            GE => LLVMRealOGE,
+            EQ => LLVMRealOEQ,
+            NE => LLVMRealONE,
         }
     }
 }

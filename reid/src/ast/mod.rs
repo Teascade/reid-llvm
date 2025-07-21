@@ -152,6 +152,7 @@ pub enum ReturnType {
 pub struct StructExpression {
     name: String,
     fields: Vec<(String, Expression)>,
+    range: TokenRange,
 }
 
 #[derive(Debug, Clone)]

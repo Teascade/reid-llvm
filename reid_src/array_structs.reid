@@ -20,6 +20,11 @@ fn main() -> u32 {
 
   *a.second[2] = 15;
 
+  let b = 4;
+  if value.field < b {
+    return 0;
+  }
+
 
   return value.second[2];
 }

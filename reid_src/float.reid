@@ -3,3 +3,7 @@
 pub fn OneHalf(var1: f32) -> f32 {
   return var1 * 1.5;
 }
+
+pub fn main() -> bool {
+  return 7.5 > 5.5;
+}
