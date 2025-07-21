@@ -395,8 +395,6 @@ impl Builder {
                 Instr::Alloca(_) => Ok(()),
                 Instr::Load(ptr, load_ty) => {
                     let ptr_ty = ptr.get_type(&self)?;
-                    dbg!(&self);
-                    dbg!(&ptr_ty, &load_ty);
                     if let Type::Ptr(ptr_ty_inner) = ptr_ty {
                         if *ptr_ty_inner == load_ty {
                             Ok(())

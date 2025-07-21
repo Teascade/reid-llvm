@@ -29,6 +29,30 @@ impl TypeKind {
         }
     }
 
+    pub fn signed(&self) -> bool {
+        match self {
+            TypeKind::Bool => false,
+            TypeKind::I8 => true,
+            TypeKind::I16 => true,
+            TypeKind::I32 => true,
+            TypeKind::I64 => true,
+            TypeKind::I128 => true,
+            TypeKind::U8 => false,
+            TypeKind::U16 => false,
+            TypeKind::U32 => false,
+            TypeKind::U64 => false,
+            TypeKind::U128 => false,
+            TypeKind::Void => false,
+            TypeKind::StringPtr => false,
+            TypeKind::Array(type_kind, len) => false,
+            TypeKind::CustomType(_) => false,
+            TypeKind::CodegenPtr(_) => false,
+            TypeKind::Vague(_) => false,
+            TypeKind::Borrow(_, _) => false,
+            TypeKind::UserPtr(_) => false,
+        }
+    }
+
     pub fn size_of(&self) -> u64 {
         match self {
             TypeKind::Bool => 1,
@@ -262,6 +286,33 @@ impl Expression {
             ExprKind::If(_) => None,
         }
     }
+
+    pub fn is_zero(&self) -> Option<bool> {
+        Some(self.num_value()? == 0)
+    }
+
+    pub fn num_value(&self) -> Option<i128> {
+        match &self.0 {
+            ExprKind::Variable(_) => None,
+            ExprKind::Indexed(..) => None,
+            ExprKind::Accessed(..) => None,
+            ExprKind::Array(_) => None,
+            ExprKind::Struct(..) => None,
+            ExprKind::Literal(literal) => literal.num_value(),
+            ExprKind::BinOp(op, lhs, rhs) => match op {
+                BinaryOperator::Add => Some(lhs.num_value()? + rhs.num_value()?),
+                BinaryOperator::Minus => Some(lhs.num_value()? - rhs.num_value()?),
+                BinaryOperator::Mult => Some(lhs.num_value()? * rhs.num_value()?),
+                BinaryOperator::And => None,
+                BinaryOperator::Cmp(_) => None,
+            },
+            ExprKind::FunctionCall(..) => None,
+            ExprKind::If(_) => None,
+            ExprKind::Block(_) => None,
+            ExprKind::Borrow(_, _) => None,
+            ExprKind::Deref(_) => None,
+        }
+    }
 }
 
 impl IfExpression {
@@ -403,6 +454,26 @@ impl Collapsable for TypeKind {
                 Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
             }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+        }
+    }
+}
+
+impl Literal {
+    pub fn num_value(&self) -> Option<i128> {
+        match self {
+            Literal::I8(val) => Some(*val as i128),
+            Literal::I16(val) => Some(*val as i128),
+            Literal::I32(val) => Some(*val as i128),
+            Literal::I64(val) => Some(*val as i128),
+            Literal::I128(val) => Some(*val as i128),
+            Literal::U8(val) => Some(*val as i128),
+            Literal::U16(val) => Some(*val as i128),
+            Literal::U32(val) => Some(*val as i128),
+            Literal::U64(val) => Some(*val as i128),
+            Literal::U128(val) => Some(*val as i128),
+            Literal::Bool(_) => None,
+            Literal::String(_) => None,
+            Literal::Vague(VagueLiteral::Number(val)) => Some(*val as i128),
         }
     }
 }

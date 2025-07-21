@@ -183,7 +183,7 @@ impl VagueLiteral {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BinaryOperator {
     Add,
     Minus,
@@ -193,7 +193,7 @@ pub enum BinaryOperator {
 }
 
 /// Specifically the operators that LLVM likes to take in as "icmp" parameters
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CmpOperator {
     LT,
     LE,
