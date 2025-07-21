@@ -6,7 +6,8 @@ use crate::{mir::*, util::try_all};
 use VagueType as Vague;
 
 use super::{
-    pass::{Pass, PassResult, PassState, ScopeFunction, ScopeVariable},
+    implement::Collapsable,
+    pass::{Pass, PassResult, PassState, ScopeVariable},
     typerefs::TypeRefs,
 };
 
@@ -723,65 +724,5 @@ impl Literal {
         } else {
             Ok(self)
         }
-    }
-}
-
-impl TypeKind {}
-
-pub trait Collapsable: Sized + Clone {
-    /// Try to narrow two types into one singular type. E.g. Vague(Number) and
-    /// I32 could be narrowed to just I32.
-    fn collapse_into(&self, other: &Self) -> Result<Self, ErrorKind>;
-}
-
-impl Collapsable for TypeKind {
-    fn collapse_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        if self == other {
-            return Ok(self.clone());
-        }
-
-        match (self, other) {
-            (TypeKind::Vague(Vague::Number), other) | (other, TypeKind::Vague(Vague::Number)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Number)),
-                    TypeKind::Vague(Vague::Number) => Ok(TypeKind::Vague(Vague::Number)),
-                    TypeKind::I8
-                    | TypeKind::I16
-                    | TypeKind::I32
-                    | TypeKind::I64
-                    | TypeKind::I128
-                    | TypeKind::U8
-                    | TypeKind::U16
-                    | TypeKind::U32
-                    | TypeKind::U64
-                    | TypeKind::U128 => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
-                Ok(other.clone())
-            }
-            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => Ok(TypeKind::Borrow(
-                Box::new(val1.collapse_into(val2)?),
-                *mut1 && *mut2,
-            )),
-            _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-        }
-    }
-}
-
-impl Collapsable for ScopeFunction {
-    fn collapse_into(&self, other: &ScopeFunction) -> Result<ScopeFunction, ErrorKind> {
-        Ok(ScopeFunction {
-            ret: self.ret.collapse_into(&other.ret)?,
-            params: try_all(
-                self.params
-                    .iter()
-                    .zip(&other.params)
-                    .map(|(p1, p2)| p1.collapse_into(&p2))
-                    .collect(),
-            )
-            .map_err(|e| e.first().unwrap().clone())?,
-        })
     }
 }

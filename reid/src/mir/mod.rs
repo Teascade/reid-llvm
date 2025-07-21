@@ -10,7 +10,7 @@ use crate::{
 };
 
 mod fmt;
-pub mod r#impl;
+pub mod implement;
 pub mod linker;
 pub mod pass;
 pub mod typecheck;

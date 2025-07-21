@@ -9,8 +9,8 @@ use std::{convert::Infallible, iter};
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
+    implement::pick_return,
     pass::{Pass, PassResult, PassState},
-    r#impl::pick_return,
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,

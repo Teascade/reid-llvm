@@ -16,8 +16,8 @@ use crate::{
 };
 
 use super::{
+    implement::EqualsIssue,
     pass::{Pass, PassResult, PassState},
-    r#impl::EqualsIssue,
     Context, FunctionDefinition, Import, Metadata, Module,
 };
 
