@@ -103,11 +103,6 @@ impl<'map> Pass for LinkerPass<'map> {
             modules.insert(module.name.clone(), Rc::new(RefCell::new((module, tokens))));
         }
 
-        // modules.insert(
-        //     "std".to_owned(),
-        //     Rc::new(RefCell::new(compile_std(&mut self.module_map)?)),
-        // );
-
         let mut modules_to_process: Vec<Rc<RefCell<(Module, Vec<FullToken>)>>> =
             modules.values().cloned().collect();
 
@@ -127,6 +122,12 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 let mut imported = if let Some(module) = modules.get_mut(module_name) {
                     module
+                } else if module_name == "std" {
+                    modules.insert(
+                        "std".to_owned(),
+                        Rc::new(RefCell::new(compile_std(&mut self.module_map)?)),
+                    );
+                    modules.get("std").unwrap()
                 } else {
                     let file_path =
                         PathBuf::from(&context.base.clone()).join(module_name.to_owned() + ".reid");
