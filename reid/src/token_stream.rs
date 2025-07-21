@@ -181,6 +181,15 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             end: self.position,
         })
     }
+
+    /// Gets range from the previous position to the current. Useful when using
+    /// with [`TokenStream::next`]
+    pub fn get_range_prev(&self) -> Option<TokenRange> {
+        self.ref_position.as_ref().map(|ref_pos| TokenRange {
+            start: **ref_pos,
+            end: self.position - 1,
+        })
+    }
 }
 
 impl Drop for TokenStream<'_, '_> {

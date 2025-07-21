@@ -103,14 +103,13 @@ pub struct IfExpression(
 );
 
 #[derive(Debug, Clone)]
-pub struct LetStatement(
-    pub String,
-    pub Option<Type>,
-    /// Mutability
-    pub bool,
-    pub Expression,
-    pub TokenRange,
-);
+pub struct LetStatement {
+    pub name: String,
+    pub ty: Option<Type>,
+    pub mutable: bool,
+    pub value: Expression,
+    pub name_range: TokenRange,
+}
 
 #[derive(Debug, Clone)]
 pub struct ImportStatement(pub Vec<String>, pub TokenRange);

@@ -318,17 +318,18 @@ impl Parse for LetStatement {
         let mutability = stream.expect(Token::MutKeyword).is_ok();
 
         if let Some(Token::Identifier(variable)) = stream.next() {
+            let range = stream.get_range_prev().unwrap();
             stream.expect(Token::Equals)?;
 
             let expression = stream.parse()?;
             stream.expect(Token::Semi)?;
-            Ok(LetStatement(
-                variable,
-                None, // TODO add possibility to name type
-                mutability,
-                expression,
-                stream.get_range().unwrap(),
-            ))
+            Ok(LetStatement {
+                name: variable,
+                ty: None,
+                mutable: mutability,
+                value: expression,
+                name_range: range,
+            })
         } else {
             Err(stream.expected_err("identifier")?)
         }

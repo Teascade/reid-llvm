@@ -114,17 +114,17 @@ impl ast::Block {
                     mir::StmtKind::Let(
                         mir::NamedVariableRef(
                             s_let
-                                .1
+                                .ty
                                 .clone()
                                 .map(|t| t.0.into())
                                 .unwrap_or(mir::TypeKind::Vague(mir::VagueType::Unknown)),
-                            s_let.0.clone(),
-                            s_let.4.as_meta(module_id),
+                            s_let.name.clone(),
+                            s_let.name_range.as_meta(module_id),
                         ),
-                        s_let.2,
-                        s_let.3.process(module_id),
+                        s_let.mutable,
+                        s_let.value.process(module_id),
                     ),
-                    s_let.4,
+                    s_let.name_range + s_let.value.1,
                 ),
                 ast::BlockLevelStatement::Set(var_ref, expression, range) => (
                     StmtKind::Set(var_ref.process(module_id), expression.process(module_id)),
