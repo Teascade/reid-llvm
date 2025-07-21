@@ -74,12 +74,12 @@ impl Display for FunctionDefinition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}fn {}({}) -> {} ",
+            "{}fn {}({}) -> {:#} ",
             if self.is_pub { "pub " } else { "" },
             self.name,
             self.parameters
                 .iter()
-                .map(|(n, t)| format!("{}: {}", n, t))
+                .map(|(n, t)| format!("{}: {:#}", n, t))
                 .collect::<Vec<_>>()
                 .join(", "),
             self.return_type
@@ -166,7 +166,7 @@ impl Display for ExprKind {
             ExprKind::Block(block) => Display::fmt(block, f),
             ExprKind::Indexed(expression, elem_ty, idx_expr) => {
                 Display::fmt(&expression, f)?;
-                write!(f, "<{}>", elem_ty)?;
+                write!(f, "<{:#}>", elem_ty)?;
                 write_index(f, idx_expr)
             }
             ExprKind::Array(expressions) => {
@@ -228,7 +228,7 @@ impl Display for IfExpression {
 
 impl Display for FunctionCall {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}<{}>(", self.name, self.return_type)?;
+        write!(f, "{}<{:#}>(", self.name, self.return_type)?;
         for (i, param) in self.parameters.iter().enumerate() {
             Display::fmt(param, f)?;
             if i < (self.parameters.len() - 1) {
@@ -241,7 +241,7 @@ impl Display for FunctionCall {
 
 impl Display for NamedVariableRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "v(\"{}\", {})", &self.1, &self.0)
+        write!(f, "v(\"{}\", {:#})", &self.1, &self.0)
     }
 }
 
@@ -311,4 +311,63 @@ fn write_index(f: &mut std::fmt::Formatter<'_>, idx: impl std::fmt::Display) -> 
 fn write_access(f: &mut std::fmt::Formatter<'_>, name: &String) -> std::fmt::Result {
     f.write_char('.')?;
     Display::fmt(name, f)
+}
+
+impl Display for TypeKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeKind::Bool => write!(f, "bool"),
+            TypeKind::I8 => write!(f, "i8"),
+            TypeKind::I16 => write!(f, "i16"),
+            TypeKind::I32 => write!(f, "i32"),
+            TypeKind::I64 => write!(f, "i64"),
+            TypeKind::I128 => write!(f, "i128"),
+            TypeKind::U8 => write!(f, "u8"),
+            TypeKind::U16 => write!(f, "u16"),
+            TypeKind::U32 => write!(f, "u32"),
+            TypeKind::U64 => write!(f, "u64"),
+            TypeKind::U128 => write!(f, "u128"),
+            TypeKind::Void => write!(f, "void"),
+            TypeKind::StringPtr => write!(f, "string"),
+            TypeKind::Array(type_kind, len) => {
+                f.write_char('[')?;
+                Display::fmt(type_kind, f)?;
+                write!(f, "; ")?;
+                Display::fmt(len, f)?;
+                f.write_char(']')
+            }
+            TypeKind::CustomType(name) => write!(f, "{}", name),
+            TypeKind::Borrow(type_kind, false) => {
+                write!(f, "&")?;
+                Display::fmt(type_kind, f)
+            }
+            TypeKind::Borrow(type_kind, true) => {
+                write!(f, "&mut ")?;
+                Display::fmt(type_kind, f)
+            }
+            TypeKind::Ptr(type_kind) => {
+                write!(f, "*")?;
+                Display::fmt(type_kind, f)
+            }
+            TypeKind::Vague(vague_type) => Display::fmt(vague_type, f),
+        }
+    }
+}
+
+impl Display for VagueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if f.alternate() {
+            match self {
+                VagueType::Unknown => write!(f, "Unknown"),
+                VagueType::Number => write!(f, "Number"),
+                VagueType::TypeRef(id) => write!(f, "TypeRef({0})", id),
+            }
+        } else {
+            match self {
+                VagueType::Unknown => write!(f, "{{unknown}}"),
+                VagueType::Number => write!(f, "Number"),
+                VagueType::TypeRef(_) => write!(f, "{{unknown}}"),
+            }
+        }
+    }
 }

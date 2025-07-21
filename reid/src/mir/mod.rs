@@ -77,53 +77,32 @@ impl TokenRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypeKind {
-    #[error("bool")]
     Bool,
-    #[error("i8")]
     I8,
-    #[error("i16")]
     I16,
-    #[error("i32")]
     I32,
-    #[error("i64")]
     I64,
-    #[error("i128")]
     I128,
-    #[error("u8")]
     U8,
-    #[error("u16")]
     U16,
-    #[error("u32")]
     U32,
-    #[error("u64")]
     U64,
-    #[error("u128")]
     U128,
-    #[error("void")]
     Void,
-    #[error("string")]
     StringPtr,
-    #[error("[{0}; {1}]")]
     Array(Box<TypeKind>, u64),
-    #[error("{0}")]
     CustomType(String),
-    #[error("Borrow({0}, {1})")]
     Borrow(Box<TypeKind>, bool),
-    #[error("Ptr({0})")]
     Ptr(Box<TypeKind>),
-    #[error(transparent)]
-    Vague(#[from] VagueType),
+    Vague(VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VagueType {
-    #[error("Unknown")]
     Unknown,
-    #[error("Number")]
     Number,
-    #[error("TypeRef({0})")]
     TypeRef(usize),
 }
 
