@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem};
+use std::{array, collections::HashMap, mem};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
@@ -736,7 +736,7 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
-                let StackValue(kind, array_ty) = expression
+                let StackValue(kind, ty) = expression
                     .codegen(scope, &state.load(false))
                     .expect("array returned none!");
                 let idx = idx_expr
@@ -749,23 +749,49 @@ impl mir::Expression {
                     .build("array.zero", Instr::Constant(ConstValue::U32(0)))
                     .unwrap();
 
-                let ptr = scope
-                    .block
-                    .build(
-                        format!("array.gep"),
-                        Instr::GetElemPtr(kind.instr(), vec![first, idx]),
-                    )
-                    .unwrap()
-                    .maybe_location(&mut scope.block, location);
-
-                let TypeKind::CodegenPtr(inner) = array_ty else {
+                let TypeKind::CodegenPtr(inner) = ty else {
                     panic!();
                 };
-                let TypeKind::Array(elem_ty, _) = *inner else {
-                    panic!();
+
+                let (ptr, contained_ty) = if let TypeKind::UserPtr(further_inner) = *inner.clone() {
+                    dbg!(&further_inner, &val_t);
+                    let loaded = scope
+                        .block
+                        .build(
+                            "array.load",
+                            Instr::Load(
+                                kind.instr(),
+                                inner.get_type(scope.type_values, scope.types),
+                            ),
+                        )
+                        .unwrap();
+                    (
+                        scope
+                            .block
+                            .build(format!("array.gep"), Instr::GetElemPtr(loaded, vec![idx]))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location),
+                        *further_inner,
+                    )
+                } else {
+                    let TypeKind::Array(elem_ty, _) = *inner else {
+                        panic!();
+                    };
+                    (
+                        scope
+                            .block
+                            .build(
+                                format!("array.gep"),
+                                Instr::GetElemPtr(kind.instr(), vec![first, idx]),
+                            )
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location),
+                        val_t.clone(),
+                    )
                 };
 
                 if state.should_load {
+                    dbg!(&contained_ty);
                     Some(StackValue(
                         kind.derive(
                             scope
@@ -774,16 +800,19 @@ impl mir::Expression {
                                     "array.load",
                                     Instr::Load(
                                         ptr,
-                                        val_t.get_type(scope.type_values, scope.types),
+                                        contained_ty.get_type(scope.type_values, scope.types),
                                     ),
                                 )
                                 .unwrap()
                                 .maybe_location(&mut scope.block, location),
                         ),
-                        *elem_ty,
+                        contained_ty,
                     ))
                 } else {
-                    Some(StackValue(kind.derive(ptr), TypeKind::CodegenPtr(elem_ty)))
+                    Some(StackValue(
+                        kind.derive(ptr),
+                        TypeKind::CodegenPtr(Box::new(contained_ty)),
+                    ))
                 }
             }
             mir::ExprKind::Array(expressions) => {
@@ -1175,9 +1204,9 @@ impl TypeKind {
                 let type_val = type_vals.get(n).unwrap().clone();
                 Type::CustomType(type_val)
             }
-            TypeKind::UserPtr(type_kind) => {
-                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
-            }
+            TypeKind::UserPtr(type_kind) => Type::Ptr(Box::new(Type::Ptr(Box::new(
+                type_kind.get_type(type_vals, typedefs),
+            )))),
             TypeKind::CodegenPtr(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
@@ -1228,7 +1257,7 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::CodegenPtr(inner) | TypeKind::Borrow(inner, _) => {
+            TypeKind::CodegenPtr(inner) | TypeKind::UserPtr(inner) | TypeKind::Borrow(inner, _) => {
                 DebugTypeData::Pointer(DebugPointerType {
                     name,
                     pointee: inner.get_debug_type_hard(

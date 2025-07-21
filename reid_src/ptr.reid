@@ -4,7 +4,9 @@
 extern fn malloc(size: u64) -> *u8;
 
 fn main() -> u8 {
-    let ptr = malloc(4);
+    let mut ptr = malloc(4);
+
+    ptr[0] = 5;
 
     return ptr[0];
 }
