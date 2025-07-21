@@ -2,10 +2,10 @@
 
 
 fn main() -> u32 {
-  let mut value = 6;
+  let mut value = [4, 3, 2];
 
   let mut borrow = &value;
-  *borrow = 17;
+  (*borrow)[1] = 17;
 
-  return *borrow;
+  return value[1];
 }

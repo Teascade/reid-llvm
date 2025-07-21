@@ -39,7 +39,8 @@ Currently missing relevant features (TODOs) are:
 - ~~Strings~~ (DONE)
 - Loops
 - Debug Information (PARTIALLY DONE)
-- Borrows+Pointers
+- ~~Borrows~~ (DONE)
+- Pointers
 
 Smaller features:
 - Easier way to initialize arrays with a single value
