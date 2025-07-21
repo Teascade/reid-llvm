@@ -712,6 +712,7 @@ impl Expression {
 
                 Ok(*inner)
             }
+            ExprKind::CastTo(expression, type_kind) => todo!(),
         }
     }
 }

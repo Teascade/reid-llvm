@@ -254,6 +254,7 @@ pub enum ExprKind {
     Block(Block),
     Borrow(NamedVariableRef, bool),
     Deref(NamedVariableRef),
+    CastTo(Box<Expression>, TypeKind),
 }
 
 #[derive(Debug)]

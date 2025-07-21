@@ -211,6 +211,7 @@ impl Display for ExprKind {
             ExprKind::Borrow(var_ref, false) => write!(f, "&{}", var_ref),
             ExprKind::Borrow(var_ref, true) => write!(f, "&mut {}", var_ref),
             ExprKind::Deref(var_ref) => write!(f, "*{}", var_ref),
+            ExprKind::CastTo(expression, type_kind) => write!(f, "{} as {}", expression, type_kind),
         }
     }
 }

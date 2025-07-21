@@ -256,7 +256,9 @@ impl ast::Expression {
                     Box::new(expr.process(module_id)),
                 ),
             },
-            ast::ExpressionKind::CastTo(expression, _) => todo!(),
+            ast::ExpressionKind::CastTo(expression, ty) => {
+                mir::ExprKind::CastTo(Box::new(expression.process(module_id)), ty.0.clone().into())
+            }
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

@@ -397,6 +397,7 @@ impl Expression {
                     _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
                 }
             }
+            ExprKind::CastTo(expression, type_kind) => todo!(),
         }
     }
 }

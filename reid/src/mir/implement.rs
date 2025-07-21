@@ -319,6 +319,13 @@ impl Expression {
                     _ => Err(ReturnTypeOther::DerefNonBorrow(var.2)),
                 }
             }
+            CastTo(expr, type_kind) => match expr.return_type(refs) {
+                Ok(ret_type) => match ret_type {
+                    (ReturnKind::Hard, ty) => Ok((ReturnKind::Hard, ty)),
+                    _ => Ok((ReturnKind::Soft, type_kind.clone())),
+                },
+                Err(_) => Ok((ReturnKind::Soft, type_kind.clone())),
+            },
         }
     }
 
@@ -336,6 +343,7 @@ impl Expression {
             ExprKind::BinOp(_, _, _) => None,
             ExprKind::FunctionCall(_) => None,
             ExprKind::If(_) => None,
+            ExprKind::CastTo(expression, _) => expression.backing_var(),
         }
     }
 
@@ -363,6 +371,7 @@ impl Expression {
             ExprKind::Block(_) => None,
             ExprKind::Borrow(_, _) => None,
             ExprKind::Deref(_) => None,
+            ExprKind::CastTo(expression, _) => expression.num_value(),
         }
     }
 }
