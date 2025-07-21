@@ -7,7 +7,7 @@ fn changer(param: &mut u32) {
 fn main() -> u32 {
   let value = 6;
 
-  changer(&mut value);
+  changer(&value);
 
   return value;
 }

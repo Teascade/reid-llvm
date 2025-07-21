@@ -61,6 +61,8 @@ pub enum ErrorKind {
     AttemptedDerefNonBorrow(String),
     #[error("Types {0} and {1} differ in mutability")]
     TypesDifferMutability(TypeKind, TypeKind),
+    #[error("Cannot mutably borrow variable {0}, which is not declared as mutable")]
+    ImpossibleMutableBorrow(String),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -633,19 +635,24 @@ impl Expression {
                 Ok(TypeKind::CustomType(struct_name.clone()))
             }
             ExprKind::Borrow(var_ref, mutable) => {
+                let scope_var = state.scope.variables.get(&var_ref.1).cloned();
+
                 let existing = state
                     .or_else(
-                        state
-                            .scope
-                            .variables
-                            .get(&var_ref.1)
-                            .map(|var| &var.ty)
-                            .cloned()
+                        scope_var
+                            .clone()
+                            .map(|var| var.ty)
                             .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
                         TypeKind::Vague(Vague::Unknown),
                         var_ref.2,
                     )
                     .resolve_ref(typerefs);
+
+                if let Some(scope_var) = scope_var {
+                    if !scope_var.mutable && *mutable {
+                        return Err(ErrorKind::ImpossibleMutableBorrow(var_ref.1.clone()));
+                    }
+                }
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
