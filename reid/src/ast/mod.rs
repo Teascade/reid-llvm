@@ -28,6 +28,7 @@ pub enum TypeKind {
     Array(Box<TypeKind>, u64),
     Custom(String),
     Borrow(Box<TypeKind>, bool),
+    Ptr(Box<TypeKind>),
 }
 
 #[derive(Debug, Clone)]
