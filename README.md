@@ -32,7 +32,7 @@ fn fibonacci(n: u16) -> u16 {
 }
 ```
 
-Currently missing relevant features (TODOs) are:
+Currently missing big features (TODOs) are:
 - ~~Arrays~~ (DONE)
 - ~~Structs~~ (DONE)
 - ~~Extern functions~~ (DONE)
@@ -41,6 +41,12 @@ Currently missing relevant features (TODOs) are:
 - Debug Information (PARTIALLY DONE)
 - ~~Borrows~~ (DONE)
 - Pointers
+- Floats
+
+Big features that I want later but are not necessary:
+- Associated functions
+- User-defined binary operations
+- Asymmetric binary operations (e.g. string + u32)
 
 Smaller features:
 - Easier way to initialize arrays with a single value
