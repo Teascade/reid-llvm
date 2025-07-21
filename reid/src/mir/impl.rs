@@ -75,8 +75,8 @@ impl TypeKind {
 
     pub fn is_mutable(&self) -> bool {
         match self {
-            TypeKind::Borrow(_, true) => true,
-            _ => false,
+            TypeKind::Borrow(_, false) => false,
+            _ => true,
         }
     }
 }

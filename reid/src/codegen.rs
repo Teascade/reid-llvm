@@ -367,7 +367,7 @@ impl mir::Module {
                 stack_values.insert(
                     p_name.clone(),
                     StackValue(
-                        StackValueKind::Mutable(alloca),
+                        StackValueKind::mutable(p_ty.is_mutable(), alloca),
                         TypeKind::Ptr(Box::new(p_ty.clone())),
                     ),
                 );
