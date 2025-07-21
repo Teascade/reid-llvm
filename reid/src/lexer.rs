@@ -265,7 +265,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             c if c.is_alphabetic() => {
                 let mut value = character.to_string();
                 while let Some(c) = cursor.first() {
-                    if !c.is_ascii_alphanumeric() {
+                    if !(c.is_ascii_alphanumeric() || c == '_') {
                         break;
                     }
                     value += &c.to_string();

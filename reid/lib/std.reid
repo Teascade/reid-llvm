@@ -1,18 +1,18 @@
 
 extern fn puts(message: *str) -> i32;
 
-struct DivT {
+struct div_t {
     quotient: i32,
     remainder: i32,
 }
 
-extern fn div(numerator: i32, denominator: i32) -> DivT;
+extern fn div(numerator: i32, denominator: i32) -> div_t;
 
 pub fn print(message: *str) {
     puts(message);
 }
 
-pub fn intdiv(numerator: i32, denominator: i32) -> DivT {
+pub fn int_div(numerator: i32, denominator: i32) -> div_t {
     return div(numerator, denominator);
 }
 
