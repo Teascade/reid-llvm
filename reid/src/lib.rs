@@ -121,7 +121,10 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{}", &context);
 
-    let state = context.pass(&mut LinkerPass { module_map })?;
+    let state = context.pass(&mut LinkerPass {
+        module_map,
+        ignore_no_main: true,
+    })?;
 
     #[cfg(debug_assertions)]
     println!("{:-^100}", "LINKER OUTPUT");

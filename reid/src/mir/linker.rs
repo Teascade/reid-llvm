@@ -63,6 +63,7 @@ pub fn compile_std(
 /// MIR.
 pub struct LinkerPass<'map> {
     pub module_map: &'map mut ModuleMap,
+    pub ignore_no_main: bool,
 }
 
 type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
@@ -80,14 +81,18 @@ impl<'map> Pass for LinkerPass<'map> {
             state.note_errors(&vec![ErrorKind::MultipleMainsAtStart], Metadata::default());
             return Ok(());
         }
-        let Some(main) = mains.first() else {
-            state.note_errors(&vec![ErrorKind::NoMainDefined], Metadata::default());
-            return Ok(());
-        };
-
-        let Some(_) = main.functions.iter().find(|f| f.name == "main") else {
-            state.note_errors(&vec![ErrorKind::NoMainFunction], Metadata::default());
-            return Ok(());
+        if let Some(main) = mains.first() {
+            if let None = main.functions.iter().find(|f| f.name == "main") {
+                if !self.ignore_no_main {
+                    state.note_errors(&vec![ErrorKind::NoMainFunction], Metadata::default());
+                    return Ok(());
+                }
+            };
+        } else {
+            if !self.ignore_no_main {
+                state.note_errors(&vec![ErrorKind::NoMainDefined], Metadata::default());
+                return Ok(());
+            }
         };
 
         let mut modules = HashMap::<String, Rc<RefCell<_>>>::new();
