@@ -38,11 +38,11 @@ Currently missing big features (TODOs) are:
 - ~~Extern functions~~ (DONE)
 - ~~Strings~~ (DONE)
 - ~~Borrows~~ (DONE)
-- ~~Pointers~~
+- ~~Pointers~~ (DONE)
+- Unary operators
+- Floats
 - Loops
 - Debug Information (PARTIALLY DONE)
-- Floats
-- Unary operators
 - Ability to specify types in literals and variable definitions
 
 Big features that I want later but are not necessary:

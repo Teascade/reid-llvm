@@ -72,6 +72,20 @@ impl Parse for Expression {
     }
 }
 
+impl Parse for UnaryOperator {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        if let Some(token) = stream.next() {
+            match token {
+                Token::Plus => Ok(UnaryOperator::Plus),
+                Token::Minus => Ok(UnaryOperator::Minus),
+                _ => Err(stream.expected_err("unary operator")?),
+            }
+        } else {
+            Err(stream.expected_err("unary operator")?)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct PrimaryExpression(Expression);
 
@@ -117,6 +131,11 @@ impl Parse for PrimaryExpression {
             stream.next(); // Consume Et
             stream.next(); // Consume identifier
             Expression(Kind::Deref(name), stream.get_range().unwrap())
+        } else if let Ok(unary) = stream.parse() {
+            Expression(
+                Kind::UnaryOperation(unary, Box::new(stream.parse()?)),
+                stream.get_range().unwrap(),
+            )
         } else if let Some(token) = stream.next() {
             match &token {
                 Token::Identifier(v) => {

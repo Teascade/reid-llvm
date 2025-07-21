@@ -238,6 +238,24 @@ impl ast::Expression {
                 name.clone(),
                 self.1.as_meta(module_id),
             )),
+            ast::ExpressionKind::UnaryOperation(unary_operator, expr) => match unary_operator {
+                ast::UnaryOperator::Plus => mir::ExprKind::BinOp(
+                    mir::BinaryOperator::Add,
+                    Box::new(mir::Expression(
+                        mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(0))),
+                        expr.1.as_meta(module_id),
+                    )),
+                    Box::new(expr.process(module_id)),
+                ),
+                ast::UnaryOperator::Minus => mir::ExprKind::BinOp(
+                    mir::BinaryOperator::Minus,
+                    Box::new(mir::Expression(
+                        mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(0))),
+                        expr.1.as_meta(module_id),
+                    )),
+                    Box::new(expr.process(module_id)),
+                ),
+            },
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

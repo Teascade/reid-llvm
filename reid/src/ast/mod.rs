@@ -57,6 +57,13 @@ pub enum ExpressionKind {
     BlockExpr(Box<Block>),
     IfExpr(Box<IfExpression>),
     StructExpression(StructExpression),
+    UnaryOperation(UnaryOperator, Box<Expression>),
+}
+
+#[derive(Debug, Clone)]
+pub enum UnaryOperator {
+    Plus,
+    Minus,
 }
 
 #[derive(Debug, Clone, Copy)]
