@@ -46,7 +46,7 @@ impl TypeKind {
             TypeKind::CustomType(_) => 32,
             TypeKind::Ptr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
-            TypeKind::Borrow(_) => 64,
+            TypeKind::Borrow(_, _) => 64,
         }
     }
 
@@ -69,7 +69,14 @@ impl TypeKind {
             TypeKind::CustomType(_) => 32,
             TypeKind::Ptr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
-            TypeKind::Borrow(_) => 64,
+            TypeKind::Borrow(_, _) => 64,
+        }
+    }
+
+    pub fn is_mutable(&self) -> bool {
+        match self {
+            TypeKind::Borrow(_, true) => true,
+            _ => false,
         }
     }
 }
@@ -221,14 +228,14 @@ impl Expression {
             }
             Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(name.clone()))),
-            Borrow(var) => {
+            Borrow(var, mutable) => {
                 let ret_type = var.return_type()?;
-                Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1))))
+                Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1), *mutable)))
             }
             Deref(var) => {
                 let (kind, ret_type) = var.return_type()?;
                 match ret_type.resolve_weak(refs) {
-                    TypeKind::Borrow(type_kind) => Ok((kind, *type_kind)),
+                    TypeKind::Borrow(type_kind, _) => Ok((kind, *type_kind)),
                     _ => Err(ReturnTypeOther::DerefNonBorrow(var.2)),
                 }
             }
@@ -240,7 +247,7 @@ impl Expression {
             ExprKind::Variable(var_ref) => Some(var_ref),
             ExprKind::Indexed(lhs, _, _) => lhs.backing_var(),
             ExprKind::Accessed(lhs, _, _) => lhs.backing_var(),
-            ExprKind::Borrow(var) => Some(var),
+            ExprKind::Borrow(var, _) => Some(var),
             ExprKind::Deref(var) => Some(var),
             ExprKind::Block(block) => block.backing_var(),
             ExprKind::Array(_) => None,
@@ -335,7 +342,9 @@ impl TypeKind {
         let resolved = self.resolve_weak(refs);
         match resolved {
             TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
-            TypeKind::Borrow(inner) => TypeKind::Borrow(Box::new(inner.resolve_ref(refs))),
+            TypeKind::Borrow(inner, mutable) => {
+                TypeKind::Borrow(Box::new(inner.resolve_ref(refs)), mutable)
+            }
             _ => resolved,
         }
     }

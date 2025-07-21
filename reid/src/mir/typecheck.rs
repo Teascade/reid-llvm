@@ -629,7 +629,7 @@ impl Expression {
                 }
                 Ok(TypeKind::CustomType(struct_name.clone()))
             }
-            ExprKind::Borrow(var_ref) => {
+            ExprKind::Borrow(var_ref, mutable) => {
                 let existing = state
                     .or_else(
                         state
@@ -651,7 +651,7 @@ impl Expression {
                     var_ref.2,
                 );
 
-                Ok(TypeKind::Borrow(Box::new(var_ref.0.clone())))
+                Ok(TypeKind::Borrow(Box::new(var_ref.0.clone()), *mutable))
             }
             ExprKind::Deref(var_ref) => {
                 let existing = state
@@ -669,7 +669,7 @@ impl Expression {
                     .resolve_ref(typerefs);
 
                 // Update typing to be more accurate
-                let TypeKind::Borrow(inner) = state.or_else(
+                let TypeKind::Borrow(inner, mutable) = state.or_else(
                     var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
@@ -677,7 +677,7 @@ impl Expression {
                     return Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone()));
                 };
 
-                var_ref.0 = TypeKind::Borrow(inner.clone());
+                var_ref.0 = TypeKind::Borrow(inner.clone(), mutable);
 
                 Ok(*inner)
             }
@@ -761,9 +761,10 @@ impl Collapsable for TypeKind {
             (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
                 Ok(other.clone())
             }
-            (TypeKind::Borrow(val1), TypeKind::Borrow(val2)) => {
-                Ok(TypeKind::Borrow(Box::new(val1.collapse_into(val2)?)))
-            }
+            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => Ok(TypeKind::Borrow(
+                Box::new(val1.collapse_into(val2)?),
+                *mut1 && *mut2,
+            )),
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }

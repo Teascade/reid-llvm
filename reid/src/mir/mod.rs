@@ -110,7 +110,7 @@ pub enum TypeKind {
     #[error("{0}")]
     CustomType(String),
     #[error("Borrow({0})")]
-    Borrow(Box<TypeKind>),
+    Borrow(Box<TypeKind>, bool),
     #[error("Ptr({0})")]
     Ptr(Box<TypeKind>),
     #[error(transparent)]
@@ -247,7 +247,7 @@ pub enum ExprKind {
     FunctionCall(FunctionCall),
     If(IfExpression),
     Block(Block),
-    Borrow(NamedVariableRef),
+    Borrow(NamedVariableRef, bool),
     Deref(NamedVariableRef),
 }
 

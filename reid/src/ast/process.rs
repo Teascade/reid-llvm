@@ -225,11 +225,14 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
             ),
-            ast::ExpressionKind::Borrow(name) => mir::ExprKind::Borrow(NamedVariableRef(
-                mir::TypeKind::Vague(mir::VagueType::Unknown),
-                name.clone(),
-                self.1.as_meta(module_id),
-            )),
+            ast::ExpressionKind::Borrow(name, mutable) => mir::ExprKind::Borrow(
+                NamedVariableRef(
+                    mir::TypeKind::Vague(mir::VagueType::Unknown),
+                    name.clone(),
+                    self.1.as_meta(module_id),
+                ),
+                *mutable,
+            ),
             ast::ExpressionKind::Deref(name) => mir::ExprKind::Deref(NamedVariableRef(
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
@@ -287,8 +290,8 @@ impl From<ast::TypeKind> for mir::TypeKind {
             }
             ast::TypeKind::String => mir::TypeKind::StringPtr,
             ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(name.clone()),
-            ast::TypeKind::Borrow(type_kind) => {
-                mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())))
+            ast::TypeKind::Borrow(type_kind, mutable) => {
+                mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())), *mutable)
             }
         }
     }

@@ -163,10 +163,10 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 self.types
                     .new(&TypeKind::Array(Box::new(elem_ty.as_type()), *length))
             }
-            TypeKind::Borrow(ty) => {
+            TypeKind::Borrow(ty, mutable) => {
                 let inner_ty = self.from_type(ty)?;
                 self.types
-                    .new(&&TypeKind::Borrow(Box::new(inner_ty.as_type())))
+                    .new(&&TypeKind::Borrow(Box::new(inner_ty.as_type()), *mutable))
             }
             _ => {
                 if let Some(ty_ref) = self.types.find(ty) {

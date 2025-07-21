@@ -208,7 +208,8 @@ impl Display for ExprKind {
                 write_access(f, name)?;
                 write!(f, "<{}>", type_kind)
             }
-            ExprKind::Borrow(var_ref) => write!(f, "&{}", var_ref),
+            ExprKind::Borrow(var_ref, false) => write!(f, "&{}", var_ref),
+            ExprKind::Borrow(var_ref, true) => write!(f, "&mut {}", var_ref),
             ExprKind::Deref(var_ref) => write!(f, "*{}", var_ref),
         }
     }

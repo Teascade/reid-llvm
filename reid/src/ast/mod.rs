@@ -27,7 +27,7 @@ pub enum TypeKind {
     String,
     Array(Box<TypeKind>, u64),
     Custom(String),
-    Borrow(Box<TypeKind>),
+    Borrow(Box<TypeKind>, bool),
 }
 
 #[derive(Debug, Clone)]
@@ -43,7 +43,7 @@ pub struct Expression(pub ExpressionKind, pub TokenRange);
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
     VariableName(String),
-    Borrow(String),
+    Borrow(String, bool),
     Deref(String),
     Literal(Literal),
     Array(Vec<Expression>),

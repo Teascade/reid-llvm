@@ -364,7 +364,7 @@ impl Expression {
                     .from_type(&TypeKind::CustomType(struct_name.clone()))
                     .unwrap())
             }
-            ExprKind::Borrow(var) => {
+            ExprKind::Borrow(var, mutable) => {
                 // Find variable type
                 let type_ref = type_refs
                     .find_var(&var.1)
@@ -377,7 +377,7 @@ impl Expression {
                 }
 
                 Ok(type_refs
-                    .from_type(&TypeKind::Borrow(Box::new(var.0.clone())))
+                    .from_type(&TypeKind::Borrow(Box::new(var.0.clone()), *mutable))
                     .unwrap())
             }
             ExprKind::Deref(var) => {
@@ -393,7 +393,7 @@ impl Expression {
                 }
 
                 match &var.0.resolve_weak(type_refs.types) {
-                    Borrow(type_kind) => Ok(type_refs.from_type(&type_kind).unwrap()),
+                    Borrow(type_kind, _) => Ok(type_refs.from_type(&type_kind).unwrap()),
                     _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
                 }
             }

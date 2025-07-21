@@ -26,8 +26,15 @@ impl Parse for Type {
             TypeKind::Array(Box::new(inner.0), length)
         } else if let Some(Token::Et) = stream.peek() {
             stream.expect(Token::Et)?;
+            let mutable = if let Some(Token::MutKeyword) = stream.peek() {
+                stream.next();
+                true
+            } else {
+                false
+            };
+
             let inner = stream.parse::<Type>()?;
-            TypeKind::Borrow(Box::new(inner.0))
+            TypeKind::Borrow(Box::new(inner.0), mutable)
         } else {
             if let Some(Token::Identifier(ident)) = stream.next() {
                 match &*ident {
@@ -87,12 +94,19 @@ impl Parse for PrimaryExpression {
                 Kind::StructExpression(stream.parse()?),
                 stream.get_range().unwrap(),
             )
+        } else if let (Some(Token::Et), Some(Token::MutKeyword)) = (stream.peek(), stream.peek2()) {
+            stream.next(); // Consume Et
+            stream.next(); // Consume mut
+            let Some(Token::Identifier(name)) = stream.next() else {
+                return Err(stream.expected_err("identifier")?);
+            };
+            Expression(Kind::Borrow(name, true), stream.get_range().unwrap())
         } else if let (Some(Token::Et), Some(Token::Identifier(name))) =
             (stream.peek(), stream.peek2())
         {
             stream.next(); // Consume Et
             stream.next(); // Consume identifier
-            Expression(Kind::Borrow(name), stream.get_range().unwrap())
+            Expression(Kind::Borrow(name, false), stream.get_range().unwrap())
         } else if let (Some(Token::Star), Some(Token::Identifier(name))) =
             (stream.peek(), stream.peek2())
         {

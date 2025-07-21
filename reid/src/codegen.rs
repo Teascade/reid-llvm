@@ -114,6 +114,13 @@ pub enum StackValueKind {
 }
 
 impl StackValueKind {
+    fn mutable(mutable: bool, instr: InstructionValue) -> StackValueKind {
+        match mutable {
+            true => StackValueKind::Mutable(instr),
+            false => StackValueKind::Immutable(instr),
+        }
+    }
+
     fn instr(&self) -> InstructionValue {
         match &self {
             StackValueKind::Immutable(val) => *val,
@@ -934,13 +941,16 @@ impl mir::Expression {
                     TypeKind::CustomType(name.clone()),
                 ))
             }
-            mir::ExprKind::Borrow(varref) => {
+            mir::ExprKind::Borrow(varref, mutable) => {
                 varref.0.known().expect("variable type unknown");
                 let v = scope
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
-                Some(v.clone())
+                Some(StackValue(
+                    StackValueKind::mutable(*mutable, v.0.instr()),
+                    v.1.clone(),
+                ))
             }
             mir::ExprKind::Deref(varref) => {
                 varref.0.known().expect("variable type unknown");
@@ -1166,7 +1176,7 @@ impl TypeKind {
             TypeKind::Ptr(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
-            TypeKind::Borrow(type_kind) => {
+            TypeKind::Borrow(type_kind, _) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
         }
@@ -1213,7 +1223,7 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Ptr(inner) | TypeKind::Borrow(inner) => {
+            TypeKind::Ptr(inner) | TypeKind::Borrow(inner, _) => {
                 DebugTypeData::Pointer(DebugPointerType {
                     name,
                     pointee: inner.get_debug_type_hard(
