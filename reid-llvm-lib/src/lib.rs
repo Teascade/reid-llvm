@@ -439,7 +439,7 @@ pub enum ConstValue {
     U64(u64),
     U128(u128),
     Bool(bool),
-    StringPtr(String),
+    Str(String),
     F16(f32),
     F32B(f32),
     F32(f32),
@@ -505,12 +505,12 @@ impl InstructionValue {
                 ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 GetElemPtr(instr, _) => {
                     let instr_ty = instr.get_type(builder)?;
-                    let Type::Ptr(inner_ty) = instr_ty else {
+                    let Type::Ptr(inner_ty) = &instr_ty else {
                         panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
                     };
-                    match *inner_ty {
+                    match *inner_ty.clone() {
                         Type::Array(elem_ty, _) => Ok(Type::Ptr(Box::new(*elem_ty.clone()))),
-                        _ => Ok(*inner_ty),
+                        _ => Ok(instr_ty),
                     }
                 }
                 GetStructElemPtr(instr, idx) => {
@@ -562,7 +562,7 @@ impl ConstValue {
             ConstValue::U32(_) => U32,
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
-            ConstValue::StringPtr(_) => Ptr(Box::new(I8)),
+            ConstValue::Str(_) => Type::Ptr(Box::new(I8)),
             ConstValue::Bool(_) => Bool,
             ConstValue::F16(_) => F16,
             ConstValue::F32B(_) => F32B,

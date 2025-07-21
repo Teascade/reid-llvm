@@ -1,10 +1,7 @@
-
 import std::print;
 
 fn main() -> i32 {
-    let hello = "hello world";
-
-    print(hello);
+    print("hello world");
 
     return 0;
 }

@@ -490,7 +490,7 @@ impl mir::Statement {
                     .block
                     .build(
                         name,
-                        Instr::Alloca(ty.get_type(scope.type_values, scope.types)),
+                        Instr::Alloca(value.1.get_type(scope.type_values, scope.types)),
                     )
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
@@ -1167,7 +1167,7 @@ impl mir::Literal {
             mir::Literal::U64(val) => ConstValue::U64(val),
             mir::Literal::U128(val) => ConstValue::U128(val),
             mir::Literal::Bool(val) => ConstValue::Bool(val),
-            mir::Literal::String(val) => ConstValue::StringPtr(val.clone()),
+            mir::Literal::String(val) => ConstValue::Str(val.clone()),
             mir::Literal::Vague(VagueLiteral::Number(val)) => ConstValue::I32(val as i32),
             mir::Literal::Vague(VagueLiteral::Decimal(val)) => ConstValue::F32(val as f32),
             mir::Literal::F16(val) => ConstValue::F16(val),
@@ -1216,9 +1216,9 @@ impl TypeKind {
                 let type_val = type_vals.get(n).unwrap().clone();
                 Type::CustomType(type_val)
             }
-            TypeKind::UserPtr(type_kind) => Type::Ptr(Box::new(Type::Ptr(Box::new(
-                type_kind.get_type(type_vals, typedefs),
-            )))),
+            TypeKind::UserPtr(type_kind) => {
+                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
+            }
             TypeKind::CodegenPtr(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
