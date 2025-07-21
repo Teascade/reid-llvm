@@ -54,7 +54,7 @@ impl Parse for Type {
                     "u64" => TypeKind::U64,
                     "u128" => TypeKind::U128,
                     "f16" => TypeKind::F16,
-                    "f16b" => TypeKind::F16B,
+                    "f32b" => TypeKind::F32B,
                     "f32" => TypeKind::F32,
                     "f64" => TypeKind::F64,
                     "f80" => TypeKind::F80,

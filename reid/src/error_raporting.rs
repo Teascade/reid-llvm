@@ -18,7 +18,7 @@ fn label(text: &str) -> &str {
     ""
 }
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq)]
 pub enum ErrorKind {
     #[error("{}{}", label("(Lexing) "), .0.kind)]
     LexerError(#[from] mir::pass::Error<lexer::Error>),
@@ -59,12 +59,6 @@ impl PartialOrd for ErrorKind {
         self.get_meta()
             .source_module_id
             .partial_cmp(&other.get_meta().source_module_id)
-    }
-}
-
-impl Ord for ErrorKind {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.get_meta().cmp(&other.get_meta())
     }
 }
 
@@ -112,7 +106,7 @@ impl ModuleMap {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReidError {
     map: ModuleMap,
     errors: Vec<ErrorKind>,
@@ -171,37 +165,38 @@ impl std::error::Error for ReidError {}
 impl std::fmt::Display for ReidError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut sorted_errors = self.errors.clone();
-        sorted_errors.sort_by(|a, b| a.cmp(&b));
+        sorted_errors.sort_by(|a, b| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal));
         sorted_errors.dedup();
 
         let mut curr_module = None;
         for error in sorted_errors {
             let meta = error.get_meta();
-            let module = self.map.module(&meta.source_module_id).unwrap();
-            let position = if let Some(tokens) = &module.tokens {
-                let range_tokens = meta.range.into_tokens(&tokens);
+            let module = self.map.module(&meta.source_module_id);
+            let position = if let Some(module) = module {
+                if let Some(tokens) = &module.tokens {
+                    let range_tokens = meta.range.into_tokens(&tokens);
 
-                get_position(&range_tokens).or(meta.position.map(|p| (p, p)))
-            } else if let Some(position) = meta.position {
-                Some((position, position))
+                    get_position(&range_tokens).or(meta.position.map(|p| (p, p)))
+                } else if let Some(position) = meta.position {
+                    Some((position, position))
+                } else {
+                    None
+                }
             } else {
                 None
             };
 
             if curr_module != Some(meta.source_module_id) {
                 curr_module = Some(meta.source_module_id);
-                writeln!(
-                    f,
-                    "Errors in module {}:",
-                    color_err(format!(
-                        "{}",
-                        self.map
-                            .module_map
-                            .get(&meta.source_module_id)
-                            .unwrap()
-                            .name
-                    ))?
-                )?;
+                if let Some(module) = self.map.module_map.get(&meta.source_module_id) {
+                    writeln!(
+                        f,
+                        "Errors in module {}:",
+                        color_err(format!("{}", module.name))?
+                    )?;
+                } else {
+                    writeln!(f, "Errors detected: {}", color_err("in general")?)?;
+                }
             }
             writeln!(f)?;
             write!(f, "  Error: ")?;
@@ -214,7 +209,9 @@ impl std::fmt::Display for ReidError {
                     .map(|p| fmt_positions(p))
                     .unwrap_or(String::from("{unknown}")),
             )?;
-            if let (Some(position), Some(source)) = (position, &module.source) {
+            if let (Some(position), Some(source)) =
+                (position, &module.and_then(|m| m.source.clone()))
+            {
                 writeln!(f, "{}", fmt_lines(source, position, 6)?)?;
             }
         }

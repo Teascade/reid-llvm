@@ -91,6 +91,13 @@ pub enum TypeKind {
     U64,
     U128,
     Void,
+    F16,
+    F32B,
+    F32,
+    F64,
+    F128,
+    F80,
+    F128PPC,
     StringPtr,
     Array(Box<TypeKind>, u64),
     CustomType(String),
@@ -103,7 +110,8 @@ pub enum TypeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VagueType {
     Unknown,
-    Number,
+    Integer,
+    Decimal,
     TypeRef(usize),
 }
 
@@ -133,7 +141,7 @@ impl TypeKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Literal {
     I8(i8),
     I16(i16),
@@ -145,14 +153,22 @@ pub enum Literal {
     U32(u32),
     U64(u64),
     U128(u128),
+    F16(f32),
+    F32B(f32),
+    F32(f32),
+    F64(f64),
+    F80(f64),
+    F128(f64),
+    F128PPC(f64),
     Bool(bool),
     String(String),
     Vague(VagueLiteral),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum VagueLiteral {
     Number(u64),
+    Decimal(f64),
 }
 
 impl Literal {
@@ -170,7 +186,15 @@ impl Literal {
             Literal::U128(_) => TypeKind::U128,
             Literal::Bool(_) => TypeKind::Bool,
             Literal::String(_) => TypeKind::StringPtr,
-            Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Number),
+            Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Integer),
+            Literal::Vague(VagueLiteral::Decimal(_)) => TypeKind::Vague(VagueType::Decimal),
+            Literal::F16(_) => TypeKind::F16,
+            Literal::F32B(_) => TypeKind::F32B,
+            Literal::F32(_) => TypeKind::F32,
+            Literal::F64(_) => TypeKind::F64,
+            Literal::F80(_) => TypeKind::F80,
+            Literal::F128(_) => TypeKind::F128,
+            Literal::F128PPC(_) => TypeKind::F128PPC,
         }
     }
 }
@@ -178,7 +202,8 @@ impl Literal {
 impl VagueLiteral {
     pub fn as_type(self: &VagueLiteral) -> VagueType {
         match self {
-            VagueLiteral::Number(_) => VagueType::Number,
+            VagueLiteral::Number(_) => VagueType::Integer,
+            VagueLiteral::Decimal(_) => VagueType::Decimal,
         }
     }
 }

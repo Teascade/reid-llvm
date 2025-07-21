@@ -25,7 +25,7 @@ pub enum TypeKind {
     U64,
     U128,
     F16,
-    F16B,
+    F32B,
     F32,
     F64,
     F128,

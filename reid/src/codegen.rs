@@ -1172,6 +1172,14 @@ impl mir::Literal {
             mir::Literal::Bool(val) => ConstValue::Bool(val),
             mir::Literal::String(val) => ConstValue::StringPtr(val.clone()),
             mir::Literal::Vague(VagueLiteral::Number(val)) => ConstValue::I32(val as i32),
+            mir::Literal::Vague(VagueLiteral::Decimal(val)) => ConstValue::F32(val as f32),
+            mir::Literal::F16(val) => ConstValue::F16(val),
+            mir::Literal::F32B(val) => ConstValue::F32B(val),
+            mir::Literal::F32(val) => ConstValue::F32(val),
+            mir::Literal::F64(val) => ConstValue::F64(val),
+            mir::Literal::F80(val) => ConstValue::F80(val),
+            mir::Literal::F128(val) => ConstValue::F128(val),
+            mir::Literal::F128PPC(val) => ConstValue::F128PPC(val),
         })
     }
 }
@@ -1194,6 +1202,13 @@ impl TypeKind {
             TypeKind::U64 => Type::U64,
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
+            TypeKind::F16 => Type::F16,
+            TypeKind::F32B => Type::F32B,
+            TypeKind::F32 => Type::F32,
+            TypeKind::F64 => Type::F64,
+            TypeKind::F128 => Type::F128,
+            TypeKind::F80 => Type::F80,
+            TypeKind::F128PPC => Type::F128PPC,
             TypeKind::StringPtr => Type::Ptr(Box::new(Type::I8)),
             TypeKind::Array(elem_t, len) => {
                 Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)

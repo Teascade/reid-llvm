@@ -307,7 +307,7 @@ pub enum CmpPredicate {
     NE,
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone)]
 pub enum Instr {
     Param(usize),
     Constant(ConstValue),
@@ -344,6 +344,13 @@ pub enum Type {
     U32,
     U64,
     U128,
+    F16,
+    F32B,
+    F32,
+    F64,
+    F80,
+    F128,
+    F128PPC,
     Bool,
     Void,
     CustomType(TypeValue),
@@ -351,7 +358,7 @@ pub enum Type {
     Ptr(Box<Type>),
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub enum ConstValue {
     I8(i8),
     I16(i16),
@@ -365,6 +372,13 @@ pub enum ConstValue {
     U128(u128),
     Bool(bool),
     StringPtr(String),
+    F16(f32),
+    F32B(f32),
+    F32(f32),
+    F64(f64),
+    F80(f64),
+    F128(f64),
+    F128PPC(f64),
 }
 
 #[derive(Clone, Hash)]
@@ -473,6 +487,13 @@ impl ConstValue {
             ConstValue::U128(_) => U128,
             ConstValue::StringPtr(_) => Ptr(Box::new(I8)),
             ConstValue::Bool(_) => Bool,
+            ConstValue::F16(_) => todo!(),
+            ConstValue::F32B(_) => todo!(),
+            ConstValue::F32(_) => todo!(),
+            ConstValue::F64(_) => todo!(),
+            ConstValue::F80(_) => todo!(),
+            ConstValue::F128(_) => todo!(),
+            ConstValue::F128PPC(_) => todo!(),
         }
     }
 }
@@ -495,6 +516,13 @@ impl Type {
             Type::Ptr(_) => false,
             Type::CustomType(_) => false,
             Type::Array(_, _) => false,
+            Type::F16 => true,
+            Type::F32B => true,
+            Type::F32 => true,
+            Type::F64 => true,
+            Type::F80 => true,
+            Type::F128 => true,
+            Type::F128PPC => true,
         }
     }
 
@@ -515,6 +543,13 @@ impl Type {
             Type::Ptr(_) => false,
             Type::CustomType(_) => false,
             Type::Array(_, _) => false,
+            Type::F16 => true,
+            Type::F32B => true,
+            Type::F32 => true,
+            Type::F64 => true,
+            Type::F80 => true,
+            Type::F128 => true,
+            Type::F128PPC => true,
         }
     }
 }

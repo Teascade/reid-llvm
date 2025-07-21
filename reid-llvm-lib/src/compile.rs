@@ -1034,6 +1034,13 @@ impl ConstValue {
                     into_cstring(val).as_ptr(),
                     c"string".as_ptr(),
                 ),
+                ConstValue::F16(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F32B(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F32(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F64(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F80(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F128(val) => LLVMConstReal(t, *val as f64),
+                ConstValue::F128PPC(val) => LLVMConstReal(t, *val as f64),
             }
         }
     }
@@ -1058,6 +1065,13 @@ impl Type {
                 Ptr(ty) => LLVMPointerType(ty.as_llvm(context, typemap), 0),
                 CustomType(struct_ty) => *typemap.get(struct_ty).unwrap(),
                 Array(r#type, len) => LLVMArrayType2(r#type.as_llvm(context, typemap), *len),
+                F16 => LLVMHalfTypeInContext(context),
+                F32 => LLVMFloatTypeInContext(context),
+                F32B => LLVMBFloatTypeInContext(context),
+                F64 => LLVMDoubleTypeInContext(context),
+                F80 => LLVMX86FP80TypeInContext(context),
+                F128 => LLVMFP128TypeInContext(context),
+                F128PPC => LLVMPPCFP128TypeInContext(context),
             }
         }
     }

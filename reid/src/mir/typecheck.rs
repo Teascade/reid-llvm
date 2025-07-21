@@ -11,7 +11,7 @@ use super::{
     typerefs::TypeRefs,
 };
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, PartialOrd)]
 pub enum ErrorKind {
     #[error("NULL error, should never occur!")]
     Null,

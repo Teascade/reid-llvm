@@ -261,6 +261,13 @@ impl Display for Literal {
             Literal::Bool(val) => write!(f, "{}", val),
             Literal::String(val) => std::fmt::Debug::fmt(val, f),
             Literal::Vague(val) => val.fmt(f),
+            Literal::F16(val) => write!(f, "{}f16", val),
+            Literal::F32B(val) => write!(f, "{}f16b", val),
+            Literal::F32(val) => write!(f, "{}f32", val),
+            Literal::F64(val) => write!(f, "{}f64", val),
+            Literal::F80(val) => write!(f, "{}f80", val),
+            Literal::F128(val) => write!(f, "{}f128", val),
+            Literal::F128PPC(val) => write!(f, "{}f128ppc", val),
         }
     }
 }
@@ -354,6 +361,13 @@ impl Display for TypeKind {
                 Display::fmt(type_kind, f)
             }
             TypeKind::Vague(vague_type) => Display::fmt(vague_type, f),
+            TypeKind::F16 => write!(f, "f16"),
+            TypeKind::F32B => write!(f, "f16b"),
+            TypeKind::F32 => write!(f, "f32"),
+            TypeKind::F64 => write!(f, "f64"),
+            TypeKind::F128 => write!(f, "f128"),
+            TypeKind::F80 => write!(f, "f80"),
+            TypeKind::F128PPC => write!(f, "f128ppc"),
         }
     }
 }
@@ -363,14 +377,16 @@ impl Display for VagueType {
         if f.alternate() {
             match self {
                 VagueType::Unknown => write!(f, "Unknown"),
-                VagueType::Number => write!(f, "Number"),
+                VagueType::Integer => write!(f, "Number"),
                 VagueType::TypeRef(id) => write!(f, "TypeRef({0})", id),
+                VagueType::Decimal => write!(f, "Decimal"),
             }
         } else {
             match self {
                 VagueType::Unknown => write!(f, "{{unknown}}"),
-                VagueType::Number => write!(f, "Number"),
+                VagueType::Integer => write!(f, "Number"),
                 VagueType::TypeRef(_) => write!(f, "{{unknown}}"),
+                VagueType::Decimal => write!(f, "Decimal"),
             }
         }
     }

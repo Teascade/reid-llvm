@@ -285,7 +285,7 @@ impl ast::Literal {
             ast::Literal::Integer(v) => mir::Literal::Vague(mir::VagueLiteral::Number(*v)),
             ast::Literal::Bool(v) => mir::Literal::Bool(*v),
             ast::Literal::String(val) => mir::Literal::String(val.clone()),
-            ast::Literal::Decimal(_) => todo!(),
+            ast::Literal::Decimal(v) => mir::Literal::Vague(mir::VagueLiteral::Decimal(*v)),
         }
     }
 }
@@ -315,13 +315,13 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::Ptr(type_kind) => {
                 mir::TypeKind::UserPtr(Box::new(mir::TypeKind::from(*type_kind.clone())))
             }
-            ast::TypeKind::F16 => todo!(),
-            ast::TypeKind::F16B => todo!(),
-            ast::TypeKind::F32 => todo!(),
-            ast::TypeKind::F64 => todo!(),
-            ast::TypeKind::F128 => todo!(),
-            ast::TypeKind::F80 => todo!(),
-            ast::TypeKind::F128PPC => todo!(),
+            ast::TypeKind::F16 => mir::TypeKind::F16,
+            ast::TypeKind::F32B => mir::TypeKind::F32B,
+            ast::TypeKind::F32 => mir::TypeKind::F32,
+            ast::TypeKind::F64 => mir::TypeKind::F64,
+            ast::TypeKind::F80 => mir::TypeKind::F80,
+            ast::TypeKind::F128 => mir::TypeKind::F128,
+            ast::TypeKind::F128PPC => mir::TypeKind::F128PPC,
         }
     }
 }

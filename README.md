@@ -41,6 +41,7 @@ Currently missing big features (TODOs) are:
 - ~~Pointers~~ (DONE)
 - ~~Unary operators~~
 - Floats
+- Type casting
 - Loops
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions

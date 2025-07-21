@@ -44,12 +44,19 @@ impl TypeKind {
             TypeKind::U128 => false,
             TypeKind::Void => false,
             TypeKind::StringPtr => false,
-            TypeKind::Array(type_kind, len) => false,
+            TypeKind::Array(_, _) => false,
             TypeKind::CustomType(_) => false,
             TypeKind::CodegenPtr(_) => false,
             TypeKind::Vague(_) => false,
             TypeKind::Borrow(_, _) => false,
             TypeKind::UserPtr(_) => false,
+            TypeKind::F16 => true,
+            TypeKind::F32B => true,
+            TypeKind::F32 => true,
+            TypeKind::F64 => true,
+            TypeKind::F128 => true,
+            TypeKind::F80 => true,
+            TypeKind::F128PPC => true,
         }
     }
 
@@ -74,6 +81,13 @@ impl TypeKind {
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(_, _) => 64,
             TypeKind::UserPtr(_) => 64,
+            TypeKind::F16 => 16,
+            TypeKind::F32B => 16,
+            TypeKind::F32 => 32,
+            TypeKind::F64 => 64,
+            TypeKind::F128 => 128,
+            TypeKind::F80 => 80,
+            TypeKind::F128PPC => 128,
         }
     }
 
@@ -98,6 +112,13 @@ impl TypeKind {
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(_, _) => 64,
             TypeKind::UserPtr(_) => 64,
+            TypeKind::F16 => 16,
+            TypeKind::F32B => 16,
+            TypeKind::F32 => 32,
+            TypeKind::F64 => 64,
+            TypeKind::F128 => 128,
+            TypeKind::F80 => 80,
+            TypeKind::F128PPC => 128,
         }
     }
 
@@ -379,8 +400,9 @@ impl TypeKind {
         match self {
             TypeKind::Vague(vague_type) => match &vague_type {
                 Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
-                Vague::Number => Ok(TypeKind::I32),
+                Vague::Integer => Ok(TypeKind::I32),
                 Vague::TypeRef(_) => panic!("Hinted default!"),
+                VagueType::Decimal => Ok(TypeKind::F32),
             },
             _ => Ok(self.clone()),
         }
@@ -418,10 +440,10 @@ impl Collapsable for TypeKind {
         }
 
         match (self, other) {
-            (TypeKind::Vague(Vague::Number), other) | (other, TypeKind::Vague(Vague::Number)) => {
+            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
                 match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Number)),
-                    TypeKind::Vague(Vague::Number) => Ok(TypeKind::Vague(Vague::Number)),
+                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
+                    TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
                     TypeKind::I8
                     | TypeKind::I16
                     | TypeKind::I32
@@ -474,6 +496,14 @@ impl Literal {
             Literal::Bool(_) => None,
             Literal::String(_) => None,
             Literal::Vague(VagueLiteral::Number(val)) => Some(*val as i128),
+            Literal::Vague(VagueLiteral::Decimal(_)) => None,
+            Literal::F16(_) => None,
+            Literal::F32B(_) => None,
+            Literal::F32(_) => None,
+            Literal::F64(_) => None,
+            Literal::F80(_) => None,
+            Literal::F128(_) => None,
+            Literal::F128PPC(_) => None,
         }
     }
 }
