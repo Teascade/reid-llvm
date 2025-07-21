@@ -53,6 +53,13 @@ impl Parse for Type {
                     "u32" => TypeKind::U32,
                     "u64" => TypeKind::U64,
                     "u128" => TypeKind::U128,
+                    "f16" => TypeKind::F16,
+                    "f16b" => TypeKind::F16B,
+                    "f32" => TypeKind::F32,
+                    "f64" => TypeKind::F64,
+                    "f80" => TypeKind::F80,
+                    "f128" => TypeKind::F128,
+                    "f128ppc" => TypeKind::F128PPC,
                     "string" => TypeKind::String,
                     _ => TypeKind::Custom(ident),
                 }
@@ -148,10 +155,25 @@ impl Parse for PrimaryExpression {
                         Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                     }
                 }
-                Token::DecimalValue(v) => Expression(
-                    Kind::Literal(Literal::Number(*v)),
-                    stream.get_range().unwrap(),
-                ),
+                Token::DecimalValue(v) => {
+                    if let Some(Token::Dot) = stream.peek() {
+                        stream.next(); // Consume dot
+                        let Some(Token::DecimalValue(fractional)) = stream.next() else {
+                            return Err(stream.expected_err("fractional part")?);
+                        };
+                        let log = (fractional as f64).log10().ceil() as u32;
+                        let value = (*v as f64) + (fractional as f64) / (10u64.pow(log) as f64);
+                        Expression(
+                            Kind::Literal(Literal::Decimal(value)),
+                            stream.get_range_prev().unwrap(),
+                        )
+                    } else {
+                        Expression(
+                            Kind::Literal(Literal::Integer(*v)),
+                            stream.get_range_prev().unwrap(),
+                        )
+                    }
+                }
                 Token::StringLit(v) => Expression(
                     Kind::Literal(Literal::String(v.clone())),
                     stream.get_range().unwrap(),

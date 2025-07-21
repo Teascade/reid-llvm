@@ -412,7 +412,6 @@ impl Expression {
 
                 let both_t = lhs_type.collapse_into(&rhs_type)?;
 
-                dbg!(&op, &both_t, both_t.signed(), lhs.is_zero(), rhs.is_zero());
                 if *op == BinaryOperator::Minus && !lhs_type.signed() {
                     if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value(), rhs.num_value()) {
                         if lhs_val < rhs_val {

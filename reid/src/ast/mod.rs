@@ -24,6 +24,13 @@ pub enum TypeKind {
     U32,
     U64,
     U128,
+    F16,
+    F16B,
+    F32,
+    F64,
+    F128,
+    F80,
+    F128PPC,
     String,
     Array(Box<TypeKind>, u64),
     Custom(String),
@@ -33,7 +40,8 @@ pub enum TypeKind {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    Number(u64),
+    Integer(u64),
+    Decimal(f64),
     Bool(bool),
     String(String),
 }

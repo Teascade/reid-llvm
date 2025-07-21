@@ -282,9 +282,10 @@ impl ast::BinaryOperator {
 impl ast::Literal {
     fn mir(&self) -> mir::Literal {
         match &self {
-            ast::Literal::Number(v) => mir::Literal::Vague(mir::VagueLiteral::Number(*v)),
+            ast::Literal::Integer(v) => mir::Literal::Vague(mir::VagueLiteral::Number(*v)),
             ast::Literal::Bool(v) => mir::Literal::Bool(*v),
             ast::Literal::String(val) => mir::Literal::String(val.clone()),
+            ast::Literal::Decimal(_) => todo!(),
         }
     }
 }
@@ -314,6 +315,13 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::Ptr(type_kind) => {
                 mir::TypeKind::UserPtr(Box::new(mir::TypeKind::from(*type_kind.clone())))
             }
+            ast::TypeKind::F16 => todo!(),
+            ast::TypeKind::F16B => todo!(),
+            ast::TypeKind::F32 => todo!(),
+            ast::TypeKind::F64 => todo!(),
+            ast::TypeKind::F128 => todo!(),
+            ast::TypeKind::F80 => todo!(),
+            ast::TypeKind::F128PPC => todo!(),
         }
     }
 }
