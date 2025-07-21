@@ -668,7 +668,7 @@ impl FunctionHolder {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMPrivateLinkage);
             }
 
-            if in_main_module && self.data.flags.is_main {
+            if in_main_module && self.data.flags.is_main || self.data.flags.is_pub {
                 LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
             }
 

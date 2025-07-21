@@ -60,6 +60,37 @@ impl TypeKind {
         }
     }
 
+    pub fn is_float(&self) -> bool {
+        match self {
+            TypeKind::Bool => false,
+            TypeKind::I8 => false,
+            TypeKind::I16 => false,
+            TypeKind::I32 => false,
+            TypeKind::I64 => false,
+            TypeKind::I128 => false,
+            TypeKind::U8 => false,
+            TypeKind::U16 => false,
+            TypeKind::U32 => false,
+            TypeKind::U64 => false,
+            TypeKind::U128 => false,
+            TypeKind::Void => false,
+            TypeKind::StringPtr => false,
+            TypeKind::Array(_, _) => false,
+            TypeKind::CustomType(_) => false,
+            TypeKind::CodegenPtr(_) => false,
+            TypeKind::Vague(_) => false,
+            TypeKind::Borrow(_, _) => false,
+            TypeKind::UserPtr(_) => false,
+            TypeKind::F16 => true,
+            TypeKind::F32B => true,
+            TypeKind::F32 => true,
+            TypeKind::F64 => true,
+            TypeKind::F128 => true,
+            TypeKind::F80 => true,
+            TypeKind::F128PPC => true,
+        }
+    }
+
     pub fn size_of(&self) -> u64 {
         match self {
             TypeKind::Bool => 1,

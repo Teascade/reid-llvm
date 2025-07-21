@@ -1,5 +1,5 @@
 // Arithmetic, function calls and imports!
 
-fn OneHalf(var1: f32) -> f32 {
+pub fn OneHalf(var1: f32) -> f32 {
   return var1 * 1.5;
 }

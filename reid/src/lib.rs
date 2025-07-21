@@ -123,7 +123,7 @@ pub fn perform_all_passes<'map>(
 
     let state = context.pass(&mut LinkerPass {
         module_map,
-        ignore_no_main: true,
+        is_lib: true,
     })?;
 
     #[cfg(debug_assertions)]

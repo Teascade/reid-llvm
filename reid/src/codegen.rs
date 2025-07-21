@@ -632,25 +632,22 @@ impl mir::Expression {
                     .codegen(scope, state)
                     .expect("rhs has no return value")
                     .instr();
+                let lhs_type = lhs_exp.return_type(&Default::default()).unwrap().1;
+                let instr = match (binop, lhs_type.signed(), lhs_type.is_float()) {
+                    (mir::BinaryOperator::Add, _, false) => Instr::Add(lhs, rhs),
+                    (mir::BinaryOperator::Add, _, true) => Instr::FAdd(lhs, rhs),
+                    (mir::BinaryOperator::Minus, _, false) => Instr::Sub(lhs, rhs),
+                    (mir::BinaryOperator::Minus, _, true) => Instr::FSub(lhs, rhs),
+                    (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
+                    (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
+                    (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
+                    (mir::BinaryOperator::Cmp(i), _, true) => {
+                        Instr::ICmp(i.int_predicate(), lhs, rhs)
+                    }
+                    _ => todo!(),
+                };
                 Some(StackValue(
-                    StackValueKind::Immutable(match binop {
-                        mir::BinaryOperator::Add => {
-                            scope.block.build("add", Instr::Add(lhs, rhs)).unwrap()
-                        }
-                        mir::BinaryOperator::Minus => {
-                            scope.block.build("sub", Instr::Sub(lhs, rhs)).unwrap()
-                        }
-                        mir::BinaryOperator::Mult => {
-                            scope.block.build("mul", Instr::Mul(lhs, rhs)).unwrap()
-                        }
-                        mir::BinaryOperator::And => {
-                            scope.block.build("and", Instr::And(lhs, rhs)).unwrap()
-                        }
-                        mir::BinaryOperator::Cmp(l) => scope
-                            .block
-                            .build("cmp", Instr::ICmp(l.int_predicate(), lhs, rhs))
-                            .unwrap(),
-                    }),
+                    StackValueKind::Immutable(scope.block.build_anon(instr).unwrap()),
                     TypeKind::U32,
                 ))
             }

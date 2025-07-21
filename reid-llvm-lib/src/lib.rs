@@ -148,7 +148,7 @@ impl Default for FunctionFlags {
         FunctionFlags {
             is_extern: false,
             is_main: false,
-            is_pub: false,
+            is_pub: true,
             is_imported: false,
         }
     }
@@ -204,6 +204,38 @@ pub struct Block<'builder> {
     value: BlockValue,
 }
 
+impl Instr {
+    pub fn default_name(&self) -> &str {
+        match self {
+            Instr::Param(_) => "param",
+            Instr::Constant(_) => "const1",
+            Instr::Add(..) => "add",
+            Instr::FAdd(..) => "fadd",
+            Instr::Sub(..) => "sub",
+            Instr::FSub(..) => "fsub",
+            Instr::Mul(..) => "mul",
+            Instr::FMul(..) => "fmul",
+            Instr::UDiv(..) => "udiv",
+            Instr::SDiv(..) => "sdiv",
+            Instr::FDiv(..) => "fdiv",
+            Instr::URem(..) => "urem",
+            Instr::SRem(..) => "srem",
+            Instr::FRem(..) => "frem",
+            Instr::And(..) => "and",
+            Instr::Phi(_) => "phi",
+            Instr::Alloca(_) => "alloca",
+            Instr::Load(_, _) => "load",
+            Instr::Store(..) => "store",
+            Instr::ArrayAlloca(_, _) => "arrayalloca",
+            Instr::GetElemPtr(..) => "getelemptr",
+            Instr::GetStructElemPtr(..) => "getstructelemptr",
+            Instr::ExtractValue(..) => "extractvalue",
+            Instr::ICmp(..) => "icmp",
+            Instr::FunctionCall(..) => "call",
+        }
+    }
+}
+
 impl<'builder> Block<'builder> {
     pub fn build<T: Into<String>>(
         &mut self,
@@ -219,6 +251,21 @@ impl<'builder> Block<'builder> {
                     meta: None,
                 },
                 name.into(),
+            )
+        }
+    }
+
+    pub fn build_anon(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
+        unsafe {
+            let name = instruction.default_name().to_owned();
+            self.builder.add_instruction(
+                &self.value,
+                InstructionData {
+                    kind: instruction,
+                    location: None,
+                    meta: None,
+                },
+                name,
             )
         }
     }
