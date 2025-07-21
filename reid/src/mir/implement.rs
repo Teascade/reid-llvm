@@ -385,10 +385,18 @@ impl Collapsable for TypeKind {
             (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
                 Ok(other.clone())
             }
-            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => Ok(TypeKind::Borrow(
-                Box::new(val1.collapse_into(val2)?),
-                *mut1 && *mut2,
-            )),
+            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
+                // Extracted to give priority for other collapse-error
+                let collapsed = val1.collapse_into(val2)?;
+                if mut1 == mut2 {
+                    Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
+                } else {
+                    Err(ErrorKind::TypesDifferMutability(
+                        self.clone(),
+                        other.clone(),
+                    ))
+                }
+            }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }

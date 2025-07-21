@@ -59,6 +59,8 @@ pub enum ErrorKind {
     InvalidSetExpression,
     #[error("Can not deref {0}, as it is not a borrow")]
     AttemptedDerefNonBorrow(String),
+    #[error("Types {0} and {1} differ in mutability")]
+    TypesDifferMutability(TypeKind, TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the

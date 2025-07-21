@@ -109,7 +109,7 @@ pub enum TypeKind {
     Array(Box<TypeKind>, u64),
     #[error("{0}")]
     CustomType(String),
-    #[error("Borrow({0})")]
+    #[error("Borrow({0}, {1})")]
     Borrow(Box<TypeKind>, bool),
     #[error("Ptr({0})")]
     Ptr(Box<TypeKind>),
