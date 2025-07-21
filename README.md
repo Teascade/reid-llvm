@@ -40,8 +40,9 @@ Currently missing big features (TODOs) are:
 - Loops
 - Debug Information (PARTIALLY DONE)
 - ~~Borrows~~ (DONE)
-- Pointers
+- ~~Pointers~~
 - Floats
+- Subtraction
 
 Big features that I want later but are not necessary:
 - Associated functions
