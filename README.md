@@ -45,6 +45,7 @@ Currently missing relevant features (TODOs) are:
 Smaller features:
 - Easier way to initialize arrays with a single value
 - Lexical scopes for Debug Information
+- Only include standard library at all if it is imported
 
 ### Why "Reid"
 
