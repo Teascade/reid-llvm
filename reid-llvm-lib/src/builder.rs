@@ -67,7 +67,7 @@ pub struct InstructionHolder {
 
 #[derive(Clone)]
 pub(crate) struct Builder {
-    modules: Rc<RefCell<Vec<ModuleHolder>>>,
+    pub(crate) modules: Rc<RefCell<Vec<ModuleHolder>>>,
     pub(crate) producer: String,
 }
 
@@ -368,7 +368,6 @@ impl Builder {
                 }
                 Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
-                    dbg!(&param_types, &params);
                     if param_types.len() != params.len() {
                         return Err(()); // TODO error: invalid amount of params
                     }

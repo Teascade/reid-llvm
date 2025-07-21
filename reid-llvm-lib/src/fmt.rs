@@ -1,19 +1,186 @@
 //! Debug implementations for relevant types
 
 use std::{
-    fmt::{Debug, Write},
+    fmt::{Debug, Display, Write},
     marker::PhantomData,
 };
 
 use crate::{
-    CmpPredicate, Instr, InstructionData, TerminatorKind,
+    CmpPredicate, Context, Instr, InstructionData, TerminatorKind,
     builder::*,
     debug_information::{
-        DebugArrayType, DebugBasicType, DebugFieldType, DebugLocation, DebugLocationValue,
-        DebugMetadataValue, DebugPointerType, DebugProgramValue, DebugScopeValue, DebugStructType,
+        DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable,
+        DebugLocation, DebugLocationValue, DebugMetadata, DebugMetadataValue, DebugParamVariable,
+        DebugPointerType, DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType,
         DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
     },
+    pad_adapter::PadAdapter,
 };
+
+impl Display for Context {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.builder, f)
+    }
+}
+
+impl Display for Builder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Producer: {}", self.producer)?;
+        for module in self.modules.borrow().iter() {
+            if module.data.is_main {
+                write!(f, "main ")?;
+            }
+            writeln!(f, "{} ({:?}) {{", module.data.name, module.value)?;
+            for function in &module.functions {
+                let mut state = Default::default();
+                let mut inner = PadAdapter::wrap(f, &mut state);
+                function.builder_fmt(&mut inner, self, &module.debug_information)?;
+            }
+            writeln!(f, "}}")?;
+        }
+        Ok(())
+    }
+}
+
+impl FunctionHolder {
+    fn builder_fmt(
+        &self,
+        f: &mut impl std::fmt::Write,
+        builder: &Builder,
+        debug: &Option<DebugInformation>,
+    ) -> std::fmt::Result {
+        if self.data.flags.is_imported {
+            write!(f, "imported ")?;
+        }
+        if self.data.flags.is_extern {
+            write!(f, "extern ")?;
+        }
+        if self.data.flags.is_pub {
+            write!(f, "pub ")?;
+        }
+        if self.data.flags.is_main {
+            write!(f, "main ")?;
+        }
+        let params = self
+            .data
+            .params
+            .iter()
+            .map(|p| format!("{:?}", p))
+            .collect::<Vec<_>>()
+            .join(", ");
+        write!(
+            f,
+            "fn {}({}) -> {:?} ",
+            self.data.name, params, self.data.ret
+        )?;
+
+        writeln!(f, "{{")?;
+        let mut state = Default::default();
+        let mut inner = PadAdapter::wrap(f, &mut state);
+        writeln!(inner, "(Value = {:?}) ", self.value)?;
+        if let Some(debug) = self.data.debug {
+            writeln!(inner, "(Debug = {:?})", debug)?;
+        }
+
+        for block in &self.blocks {
+            let mut state = Default::default();
+            let mut inner = PadAdapter::wrap(&mut inner, &mut state);
+            block.builder_fmt(&mut inner, builder, debug)?;
+        }
+
+        writeln!(f, "}}")?;
+        Ok(())
+    }
+}
+
+impl BlockHolder {
+    fn builder_fmt(
+        &self,
+        f: &mut impl std::fmt::Write,
+        builder: &Builder,
+        debug: &Option<DebugInformation>,
+    ) -> std::fmt::Result {
+        if self.data.deleted {
+            write!(f, "deleted ")?;
+        }
+        writeln!(f, "{} ({:?}):", self.data.name, self.value)?;
+
+        for instr in &self.instructions {
+            let mut state = Default::default();
+            let mut inner = PadAdapter::wrap(f, &mut state);
+            instr.builder_fmt(&mut inner, builder, debug)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl InstructionHolder {
+    fn builder_fmt(
+        &self,
+        f: &mut impl std::fmt::Write,
+        builder: &Builder,
+        debug: &Option<DebugInformation>,
+    ) -> std::fmt::Result {
+        if let Some(record) = &self.record {
+            let kind = match record.kind {
+                DebugRecordKind::Declare(instruction_value) => {
+                    format!("= {:?} (Assign)", instruction_value)
+                }
+                DebugRecordKind::Value(instruction_value) => {
+                    format!("= {:?} (Value)", instruction_value)
+                }
+            };
+
+            if let Some(debug) = debug {
+                writeln!(f, "  (Debug {} {})", record.variable.hr(debug), kind)?;
+            }
+        }
+        writeln!(
+            f,
+            "{:?} ({}) = {:?} ",
+            self.value, self.name, self.data.kind
+        )?;
+        if let Some(debug) = debug {
+            if let Some(location) = self.data.location {
+                writeln!(f, "  ^  (At {}) ", debug.get_location(location))?;
+            }
+            if let Some(meta) = self.data.meta {
+                writeln!(f, "  ^  (Meta {}) ", meta.hr(debug))?;
+            }
+        }
+        writeln!(f)?;
+
+        Ok(())
+    }
+}
+
+impl DebugMetadataValue {
+    fn hr(&self, debug: &DebugInformation) -> String {
+        match debug.get_metadata(*self) {
+            DebugMetadata::ParamVar(DebugParamVariable {
+                name,
+                arg_idx,
+                location,
+                ty,
+                ..
+            }) => format!(
+                "param {} (idx {}) (type {:?}) at {}",
+                name, arg_idx, ty, location
+            ),
+            DebugMetadata::LocalVar(DebugLocalVariable {
+                name, location, ty, ..
+            }) => format!("var {} (type {:?}) at {}", name, ty, location),
+            DebugMetadata::VarAssignment => todo!(),
+        }
+    }
+}
+
+impl Display for DebugLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "line {}, col {}", self.line, self.column)
+    }
+}
 
 impl Debug for Builder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,7 +196,7 @@ pub struct PrintableModule<'ctx> {
 
 impl<'ctx> Debug for PrintableModule<'ctx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.module.fmt(f)
+        Debug::fmt(&self.module, f)
     }
 }
 
@@ -108,11 +275,21 @@ impl Debug for InstructionValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "I[{:0>2}-{:0>2}-{:0>2}-{:0>2}]",
-            &self.0.0.0.0, &self.0.0.1, &self.0.1, self.1
+            "%{}.{}.{}.{}",
+            self.0.0.0.0, self.0.0.1, self.0.1, self.1
         )
     }
 }
+
+// impl Debug for InstructionValue {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "I[{:0>2}-{:0>2}-{:0>2}-{:0>2}]",
+//             &self.0.0.0.0, &self.0.0.1, &self.0.1, self.1
+//         )
+//     }
+// }
 
 impl Debug for TypeValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

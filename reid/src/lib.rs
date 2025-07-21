@@ -124,6 +124,8 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut LinkerPass { module_map })?;
 
     #[cfg(debug_assertions)]
+    println!("{:-^100}", "LINKER OUTPUT");
+    #[cfg(debug_assertions)]
     println!("{}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
@@ -139,6 +141,8 @@ pub fn perform_all_passes<'map>(
 
     let state = context.pass(&mut TypeInference { refs: &refs })?;
 
+    #[cfg(debug_assertions)]
+    println!("{:-^100}", "TYPE INFERRER OUTPUT");
     #[cfg(debug_assertions)]
     dbg!(&refs);
     #[cfg(debug_assertions)]
@@ -159,6 +163,8 @@ pub fn perform_all_passes<'map>(
 
     let state = context.pass(&mut TypeCheck { refs: &refs })?;
 
+    #[cfg(debug_assertions)]
+    println!("{:-^100}", "TYPECHECKER OUTPUT");
     #[cfg(debug_assertions)]
     println!("{}", &context);
     #[cfg(debug_assertions)]
@@ -197,7 +203,7 @@ pub fn compile_and_pass<'map>(
     perform_all_passes(&mut mir_context, module_map)?;
 
     #[cfg(debug_assertions)]
-    dbg!(&mir_context);
+    println!("{:-^100}", "FINAL OUTPUT");
     #[cfg(debug_assertions)]
     println!("{}", &mir_context);
 
@@ -205,7 +211,7 @@ pub fn compile_and_pass<'map>(
     let codegen_modules = mir_context.codegen(&mut context, &module_map);
 
     #[cfg(debug_assertions)]
-    dbg!(&codegen_modules);
+    println!("{}", &codegen_modules.context);
 
     let compiled = codegen_modules.compile();
     Ok(compiled.output())

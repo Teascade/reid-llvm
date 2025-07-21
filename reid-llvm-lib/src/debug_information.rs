@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::hash_map::Values, rc::Rc};
 
 use crate::builder::InstructionValue;
 
@@ -161,7 +161,33 @@ impl DebugInformation {
         value
     }
 
-    pub fn get_metadata(&self) -> Rc<RefCell<Vec<DebugMetadataHolder>>> {
+    pub fn get_metadata(&self, value: DebugMetadataValue) -> DebugMetadata {
+        unsafe { self.metadata.borrow().get_unchecked(value.0).data.clone() }
+    }
+
+    pub fn get_subprogram_data(&self, value: DebugProgramValue) -> Option<DebugSubprogramData> {
+        if value.0 == 0 {
+            None
+        } else {
+            Some(self.get_subprogram_data_unchecked(&value))
+        }
+    }
+
+    pub fn get_type_data(&self, value: DebugTypeValue) -> DebugTypeData {
+        unsafe { self.types.borrow().get_unchecked(value.0).data.clone() }
+    }
+
+    pub fn get_location(&self, value: DebugLocationValue) -> DebugLocation {
+        unsafe {
+            self.locations
+                .borrow()
+                .get_unchecked(value.1)
+                .location
+                .clone()
+        }
+    }
+
+    pub fn get_metadatas(&self) -> Rc<RefCell<Vec<DebugMetadataHolder>>> {
         self.metadata.clone()
     }
 
@@ -181,7 +207,7 @@ impl DebugInformation {
         self.locations.clone()
     }
 
-    pub fn get_subprogram_data(&self, value: &DebugProgramValue) -> DebugSubprogramData {
+    pub fn get_subprogram_data_unchecked(&self, value: &DebugProgramValue) -> DebugSubprogramData {
         unsafe {
             self.programs
                 .borrow()

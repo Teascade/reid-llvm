@@ -27,7 +27,7 @@ use crate::{
 /// LLIR that can then be finally compiled into LLVM IR.
 #[derive(Debug)]
 pub struct CodegenContext<'ctx> {
-    context: &'ctx Context,
+    pub(crate) context: &'ctx Context,
 }
 
 impl<'ctx> CodegenContext<'ctx> {

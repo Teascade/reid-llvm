@@ -339,7 +339,7 @@ impl ModuleHolder {
                     debug.locations.insert(location.value, location_ref);
                 }
 
-                for meta in debug.debug.get_metadata().borrow().iter() {
+                for meta in debug.debug.get_metadatas().borrow().iter() {
                     let meta_ref = meta.compile(&debug);
                     debug.metadata.insert(meta.value.clone(), meta_ref);
                 }
@@ -606,7 +606,7 @@ impl FunctionHolder {
 
             let metadata = if let Some(debug) = debug {
                 if let Some(value) = &self.data.debug {
-                    let subprogram = debug.debug.get_subprogram_data(&value);
+                    let subprogram = debug.debug.get_subprogram_data_unchecked(&value);
 
                     let mangled_length_ptr = &mut 0;
                     let mangled_name = LLVMGetValueName2(function_ref, mangled_length_ptr);

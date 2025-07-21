@@ -16,6 +16,7 @@ pub mod builder;
 pub mod compile;
 pub mod debug_information;
 mod fmt;
+mod pad_adapter;
 mod util;
 
 #[derive(Debug)]
