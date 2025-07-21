@@ -312,9 +312,30 @@ pub enum Instr {
     Param(usize),
     Constant(ConstValue),
 
+    /// Add two integers
     Add(InstructionValue, InstructionValue),
+    /// Add two floats
+    FAdd(InstructionValue, InstructionValue),
+    /// Subtract two integers
     Sub(InstructionValue, InstructionValue),
-    Mult(InstructionValue, InstructionValue),
+    /// Subtract two floats
+    FSub(InstructionValue, InstructionValue),
+    /// Multiply two integers
+    Mul(InstructionValue, InstructionValue),
+    /// Multiply two floats
+    FMul(InstructionValue, InstructionValue),
+    /// Divide two unsigned integers
+    UDiv(InstructionValue, InstructionValue),
+    /// Divide two signed integers
+    SDiv(InstructionValue, InstructionValue),
+    /// Divide two floats
+    FDiv(InstructionValue, InstructionValue),
+    /// Get the remainder from two unsigned integers
+    URem(InstructionValue, InstructionValue),
+    /// Get the remainder from two signed integers
+    SRem(InstructionValue, InstructionValue),
+    /// Get the remainder from two floats
+    FRem(InstructionValue, InstructionValue),
     And(InstructionValue, InstructionValue),
     Phi(Vec<InstructionValue>),
 
@@ -416,8 +437,17 @@ impl InstructionValue {
                     .ok_or(()),
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FAdd(lhs, rhs) => match_types(lhs, rhs, &builder),
                 Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
-                Mult(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FSub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Mul(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FMul(lhs, rhs) => match_types(lhs, rhs, &builder),
+                UDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                SDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                URem(lhs, rhs) => match_types(lhs, rhs, &builder),
+                SRem(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FRem(lhs, rhs) => match_types(lhs, rhs, &builder),
                 And(lhs, rhs) => match_types(lhs, rhs, &builder),
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),

@@ -641,7 +641,7 @@ impl mir::Expression {
                             scope.block.build("sub", Instr::Sub(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::Mult => {
-                            scope.block.build("mul", Instr::Mult(lhs, rhs)).unwrap()
+                            scope.block.build("mul", Instr::Mul(lhs, rhs)).unwrap()
                         }
                         mir::BinaryOperator::And => {
                             scope.block.build("and", Instr::And(lhs, rhs)).unwrap()

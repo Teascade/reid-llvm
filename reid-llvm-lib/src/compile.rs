@@ -754,15 +754,61 @@ impl InstructionHolder {
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildAdd(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
+                FAdd(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFAdd(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
                 Sub(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildSub(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
-                Mult(lhs, rhs) => {
+                FSub(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFSub(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                Mul(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildMul(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+
+                FMul(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFMul(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                UDiv(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildUDiv(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                SDiv(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildSDiv(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                FDiv(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFDiv(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                URem(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildURem(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                SRem(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildSRem(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                FRem(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFRem(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 And(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
