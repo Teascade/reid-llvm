@@ -345,8 +345,12 @@ impl Display for TypeKind {
                 write!(f, "&mut ")?;
                 Display::fmt(type_kind, f)
             }
-            TypeKind::Ptr(type_kind) => {
+            TypeKind::UserPtr(type_kind) => {
                 write!(f, "*")?;
+                Display::fmt(type_kind, f)
+            }
+            TypeKind::CodegenPtr(type_kind) => {
+                write!(f, "CodegenPtr ")?;
                 Display::fmt(type_kind, f)
             }
             TypeKind::Vague(vague_type) => Display::fmt(vague_type, f),

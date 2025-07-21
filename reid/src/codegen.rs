@@ -368,7 +368,7 @@ impl mir::Module {
                     p_name.clone(),
                     StackValue(
                         StackValueKind::mutable(p_ty.is_mutable(), alloca),
-                        TypeKind::Ptr(Box::new(p_ty.clone())),
+                        TypeKind::CodegenPtr(Box::new(p_ty.clone())),
                     ),
                 );
 
@@ -511,7 +511,7 @@ impl mir::Statement {
 
                 scope.stack_values.insert(
                     name.clone(),
-                    StackValue(stack_value, TypeKind::Ptr(Box::new(value.clone().1))),
+                    StackValue(stack_value, TypeKind::CodegenPtr(Box::new(value.clone().1))),
                 );
                 if let Some(debug) = &scope.debug {
                     let location = self.1.into_debug(scope.tokens).unwrap();
@@ -595,7 +595,7 @@ impl mir::Expression {
                     .expect("Variable reference not found?!");
                 Some({
                     if state.should_load {
-                        if let TypeKind::Ptr(inner) = &v.1 {
+                        if let TypeKind::CodegenPtr(inner) = &v.1 {
                             StackValue(
                                 v.0.derive(
                                     scope
@@ -715,7 +715,7 @@ impl mir::Expression {
                     } else {
                         Some(StackValue(
                             StackValueKind::Immutable(ptr),
-                            TypeKind::Ptr(Box::new(ret_type_kind)),
+                            TypeKind::CodegenPtr(Box::new(ret_type_kind)),
                         ))
                     }
                 } else {
@@ -758,7 +758,7 @@ impl mir::Expression {
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                let TypeKind::Ptr(inner) = array_ty else {
+                let TypeKind::CodegenPtr(inner) = array_ty else {
                     panic!();
                 };
                 let TypeKind::Array(elem_ty, _) = *inner else {
@@ -783,7 +783,7 @@ impl mir::Expression {
                         *elem_ty,
                     ))
                 } else {
-                    Some(StackValue(kind.derive(ptr), TypeKind::Ptr(elem_ty)))
+                    Some(StackValue(kind.derive(ptr), TypeKind::CodegenPtr(elem_ty)))
                 }
             }
             mir::ExprKind::Array(expressions) => {
@@ -856,7 +856,7 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
 
-                let TypeKind::Ptr(inner) = &struct_val.1 else {
+                let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
                 let TypeKind::CustomType(name) = *inner.clone() else {
@@ -898,7 +898,9 @@ impl mir::Expression {
                 } else {
                     Some(StackValue(
                         struct_val.0.derive(value),
-                        TypeKind::Ptr(Box::new(struct_ty.get_field_ty(&field).unwrap().clone())),
+                        TypeKind::CodegenPtr(Box::new(
+                            struct_ty.get_field_ty(&field).unwrap().clone(),
+                        )),
                     ))
                 }
             }
@@ -959,7 +961,7 @@ impl mir::Expression {
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
 
-                let TypeKind::Ptr(ptr_inner) = &v.1 else {
+                let TypeKind::CodegenPtr(ptr_inner) = &v.1 else {
                     panic!();
                 };
 
@@ -976,7 +978,7 @@ impl mir::Expression {
 
                 Some({
                     if state.should_load {
-                        if let TypeKind::Ptr(inner) = *ptr_inner.clone() {
+                        if let TypeKind::CodegenPtr(inner) = *ptr_inner.clone() {
                             StackValue(
                                 v.0.derive(
                                     scope
@@ -1173,7 +1175,10 @@ impl TypeKind {
                 let type_val = type_vals.get(n).unwrap().clone();
                 Type::CustomType(type_val)
             }
-            TypeKind::Ptr(type_kind) => {
+            TypeKind::UserPtr(type_kind) => {
+                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
+            }
+            TypeKind::CodegenPtr(type_kind) => {
                 Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
             }
             TypeKind::Borrow(type_kind, _) => {
@@ -1223,7 +1228,7 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Ptr(inner) | TypeKind::Borrow(inner, _) => {
+            TypeKind::CodegenPtr(inner) | TypeKind::Borrow(inner, _) => {
                 DebugTypeData::Pointer(DebugPointerType {
                     name,
                     pointee: inner.get_debug_type_hard(

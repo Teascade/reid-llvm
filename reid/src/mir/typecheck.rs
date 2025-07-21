@@ -39,8 +39,8 @@ pub enum ErrorKind {
     TypeNotInferrable(TypeKind),
     #[error("Expected branch type to be {0}, found {1} instead")]
     BranchTypesDiffer(TypeKind, TypeKind),
-    #[error("Attempted to index a non-array type of {0}")]
-    TriedIndexingNonArray(TypeKind),
+    #[error("Attempted to index a non-indexable type of {0}")]
+    TriedIndexingNonIndexable(TypeKind),
     #[error("Index {0} out of bounds ({1})")]
     IndexOutOfBounds(u64, u64),
     #[error("No such type {0} could be found")]
@@ -535,7 +535,7 @@ impl Expression {
 
                 let expr_t = expression.typecheck(state, typerefs, hint_t)?;
                 match expr_t {
-                    TypeKind::Array(inferred_ty, _) | TypeKind::Ptr(inferred_ty) => {
+                    TypeKind::Array(inferred_ty, _) | TypeKind::UserPtr(inferred_ty) => {
                         let ty = state.or_else(
                             elem_ty.resolve_ref(typerefs).collapse_into(&inferred_ty),
                             TypeKind::Vague(Vague::Unknown),
@@ -544,7 +544,7 @@ impl Expression {
                         *elem_ty = ty.clone();
                         Ok(ty)
                     }
-                    _ => Err(ErrorKind::TriedIndexingNonArray(expr_t)),
+                    _ => Err(ErrorKind::TriedIndexingNonIndexable(expr_t)),
                 }
             }
             ExprKind::Array(expressions) => {

@@ -267,12 +267,12 @@ impl Expression {
                 // need for further resolution.
                 let kind = expr_ty.resolve_weak().unwrap();
                 match kind {
-                    Array(type_kind, _) | Ptr(type_kind) => {
+                    Array(type_kind, _) | UserPtr(type_kind) => {
                         let elem_ty = type_refs.from_type(&type_kind).unwrap();
                         *index_ty = elem_ty.as_type().clone();
                         Ok(elem_ty)
                     }
-                    _ => Err(ErrorKind::TriedIndexingNonArray(kind)),
+                    _ => Err(ErrorKind::TriedIndexingNonIndexable(kind)),
                 }
             }
             ExprKind::Array(expressions) => {

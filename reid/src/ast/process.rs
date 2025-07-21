@@ -294,7 +294,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
                 mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())), *mutable)
             }
             ast::TypeKind::Ptr(type_kind) => {
-                mir::TypeKind::Ptr(Box::new(mir::TypeKind::from(*type_kind.clone())))
+                mir::TypeKind::UserPtr(Box::new(mir::TypeKind::from(*type_kind.clone())))
             }
         }
     }

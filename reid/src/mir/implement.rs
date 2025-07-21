@@ -46,9 +46,10 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, len) => type_kind.size_of() * len,
             TypeKind::CustomType(_) => 32,
-            TypeKind::Ptr(_) => 64,
+            TypeKind::CodegenPtr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(_, _) => 64,
+            TypeKind::UserPtr(_) => 64,
         }
     }
 
@@ -69,9 +70,10 @@ impl TypeKind {
             TypeKind::StringPtr => 32,
             TypeKind::Array(type_kind, _) => type_kind.alignment(),
             TypeKind::CustomType(_) => 32,
-            TypeKind::Ptr(_) => 64,
+            TypeKind::CodegenPtr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(_, _) => 64,
+            TypeKind::UserPtr(_) => 64,
         }
     }
 
@@ -397,8 +399,8 @@ impl Collapsable for TypeKind {
                     ))
                 }
             }
-            (TypeKind::Ptr(val1), TypeKind::Ptr(val2)) => {
-                Ok(TypeKind::Ptr(Box::new(val1.collapse_into(val2)?)))
+            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
+                Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
             }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }

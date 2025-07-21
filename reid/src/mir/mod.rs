@@ -95,7 +95,8 @@ pub enum TypeKind {
     Array(Box<TypeKind>, u64),
     CustomType(String),
     Borrow(Box<TypeKind>, bool),
-    Ptr(Box<TypeKind>),
+    UserPtr(Box<TypeKind>),
+    CodegenPtr(Box<TypeKind>),
     Vague(VagueType),
 }
 
