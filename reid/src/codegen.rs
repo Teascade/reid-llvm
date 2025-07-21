@@ -488,7 +488,7 @@ impl mir::Statement {
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                let store = scope
+                scope
                     .block
                     .build(
                         format!("{}.store", name),
@@ -513,12 +513,12 @@ impl mir::Statement {
                         DebugMetadata::LocalVar(DebugLocalVariable {
                             name: name.clone(),
                             location,
-                            ty: TypeKind::Ptr(Box::new(ty.clone())).get_debug_type(debug, scope),
+                            ty: ty.clone().get_debug_type(debug, scope),
                             always_preserve: true,
                             flags: DwarfFlags,
                         }),
                     );
-                    store.add_record(
+                    alloca.add_record(
                         &mut scope.block,
                         InstructionDebugRecordData {
                             variable: var,
@@ -934,8 +934,62 @@ impl mir::Expression {
                     TypeKind::CustomType(name.clone()),
                 ))
             }
-            mir::ExprKind::Borrow(named_variable_ref) => todo!(),
-            mir::ExprKind::Deref(named_variable_ref) => todo!(),
+            mir::ExprKind::Borrow(varref) => {
+                varref.0.known().expect("variable type unknown");
+                let v = scope
+                    .stack_values
+                    .get(&varref.1)
+                    .expect("Variable reference not found?!");
+                Some(v.clone())
+            }
+            mir::ExprKind::Deref(varref) => {
+                varref.0.known().expect("variable type unknown");
+                let v = scope
+                    .stack_values
+                    .get(&varref.1)
+                    .expect("Variable reference not found?!");
+
+                let TypeKind::Ptr(ptr_inner) = &v.1 else {
+                    panic!();
+                };
+
+                let var_ptr_instr = scope
+                    .block
+                    .build(
+                        format!("{}.deref", varref.1),
+                        Instr::Load(
+                            v.0.instr(),
+                            ptr_inner.get_type(scope.type_values, scope.types),
+                        ),
+                    )
+                    .unwrap();
+
+                Some({
+                    if state.should_load {
+                        if let TypeKind::Ptr(inner) = *ptr_inner.clone() {
+                            StackValue(
+                                v.0.derive(
+                                    scope
+                                        .block
+                                        .build(
+                                            format!("{}.deref.inner", varref.1),
+                                            Instr::Load(
+                                                var_ptr_instr,
+                                                inner.get_type(scope.type_values, scope.types),
+                                            ),
+                                        )
+                                        .unwrap(),
+                                ),
+                                *inner.clone(),
+                            )
+                        } else {
+                            panic!("Variable was not a pointer?!?")
+                        }
+                    } else {
+                        StackValue(v.0.derive(var_ptr_instr), *ptr_inner.clone())
+                    }
+                })
+            }
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
@@ -1159,18 +1213,20 @@ impl TypeKind {
                 ),
                 size_bits: self.size_of(),
             }),
-            TypeKind::Ptr(inner) => DebugTypeData::Pointer(DebugPointerType {
-                name,
-                pointee: inner.get_debug_type_hard(
-                    scope,
-                    debug_info,
-                    debug_types,
-                    type_values,
-                    types,
-                    tokens,
-                ),
-                size_bits: self.size_of(),
-            }),
+            TypeKind::Ptr(inner) | TypeKind::Borrow(inner) => {
+                DebugTypeData::Pointer(DebugPointerType {
+                    name,
+                    pointee: inner.get_debug_type_hard(
+                        scope,
+                        debug_info,
+                        debug_types,
+                        type_values,
+                        types,
+                        tokens,
+                    ),
+                    size_bits: self.size_of(),
+                })
+            }
             TypeKind::Array(elem_ty, len) => {
                 let elem_ty = elem_ty.clone().get_debug_type_hard(
                     scope,
