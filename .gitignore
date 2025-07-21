@@ -5,7 +5,7 @@ src/old_llvm
 .env
 hello.*
 main
-reid_src/*.o
-reid_src/*.ll
-reid_src/*.asm
-reid_src/*.out
+*.o
+*.ll
+*.asm
+*.out

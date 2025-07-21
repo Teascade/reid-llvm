@@ -52,10 +52,13 @@ Big features that I want later but are not necessary:
 - Asymmetric binary operations (e.g. string + u32)
 
 Smaller features:
+- Hex-numbers
+- Built-in Int/Float division and modulo
+- Bitwise operations
 - Easier way to initialize arrays with a single value
-- Lexical scopes for Debug Information
-- ~~Only include standard library at all if it is imported~~
 - Void-returns (`return;` for void-returning functions)
+- ~~Only include standard library at all if it is imported~~
+- Lexical scopes for Debug Information
 
 ### Why "Reid"
 
