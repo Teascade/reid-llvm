@@ -233,7 +233,24 @@ impl Parse for PrimaryExpression {
             }
         }
 
+        while let Ok(as_cast) = stream.parse::<AsCast>() {
+            expr = Expression(
+                ExpressionKind::CastTo(Box::new(expr), as_cast.0),
+                stream.get_range().unwrap(),
+            );
+        }
+
         Ok(PrimaryExpression(expr))
+    }
+}
+
+#[derive(Debug)]
+pub struct AsCast(Type);
+
+impl Parse for AsCast {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::AsKeyword)?;
+        Ok(AsCast(stream.parse()?))
     }
 }
 

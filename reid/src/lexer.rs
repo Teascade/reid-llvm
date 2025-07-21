@@ -24,6 +24,8 @@ pub enum Token {
     FnKeyword,
     /// `pub`
     PubKeyword,
+    /// `as`
+    AsKeyword,
     /// `->`
     Arrow,
     /// `if`
@@ -124,6 +126,7 @@ impl ToString for Token {
             Token::False => String::from("false"),
             Token::Extern => String::from("extern"),
             Token::Struct => String::from("struct"),
+            Token::AsKeyword => String::from("as"),
             Token::Semi => String::from(';'),
             Token::Equals => String::from('='),
             Token::Colon => String::from(':'),
@@ -286,6 +289,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "extern" => Token::Extern,
                     "pub" => Token::PubKeyword,
                     "struct" => Token::Struct,
+                    "as" => Token::AsKeyword,
                     _ => Token::Identifier(value),
                 };
                 variant

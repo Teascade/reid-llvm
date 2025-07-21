@@ -66,6 +66,7 @@ pub enum ExpressionKind {
     IfExpr(Box<IfExpression>),
     StructExpression(StructExpression),
     UnaryOperation(UnaryOperator, Box<Expression>),
+    CastTo(Box<Expression>, Type),
 }
 
 #[derive(Debug, Clone)]
