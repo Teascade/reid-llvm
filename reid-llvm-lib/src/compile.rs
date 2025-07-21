@@ -8,7 +8,7 @@ use std::{
 };
 
 use llvm_sys::{
-    LLVMIntPredicate, LLVMLinkage, LLVMValueKind,
+    LLVMIntPredicate, LLVMLinkage, LLVMRealPredicate, LLVMValueKind,
     analysis::LLVMVerifyModule,
     core::*,
     debuginfo::*,
@@ -774,7 +774,6 @@ impl InstructionHolder {
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildMul(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
-
                 FMul(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
@@ -822,6 +821,17 @@ impl InstructionHolder {
                         module.builder_ref,
                         // Signedness from LHS
                         pred.as_llvm_int(lhs._ty.signed()),
+                        lhs.value_ref,
+                        rhs_val,
+                        name.as_ptr(),
+                    )
+                }
+                FCmp(pred, lhs, rhs) => {
+                    let lhs = module.values.get(&lhs).unwrap();
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildFCmp(
+                        module.builder_ref,
+                        pred.as_llvm_unsorted_float(),
                         lhs.value_ref,
                         rhs_val,
                         name.as_ptr(),
@@ -1055,6 +1065,19 @@ impl CmpPredicate {
             (GE, false) => LLVMIntUGE,
             (EQ, _) => LLVMIntEQ,
             (NE, _) => LLVMIntNE,
+        }
+    }
+
+    fn as_llvm_unsorted_float(&self) -> LLVMRealPredicate {
+        use CmpPredicate::*;
+        use LLVMRealPredicate::*;
+        match self {
+            LT => LLVMRealULT,
+            LE => LLVMRealULE,
+            GT => LLVMRealUGT,
+            GE => LLVMRealUGE,
+            EQ => LLVMRealUEQ,
+            NE => LLVMRealUNE,
         }
     }
 }

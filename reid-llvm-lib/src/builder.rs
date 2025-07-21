@@ -5,7 +5,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData, NamedStruct,
-    TerminatorKind, Type, TypeData,
+    TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
         DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
         InstructionDebugRecordData,
@@ -369,7 +369,15 @@ impl Builder {
                 Instr::And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::ICmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
-                    if t.comparable() {
+                    if t.comparable() || t.category() != TypeCategory::Integer {
+                        Ok(())
+                    } else {
+                        Err(()) // TODO error: Types not comparable
+                    }
+                }
+                Instr::FCmp(_, lhs, rhs) => {
+                    let t = match_types(&lhs, &rhs, self)?;
+                    if t.comparable() || t.category() != TypeCategory::Real {
                         Ok(())
                     } else {
                         Err(()) // TODO error: Types not comparable

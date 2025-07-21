@@ -232,6 +232,7 @@ impl Instr {
             Instr::ExtractValue(..) => "extractvalue",
             Instr::ICmp(..) => "icmp",
             Instr::FunctionCall(..) => "call",
+            Instr::FCmp(_, _, _) => "fcmp",
         }
     }
 }
@@ -396,6 +397,7 @@ pub enum Instr {
 
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
+    FCmp(CmpPredicate, InstructionValue, InstructionValue),
 
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }
@@ -497,6 +499,7 @@ impl InstructionValue {
                 FRem(lhs, rhs) => match_types(lhs, rhs, &builder),
                 And(lhs, rhs) => match_types(lhs, rhs, &builder),
                 ICmp(_, _, _) => Ok(Type::Bool),
+                FCmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
                 Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
                 Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
@@ -629,6 +632,38 @@ impl Type {
             Type::F128PPC => true,
         }
     }
+
+    pub fn category(&self) -> TypeCategory {
+        match self {
+            Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::U8
+            | Type::U16
+            | Type::U32
+            | Type::U64
+            | Type::U128 => TypeCategory::Integer,
+            Type::F16
+            | Type::F32B
+            | Type::F32
+            | Type::F64
+            | Type::F80
+            | Type::F128
+            | Type::F128PPC => TypeCategory::Real,
+            Type::Bool | Type::Void | Type::CustomType(_) | Type::Array(_, _) | Type::Ptr(_) => {
+                TypeCategory::Other
+            }
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+pub enum TypeCategory {
+    Integer,
+    Real,
+    Other,
 }
 
 impl TerminatorKind {
