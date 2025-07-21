@@ -457,6 +457,20 @@ impl Collapsable for TypeKind {
                     _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
                 }
             }
+            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
+                match other {
+                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
+                    TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
+                    TypeKind::F16
+                    | TypeKind::F32B
+                    | TypeKind::F32
+                    | TypeKind::F64
+                    | TypeKind::F80
+                    | TypeKind::F128
+                    | TypeKind::F128PPC => Ok(other.clone()),
+                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+                }
+            }
             (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
                 Ok(other.clone())
             }
