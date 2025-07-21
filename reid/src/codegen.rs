@@ -641,7 +641,7 @@ impl mir::Expression {
                     (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
                     (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
                     (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
-                    (mir::BinaryOperator::Cmp(i), _, true) => {
+                    (mir::BinaryOperator::Cmp(i), _, false) => {
                         Instr::ICmp(i.int_predicate(), lhs, rhs)
                     }
                     _ => todo!(),
