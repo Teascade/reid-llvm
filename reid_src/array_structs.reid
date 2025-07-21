@@ -16,9 +16,9 @@ fn test() -> Test {
 fn main() -> u32 {
   let mut value = test();
 
-  let mut a = value.second;
+  let mut a = &mut value;
 
-  a[2] = 15;
+  *a.second[2] = 15;
 
 
   return value.second[2];

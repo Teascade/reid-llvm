@@ -55,6 +55,7 @@ Smaller features:
 - Easier way to initialize arrays with a single value
 - Lexical scopes for Debug Information
 - ~~Only include standard library at all if it is imported~~
+- Void-returns (`return;` for void-returning functions)
 
 ### Why "Reid"
 
