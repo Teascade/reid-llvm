@@ -165,12 +165,12 @@ impl Parse for PrimaryExpression {
                         let value = (*v as f64) + (fractional as f64) / (10u64.pow(log) as f64);
                         Expression(
                             Kind::Literal(Literal::Decimal(value)),
-                            stream.get_range_prev().unwrap(),
+                            stream.get_range().unwrap(),
                         )
                     } else {
                         Expression(
                             Kind::Literal(Literal::Integer(*v)),
-                            stream.get_range_prev().unwrap(),
+                            stream.get_range().unwrap(),
                         )
                     }
                 }
