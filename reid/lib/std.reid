@@ -1,5 +1,5 @@
 
-extern fn puts(message: string) -> i32;
+extern fn puts(message: *str) -> i32;
 
 struct DivT {
     quotient: i32,
@@ -8,7 +8,7 @@ struct DivT {
 
 extern fn div(numerator: i32, denominator: i32) -> DivT;
 
-pub fn print(message: string) {
+pub fn print(message: *str) {
     puts(message);
 }
 

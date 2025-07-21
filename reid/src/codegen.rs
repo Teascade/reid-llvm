@@ -247,7 +247,7 @@ impl mir::Module {
         insert_debug!(&TypeKind::I64);
         insert_debug!(&TypeKind::I128);
         insert_debug!(&TypeKind::Void);
-        insert_debug!(&TypeKind::StringPtr);
+        insert_debug!(&TypeKind::Str);
 
         for typedef in &self.typedefs {
             let type_value = match &typedef.kind {
@@ -1206,7 +1206,7 @@ impl TypeKind {
             TypeKind::F128 => Type::F128,
             TypeKind::F80 => Type::F80,
             TypeKind::F128PPC => Type::F128PPC,
-            TypeKind::StringPtr => Type::Ptr(Box::new(Type::I8)),
+            TypeKind::Str => Type::I8,
             TypeKind::Array(elem_t, len) => {
                 Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)
             }
@@ -1257,18 +1257,6 @@ impl TypeKind {
         let name = format!("{}", self);
 
         let data = match self {
-            TypeKind::StringPtr => DebugTypeData::Pointer(DebugPointerType {
-                name,
-                pointee: TypeKind::I8.get_debug_type_hard(
-                    scope,
-                    debug_info,
-                    debug_types,
-                    type_values,
-                    types,
-                    tokens,
-                ),
-                size_bits: self.size_of(),
-            }),
             TypeKind::CodegenPtr(inner) | TypeKind::UserPtr(inner) | TypeKind::Borrow(inner, _) => {
                 DebugTypeData::Pointer(DebugPointerType {
                     name,
@@ -1358,7 +1346,7 @@ impl TypeKind {
                     | TypeKind::F128
                     | TypeKind::F128PPC => DwarfEncoding::Float,
                     TypeKind::Void => DwarfEncoding::Address,
-                    TypeKind::StringPtr => DwarfEncoding::Address,
+                    TypeKind::Str => DwarfEncoding::UnsignedChar,
                     TypeKind::Array(_, _) => DwarfEncoding::Address,
                     TypeKind::CustomType(_) => DwarfEncoding::Address,
                     _ => panic!("tried fetching debug-type for non-supported type!"),

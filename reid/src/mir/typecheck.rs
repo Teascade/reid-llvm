@@ -742,7 +742,10 @@ impl Literal {
                 (L::F128(_), TypeKind::F128) => self,
                 (L::F128PPC(_), TypeKind::F128PPC) => self,
                 (L::Bool(_), TypeKind::Bool) => self,
-                (L::String(_), TypeKind::StringPtr) => self,
+                (L::String(_), TypeKind::UserPtr(ptr)) => match *ptr.clone() {
+                    TypeKind::Str => self,
+                    _ => Err(ErrorKind::LiteralIncompatible(self, hint.clone()))?,
+                },
                 // TODO make sure that v is actually able to fit in the
                 // requested type
                 (L::Vague(VagueL::Number(v)), TypeKind::I8) => L::I8(v as i8),

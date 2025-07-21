@@ -31,7 +31,7 @@ pub enum TypeKind {
     F128,
     F80,
     F128PPC,
-    String,
+    Str,
     Array(Box<TypeKind>, u64),
     Custom(String),
     Borrow(Box<TypeKind>, bool),
