@@ -26,9 +26,10 @@ pub static FIBONACCI: &str = include_str!("../../reid_src/fibonacci.reid");
 pub static HELLO_WORLD: &str = include_str!("../../reid_src/hello_world.reid");
 pub static MUTABLE: &str = include_str!("../../reid_src/mutable.reid");
 pub static STRINGS: &str = include_str!("../../reid_src/strings.reid");
-pub static ARRAYS: &str = include_str!("../../reid_src/array.reid");
 pub static STRUCTS: &str = include_str!("../../reid_src/struct.reid");
 pub static ARRAY_STRUCTS: &str = include_str!("../../reid_src/array_structs.reid");
+pub static BORROW: &str = include_str!("../../reid_src/borrow.reid");
+pub static ARITHMETIC: &str = include_str!("../../reid_src/arithmetic.reid");
 
 #[test]
 fn array_compiles_well() {
@@ -68,4 +69,14 @@ fn struct_compiles_well() {
 #[test]
 fn array_structs_compiles_well() {
     test(ARRAY_STRUCTS, "array_structs");
+}
+
+#[test]
+fn borrow_structs_compiles_well() {
+    test(BORROW, "borrow");
+}
+
+#[test]
+fn arithmetic_structs_compiles_well() {
+    test(ARITHMETIC, "arithmetic");
 }
