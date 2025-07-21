@@ -63,6 +63,8 @@ pub enum ErrorKind {
     TypesDifferMutability(TypeKind, TypeKind),
     #[error("Cannot mutably borrow variable {0}, which is not declared as mutable")]
     ImpossibleMutableBorrow(String),
+    #[error("Cannot declare variable {0} as mutable, when it's type is immutable")]
+    ImpossibleMutLet(String),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -224,6 +226,13 @@ impl Block {
                         TypeKind::Vague(Vague::Unknown),
                         variable_reference.2 + expression.1,
                     );
+
+                    if *mutable && !res_t.is_mutable() {
+                        state.note_errors(
+                            &vec![ErrorKind::ImpossibleMutLet(variable_reference.1.clone())],
+                            variable_reference.2,
+                        );
+                    }
 
                     let res_t = if res_t.known().is_err() {
                         // Unable to infer variable type even from expression! Default it
