@@ -3,7 +3,7 @@
 
 extern fn malloc(size: u64) -> *u8;
 
-fn main() -> u16 {
+fn main() -> u8 {
     let ptr = malloc(4);
 
     return ptr[0];

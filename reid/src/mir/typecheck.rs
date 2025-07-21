@@ -534,16 +534,17 @@ impl Expression {
                 // TODO it could be possible to check length against constants..
 
                 let expr_t = expression.typecheck(state, typerefs, hint_t)?;
-                if let TypeKind::Array(inferred_ty, _) = expr_t {
-                    let ty = state.or_else(
-                        elem_ty.resolve_ref(typerefs).collapse_into(&inferred_ty),
-                        TypeKind::Vague(Vague::Unknown),
-                        self.1,
-                    );
-                    *elem_ty = ty.clone();
-                    Ok(ty)
-                } else {
-                    Err(ErrorKind::TriedIndexingNonArray(expr_t))
+                match expr_t {
+                    TypeKind::Array(inferred_ty, _) | TypeKind::Ptr(inferred_ty) => {
+                        let ty = state.or_else(
+                            elem_ty.resolve_ref(typerefs).collapse_into(&inferred_ty),
+                            TypeKind::Vague(Vague::Unknown),
+                            self.1,
+                        );
+                        *elem_ty = ty.clone();
+                        Ok(ty)
+                    }
+                    _ => Err(ErrorKind::TriedIndexingNonArray(expr_t)),
                 }
             }
             ExprKind::Array(expressions) => {

@@ -397,6 +397,9 @@ impl Collapsable for TypeKind {
                     ))
                 }
             }
+            (TypeKind::Ptr(val1), TypeKind::Ptr(val2)) => {
+                Ok(TypeKind::Ptr(Box::new(val1.collapse_into(val2)?)))
+            }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }
