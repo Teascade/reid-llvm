@@ -107,6 +107,16 @@ impl TypeKind {
         }
     }
 
+    pub fn binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
+        match op {
+            BinaryOperator::Add | BinaryOperator::Minus | BinaryOperator::Mult => {
+                Some(self.clone())
+            }
+            BinaryOperator::And => None,
+            BinaryOperator::Cmp(_) => None,
+        }
+    }
+
     pub fn signed(&self) -> bool {
         match self {
             TypeKind::Bool => false,
