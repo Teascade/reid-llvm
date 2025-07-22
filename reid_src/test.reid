@@ -1,3 +1,5 @@
+struct SDL_Thing {}
+
 extern fn SDL_malloc(size: u64) -> *SDL_Thing;
 
 fn main() {

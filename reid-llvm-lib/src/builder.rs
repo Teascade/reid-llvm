@@ -385,10 +385,12 @@ impl Builder {
                 }
                 Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
+                    dbg!(&params, &param_types);
                     if param_types.len() != params.len() {
                         return Err(()); // TODO error: invalid amount of params
                     }
                     for (a, b) in param_types.iter().zip(params) {
+                        dbg!(b.get_type(&self)?);
                         if *a != b.get_type(&self)? {
                             return Err(()); // TODO error: params do not match
                         }

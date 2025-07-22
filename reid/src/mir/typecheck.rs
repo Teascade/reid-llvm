@@ -408,7 +408,7 @@ impl Expression {
             ExprKind::BinOp(op, lhs, rhs) => {
                 // TODO make sure lhs and rhs can actually do this binary
                 // operation once relevant
-                let lhs_res = lhs.typecheck(state, &typerefs, None);
+                let lhs_res = lhs.typecheck(state, &typerefs, hint_t);
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
