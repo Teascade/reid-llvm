@@ -37,11 +37,13 @@ pub fn new_string() -> String {
 
 pub fn from_str(str: *char) -> String {
     let length = str_length(str, 0);
-    String {
-        inner: str,
+    let cloned = malloc(length as u64) as *char;
+    copy_bits(str, cloned, 0, length as u64);
+    return String {
+        inner: cloned,
         length: length,
         max_length: length
-    }
+    };
 }
 
 pub fn add_char(string: &mut String, c: char) {
