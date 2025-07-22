@@ -542,7 +542,7 @@ pub fn pick_return<T>(lhs: (ReturnKind, T), rhs: (ReturnKind, T)) -> (ReturnKind
 impl TypeKind {
     /// Assert that a type is already known and not vague. Return said type or
     /// error.
-    pub fn assert_known(&self) -> Result<TypeKind, ErrorKind> {
+    pub fn assert_unvague(&self) -> Result<TypeKind, ErrorKind> {
         self.known().map_err(ErrorKind::TypeIsVague)
     }
 

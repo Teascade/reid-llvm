@@ -1,0 +1,5 @@
+extern fn SDL_malloc(size: u64) -> *SDL_Thing;
+
+fn main() {
+    let pixels = SDL_malloc(4 * 320 * 240);
+}

@@ -49,7 +49,7 @@ impl FunctionDefinition {
     ) -> Result<(), ErrorKind> {
         let scope_hints = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
-            let param_t = state.or_else(param.1.assert_known(), Vague(Unknown), self.signature());
+            let param_t = state.or_else(param.1.assert_unvague(), Vague(Unknown), self.signature());
             let res = scope_hints
                 .new_var(param.0.clone(), false, &param_t)
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));

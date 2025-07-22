@@ -89,7 +89,7 @@ impl<'t> Pass for TypeCheck<'t> {
                 name,
                 kind,
                 meta,
-                source_module,
+                source_module: _,
             } = &typedef;
 
             match kind {
@@ -162,12 +162,12 @@ fn check_typedefs_for_recursion<'a, 'b>(
 impl FunctionDefinition {
     fn typecheck(
         &mut self,
-        hints: &TypeRefs,
+        typerefs: &TypeRefs,
         state: &mut TypecheckPassState,
     ) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
             let param_t = state.or_else(
-                param.1.assert_known(),
+                param.1.assert_known(typerefs, state),
                 TypeKind::Vague(Vague::Unknown),
                 self.signature(),
             );
@@ -185,11 +185,11 @@ impl FunctionDefinition {
             state.ok(res, self.signature());
         }
 
-        let return_type = self.return_type.clone();
+        let return_type = self.return_type.clone().assert_known(typerefs, state)?;
         let inferred = match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 state.scope.return_type_hint = Some(self.return_type.clone());
-                block.typecheck(&mut state.inner(), &hints, Some(&return_type))
+                block.typecheck(&mut state.inner(), &typerefs, Some(&return_type))
             }
             FunctionDefinitionKind::Extern(_) => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
@@ -752,6 +752,32 @@ impl Literal {
             })
         } else {
             Ok(self)
+        }
+    }
+}
+
+impl TypeKind {
+    fn assert_known(
+        &self,
+        refs: &TypeRefs,
+        state: &TypecheckPassState,
+    ) -> Result<TypeKind, ErrorKind> {
+        match &self {
+            TypeKind::Array(type_kind, _) => type_kind.as_ref().assert_known(refs, state),
+            TypeKind::CustomType(custom_type_key) => state
+                .scope
+                .types
+                .get(custom_type_key)
+                .map(|_| self.clone())
+                .ok_or(ErrorKind::NoSuchType(
+                    custom_type_key.0.clone(),
+                    state.module_id.unwrap(),
+                )),
+            TypeKind::Borrow(type_kind, _) => type_kind.assert_known(refs, state),
+            TypeKind::UserPtr(type_kind) => type_kind.assert_known(refs, state),
+            TypeKind::CodegenPtr(type_kind) => type_kind.assert_known(refs, state),
+            TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(*vague_type)),
+            _ => Ok(self.clone()),
         }
     }
 }
