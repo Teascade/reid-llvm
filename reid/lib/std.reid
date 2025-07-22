@@ -25,6 +25,7 @@ struct String {
     inner: *char,
     length: u64,
     max_length: u64,
+    must_be_freed: bool,
 }
 
 pub fn new_string() -> String {
@@ -32,6 +33,7 @@ pub fn new_string() -> String {
         inner: allocate(0),
         length: 0,
         max_length: 0,
+        must_be_freed: true,
     }
 }
 
@@ -42,7 +44,8 @@ pub fn from_str(str: *char) -> String {
     return String {
         inner: cloned,
         length: length,
-        max_length: length
+        max_length: length,
+        must_be_freed: false,
     };
 }
 
@@ -51,14 +54,23 @@ pub fn add_char(string: &mut String, c: char) {
         let new = allocate((*string).max_length + 4) as *char;
         copy_bits((*string).inner, new, 0, (*string).max_length);
 
-        free((*string).inner as *u8);
+        if (*string).must_be_freed == true {
+            free((*string).inner as *u8);
+        }
         (*string).max_length = (*string).max_length + 4;
         (*string).inner = new;
+        (*string).must_be_freed = true;
     }
 
     (*string).inner[(*string).length] = c;
     (((*string).inner) as *u8)[((*string).length + 1)] = 0;
     (*string).length = (*string).length + 1;
+}
+
+pub fn set_char(string: &mut String, c: char, position: u64) {
+    if position <= (*string).length {
+        (*string).inner[position] = c;
+    }
 }
 
 pub fn free_string(string: &mut String) {
@@ -74,7 +86,7 @@ fn copy_bits(from: *char, to: *char, pos: u64, max: u64) -> u8 {
 }
 
 fn str_length(string: *char, position: u32) -> u32 {
-    if ((string[position] as u8) == 0) {
+    if (string[position] == '\0') {
         return 0;
     }
     return str_length(string, position + 1) + 1;

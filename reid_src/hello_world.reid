@@ -1,10 +1,14 @@
 import std::print;
 import std::from_str;
 import std::add_char;
+import std::set_char;
 import std::free_string;
 
 fn main() -> i32 {
     let mut test = from_str("hello world");
+
+    add_char(&mut test, '!');
+    set_char(&mut test, 'B', 0);
     
     print(&test);
 

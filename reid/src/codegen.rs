@@ -1135,7 +1135,7 @@ impl mir::IfExpression {
         if let Some(debug) = &scope.debug {
             let before_location = self.0 .1.into_debug(scope.tokens, debug.scope).unwrap();
             let before_v = debug.info.location(&debug.scope, before_location);
-            scope.block.set_terminator_location(before_v).unwrap();
+            scope.block.set_terminator_location(before_v).ok();
 
             let then_location = self
                 .1
