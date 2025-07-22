@@ -394,6 +394,8 @@ impl Expression {
                 let expr_type = expression.return_type(refs, mod_id)?;
                 if let TypeKind::Array(elem_ty, _) = expr_type.1.resolve_weak(refs) {
                     Ok((ReturnKind::Soft, *elem_ty))
+                } else if let TypeKind::UserPtr(_) = expr_type.1.resolve_weak(refs) {
+                    Ok((ReturnKind::Soft, expr_type.1))
                 } else {
                     Err(ReturnTypeOther::IndexingNonArray(expression.1))
                 }

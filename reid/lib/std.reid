@@ -31,6 +31,16 @@ pub fn new_string() -> String {
     String {
         inner: allocate(0),
         length: 0,
+        max_length: 0,
+    }
+}
+
+pub fn from_str(str: *char) -> String {
+    let length = str_length(str, 0);
+    String {
+        inner: str,
+        length: length,
+        max_length: length
     }
 }
 
@@ -42,11 +52,15 @@ pub fn add_char(string: &mut String, c: char) {
         free((*string).inner as *u8);
         (*string).max_length = (*string).max_length + 4;
         (*string).inner = new;
-
     }
+
     (*string).inner[(*string).length] = c;
     (((*string).inner) as *u8)[((*string).length + 1)] = 0;
     (*string).length = (*string).length + 1;
+}
+
+pub fn free_string(string: &mut String) {
+    free((*string).inner as *u8);
 }
 
 fn copy_bits(from: *char, to: *char, pos: u64, max: u64) -> u8 {
@@ -57,6 +71,9 @@ fn copy_bits(from: *char, to: *char, pos: u64, max: u64) -> u8 {
     return copy_bits(from, to, pos + 1, max);
 }
 
-pub fn free_string(string: &mut String) {
-    free((*string).inner as *u8);
+fn str_length(string: *char, position: u32) -> u32 {
+    if ((string[position] as u8) == 0) {
+        return 0;
+    }
+    return str_length(string, position + 1) + 1;
 }
