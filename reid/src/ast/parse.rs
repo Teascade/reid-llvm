@@ -61,6 +61,7 @@ impl Parse for Type {
                     "f128" => TypeKind::F128,
                     "f128ppc" => TypeKind::F128PPC,
                     "str" => TypeKind::Str,
+                    "char" => TypeKind::Char,
                     _ => TypeKind::Custom(ident),
                 }
             } else {
@@ -174,6 +175,20 @@ impl Parse for PrimaryExpression {
                     stream.next(); // Consume
                     Expression(
                         Kind::Literal(Literal::String(v.clone())),
+                        stream.get_range().unwrap(),
+                    )
+                }
+                Token::CharLit(v) => {
+                    stream.next(); // Consume
+                    let chars = v.as_bytes();
+                    if chars.len() == 0 {
+                        stream.expected_err("char to not be empty")?;
+                    } else if chars.len() > 0 {
+                        stream.expected_err("char to only have one char inside it")?;
+                    }
+
+                    Expression(
+                        Kind::Literal(Literal::Char(v.chars().next().unwrap())),
                         stream.get_range().unwrap(),
                     )
                 }

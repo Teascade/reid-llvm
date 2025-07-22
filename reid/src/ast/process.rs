@@ -289,7 +289,7 @@ impl ast::Literal {
             ast::Literal::Bool(v) => mir::Literal::Bool(*v),
             ast::Literal::String(val) => mir::Literal::String(val.clone()),
             ast::Literal::Decimal(v) => mir::Literal::Vague(mir::VagueLiteral::Decimal(*v)),
-            ast::Literal::Char(inner) => mir::Literal::Char(inner.chars().next().unwrap()),
+            ast::Literal::Char(inner) => mir::Literal::Char(*inner),
         }
     }
 }
@@ -326,6 +326,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::F80 => mir::TypeKind::F80,
             ast::TypeKind::F128 => mir::TypeKind::F128,
             ast::TypeKind::F128PPC => mir::TypeKind::F128PPC,
+            ast::TypeKind::Char => todo!(),
         }
     }
 }

@@ -250,16 +250,21 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             }
             '\"' | '\'' => {
                 let mut value = String::new();
-                let mut ignore_next = false;
+                let mut escape_next = false;
                 while cursor.first().is_some()
-                    && (cursor.first() != Some(*character) || ignore_next)
+                    && (cursor.first() != Some(*character) || escape_next)
                 {
-                    if cursor.first() == Some('\\') && !ignore_next {
-                        cursor.next(); // Consume backslash anjd always add next character
-                        ignore_next = true;
+                    if cursor.first() == Some('\\') && !escape_next {
+                        cursor.next(); // Consume backslash and always add next character
+                        escape_next = true;
                     } else {
-                        ignore_next = false;
-                        value += &cursor.next().unwrap().to_string();
+                        let c = &cursor.next().unwrap();
+                        if escape_next {
+                            value += &escape_char(&c).to_string();
+                        } else {
+                            value += &c.to_string();
+                        }
+                        escape_next = false;
                     }
                 }
                 if cursor.first() == Some(*character) {
@@ -268,7 +273,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     return Err(Error::MissingQuotation(position));
                 }
                 match character {
-                    '\'' => Token::StringLit(value),
+                    '\'' => Token::CharLit(value),
                     '\"' => Token::StringLit(value),
                     _ => unsafe { unreachable_unchecked() },
                 }
@@ -354,6 +359,15 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
     });
 
     Ok(tokens)
+}
+
+fn escape_char(c: &char) -> char {
+    match c {
+        't' => '\t',
+        'n' => '\n',
+        'r' => '\r',
+        _ => *c,
+    }
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

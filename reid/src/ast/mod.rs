@@ -32,6 +32,7 @@ pub enum TypeKind {
     F80,
     F128PPC,
     Str,
+    Char,
     Array(Box<TypeKind>, u64),
     Custom(String),
     Borrow(Box<TypeKind>, bool),
@@ -44,7 +45,7 @@ pub enum Literal {
     Decimal(f64),
     Bool(bool),
     String(String),
-    Char(String),
+    Char(char),
 }
 
 #[derive(Debug, Clone)]
