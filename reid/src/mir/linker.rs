@@ -11,7 +11,7 @@ use crate::{
     compile_module,
     error_raporting::{ModuleMap, ReidError},
     lexer::FullToken,
-    mir::{TypeDefinition, TypeKind},
+    mir::{SourceModuleId, TypeDefinition, TypeKey, TypeKind},
     parse_module,
 };
 
@@ -195,7 +195,6 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 let func_name = unsafe { path.get_unchecked(1) };
                 let imported_mod_name = imported.0.name.clone();
-                let imported_mod_typedefs = imported.0.typedefs.clone();
 
                 let Some(func) = imported
                     .0
@@ -212,6 +211,8 @@ impl<'map> Pass for LinkerPass<'map> {
                     );
                     continue;
                 };
+
+                let func_name = func.name.clone();
 
                 if !func.is_pub {
                     state.ok::<_, Infallible>(
@@ -244,14 +245,12 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
 
-                fn import_type(base: &String, ty: &TypeKind) -> (TypeKind, Vec<String>) {
+                fn import_type(base: &String, ty: &TypeKind) -> (TypeKind, Vec<TypeKey>) {
                     let mut imported_types = Vec::new();
                     let ty = match &ty {
-                        TypeKind::CustomType(name) => {
-                            imported_types.push(name.clone());
-
-                            let name = format!("{}::{}", base, name);
-                            TypeKind::CustomType(name)
+                        TypeKind::CustomType(key) => {
+                            imported_types.push(key.clone());
+                            TypeKind::CustomType(key.clone())
                         }
                         _ => ty.clone(),
                     };
@@ -272,27 +271,28 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 fn find_inner_types(
                     typedef: &TypeDefinition,
-                    mut seen: HashSet<String>,
-                ) -> Vec<String> {
+                    mut seen: HashSet<TypeKey>,
+                    mod_id: SourceModuleId,
+                ) -> Vec<TypeKey> {
                     match &typedef.kind {
                         crate::mir::TypeDefinitionKind::Struct(struct_type) => {
                             let typenames = struct_type
                                 .0
                                 .iter()
-                                .filter(|t| matches!(t.1, TypeKind::CustomType(_)))
+                                .filter(|t| matches!(t.1, TypeKind::CustomType(..)))
                                 .map(|t| match &t.1 {
-                                    TypeKind::CustomType(t) => t,
+                                    TypeKind::CustomType(TypeKey(t, _)) => t,
                                     _ => panic!(),
                                 })
                                 .cloned()
                                 .collect::<Vec<_>>();
 
                             for typename in typenames {
-                                if seen.contains(&typename) {
+                                if seen.contains(&TypeKey(typename.clone(), mod_id)) {
                                     continue;
                                 }
-                                let inner = find_inner_types(typedef, seen.clone());
-                                seen.insert(typename);
+                                let inner = find_inner_types(typedef, seen.clone(), mod_id);
+                                seen.insert(TypeKey(typename, mod_id));
                                 seen.extend(inner);
                             }
 
@@ -304,28 +304,30 @@ impl<'map> Pass for LinkerPass<'map> {
                 let mut seen = HashSet::new();
                 seen.extend(imported_types.clone());
 
-                for typename in imported_types.clone() {
+                let imported_mod_id = imported.0.module_id;
+                let imported_mod_typedefs = &mut imported.0.typedefs;
+
+                for typekey in imported_types.clone() {
                     let typedef = imported_mod_typedefs
                         .iter()
-                        .find(|ty| ty.name == typename)
+                        .find(|ty| TypeKey(ty.name.clone(), imported_mod_id) == typekey)
                         .unwrap();
-                    let inner = find_inner_types(typedef, seen.clone());
+                    let inner = find_inner_types(typedef, seen.clone(), imported_mod_id);
                     seen.extend(inner);
                 }
 
-                for typename in seen.into_iter() {
-                    let mut typedef = imported_mod_typedefs
+                for typekey in seen.into_iter() {
+                    let typedef = imported_mod_typedefs
                         .iter()
-                        .find(|ty| ty.name == typename)
+                        .find(|ty| TypeKey(ty.name.clone(), imported_mod_id) == typekey)
                         .unwrap()
                         .clone();
 
-                    typedef.name = format!("{}::{}", imported_mod_name, typedef.name);
-                    importer_module.0.typedefs.push(typedef);
+                    importer_module.0.typedefs.push(typedef.clone());
                 }
 
                 importer_module.0.functions.push(FunctionDefinition {
-                    name: func.name.clone(),
+                    name: func_name,
                     is_pub: false,
                     is_imported: false,
                     return_type: return_type,

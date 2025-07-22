@@ -18,8 +18,8 @@ use crate::{
     error_raporting::ModuleMap,
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, Metadata, NamedVariableRef, StructField, StructType,
-        TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
+        self, implement::TypeCategory, Metadata, NamedVariableRef, SourceModuleId, StructField,
+        StructType, TypeDefinition, TypeDefinitionKind, TypeKey, TypeKind, VagueLiteral,
     },
 };
 
@@ -77,10 +77,11 @@ pub struct Scope<'ctx, 'a> {
     context: &'ctx Context,
     tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
+    module_id: SourceModuleId,
     function: &'ctx StackFunction<'ctx>,
     block: Block<'ctx>,
     types: &'a HashMap<TypeValue, TypeDefinition>,
-    type_values: &'a HashMap<String, TypeValue>,
+    type_values: &'a HashMap<TypeKey, TypeValue>,
     functions: &'a HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
@@ -154,6 +155,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             function: self.function,
             context: self.context,
             module: self.module,
+            module_id: self.module_id,
             functions: self.functions,
             types: self.types,
             type_values: self.type_values,
@@ -170,8 +172,8 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
         old_block
     }
 
-    fn get_typedef(&self, name: &String) -> Option<&TypeDefinition> {
-        self.type_values.get(name).and_then(|v| self.types.get(v))
+    fn get_typedef(&self, key: &TypeKey) -> Option<&TypeDefinition> {
+        self.type_values.get(key).and_then(|v| self.types.get(v))
     }
 }
 
@@ -250,6 +252,7 @@ impl mir::Module {
         insert_debug!(&TypeKind::Char);
 
         for typedef in &self.typedefs {
+            let type_key = TypeKey(typedef.name.clone(), self.module_id);
             let type_value = match &typedef.kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
                     module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
@@ -265,8 +268,8 @@ impl mir::Module {
                 }
             };
             types.insert(type_value, typedef.clone());
-            type_values.insert(typedef.name.clone(), type_value);
-            insert_debug!(&TypeKind::CustomType(typedef.name.clone()));
+            type_values.insert(type_key.clone(), type_value);
+            insert_debug!(&TypeKind::CustomType(type_key.clone()));
         }
 
         let mut functions = HashMap::new();
@@ -401,6 +404,7 @@ impl mir::Module {
                 context,
                 tokens,
                 module: &module,
+                module_id: self.module_id,
                 function,
                 block: entry,
                 functions: &functions,
@@ -632,7 +636,10 @@ impl mir::Expression {
                     .codegen(scope, state)
                     .expect("rhs has no return value")
                     .instr();
-                let lhs_type = lhs_exp.return_type(&Default::default()).unwrap().1;
+                let lhs_type = lhs_exp
+                    .return_type(&Default::default(), scope.module_id)
+                    .unwrap()
+                    .1;
                 let instr = match (
                     binop,
                     lhs_type.signed(),
@@ -887,15 +894,15 @@ impl mir::Expression {
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
-                let TypeKind::CustomType(name) = *inner.clone() else {
+                let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };
                 let TypeDefinitionKind::Struct(struct_ty) =
-                    scope.get_typedef(&name).unwrap().kind.clone();
+                    scope.get_typedef(&key).unwrap().kind.clone();
                 let idx = struct_ty.find_index(field).unwrap();
 
-                let gep_n = format!("{}.{}.gep", name, field);
-                let load_n = format!("{}.{}.load", name, field);
+                let gep_n = format!("{}.{}.gep", key.0, field);
+                let load_n = format!("{}.{}.load", key.0, field);
 
                 let value = scope
                     .block
@@ -933,7 +940,8 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Struct(name, items) => {
-                let struct_ty = Type::CustomType(*scope.type_values.get(name)?);
+                let type_key = TypeKey(name.clone(), scope.module_id);
+                let struct_ty = Type::CustomType(*scope.type_values.get(&type_key)?);
 
                 let load_n = format!("{}.load", name);
 
@@ -968,7 +976,7 @@ impl mir::Expression {
 
                 Some(StackValue(
                     StackValueKind::Literal(struct_val),
-                    TypeKind::CustomType(name.clone()),
+                    TypeKind::CustomType(type_key),
                 ))
             }
             mir::ExprKind::Borrow(varref, mutable) => {
@@ -1209,7 +1217,7 @@ impl mir::Literal {
 impl TypeKind {
     fn get_type(
         &self,
-        type_vals: &HashMap<String, TypeValue>,
+        type_vals: &HashMap<TypeKey, TypeValue>,
         typedefs: &HashMap<TypeValue, TypeDefinition>,
     ) -> Type {
         match &self {
@@ -1271,7 +1279,7 @@ impl TypeKind {
         scope: DebugProgramValue,
         debug_info: &DebugInformation,
         debug_types: &HashMap<TypeKind, DebugTypeValue>,
-        type_values: &HashMap<String, TypeValue>,
+        type_values: &HashMap<TypeKey, TypeValue>,
         types: &HashMap<TypeValue, TypeDefinition>,
         tokens: &Vec<FullToken>,
     ) -> DebugTypeValue {
@@ -1312,8 +1320,8 @@ impl TypeKind {
                     length: *len,
                 })
             }
-            TypeKind::CustomType(name) => {
-                let typedef = types.get(type_values.get(name).unwrap()).unwrap();
+            TypeKind::CustomType(key) => {
+                let typedef = types.get(type_values.get(key).unwrap()).unwrap();
 
                 match &typedef.kind {
                     TypeDefinitionKind::Struct(struct_type) => {
@@ -1339,7 +1347,7 @@ impl TypeKind {
                         }
                         {
                             DebugTypeData::Struct(DebugStructType {
-                                name: name.clone(),
+                                name: key.0.clone(),
                                 scope,
                                 location: typedef.meta.into_debug(tokens).unwrap(),
                                 size_bits,

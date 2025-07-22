@@ -90,16 +90,16 @@ impl<TErr: STDError> State<TErr> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Storage<T: std::fmt::Debug>(HashMap<String, T>);
+pub struct Storage<Key: std::hash::Hash, T: std::fmt::Debug>(HashMap<Key, T>);
 
-impl<T: std::fmt::Debug> Default for Storage<T> {
+impl<Key: std::hash::Hash, T: std::fmt::Debug> Default for Storage<Key, T> {
     fn default() -> Self {
         Self(Default::default())
     }
 }
 
-impl<T: Clone + std::fmt::Debug> Storage<T> {
-    pub fn set(&mut self, key: String, value: T) -> Result<T, ()> {
+impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
+    pub fn set(&mut self, key: Key, value: T) -> Result<T, ()> {
         if let Some(_) = self.0.get(&key) {
             Err(())
         } else {
@@ -108,16 +108,16 @@ impl<T: Clone + std::fmt::Debug> Storage<T> {
         }
     }
 
-    pub fn get(&self, key: &String) -> Option<&T> {
+    pub fn get(&self, key: &Key) -> Option<&T> {
         self.0.get(key)
     }
 }
 
 #[derive(Clone, Default, Debug)]
 pub struct Scope<Data: Clone + Default> {
-    pub function_returns: Storage<ScopeFunction>,
-    pub variables: Storage<ScopeVariable>,
-    pub types: Storage<TypeDefinitionKind>,
+    pub function_returns: Storage<String, ScopeFunction>,
+    pub variables: Storage<String, ScopeVariable>,
+    pub types: Storage<TypeKey, TypeDefinition>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
     pub data: Data,
@@ -134,11 +134,19 @@ impl<Data: Clone + Default> Scope<Data> {
         }
     }
 
-    pub fn get_struct_type(&self, name: &String) -> Option<&StructType> {
-        let ty = self.types.get(&name)?;
-        match ty {
+    pub fn get_struct_type(&self, key: &TypeKey) -> Option<&StructType> {
+        let ty = self.types.get(&key)?;
+        match &ty.kind {
             TypeDefinitionKind::Struct(struct_ty) => Some(struct_ty),
         }
+    }
+
+    pub fn find_type(&self, name: &String) -> Option<&TypeKey> {
+        self.types
+            .0
+            .iter()
+            .find(|(TypeKey(n, _), _)| n == name)
+            .map(|(key, _)| key)
     }
 }
 
@@ -158,14 +166,20 @@ pub struct PassState<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> 
     state: &'st mut State<TError>,
     pub scope: &'sc mut Scope<Data>,
     inner: Vec<Scope<Data>>,
+    pub module_id: Option<SourceModuleId>,
 }
 
 impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, 'sc, Data, TError> {
-    fn from(state: &'st mut State<TError>, scope: &'sc mut Scope<Data>) -> Self {
+    fn from(
+        state: &'st mut State<TError>,
+        scope: &'sc mut Scope<Data>,
+        module_id: Option<SourceModuleId>,
+    ) -> Self {
         PassState {
             state,
             scope,
             inner: Vec::new(),
+            module_id: module_id,
         }
     }
 
@@ -203,6 +217,7 @@ impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, '
             state: self.state,
             scope,
             inner: Vec::new(),
+            module_id: self.module_id,
         }
     }
 }
@@ -261,7 +276,7 @@ impl Context {
     pub fn pass<T: Pass>(&mut self, pass: &mut T) -> Result<State<T::TError>, ReidError> {
         let mut state = State::new();
         let mut scope = Scope::default();
-        pass.context(self, PassState::from(&mut state, &mut scope))?;
+        pass.context(self, PassState::from(&mut state, &mut scope, None))?;
         for module in &mut self.modules {
             module.pass(pass, &mut state, &mut scope.inner())?;
         }
@@ -277,10 +292,13 @@ impl Module {
         scope: &mut Scope<T::Data>,
     ) -> PassResult {
         for typedef in &self.typedefs {
-            let kind = match &typedef.kind {
-                TypeDefinitionKind::Struct(fields) => TypeDefinitionKind::Struct(fields.clone()),
-            };
-            scope.types.set(typedef.name.clone(), kind).ok();
+            scope
+                .types
+                .set(
+                    TypeKey(typedef.name.clone(), self.module_id),
+                    typedef.clone(),
+                )
+                .ok();
         }
 
         for function in &self.functions {
@@ -296,10 +314,10 @@ impl Module {
                 .ok();
         }
 
-        pass.module(self, PassState::from(state, scope))?;
+        pass.module(self, PassState::from(state, scope, Some(self.module_id)))?;
 
         for function in &mut self.functions {
-            function.pass(pass, state, &mut scope.inner())?;
+            function.pass(pass, state, &mut scope.inner(), self.module_id)?;
         }
         Ok(())
     }
@@ -311,6 +329,7 @@ impl FunctionDefinition {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
+        mod_id: SourceModuleId,
     ) -> PassResult {
         for param in &self.parameters {
             scope
@@ -325,12 +344,12 @@ impl FunctionDefinition {
                 .ok();
         }
 
-        pass.function(self, PassState::from(state, scope))?;
+        pass.function(self, PassState::from(state, scope, Some(mod_id)))?;
 
         match &mut self.kind {
             FunctionDefinitionKind::Local(block, _) => {
                 scope.return_type_hint = Some(self.return_type.clone());
-                block.pass(pass, state, scope)?;
+                block.pass(pass, state, scope, mod_id)?;
             }
             FunctionDefinitionKind::Extern(_) => {}
         };
@@ -344,14 +363,15 @@ impl Block {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
+        mod_id: SourceModuleId,
     ) -> PassResult {
         let mut scope = scope.inner();
 
         for statement in &mut self.statements {
-            statement.pass(pass, state, &mut scope)?;
+            statement.pass(pass, state, &mut scope, mod_id)?;
         }
 
-        pass.block(self, PassState::from(state, &mut scope))
+        pass.block(self, PassState::from(state, &mut scope, Some(mod_id)))
     }
 }
 
@@ -361,21 +381,22 @@ impl Statement {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
+        mod_id: SourceModuleId,
     ) -> PassResult {
         match &mut self.0 {
             StmtKind::Let(_, _, expression) => {
-                expression.pass(pass, state, scope)?;
+                expression.pass(pass, state, scope, mod_id)?;
             }
             StmtKind::Set(_, expression) => {
-                expression.pass(pass, state, scope)?;
+                expression.pass(pass, state, scope, mod_id)?;
             }
             StmtKind::Import(_) => {} // Never exists at this stage
             StmtKind::Expression(expression) => {
-                expression.pass(pass, state, scope)?;
+                expression.pass(pass, state, scope, mod_id)?;
             }
         }
 
-        pass.stmt(self, PassState::from(state, scope))?;
+        pass.stmt(self, PassState::from(state, scope, Some(mod_id)))?;
 
         match &mut self.0 {
             StmtKind::Let(variable_reference, mutable, _) => {
@@ -404,8 +425,9 @@ impl Expression {
         pass: &mut T,
         state: &mut State<T::TError>,
         scope: &mut Scope<T::Data>,
+        mod_id: SourceModuleId,
     ) -> PassResult {
-        pass.expr(self, PassState::from(state, scope))?;
+        pass.expr(self, PassState::from(state, scope, Some(mod_id)))?;
         Ok(())
     }
 }

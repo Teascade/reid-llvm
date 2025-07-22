@@ -1,8 +1,17 @@
 import std::print;
+import std::new_string;
+import std::add_char;
+import std::free_string;
 
 fn main() -> i32 {
-    let test = "hello world";
-    print(test);
+    let mut test = new_string();
+    add_char(&mut test, 'h');
+    add_char(&mut test, 'e');
+    add_char(&mut test, 'l');
+    add_char(&mut test, 'l');
+    add_char(&mut test, 'o');
+    
+    print(&test);
 
     return 0;
 }

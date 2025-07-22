@@ -345,7 +345,7 @@ impl Display for TypeKind {
                 Display::fmt(len, f)?;
                 f.write_char(']')
             }
-            TypeKind::CustomType(name) => write!(f, "{}", name),
+            TypeKind::CustomType(TypeKey(name, mod_id)) => write!(f, "{}:{}", mod_id, name),
             TypeKind::Borrow(type_kind, false) => {
                 write!(f, "&")?;
                 Display::fmt(type_kind, f)

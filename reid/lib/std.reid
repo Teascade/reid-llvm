@@ -1,6 +1,7 @@
 
 extern fn puts(message: *char) -> i32;
 extern fn malloc(size: u64) -> *u8;
+extern fn free(ptr: *u8);
 extern fn div(numerator: i32, denominator: i32) -> div_t;
 
 struct div_t {
@@ -8,8 +9,8 @@ struct div_t {
     remainder: i32,
 }
 
-pub fn print(message: *char) {
-    puts(message);
+pub fn print(message: &String) {
+    puts(*message.inner);
 }
 
 pub fn int_div(numerator: i32, denominator: i32) -> div_t {
@@ -20,6 +21,30 @@ pub fn allocate(size: u64) -> *u8 {
     malloc(size)
 }
 
-fn main() -> u16 {
-    return 0;
+struct String {
+    inner: *char,
+    length: u64,
+    max_length: u64,
+}
+
+pub fn new_string() -> String {
+    String {
+        inner: allocate(0),
+        length: 0,
+    }
+}
+
+pub fn add_char(string: &mut String, c: char) {
+    if ((*string).length + 1) >= (*string).max_length {
+        free((*string).inner as *u8);
+        (*string).max_length = (*string).max_length + 4;
+        (*string).inner = allocate((*string).max_length) as *char;
+    }
+    (*string).inner[(*string).length] = c;
+    (*string).inner[((*string).length + 1)] = '\0';
+    (*string).length = (*string).length + 1;
+}
+
+pub fn free_string(string: &mut String) {
+    free((*string).inner as *u8);
 }

@@ -42,8 +42,8 @@ pub enum ErrorKind {
     TriedIndexingNonIndexable(TypeKind),
     #[error("Index {0} out of bounds ({1})")]
     IndexOutOfBounds(u64, u64),
-    #[error("No such type {0} could be found")]
-    NoSuchType(String),
+    #[error("No such type {0} could be found in module {1}")]
+    NoSuchType(String, SourceModuleId),
     #[error("Attempted to access field of non-struct type of {0}")]
     TriedAccessingNonStruct(TypeKind),
     #[error("No such struct-field on type {0}")]
@@ -85,7 +85,13 @@ impl<'t> Pass for TypeCheck<'t> {
     fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) -> PassResult {
         let mut defmap = HashMap::new();
         for typedef in &module.typedefs {
-            let TypeDefinition { name, kind, meta } = &typedef;
+            let TypeDefinition {
+                name,
+                kind,
+                meta,
+                source_module,
+            } = &typedef;
+
             match kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
                     let mut fieldmap = HashMap::new();
@@ -132,7 +138,7 @@ fn check_typedefs_for_recursion<'a, 'b>(
     match &typedef.kind {
         TypeDefinitionKind::Struct(StructType(fields)) => {
             for field_ty in fields.iter().map(|StructField(_, ty, _)| ty) {
-                if let TypeKind::CustomType(name) = field_ty {
+                if let TypeKind::CustomType(TypeKey(name, _)) = field_ty {
                     if seen.contains(name) {
                         state.ok::<_, Infallible>(
                             Err(ErrorKind::RecursiveTypeDefinition(
@@ -319,7 +325,9 @@ impl Block {
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, &typerefs, None);
                     state.or_else(res, TypeKind::Void, expression.1);
-                    if let Ok((kind, _)) = expression.return_type(typerefs) {
+                    if let Ok((kind, _)) =
+                        expression.return_type(typerefs, state.module_id.unwrap())
+                    {
                         Some((kind, expression))
                     } else {
                         None
@@ -605,11 +613,11 @@ impl Expression {
                 let expr_ty =
                     state.or_else(expr_res, TypeKind::Vague(Vague::Unknown), expression.1);
 
-                if let TypeKind::CustomType(struct_name) = expr_ty {
+                if let TypeKind::CustomType(key) = expr_ty {
                     let struct_type = state
                         .scope
-                        .get_struct_type(&struct_name)
-                        .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?;
+                        .get_struct_type(&key)
+                        .ok_or(ErrorKind::NoSuchType(key.0.clone(), key.1))?;
                     if let Some(expr_field_ty) = struct_type.get_field_ty(&field_name) {
                         // Make sure they are the same
                         let true_ty = state.or_else(
@@ -628,10 +636,11 @@ impl Expression {
                 }
             }
             ExprKind::Struct(struct_name, items) => {
+                let type_key = TypeKey(struct_name.clone(), state.module_id.unwrap());
                 let struct_def = state
                     .scope
-                    .get_struct_type(struct_name)
-                    .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?
+                    .get_struct_type(&type_key)
+                    .ok_or(ErrorKind::NoSuchType(struct_name.clone(), type_key.1))?
                     .clone();
                 for (field_name, field_expr) in items {
                     // Get expected type, or error if field does not exist
@@ -654,7 +663,7 @@ impl Expression {
                     // Make sure both are the same type, report error if not
                     state.ok(expr_ty.collapse_into(&expr_ty), field_expr.1);
                 }
-                Ok(TypeKind::CustomType(struct_name.clone()))
+                Ok(TypeKind::CustomType(type_key))
             }
             ExprKind::Borrow(var_ref, mutable) => {
                 let scope_var = state.scope.variables.get(&var_ref.1).cloned();

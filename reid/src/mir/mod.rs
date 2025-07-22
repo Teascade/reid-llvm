@@ -18,7 +18,7 @@ pub mod typeinference;
 pub mod typerefs;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
-pub struct SourceModuleId(u32);
+pub struct SourceModuleId(pub u32);
 
 impl SourceModuleId {
     pub fn increment(&mut self) -> SourceModuleId {
@@ -77,6 +77,9 @@ impl TokenRange {
     }
 }
 
+#[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct TypeKey(pub String, pub SourceModuleId);
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypeKind {
     Bool,
@@ -100,7 +103,7 @@ pub enum TypeKind {
     F128PPC,
     Char,
     Array(Box<TypeKind>, u64),
-    CustomType(String),
+    CustomType(TypeKey),
     Borrow(Box<TypeKind>, bool),
     UserPtr(Box<TypeKind>),
     CodegenPtr(Box<TypeKind>),
@@ -335,6 +338,7 @@ pub struct TypeDefinition {
     pub name: String,
     pub kind: TypeDefinitionKind,
     pub meta: Metadata,
+    pub source_module: SourceModuleId,
 }
 
 #[derive(Debug, Clone)]

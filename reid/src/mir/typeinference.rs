@@ -14,7 +14,7 @@ use super::{
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
-    ReturnKind, StmtKind,
+    ReturnKind, StmtKind, TypeKey,
     TypeKind::*,
     VagueType::*,
 };
@@ -138,7 +138,7 @@ impl Block {
 
         // Fetch the declared return type
         let (kind, ty) = self
-            .return_type(inner_refs.types)
+            .return_type(inner_refs.types, state.module_id.unwrap())
             .ok()
             .unwrap_or((ReturnKind::Soft, Void));
         let mut ret_type_ref = outer_refs.from_type(&ty).unwrap();
@@ -320,11 +320,11 @@ impl Expression {
                 // need for further resolution.
                 let kind = expr_ty.resolve_weak().unwrap();
                 match kind {
-                    CustomType(name) => {
+                    CustomType(key) => {
                         let struct_ty = state
                             .scope
-                            .get_struct_type(&name)
-                            .ok_or(ErrorKind::NoSuchType(name.clone()))?;
+                            .get_struct_type(&key)
+                            .ok_or(ErrorKind::NoSuchType(key.0.clone(), key.1))?;
                         match struct_ty.get_field_ty(&field_name) {
                             Some(field_ty) => {
                                 let mut elem_ty = type_refs.from_type(&type_kind).unwrap();
@@ -339,10 +339,14 @@ impl Expression {
                 }
             }
             ExprKind::Struct(struct_name, fields) => {
+                let type_key = TypeKey(struct_name.clone(), state.module_id.unwrap());
                 let expected_struct_ty = state
                     .scope
-                    .get_struct_type(&struct_name)
-                    .ok_or(ErrorKind::NoSuchType(struct_name.clone()))?
+                    .get_struct_type(&type_key)
+                    .ok_or(ErrorKind::NoSuchType(
+                        struct_name.clone(),
+                        state.module_id.unwrap(),
+                    ))?
                     .clone();
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
@@ -361,7 +365,7 @@ impl Expression {
                     }
                 }
                 Ok(type_refs
-                    .from_type(&TypeKind::CustomType(struct_name.clone()))
+                    .from_type(&TypeKind::CustomType(type_key.clone()))
                     .unwrap())
             }
             ExprKind::Borrow(var, mutable) => {

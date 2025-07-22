@@ -2,7 +2,7 @@ use std::{path::PathBuf, process};
 
 use crate::{
     ast::{self},
-    mir::{self, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType},
+    mir::{self, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType, TypeKey},
 };
 
 impl mir::Context {
@@ -31,13 +31,13 @@ impl ast::Module {
                         return_type: signature
                             .return_type
                             .clone()
-                            .map(|r| r.0.into())
+                            .map(|r| r.0.into_mir(module_id))
                             .unwrap_or(mir::TypeKind::Void),
                         parameters: signature
                             .args
                             .iter()
                             .cloned()
-                            .map(|p| (p.0, p.1.into()))
+                            .map(|p| (p.0, p.1 .0.into_mir(module_id)))
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Local(
                             block.into_mir(module_id),
@@ -54,13 +54,13 @@ impl ast::Module {
                         return_type: signature
                             .return_type
                             .clone()
-                            .map(|r| r.0.into())
+                            .map(|r| r.0.into_mir(module_id))
                             .unwrap_or(mir::TypeKind::Void),
                         parameters: signature
                             .args
                             .iter()
                             .cloned()
-                            .map(|p| (p.0, p.1.into()))
+                            .map(|p| (p.0, p.1 .0.into_mir(module_id)))
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Extern(false),
                     };
@@ -77,7 +77,7 @@ impl ast::Module {
                                         .map(|s| {
                                             StructField(
                                                 s.name.clone(),
-                                                s.ty.clone().into(),
+                                                s.ty.clone().0.into_mir(module_id),
                                                 s.range.as_meta(module_id),
                                             )
                                         })
@@ -86,6 +86,7 @@ impl ast::Module {
                             }
                         },
                         meta: (*range).as_meta(module_id),
+                        source_module: module_id,
                     };
                     typedefs.push(def);
                 }
@@ -116,7 +117,7 @@ impl ast::Block {
                             s_let
                                 .ty
                                 .clone()
-                                .map(|t| t.0.into())
+                                .map(|t| t.0.into_mir(module_id))
                                 .unwrap_or(mir::TypeKind::Vague(mir::VagueType::Unknown)),
                             s_let.name.clone(),
                             s_let.name_range.as_meta(module_id),
@@ -256,9 +257,10 @@ impl ast::Expression {
                     Box::new(expr.process(module_id)),
                 ),
             },
-            ast::ExpressionKind::CastTo(expression, ty) => {
-                mir::ExprKind::CastTo(Box::new(expression.process(module_id)), ty.0.clone().into())
-            }
+            ast::ExpressionKind::CastTo(expression, ty) => mir::ExprKind::CastTo(
+                Box::new(expression.process(module_id)),
+                ty.0.clone().into_mir(module_id),
+            ),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))
@@ -294,9 +296,9 @@ impl ast::Literal {
     }
 }
 
-impl From<ast::TypeKind> for mir::TypeKind {
-    fn from(value: ast::TypeKind) -> Self {
-        match &value {
+impl ast::TypeKind {
+    fn into_mir(&self, source_mod: SourceModuleId) -> mir::TypeKind {
+        match &self {
             ast::TypeKind::Bool => mir::TypeKind::Bool,
             ast::TypeKind::I8 => mir::TypeKind::I8,
             ast::TypeKind::I16 => mir::TypeKind::I16,
@@ -309,14 +311,16 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::U64 => mir::TypeKind::U64,
             ast::TypeKind::U128 => mir::TypeKind::U128,
             ast::TypeKind::Array(type_kind, length) => {
-                mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
+                mir::TypeKind::Array(Box::new(type_kind.clone().into_mir(source_mod)), *length)
             }
-            ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(name.clone()),
+            ast::TypeKind::Custom(name) => {
+                mir::TypeKind::CustomType(TypeKey(name.clone(), source_mod))
+            }
             ast::TypeKind::Borrow(type_kind, mutable) => {
-                mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())), *mutable)
+                mir::TypeKind::Borrow(Box::new(type_kind.clone().into_mir(source_mod)), *mutable)
             }
             ast::TypeKind::Ptr(type_kind) => {
-                mir::TypeKind::UserPtr(Box::new(mir::TypeKind::from(*type_kind.clone())))
+                mir::TypeKind::UserPtr(Box::new(type_kind.clone().into_mir(source_mod)))
             }
             ast::TypeKind::F16 => mir::TypeKind::F16,
             ast::TypeKind::F32B => mir::TypeKind::F32B,
@@ -327,11 +331,5 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::F128PPC => mir::TypeKind::F128PPC,
             ast::TypeKind::Char => mir::TypeKind::Char,
         }
-    }
-}
-
-impl From<ast::Type> for mir::TypeKind {
-    fn from(value: ast::Type) -> Self {
-        value.0.into()
     }
 }
