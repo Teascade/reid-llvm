@@ -224,7 +224,7 @@ impl Parse for PrimaryExpression {
                     stream.expect(Token::BracketClose)?;
                     Expression(Kind::Array(expressions), stream.get_range().unwrap())
                 }
-                _ => Err(stream.expected_err("expression")?)?,
+                _ => Err(stream.expected_err("expression inner")?)?,
             }
         } else {
             Err(stream.expected_err("expression")?)?
@@ -662,14 +662,11 @@ impl Parse for BlockLevelStatement {
                 if let Ok(SetStatement(ident, expr, range)) = stream.parse() {
                     Stmt::Set(ident, expr, range)
                 } else {
-                    if let Ok(e) = stream.parse() {
-                        if stream.expect(Token::Semi).is_ok() {
-                            Stmt::Expression(e)
-                        } else {
-                            Stmt::Return(ReturnType::Soft, e)
-                        }
+                    let e = stream.parse()?;
+                    if stream.expect(Token::Semi).is_ok() {
+                        Stmt::Expression(e)
                     } else {
-                        Err(stream.expecting_err("expression")?)?
+                        Stmt::Return(ReturnType::Soft, e)
                     }
                 }
             }
