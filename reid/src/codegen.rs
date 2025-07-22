@@ -1177,8 +1177,9 @@ impl mir::IfExpression {
 
             let opt = else_block.codegen(&mut else_scope, state);
 
+            else_scope.block.terminate(Term::Br(after_bb)).ok();
+
             if let Some(ret) = opt {
-                else_scope.block.terminate(Term::Br(after_bb)).ok();
                 Some(ret)
             } else {
                 None

@@ -105,10 +105,22 @@ impl BlockHolder {
         }
         writeln!(f, "{} ({:?}):", self.data.name, self.value)?;
 
+        let mut state = Default::default();
+        let mut inner = PadAdapter::wrap(f, &mut state);
+
         for instr in &self.instructions {
-            let mut state = Default::default();
-            let mut inner = PadAdapter::wrap(f, &mut state);
             instr.builder_fmt(&mut inner, builder, debug)?;
+        }
+
+        if let Some(terminator) = &self.data.terminator {
+            terminator.builder_fmt(&mut inner, builder, debug)?;
+        }
+        if let Some(location) = self.data.terminator_location {
+            writeln!(
+                inner,
+                "  ^  (At {}) ",
+                debug.as_ref().unwrap().get_location(location)
+            )?;
         }
 
         Ok(())
@@ -152,6 +164,24 @@ impl InstructionHolder {
         writeln!(f)?;
 
         Ok(())
+    }
+}
+
+impl TerminatorKind {
+    fn builder_fmt(
+        &self,
+        f: &mut impl std::fmt::Write,
+        builder: &Builder,
+        debug: &Option<DebugInformation>,
+    ) -> std::fmt::Result {
+        match self {
+            TerminatorKind::Ret(instr) => writeln!(f, "ret {:?}", instr),
+            TerminatorKind::RetVoid => writeln!(f, "ret void"),
+            TerminatorKind::Br(block) => writeln!(f, "br {:?}", block),
+            TerminatorKind::CondBr(instr, lhs, rhs) => {
+                writeln!(f, "condbr {:?}, {:?} or {:?}", instr, lhs, rhs)
+            }
+        }
     }
 }
 
