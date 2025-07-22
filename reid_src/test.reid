@@ -1,12 +1,7 @@
-fn vec_sub(l: [f32; 3], r: [f32; 3]) -> [f32; 3] {
-    return [l[0]-r[0], l[1]-r[1], l[2]-r[2]];
-}
+fn foo() -> f32 { return 1.0; }
 
-fn foo(x: f32) {
-    let a = [x, x, 0.0];
-    let b = [x, x, x]; // works
-    // let b = [x * 0.5, x * 0.5, x]; // does not work
-    vec_sub(a, b);
+fn main() -> u8 {
+    let mut a = 0;
+    a = (foo() * 1.0) as u8;
+    return a;
 }
-
-fn main() {}

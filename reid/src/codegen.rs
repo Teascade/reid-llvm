@@ -672,7 +672,7 @@ impl mir::Expression {
                 };
                 Some(StackValue(
                     StackValueKind::Immutable(scope.block.build(instr).unwrap()),
-                    TypeKind::U32,
+                    lhs_type,
                 ))
             }
             mir::ExprKind::FunctionCall(call) => {
