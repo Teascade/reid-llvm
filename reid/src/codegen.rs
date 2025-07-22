@@ -15,7 +15,7 @@ use reid_lib::{
 };
 
 use crate::{
-    error_raporting::ModuleMap,
+    error_raporting::ErrorModules,
     lexer::{FullToken, Position},
     mir::{
         self, implement::TypeCategory, Metadata, NamedVariableRef, SourceModuleId, StructField,
@@ -40,24 +40,10 @@ impl<'ctx> CodegenContext<'ctx> {
 
 impl mir::Context {
     /// Compile MIR [`Context`] into [`CodegenContext`] containing LLIR.
-    pub fn codegen<'ctx>(
-        &self,
-        context: &'ctx Context,
-        mod_map: &ModuleMap,
-    ) -> CodegenContext<'ctx> {
+    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
         let mut modules = Vec::new();
-        for module in &self.modules {
-            modules.push(
-                module.codegen(
-                    context,
-                    mod_map
-                        .module(&module.module_id)
-                        .unwrap()
-                        .tokens
-                        .as_ref()
-                        .unwrap(),
-                ),
-            );
+        for (_, module) in &self.modules {
+            modules.push(module.codegen(context));
         }
         CodegenContext { context }
     }
@@ -198,12 +184,9 @@ impl Default for State {
 }
 
 impl mir::Module {
-    fn codegen<'ctx>(
-        &self,
-        context: &'ctx Context,
-        tokens: &Vec<FullToken>,
-    ) -> ModuleCodegen<'ctx> {
+    fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name, self.is_main);
+        let tokens = &self.tokens;
 
         let (debug, compile_unit) = if let Some(path) = &self.path {
             module.create_debug_info(DebugFileData {
@@ -252,19 +235,24 @@ impl mir::Module {
         insert_debug!(&TypeKind::Char);
 
         for typedef in &self.typedefs {
-            let type_key = TypeKey(typedef.name.clone(), self.module_id);
-            let type_value = match &typedef.kind {
-                TypeDefinitionKind::Struct(StructType(fields)) => {
-                    module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
-                        typedef.name.clone(),
-                        fields
-                            .iter()
-                            // TODO: Reorder custom-type definitions such that
-                            // inner types get evaluated first. Otherwise this
-                            // will cause a panic!
-                            .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
-                            .collect(),
-                    )))
+            let type_key = TypeKey(typedef.name.clone(), typedef.source_module);
+
+            let type_value = if typedef.source_module != self.module_id {
+                todo!()
+            } else {
+                match &typedef.kind {
+                    TypeDefinitionKind::Struct(StructType(fields)) => {
+                        module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
+                            typedef.name.clone(),
+                            fields
+                                .iter()
+                                // TODO: Reorder custom-type definitions such that
+                                // inner types get evaluated first. Otherwise this
+                                // will cause a panic!
+                                .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
+                                .collect(),
+                        )))
+                    }
                 }
             };
             types.insert(type_value, typedef.clone());
@@ -891,6 +879,7 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
 
+                dbg!(&expression);
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
@@ -1034,7 +1023,13 @@ impl mir::Expression {
                             panic!("Variable was not a pointer?!?")
                         }
                     } else {
-                        StackValue(v.0.derive(var_ptr_instr), *ptr_inner.clone())
+                        let TypeKind::Borrow(borrow_inner, mutable) = *ptr_inner.clone() else {
+                            panic!();
+                        };
+                        StackValue(
+                            StackValueKind::mutable(mutable, var_ptr_instr),
+                            *borrow_inner.clone(),
+                        )
                     }
                 })
             }

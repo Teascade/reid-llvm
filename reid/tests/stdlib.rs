@@ -14,7 +14,7 @@ fn compiles() {
 #[test]
 fn passes_all_passes() {
     let mut map = Default::default();
-    let Ok((mut std, _)) = compile_std(&mut map) else {
+    let Ok(mut std) = compile_std(&mut map) else {
         panic!()
     };
 
@@ -22,10 +22,7 @@ fn passes_all_passes() {
     std.is_main = true;
 
     assert_err(perform_all_passes(
-        &mut mir::Context {
-            modules: vec![std],
-            base: Default::default(),
-        },
+        &mut mir::Context::from(vec![std], Default::default()),
         &mut map,
     ));
 }

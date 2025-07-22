@@ -10,13 +10,10 @@ mod util;
 fn test(source: &str, name: &str) {
     let mut map = Default::default();
     let (id, tokens) = assert_err(parse_module(source, name, &mut map));
-    let module = assert_err(compile_module(id, &tokens, &mut map, None, true));
+    let module = assert_err(compile_module(id, tokens, &mut map, None, true));
 
     assert_err(perform_all_passes(
-        &mut mir::Context {
-            modules: vec![module],
-            base: Default::default(),
-        },
+        &mut mir::Context::from(vec![module], Default::default()),
         &mut map,
     ));
 }

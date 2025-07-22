@@ -9,8 +9,7 @@ use std::{
 
 use crate::{
     compile_module,
-    error_raporting::{ModuleMap, ReidError},
-    lexer::FullToken,
+    error_raporting::{ErrorModules, ReidError},
     mir::{SourceModuleId, TypeDefinition, TypeKey, TypeKind},
     parse_module,
 };
@@ -47,22 +46,21 @@ pub enum ErrorKind {
     FunctionIsPrivate(String, String),
 }
 
-pub fn compile_std(
-    module_map: &mut ModuleMap,
-) -> Result<(super::Module, Vec<FullToken>), ReidError> {
+pub fn compile_std(module_map: &mut ErrorModules) -> Result<Module, ReidError> {
     let (id, tokens) = parse_module(STD_SOURCE, "standard_library", module_map)?;
-    let module = compile_module(id, &tokens, module_map, None, false)?;
+    let module = compile_module(id, tokens, module_map, None, false)?;
 
+    let module_id = module.module_id;
     let mut mir_context = super::Context::from(vec![module], Default::default());
 
-    let std_compiled = mir_context.modules.remove(0);
-    Ok((std_compiled, tokens))
+    let std_compiled = mir_context.modules.remove(&module_id).unwrap();
+    Ok(std_compiled)
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct LinkerPass<'map> {
-    pub module_map: &'map mut ModuleMap,
+    pub module_map: &'map mut ErrorModules,
     pub is_lib: bool,
 }
 
@@ -72,16 +70,15 @@ impl<'map> Pass for LinkerPass<'map> {
     type Data = ();
     type TError = ErrorKind;
     fn context(&mut self, context: &mut Context, mut state: LinkerPassState) -> PassResult {
-        let mains = context
-            .modules
-            .iter_mut()
-            .filter(|m| m.is_main)
+        let mains = (&mut context.modules)
+            .into_iter()
+            .filter(|(_, module)| module.is_main)
             .collect::<Vec<_>>();
         if mains.len() > 1 {
             state.note_errors(&vec![ErrorKind::MultipleMainsAtStart], Metadata::default());
             return Ok(());
         }
-        if let Some(main) = mains.first() {
+        if let Some((_, main)) = mains.first() {
             if let None = main.functions.iter().find(|f| f.name == "main") {
                 if !self.is_lib {
                     state.note_errors(&vec![ErrorKind::NoMainFunction], Metadata::default());
@@ -95,26 +92,19 @@ impl<'map> Pass for LinkerPass<'map> {
             }
         };
 
-        let mut modules = HashMap::<String, Rc<RefCell<_>>>::new();
+        let mut modules = HashMap::<SourceModuleId, Rc<RefCell<_>>>::new();
+        let mut module_ids = HashMap::<String, SourceModuleId>::new();
 
-        for module in context.modules.drain(..) {
-            let tokens = self
-                .module_map
-                .module(&module.module_id)
-                .unwrap()
-                .tokens
-                .clone()
-                .unwrap();
-            modules.insert(module.name.clone(), Rc::new(RefCell::new((module, tokens))));
+        for (mod_id, module) in context.modules.drain() {
+            modules.insert(mod_id, Rc::new(RefCell::new(module)));
         }
 
-        let mut modules_to_process: Vec<Rc<RefCell<(Module, Vec<FullToken>)>>> =
-            modules.values().cloned().collect();
+        let mut modules_to_process: Vec<Rc<RefCell<_>>> = modules.values().cloned().collect();
 
         while let Some(module) = modules_to_process.pop() {
             let mut importer_module = module.borrow_mut();
 
-            for import in importer_module.0.imports.clone() {
+            for import in importer_module.imports.clone() {
                 let Import(path, _) = &import;
                 if path.len() != 2 {
                     state.ok::<_, Infallible>(
@@ -125,14 +115,18 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 let module_name = unsafe { path.get_unchecked(0) };
 
-                let mut imported = if let Some(module) = modules.get_mut(module_name) {
+                let mut imported = if let Some(module) =
+                    modules.get_mut(module_ids.get(module_name).unwrap())
+                {
                     module
                 } else if module_name == "std" {
+                    let std = compile_std(&mut self.module_map)?;
                     modules.insert(
-                        "std".to_owned(),
+                        std.module_id,
                         Rc::new(RefCell::new(compile_std(&mut self.module_map)?)),
                     );
-                    modules.get("std").unwrap()
+                    module_ids.insert(std.name, std.module_id);
+                    modules.get(&std.module_id).unwrap()
                 } else {
                     let file_path =
                         PathBuf::from(&context.base.clone()).join(module_name.to_owned() + ".reid");
@@ -160,8 +154,7 @@ impl<'map> Pass for LinkerPass<'map> {
                             }
                         };
 
-                    match compile_module(id, &tokens, &mut self.module_map, Some(file_path), false)
-                    {
+                    match compile_module(id, tokens, &mut self.module_map, Some(file_path), false) {
                         Ok(imported_module) => {
                             if imported_module.is_main {
                                 state.ok::<_, Infallible>(
@@ -170,12 +163,11 @@ impl<'map> Pass for LinkerPass<'map> {
                                 );
                                 continue;
                             }
-                            let module_name = imported_module.name.clone();
-                            modules.insert(
-                                module_name.clone(),
-                                Rc::new(RefCell::new((imported_module, tokens))),
-                            );
-                            let imported = modules.get_mut(&module_name).unwrap();
+                            let module_id = imported_module.module_id;
+                            module_ids
+                                .insert(imported_module.name.clone(), imported_module.module_id);
+                            modules.insert(module_id, Rc::new(RefCell::new(imported_module)));
+                            let imported = modules.get_mut(&module_id).unwrap();
                             modules_to_process.push(imported.clone());
                             imported
                         }
@@ -194,13 +186,9 @@ impl<'map> Pass for LinkerPass<'map> {
                 .borrow_mut();
 
                 let func_name = unsafe { path.get_unchecked(1) };
-                let imported_mod_name = imported.0.name.clone();
+                let imported_mod_name = imported.name.clone();
 
-                let Some(func) = imported
-                    .0
-                    .functions
-                    .iter_mut()
-                    .find(|f| f.name == *func_name)
+                let Some(func) = imported.functions.iter_mut().find(|f| f.name == *func_name)
                 else {
                     state.ok::<_, Infallible>(
                         Err(ErrorKind::NoSuchFunctionInModule(
@@ -228,7 +216,6 @@ impl<'map> Pass for LinkerPass<'map> {
                 func.is_imported = true;
 
                 if let Some(existing) = importer_module
-                    .0
                     .functions
                     .iter()
                     .find(|f| f.name == *func_name)
@@ -304,8 +291,8 @@ impl<'map> Pass for LinkerPass<'map> {
                 let mut seen = HashSet::new();
                 seen.extend(imported_types.clone());
 
-                let imported_mod_id = imported.0.module_id;
-                let imported_mod_typedefs = &mut imported.0.typedefs;
+                let imported_mod_id = imported.module_id;
+                let imported_mod_typedefs = &mut imported.typedefs;
 
                 for typekey in imported_types.clone() {
                     let typedef = imported_mod_typedefs
@@ -323,10 +310,10 @@ impl<'map> Pass for LinkerPass<'map> {
                         .unwrap()
                         .clone();
 
-                    importer_module.0.typedefs.push(typedef.clone());
+                    importer_module.typedefs.push(typedef.clone());
                 }
 
-                importer_module.0.functions.push(FunctionDefinition {
+                importer_module.functions.push(FunctionDefinition {
                     name: func_name,
                     is_pub: false,
                     is_imported: false,
@@ -337,9 +324,9 @@ impl<'map> Pass for LinkerPass<'map> {
             }
         }
 
-        context.modules = modules
+        let modules: Vec<Module> = modules
             .into_values()
-            .map(|v| Rc::into_inner(v).unwrap().into_inner().0)
+            .map(|v| Rc::into_inner(v).unwrap().into_inner())
             .collect();
 
         Ok(())

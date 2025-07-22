@@ -6,7 +6,7 @@ use super::*;
 
 impl Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for module in &self.modules {
+        for (_, module) in &self.modules {
             Display::fmt(&module, f)?;
         }
         Ok(())

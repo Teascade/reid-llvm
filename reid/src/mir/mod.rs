@@ -354,11 +354,14 @@ pub struct Module {
     pub functions: Vec<FunctionDefinition>,
     pub typedefs: Vec<TypeDefinition>,
     pub path: Option<PathBuf>,
+    pub tokens: Vec<FullToken>,
     pub is_main: bool,
 }
 
+pub type ModuleMap = HashMap<SourceModuleId, Module>;
+
 #[derive(Debug)]
 pub struct Context {
-    pub modules: Vec<Module>,
+    pub modules: ModuleMap,
     pub base: PathBuf,
 }

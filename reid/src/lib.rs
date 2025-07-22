@@ -43,7 +43,7 @@
 
 use std::path::PathBuf;
 
-use error_raporting::{ErrorKind as ErrorRapKind, ModuleMap, ReidError};
+use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
 use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
@@ -64,7 +64,7 @@ mod util;
 pub fn parse_module<'map, T: Into<String>>(
     source: &str,
     name: T,
-    map: &'map mut ModuleMap,
+    map: &'map mut ErrorModules,
 ) -> Result<(mir::SourceModuleId, Vec<FullToken>), ReidError> {
     let id = map.add_module(name.into()).unwrap();
     map.set_source(id, source.to_owned());
@@ -81,8 +81,8 @@ pub fn parse_module<'map, T: Into<String>>(
 
 pub fn compile_module<'map>(
     module_id: mir::SourceModuleId,
-    tokens: &Vec<FullToken>,
-    map: &'map mut ModuleMap,
+    tokens: Vec<FullToken>,
+    map: &'map mut ErrorModules,
     path: Option<PathBuf>,
     is_main: bool,
 ) -> Result<mir::Module, ReidError> {
@@ -101,8 +101,11 @@ pub fn compile_module<'map>(
         statements.push(statement);
     }
 
+    drop(token_stream);
+
     let ast_module = ast::Module {
         name: module.name,
+        tokens: tokens,
         top_level_statements: statements,
         path,
         is_main,
@@ -113,7 +116,7 @@ pub fn compile_module<'map>(
 
 pub fn perform_all_passes<'map>(
     context: &mut mir::Context,
-    module_map: &'map mut ModuleMap,
+    module_map: &'map mut ErrorModules,
 ) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
     dbg!(&context);
@@ -193,13 +196,13 @@ pub fn perform_all_passes<'map>(
 pub fn compile_and_pass<'map>(
     source: &str,
     path: PathBuf,
-    module_map: &'map mut ModuleMap,
+    module_map: &'map mut ErrorModules,
 ) -> Result<CompileOutput, ReidError> {
     let path = path.canonicalize().unwrap();
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
     let (id, tokens) = parse_module(source, name, module_map)?;
-    let module = compile_module(id, &tokens, module_map, Some(path.clone()), true)?;
+    let module = compile_module(id, tokens, module_map, Some(path.clone()), true)?;
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
 
@@ -211,7 +214,7 @@ pub fn compile_and_pass<'map>(
     println!("{}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
-    let codegen_modules = mir_context.codegen(&mut context, &module_map);
+    let codegen_modules = mir_context.codegen(&mut context);
 
     #[cfg(debug_assertions)]
     println!("{}", &codegen_modules.context);
@@ -221,6 +224,6 @@ pub fn compile_and_pass<'map>(
 }
 
 pub fn compile_simple(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> {
-    let mut map = ModuleMap::default();
+    let mut map = ErrorModules::default();
     compile_and_pass(source, path, &mut map)
 }

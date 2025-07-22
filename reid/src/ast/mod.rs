@@ -3,7 +3,7 @@
 //! used for unwrapping syntax sugar, and then be transformed into Reid MIR.
 use std::path::PathBuf;
 
-use crate::token_stream::TokenRange;
+use crate::{lexer::FullToken, token_stream::TokenRange};
 
 pub mod parse;
 pub mod process;
@@ -206,6 +206,7 @@ pub enum TopLevelStatement {
 #[derive(Debug)]
 pub struct Module {
     pub name: String,
+    pub tokens: Vec<FullToken>,
     pub top_level_statements: Vec<TopLevelStatement>,
     pub path: Option<PathBuf>,
     pub is_main: bool,

@@ -1,18 +1,25 @@
-use std::{path::PathBuf, process};
+use std::path::PathBuf;
 
 use crate::{
     ast::{self},
-    mir::{self, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType, TypeKey},
+    mir::{
+        self, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType,
+        TypeKey,
+    },
 };
 
 impl mir::Context {
     pub fn from(modules: Vec<mir::Module>, base: PathBuf) -> mir::Context {
-        mir::Context { modules, base }
+        let mut map = ModuleMap::new();
+        for module in modules {
+            map.insert(module.module_id, module);
+        }
+        mir::Context { modules: map, base }
     }
 }
 
 impl ast::Module {
-    pub fn process(&self, module_id: SourceModuleId) -> mir::Module {
+    pub fn process(self, module_id: SourceModuleId) -> mir::Module {
         let mut imports = Vec::new();
         let mut functions = Vec::new();
         let mut typedefs = Vec::new();
@@ -100,6 +107,7 @@ impl ast::Module {
             functions,
             path: self.path.clone(),
             is_main: self.is_main,
+            tokens: self.tokens,
             typedefs,
         }
     }

@@ -63,24 +63,24 @@ impl PartialOrd for ErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Module {
+pub struct ErrorModule {
     pub name: String,
     pub tokens: Option<Vec<FullToken>>,
     pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ModuleMap {
-    module_map: HashMap<mir::SourceModuleId, Module>,
+pub struct ErrorModules {
+    module_map: HashMap<mir::SourceModuleId, ErrorModule>,
     module_counter: mir::SourceModuleId,
 }
 
-impl ModuleMap {
+impl ErrorModules {
     pub fn add_module<T: Into<String>>(&mut self, name: T) -> Option<mir::SourceModuleId> {
         let id = self.module_counter.increment();
         self.module_map.insert(
             id,
-            Module {
+            ErrorModule {
                 name: name.into(),
                 tokens: None,
                 source: None,
@@ -101,21 +101,21 @@ impl ModuleMap {
         }
     }
 
-    pub fn module(&self, id: &mir::SourceModuleId) -> Option<&Module> {
+    pub fn module(&self, id: &mir::SourceModuleId) -> Option<&ErrorModule> {
         self.module_map.get(id)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReidError {
-    map: ModuleMap,
+    map: ErrorModules,
     errors: Vec<ErrorKind>,
 }
 
 impl ReidError {
     pub fn from_lexer<U>(
         result: Result<U, lexer::Error>,
-        map: ModuleMap,
+        map: ErrorModules,
         module: SourceModuleId,
     ) -> Result<U, ReidError> {
         result.map_err(|error| {
@@ -136,7 +136,7 @@ impl ReidError {
 
     pub fn from_parser<U>(
         result: Result<U, token_stream::Error>,
-        map: ModuleMap,
+        map: ErrorModules,
         module: SourceModuleId,
     ) -> Result<U, ReidError> {
         result.map_err(|error| {
@@ -155,7 +155,7 @@ impl ReidError {
         })
     }
 
-    pub fn from_kind<U>(errors: Vec<ErrorKind>, map: ModuleMap) -> ReidError {
+    pub fn from_kind<U>(errors: Vec<ErrorKind>, map: ErrorModules) -> ReidError {
         ReidError { map, errors }
     }
 }
