@@ -10,7 +10,7 @@ use std::{
 use crate::{
     compile_module,
     error_raporting::{ErrorModules, ReidError},
-    mir::{SourceModuleId, TypeDefinition, CustomTypeKey, TypeKind},
+    mir::{CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind},
     parse_module,
 };
 
@@ -232,7 +232,7 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
 
-                fn import_type(base: &String, ty: &TypeKind) -> (TypeKind, Vec<CustomTypeKey>) {
+                fn import_type(_: &String, ty: &TypeKind) -> (TypeKind, Vec<CustomTypeKey>) {
                     let mut imported_types = Vec::new();
                     let ty = match &ty {
                         TypeKind::CustomType(key) => {

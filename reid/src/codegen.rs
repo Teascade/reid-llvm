@@ -1,12 +1,12 @@
-use std::{array, collections::HashMap, hash::Hash, mem};
+use std::{collections::HashMap, mem};
 
 use reid_lib::{
-    builder::{InstructionValue, ModuleValue, TypeValue},
+    builder::{InstructionValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugFileData, DebugInformation,
-        DebugLocalVariable, DebugLocation, DebugMetadata, DebugParamVariable, DebugPointerType,
-        DebugPosition, DebugProgramValue, DebugRecordKind, DebugStructType, DebugSubprogramData,
+        DebugLocalVariable, DebugLocation, DebugMetadata, DebugPointerType, DebugPosition,
+        DebugProgramValue, DebugRecordKind, DebugStructType, DebugSubprogramData,
         DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DebugTypeValue,
         DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
@@ -15,12 +15,10 @@ use reid_lib::{
 };
 
 use crate::{
-    error_raporting::ErrorModules,
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, CustomTypeKey, Metadata, ModuleMap, NamedVariableRef,
-        SourceModuleId, StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind,
-        VagueLiteral,
+        self, implement::TypeCategory, CustomTypeKey, Metadata, NamedVariableRef, SourceModuleId,
+        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
     },
 };
 
@@ -57,9 +55,6 @@ impl mir::Context {
 #[derive(Clone)]
 struct ModuleCodegen<'ctx> {
     module: Module<'ctx>,
-    tokens: &'ctx Vec<FullToken>,
-    debug_types: Option<HashMap<TypeKind, DebugTypeValue>>,
-    type_values: HashMap<CustomTypeKey, TypeValue>,
 }
 
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
@@ -456,12 +451,7 @@ impl mir::Module {
             }
         }
 
-        ModuleCodegen {
-            module,
-            debug_types: Some(debug_types),
-            type_values,
-            tokens: &self.tokens,
-        }
+        ModuleCodegen { module }
     }
 }
 

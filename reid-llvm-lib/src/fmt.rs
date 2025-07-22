@@ -131,7 +131,7 @@ impl InstructionHolder {
     fn builder_fmt(
         &self,
         f: &mut impl std::fmt::Write,
-        builder: &Builder,
+        _builder: &Builder,
         debug: &Option<DebugInformation>,
     ) -> std::fmt::Result {
         if let Some(record) = &self.record {
@@ -171,8 +171,8 @@ impl TerminatorKind {
     fn builder_fmt(
         &self,
         f: &mut impl std::fmt::Write,
-        builder: &Builder,
-        debug: &Option<DebugInformation>,
+        _builder: &Builder,
+        _debug: &Option<DebugInformation>,
     ) -> std::fmt::Result {
         match self {
             TerminatorKind::Ret(instr) => writeln!(f, "ret {:?}", instr),

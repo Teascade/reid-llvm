@@ -2,10 +2,7 @@ use std::fmt::{Debug, Display, Write};
 
 use crate::pad_adapter::PadAdapter;
 
-use super::{
-    typerefs::{TypeRef, TypeRefs},
-    *,
-};
+use super::{typerefs::TypeRefs, *};
 
 impl Display for TypeRefs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

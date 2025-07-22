@@ -9,7 +9,6 @@ use std::{convert::Infallible, iter};
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    implement::pick_return,
     pass::{Pass, PassResult, PassState},
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},

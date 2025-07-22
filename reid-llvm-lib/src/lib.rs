@@ -7,10 +7,8 @@ use std::{fmt::Debug, marker::PhantomData};
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
 use debug_information::{
     DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
-    InstructionDebugRecordData,
 };
 use fmt::PrintableModule;
-use util::match_types;
 
 pub mod builder;
 pub mod compile;
