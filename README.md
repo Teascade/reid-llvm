@@ -41,7 +41,8 @@ Currently missing big features (TODOs) are:
 - ~~Pointers~~ (DONE)
 - ~~Unary operators~~
 - ~~Floats~~ (DONE)
-- Type casting
+- ~~Type casting~~ (DONE)
+- Built-in Int/Float division and modulo
 - Loops
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions
@@ -53,7 +54,6 @@ Big features that I want later but are not necessary:
 
 Smaller features:
 - Hex-numbers
-- Built-in Int/Float division and modulo
 - Bitwise operations
 - Easier way to initialize arrays with a single value
 - Void-returns (`return;` for void-returning functions)
