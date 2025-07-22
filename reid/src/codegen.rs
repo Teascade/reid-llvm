@@ -641,9 +641,8 @@ impl mir::Expression {
                     (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
                     (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
                     (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
-                    (mir::BinaryOperator::Cmp(i), _, false) => {
-                        Instr::ICmp(i.int_predicate(), lhs, rhs)
-                    }
+                    (mir::BinaryOperator::Cmp(i), _, false) => Instr::ICmp(i.predicate(), lhs, rhs),
+                    (mir::BinaryOperator::Cmp(i), _, true) => Instr::FCmp(i.predicate(), lhs, rhs),
                     _ => todo!(),
                 };
                 Some(StackValue(
@@ -771,7 +770,7 @@ impl mir::Expression {
                         *further_inner,
                     )
                 } else {
-                    let TypeKind::Array(elem_ty, _) = *inner else {
+                    let TypeKind::Array(_, _) = *inner else {
                         panic!();
                     };
                     (
@@ -1157,7 +1156,7 @@ impl mir::IfExpression {
     }
 }
 impl mir::CmpOperator {
-    fn int_predicate(&self) -> CmpPredicate {
+    fn predicate(&self) -> CmpPredicate {
         match self {
             mir::CmpOperator::LT => CmpPredicate::LT,
             mir::CmpOperator::GT => CmpPredicate::GT,
@@ -1199,7 +1198,7 @@ impl mir::Literal {
             mir::Literal::F80(val) => ConstValue::F80(val),
             mir::Literal::F128(val) => ConstValue::F128(val),
             mir::Literal::F128PPC(val) => ConstValue::F128PPC(val),
-            mir::Literal::Char(c) => todo!(),
+            mir::Literal::Char(c) => ConstValue::U8(c as u8),
         })
     }
 }
