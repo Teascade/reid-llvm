@@ -389,6 +389,7 @@ impl Builder {
                         return Err(()); // TODO error: invalid amount of params
                     }
                     for (a, b) in param_types.iter().zip(params) {
+                        dbg!(&a, &b.get_type(&self));
                         if *a != b.get_type(&self)? {
                             return Err(()); // TODO error: params do not match
                         }
@@ -478,7 +479,7 @@ impl Builder {
                 Instr::SIToFP(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::PtrToInt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::IntToPtr(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
-                Instr::BitCast(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::BitCast(instr, ty) => Ok(()),
             }
         }
     }
@@ -628,7 +629,7 @@ impl InstructionValue {
                 SIToFP(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
                 PtrToInt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
                 IntToPtr(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
-                BitCast(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                BitCast(_, ty) => Ok(ty.clone()),
             }
         }
     }

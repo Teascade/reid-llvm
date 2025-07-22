@@ -521,7 +521,7 @@ impl ConstValue {
             ConstValue::U32(_) => U32,
             ConstValue::U64(_) => U64,
             ConstValue::U128(_) => U128,
-            ConstValue::Str(_) => Type::Ptr(Box::new(I8)),
+            ConstValue::Str(_) => Type::Ptr(Box::new(U8)),
             ConstValue::Bool(_) => Bool,
             ConstValue::F16(_) => F16,
             ConstValue::F32B(_) => F32B,

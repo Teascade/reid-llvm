@@ -6,7 +6,7 @@ use reid_lib::{
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugFileData, DebugInformation,
         DebugLocalVariable, DebugLocation, DebugMetadata, DebugParamVariable, DebugPointerType,
-        DebugProgramValue, DebugRecordKind, DebugStructType, DebugSubprogramData,
+        DebugPosition, DebugProgramValue, DebugRecordKind, DebugStructType, DebugSubprogramData,
         DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DebugTypeValue,
         DwarfEncoding, DwarfFlags, InstructionDebugRecordData,
     },
@@ -57,6 +57,8 @@ impl mir::Context {
 #[derive(Clone)]
 struct ModuleCodegen<'ctx> {
     module: Module<'ctx>,
+    tokens: &'ctx Vec<FullToken>,
+    debug_types: Option<HashMap<TypeKind, DebugTypeValue>>,
     type_values: HashMap<TypeKey, TypeValue>,
 }
 
@@ -194,7 +196,7 @@ impl Default for State {
 
 impl mir::Module {
     fn codegen<'ctx>(
-        &self,
+        &'ctx self,
         context: &'ctx Context,
         modules: HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
     ) -> ModuleCodegen<'ctx> {
@@ -227,7 +229,9 @@ impl mir::Module {
                         &debug_types,
                         &type_values,
                         &types,
-                        tokens,
+                        self.module_id,
+                        &self.tokens,
+                        &modules,
                     ),
                 )
             };
@@ -247,29 +251,23 @@ impl mir::Module {
         insert_debug!(&TypeKind::Void);
         insert_debug!(&TypeKind::Char);
 
-        for typedef in &self.typedefs {
+        let mut typedefs = self.typedefs.clone();
+        typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
+
+        for typedef in typedefs {
             let type_key = TypeKey(typedef.name.clone(), typedef.source_module);
-            let type_value = if typedef.source_module != self.module_id {
-                *modules
-                    .get(&typedef.source_module)
-                    .unwrap()
-                    .type_values
-                    .get(&type_key)
-                    .unwrap()
-            } else {
-                match &typedef.kind {
-                    TypeDefinitionKind::Struct(StructType(fields)) => {
-                        module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
-                            typedef.name.clone(),
-                            fields
-                                .iter()
-                                // TODO: Reorder custom-type definitions such that
-                                // inner types get evaluated first. Otherwise this
-                                // will cause a panic!
-                                .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
-                                .collect(),
-                        )))
-                    }
+            let type_value = match &typedef.kind {
+                TypeDefinitionKind::Struct(StructType(fields)) => {
+                    module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
+                        typedef.name.clone(),
+                        fields
+                            .iter()
+                            // TODO: Reorder custom-type definitions such that
+                            // inner types get evaluated first. Otherwise this
+                            // will cause a panic!
+                            .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
+                            .collect(),
+                    )))
                 }
             };
             types.insert(type_value, typedef.clone());
@@ -316,120 +314,128 @@ impl mir::Module {
 
         for mir_function in &self.functions {
             let function = functions.get(&mir_function.name).unwrap();
-            let mut entry = function.ir.block("entry");
-
-            // Insert debug information
-            let debug_scope = if let Some(location) =
-                mir_function.signature().into_debug(tokens, compile_unit)
-            {
-                // let debug_scope = debug.inner_scope(&outer_scope, location);
-
-                let fn_param_ty = &mir_function.return_type.get_debug_type_hard(
-                    compile_unit,
-                    &debug,
-                    &debug_types,
-                    &type_values,
-                    &types,
-                    tokens,
-                );
-
-                let debug_ty = debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
-                    parameters: vec![*fn_param_ty],
-                    flags: DwarfFlags,
-                }));
-
-                let subprogram = debug.subprogram(DebugSubprogramData {
-                    name: mir_function.name.clone(),
-                    outer_scope: compile_unit.clone(),
-                    location,
-                    ty: debug_ty,
-                    opts: DebugSubprogramOptionals {
-                        is_local: !mir_function.is_pub,
-                        is_definition: true,
-                        ..DebugSubprogramOptionals::default()
-                    },
-                });
-
-                function.ir.set_debug(subprogram);
-
-                Some(subprogram)
-            } else {
-                None
-            };
-
-            // Compile actual IR part
-            let mut stack_values = HashMap::new();
-            for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
-                // Codegen actual parameters
-                let arg_name = format!("arg.{}", p_name);
-                let param = entry
-                    .build_named(format!("{}.get", arg_name), Instr::Param(i))
-                    .unwrap();
-                let alloca = entry
-                    .build_named(
-                        &arg_name,
-                        Instr::Alloca(p_ty.get_type(&type_values, &types)),
-                    )
-                    .unwrap();
-                entry
-                    .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
-                    .unwrap();
-                stack_values.insert(
-                    p_name.clone(),
-                    StackValue(
-                        StackValueKind::mutable(p_ty.is_mutable(), alloca),
-                        TypeKind::CodegenPtr(Box::new(p_ty.clone())),
-                    ),
-                );
-
-                // Generate debug info
-                if let (Some(debug_scope), Some(location)) = (
-                    &debug_scope,
-                    mir_function.signature().into_debug(tokens, compile_unit),
-                ) {
-                    debug.metadata(
-                        &location,
-                        DebugMetadata::ParamVar(DebugParamVariable {
-                            name: p_name.clone(),
-                            arg_idx: i as u32,
-                            ty: p_ty.get_debug_type_hard(
-                                *debug_scope,
-                                &debug,
-                                &debug_types,
-                                &type_values,
-                                &types,
-                                tokens,
-                            ),
-                            always_preserve: true,
-                            flags: DwarfFlags,
-                        }),
-                    );
-                }
-            }
-
-            let mut scope = Scope {
-                context,
-                modules: &modules,
-                tokens,
-                module: &module,
-                module_id: self.module_id,
-                function,
-                block: entry,
-                functions: &functions,
-                types: &types,
-                type_values: &type_values,
-                stack_values,
-                debug: debug_scope.and_then(|scope| {
-                    Some(Debug {
-                        info: &debug,
-                        scope,
-                        types: &debug_types,
-                    })
-                }),
-            };
 
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
+                    let mut entry = function.ir.block("entry");
+
+                    // Insert debug information
+                    let debug_scope = if let Some(location) =
+                        mir_function.signature().into_debug(tokens, compile_unit)
+                    {
+                        // let debug_scope = debug.inner_scope(&outer_scope, location);
+
+                        let fn_param_ty = &mir_function.return_type.get_debug_type_hard(
+                            compile_unit,
+                            &debug,
+                            &debug_types,
+                            &type_values,
+                            &types,
+                            self.module_id,
+                            &self.tokens,
+                            &modules,
+                        );
+
+                        let debug_ty =
+                            debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
+                                parameters: vec![*fn_param_ty],
+                                flags: DwarfFlags,
+                            }));
+
+                        let subprogram = debug.subprogram(DebugSubprogramData {
+                            name: mir_function.name.clone(),
+                            outer_scope: compile_unit.clone(),
+                            location,
+                            ty: debug_ty,
+                            opts: DebugSubprogramOptionals {
+                                is_local: !mir_function.is_pub,
+                                is_definition: true,
+                                ..DebugSubprogramOptionals::default()
+                            },
+                        });
+
+                        function.ir.set_debug(subprogram);
+
+                        Some(subprogram)
+                    } else {
+                        None
+                    };
+
+                    // Compile actual IR part
+                    let mut stack_values = HashMap::new();
+                    for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
+                        // Codegen actual parameters
+                        let arg_name = format!("arg.{}", p_name);
+                        let param = entry
+                            .build_named(format!("{}.get", arg_name), Instr::Param(i))
+                            .unwrap();
+                        let alloca = entry
+                            .build_named(
+                                &arg_name,
+                                Instr::Alloca(p_ty.get_type(&type_values, &types)),
+                            )
+                            .unwrap();
+                        entry
+                            .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
+                            .unwrap();
+                        stack_values.insert(
+                            p_name.clone(),
+                            StackValue(
+                                StackValueKind::mutable(p_ty.is_mutable(), alloca),
+                                TypeKind::CodegenPtr(Box::new(p_ty.clone())),
+                            ),
+                        );
+
+                        // Generate debug info
+                        if let (Some(debug_scope), Some(location)) = (
+                            &debug_scope,
+                            mir_function.signature().into_debug(tokens, compile_unit),
+                        ) {
+                            dbg!(mir_function.name.clone());
+                            dbg!(p_name.clone());
+                            // debug.metadata(
+                            //     &location,
+                            //     DebugMetadata::ParamVar(DebugParamVariable {
+                            //         name: p_name.clone(),
+                            //         arg_idx: i as u32,
+                            //         ty: p_ty.get_debug_type_hard(
+                            //             *debug_scope,
+                            //             &debug,
+                            //             &debug_types,
+                            //             &type_values,
+                            //             &types,
+                            //             self.module_id,
+                            //             &self.tokens,
+                            //             &modules,
+                            //         ),
+                            //         always_preserve: true,
+                            //         flags: DwarfFlags,
+                            //     }),
+                            // );
+                        }
+                    }
+
+                    let mut scope = Scope {
+                        context,
+                        modules: &modules,
+                        tokens,
+                        module: &module,
+                        module_id: self.module_id,
+                        function,
+                        block: entry,
+                        functions: &functions,
+                        types: &types,
+                        type_values: &type_values,
+                        stack_values,
+                        debug: debug_scope.and_then(|scope| {
+                            Some(Debug {
+                                info: &debug,
+                                scope,
+                                types: &debug_types,
+                            })
+                        }),
+                    };
+
                     let state = State::default();
                     if let Some(ret) = block.codegen(&mut scope, &state) {
                         scope.block.terminate(Term::Ret(ret.instr())).unwrap();
@@ -454,7 +460,9 @@ impl mir::Module {
 
         ModuleCodegen {
             module,
+            debug_types: Some(debug_types),
             type_values,
+            tokens: &self.tokens,
         }
     }
 }
@@ -680,8 +688,9 @@ impl mir::Expression {
                 let params = call
                     .parameters
                     .iter()
-                    .map(|e| e.codegen(scope, &mut state.load(true)).unwrap().instr())
-                    .collect();
+                    .map(|e| e.codegen(scope, state).unwrap())
+                    .collect::<Vec<_>>();
+                let param_instrs = params.iter().map(|e| e.instr()).collect();
                 let callee = scope
                     .functions
                     .get(&call.name)
@@ -691,7 +700,7 @@ impl mir::Expression {
                     .block
                     .build_named(
                         call.name.clone(),
-                        Instr::FunctionCall(callee.ir.value(), params),
+                        Instr::FunctionCall(callee.ir.value(), param_instrs),
                     )
                     .unwrap();
 
@@ -769,7 +778,6 @@ impl mir::Expression {
                 };
 
                 let (ptr, contained_ty) = if let TypeKind::UserPtr(further_inner) = *inner.clone() {
-                    dbg!(&further_inner, &val_t);
                     let loaded = scope
                         .block
                         .build_named(
@@ -806,7 +814,6 @@ impl mir::Expression {
                 };
 
                 if state.should_load {
-                    dbg!(&contained_ty);
                     Some(StackValue(
                         kind.derive(
                             scope
@@ -900,7 +907,6 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
 
-                dbg!(&expression, &struct_val);
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
@@ -1049,7 +1055,7 @@ impl mir::Expression {
                         };
                         StackValue(
                             StackValueKind::mutable(mutable, var_ptr_instr),
-                            *borrow_inner.clone(),
+                            TypeKind::CodegenPtr(borrow_inner.clone()),
                         )
                     }
                 })
@@ -1059,7 +1065,18 @@ impl mir::Expression {
                 if val.1 == *type_kind {
                     Some(val)
                 } else if let (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) = (&val.1, type_kind) {
-                    Some(val)
+                    Some(StackValue(
+                        val.0.derive(
+                            scope
+                                .block
+                                .build(Instr::BitCast(
+                                    val.instr(),
+                                    type_kind.get_type(scope.type_values, scope.types),
+                                ))
+                                .unwrap(),
+                        ),
+                        type_kind.clone(),
+                    ))
                 } else {
                     let cast_instr = val
                         .1
@@ -1262,7 +1279,7 @@ impl TypeKind {
             TypeKind::F128 => Type::F128,
             TypeKind::F80 => Type::F80,
             TypeKind::F128PPC => Type::F128PPC,
-            TypeKind::Char => Type::I8,
+            TypeKind::Char => Type::U8,
             TypeKind::Array(elem_t, len) => {
                 Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)
             }
@@ -1293,7 +1310,9 @@ impl TypeKind {
             debug.types,
             scope.type_values,
             scope.types,
+            scope.module_id,
             scope.tokens,
+            scope.modules,
         )
     }
 
@@ -1304,7 +1323,9 @@ impl TypeKind {
         debug_types: &HashMap<TypeKind, DebugTypeValue>,
         type_values: &HashMap<TypeKey, TypeValue>,
         types: &HashMap<TypeValue, TypeDefinition>,
+        local_mod: SourceModuleId,
         tokens: &Vec<FullToken>,
+        modules: &HashMap<SourceModuleId, ModuleCodegen>,
     ) -> DebugTypeValue {
         if let Some(ty) = debug_types.get(self) {
             return *ty;
@@ -1322,7 +1343,9 @@ impl TypeKind {
                         debug_types,
                         type_values,
                         types,
+                        local_mod,
                         tokens,
+                        modules,
                     ),
                     size_bits: self.size_of(),
                 })
@@ -1334,7 +1357,9 @@ impl TypeKind {
                     debug_types,
                     type_values,
                     types,
+                    local_mod,
                     tokens,
+                    modules,
                 );
                 DebugTypeData::Array(DebugArrayType {
                     size_bits: self.size_of(),
@@ -1345,15 +1370,21 @@ impl TypeKind {
             }
             TypeKind::CustomType(key) => {
                 let typedef = types.get(type_values.get(key).unwrap()).unwrap();
-
                 match &typedef.kind {
                     TypeDefinitionKind::Struct(struct_type) => {
                         let mut fields = Vec::new();
                         let mut size_bits = 0;
+
                         for field in &struct_type.0 {
+                            let location = if typedef.source_module != local_mod {
+                                None
+                            } else {
+                                field.2.into_debug(&tokens, scope)
+                            };
                             fields.push(DebugFieldType {
                                 name: field.0.clone(),
-                                location: field.2.into_debug(tokens, scope).unwrap(),
+                                scope,
+                                pos: location.map(|l| l.pos),
                                 size_bits: field.1.size_of(),
                                 offset: size_bits,
                                 flags: DwarfFlags,
@@ -1363,15 +1394,23 @@ impl TypeKind {
                                     debug_types,
                                     type_values,
                                     types,
+                                    local_mod,
                                     tokens,
+                                    modules,
                                 ),
                             });
                             size_bits += field.1.size_of();
                         }
                         {
+                            let location = if typedef.source_module != local_mod {
+                                None
+                            } else {
+                                typedef.meta.into_debug(&tokens, scope)
+                            };
                             DebugTypeData::Struct(DebugStructType {
                                 name: key.0.clone(),
-                                location: typedef.meta.into_debug(tokens, scope).unwrap(),
+                                scope,
+                                pos: location.map(|l| l.pos),
                                 size_bits,
                                 flags: DwarfFlags,
                                 fields,
@@ -1422,7 +1461,7 @@ impl Metadata {
         if let Some((start, _)) = self.into_positions(tokens) {
             Some(start.debug(scope))
         } else {
-            Some(Position(0, 0).debug(scope))
+            None
         }
     }
 }
@@ -1430,8 +1469,10 @@ impl Metadata {
 impl Position {
     fn debug(self, scope: DebugProgramValue) -> DebugLocation {
         DebugLocation {
-            line: self.1,
-            column: self.0,
+            pos: DebugPosition {
+                line: self.1,
+                column: self.0,
+            },
             scope,
         }
     }

@@ -376,8 +376,8 @@ impl DebugLocationHolder {
         unsafe {
             LLVMDIBuilderCreateDebugLocation(
                 context.context_ref,
-                self.location.line,
-                self.location.column,
+                self.location.pos.line,
+                self.location.pos.column,
                 *debug.programs.get(&self.program).unwrap(),
                 null_mut(),
             )
@@ -399,8 +399,8 @@ impl DebugScopeHolder {
                     di_builder,
                     parent,
                     file,
-                    location.line,
-                    location.column,
+                    location.pos.line,
+                    location.pos.column,
                 )
             } else {
                 LLVMDIBuilderCreateLexicalBlockFile(di_builder, parent, file, 0)
@@ -426,7 +426,7 @@ impl DebugMetadataHolder {
                     param.name.len(),
                     param.arg_idx + 1,
                     debug.file_ref,
-                    self.location.line,
+                    self.location.pos.line,
                     *debug.types.get(&param.ty).unwrap(),
                     param.always_preserve as i32,
                     param.flags.as_llvm(),
@@ -437,7 +437,7 @@ impl DebugMetadataHolder {
                     into_cstring(var.name.clone()).as_ptr(),
                     var.name.len(),
                     debug.file_ref,
-                    self.location.line,
+                    self.location.pos.line,
                     *debug.types.get(&var.ty).unwrap(),
                     var.always_preserve as i32,
                     var.flags.as_llvm(),
@@ -504,11 +504,11 @@ impl DebugTypeHolder {
                         .map(|field| {
                             LLVMDIBuilderCreateMemberType(
                                 debug.builder,
-                                *debug.programs.get(&st.location.scope).unwrap(),
+                                *debug.programs.get(&st.scope).unwrap(),
                                 into_cstring(field.name.clone()).as_ptr(),
                                 field.name.len(),
                                 debug.file_ref,
-                                field.location.line,
+                                field.pos.map(|p| p.line).unwrap_or(1),
                                 field.size_bits,
                                 0,
                                 1,
@@ -519,11 +519,11 @@ impl DebugTypeHolder {
                         .collect::<Vec<_>>();
                     LLVMDIBuilderCreateStructType(
                         debug.builder,
-                        *debug.programs.get(&st.location.scope).unwrap(),
+                        *debug.programs.get(&st.scope).unwrap(),
                         into_cstring(st.name.clone()).as_ptr(),
                         st.name.len(),
                         debug.file_ref,
-                        st.location.line,
+                        st.pos.map(|p| p.line).unwrap_or(1),
                         st.size_bits,
                         0,
                         st.flags.as_llvm(),
@@ -617,7 +617,7 @@ impl FunctionHolder {
                         mangled_name,
                         mangled_length,
                         debug.file_ref,
-                        subprogram.location.line,
+                        subprogram.location.pos.line,
                         *debug.types.get(&subprogram.ty).unwrap(),
                         subprogram.opts.is_local as i32,
                         subprogram.opts.is_definition as i32,
@@ -1027,8 +1027,8 @@ impl InstructionHolder {
 
                 let location = LLVMDIBuilderCreateDebugLocation(
                     module.context_ref,
-                    record.location.line,
-                    record.location.column,
+                    record.location.pos.line,
+                    record.location.pos.column,
                     *debug.programs.get(&record.scope).unwrap(),
                     null_mut(),
                 );

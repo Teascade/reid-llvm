@@ -11,8 +11,8 @@ use crate::{
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable,
         DebugLocation, DebugLocationValue, DebugMetadata, DebugMetadataValue, DebugParamVariable,
-        DebugPointerType, DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType,
-        DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
+        DebugPointerType, DebugPosition, DebugProgramValue, DebugRecordKind, DebugScopeValue,
+        DebugStructType, DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
     },
     pad_adapter::PadAdapter,
 };
@@ -171,6 +171,12 @@ impl DebugMetadataValue {
 }
 
 impl Display for DebugLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} on scope {:?}", self.pos, self.scope)
+    }
+}
+
+impl Display for DebugPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "line {}, col {}", self.line, self.column)
     }
@@ -484,7 +490,8 @@ impl Debug for DebugStructType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Struct")
             .field("name", &self.name)
-            .field("location", &self.location)
+            .field("scope", &self.scope)
+            .field("pos", &self.pos)
             .field("size_bit", &self.size_bits)
             .field("flags", &self.flags)
             .field("elements", &self.fields)
@@ -495,7 +502,8 @@ impl Debug for DebugStructType {
 impl Debug for DebugFieldType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct(&format!("Field({})", self.name))
-            .field("location", &self.location)
+            .field("scope", &self.scope)
+            .field("pos", &self.pos)
             .field("size_bits", &self.size_bits)
             .field("offset", &self.offset)
             .field("flags", &self.flags)
@@ -569,6 +577,12 @@ impl Debug for DebugLocationValue {
 }
 
 impl Debug for DebugLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?} on scope {:?}", self.pos, self.scope)
+    }
+}
+
+impl Debug for DebugPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "ln {}, col {}", self.line, self.column)
     }

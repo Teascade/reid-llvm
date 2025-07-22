@@ -225,6 +225,11 @@ impl DebugInformation {
 #[derive(Clone, Copy)]
 pub struct DebugLocation {
     pub scope: DebugProgramValue,
+    pub pos: DebugPosition,
+}
+
+#[derive(Clone, Copy)]
+pub struct DebugPosition {
     pub line: u32,
     pub column: u32,
 }
@@ -310,7 +315,8 @@ pub struct DebugPointerType {
 #[derive(Clone)]
 pub struct DebugStructType {
     pub name: String,
-    pub location: DebugLocation,
+    pub scope: DebugProgramValue,
+    pub pos: Option<DebugPosition>,
     pub size_bits: u64,
     pub flags: DwarfFlags,
     pub fields: Vec<DebugFieldType>,
@@ -319,7 +325,8 @@ pub struct DebugStructType {
 #[derive(Clone)]
 pub struct DebugFieldType {
     pub name: String,
-    pub location: DebugLocation,
+    pub scope: DebugProgramValue,
+    pub pos: Option<DebugPosition>,
     pub size_bits: u64,
     pub offset: u64,
     pub flags: DwarfFlags,
