@@ -1,5 +1,5 @@
 
-extern fn puts(message: *str) -> i32;
+extern fn puts(message: *char) -> i32;
 extern fn malloc(size: u64) -> *u8;
 extern fn div(numerator: i32, denominator: i32) -> div_t;
 
@@ -8,7 +8,7 @@ struct div_t {
     remainder: i32,
 }
 
-pub fn print(message: *str) {
+pub fn print(message: *char) {
     puts(message);
 }
 

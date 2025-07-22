@@ -337,7 +337,7 @@ impl Display for TypeKind {
             TypeKind::U64 => write!(f, "u64"),
             TypeKind::U128 => write!(f, "u128"),
             TypeKind::Void => write!(f, "void"),
-            TypeKind::Str => write!(f, "str"),
+            TypeKind::Char => write!(f, "char"),
             TypeKind::Array(type_kind, len) => {
                 f.write_char('[')?;
                 Display::fmt(type_kind, f)?;

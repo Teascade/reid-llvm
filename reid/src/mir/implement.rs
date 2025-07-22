@@ -79,8 +79,8 @@ impl TypeKind {
             let other_cat = other.category();
             match (self, other) {
                 (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Ok(other.clone()),
-                (TypeKind::Str, TypeKind::U8) => Ok(other.clone()),
-                (TypeKind::U8, TypeKind::Str) => Ok(other.clone()),
+                (TypeKind::Char, TypeKind::U8) => Ok(other.clone()),
+                (TypeKind::U8, TypeKind::Char) => Ok(other.clone()),
                 _ => match (&self_cat, &other_cat) {
                     (TypeCategory::Integer, TypeCategory::Integer) => Ok(other.clone()),
                     (TypeCategory::Integer, TypeCategory::Real) => Ok(other.clone()),
@@ -121,38 +121,7 @@ impl TypeKind {
             TypeKind::U64 => false,
             TypeKind::U128 => false,
             TypeKind::Void => false,
-            TypeKind::Str => false,
-            TypeKind::Array(_, _) => false,
-            TypeKind::CustomType(_) => false,
-            TypeKind::CodegenPtr(_) => false,
-            TypeKind::Vague(_) => false,
-            TypeKind::Borrow(_, _) => false,
-            TypeKind::UserPtr(_) => false,
-            TypeKind::F16 => true,
-            TypeKind::F32B => true,
-            TypeKind::F32 => true,
-            TypeKind::F64 => true,
-            TypeKind::F128 => true,
-            TypeKind::F80 => true,
-            TypeKind::F128PPC => true,
-        }
-    }
-
-    pub fn is_float(&self) -> bool {
-        match self {
-            TypeKind::Bool => false,
-            TypeKind::I8 => false,
-            TypeKind::I16 => false,
-            TypeKind::I32 => false,
-            TypeKind::I64 => false,
-            TypeKind::I128 => false,
-            TypeKind::U8 => false,
-            TypeKind::U16 => false,
-            TypeKind::U32 => false,
-            TypeKind::U64 => false,
-            TypeKind::U128 => false,
-            TypeKind::Void => false,
-            TypeKind::Str => false,
+            TypeKind::Char => false,
             TypeKind::Array(_, _) => false,
             TypeKind::CustomType(_) => false,
             TypeKind::CodegenPtr(_) => false,
@@ -183,7 +152,7 @@ impl TypeKind {
             TypeKind::I128 => 128,
             TypeKind::U128 => 128,
             TypeKind::Void => 0,
-            TypeKind::Str => 8,
+            TypeKind::Char => 8,
             TypeKind::Array(type_kind, len) => type_kind.size_of() * len,
             TypeKind::CustomType(_) => 32,
             TypeKind::CodegenPtr(_) => 64,
@@ -214,7 +183,7 @@ impl TypeKind {
             TypeKind::I128 => 128,
             TypeKind::U128 => 128,
             TypeKind::Void => 0,
-            TypeKind::Str => 8,
+            TypeKind::Char => 8,
             TypeKind::Array(type_kind, _) => type_kind.alignment(),
             TypeKind::CustomType(_) => 32,
             TypeKind::CodegenPtr(_) => 64,
@@ -250,7 +219,7 @@ impl TypeKind {
             | TypeKind::U32
             | TypeKind::U64
             | TypeKind::U128
-            | TypeKind::Str => TypeCategory::Integer,
+            | TypeKind::Char => TypeCategory::Integer,
             TypeKind::F16
             | TypeKind::F32B
             | TypeKind::F32
@@ -275,6 +244,7 @@ impl TypeKind {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum TypeCategory {
     Integer,
     Real,

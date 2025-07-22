@@ -728,29 +728,12 @@ impl Literal {
         if let Some(hint) = &hint {
             use Literal as L;
             use VagueLiteral as VagueL;
+
+            if *hint == self.as_type() {
+                return Ok(self);
+            }
+
             Ok(match (self.clone(), hint) {
-                (L::I8(_), TypeKind::I8) => self,
-                (L::I16(_), TypeKind::I16) => self,
-                (L::I32(_), TypeKind::I32) => self,
-                (L::I64(_), TypeKind::I64) => self,
-                (L::I128(_), TypeKind::I128) => self,
-                (L::U8(_), TypeKind::U8) => self,
-                (L::U16(_), TypeKind::U16) => self,
-                (L::U32(_), TypeKind::U32) => self,
-                (L::U64(_), TypeKind::U64) => self,
-                (L::U128(_), TypeKind::U128) => self,
-                (L::F16(_), TypeKind::F16) => self,
-                (L::F32(_), TypeKind::F32) => self,
-                (L::F32B(_), TypeKind::F32B) => self,
-                (L::F64(_), TypeKind::F64) => self,
-                (L::F80(_), TypeKind::F80) => self,
-                (L::F128(_), TypeKind::F128) => self,
-                (L::F128PPC(_), TypeKind::F128PPC) => self,
-                (L::Bool(_), TypeKind::Bool) => self,
-                (L::String(_), TypeKind::UserPtr(ptr)) => match *ptr.clone() {
-                    TypeKind::Str => self,
-                    _ => Err(ErrorKind::LiteralIncompatible(self, hint.clone()))?,
-                },
                 // TODO make sure that v is actually able to fit in the
                 // requested type
                 (L::Vague(VagueL::Number(v)), TypeKind::I8) => L::I8(v as i8),

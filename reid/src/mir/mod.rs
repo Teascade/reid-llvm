@@ -98,7 +98,7 @@ pub enum TypeKind {
     F128,
     F80,
     F128PPC,
-    Str,
+    Char,
     Array(Box<TypeKind>, u64),
     CustomType(String),
     Borrow(Box<TypeKind>, bool),
@@ -186,7 +186,7 @@ impl Literal {
             Literal::U64(_) => TypeKind::U64,
             Literal::U128(_) => TypeKind::U128,
             Literal::Bool(_) => TypeKind::Bool,
-            Literal::String(_) => TypeKind::UserPtr(Box::new(TypeKind::Str)),
+            Literal::String(_) => TypeKind::UserPtr(Box::new(TypeKind::Char)),
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Integer),
             Literal::Vague(VagueLiteral::Decimal(_)) => TypeKind::Vague(VagueType::Decimal),
             Literal::F16(_) => TypeKind::F16,
@@ -196,7 +196,7 @@ impl Literal {
             Literal::F80(_) => TypeKind::F80,
             Literal::F128(_) => TypeKind::F128,
             Literal::F128PPC(_) => TypeKind::F128PPC,
-            Literal::Char(_) => todo!(),
+            Literal::Char(_) => TypeKind::Char,
         }
     }
 }

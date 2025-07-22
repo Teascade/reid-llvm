@@ -60,7 +60,6 @@ impl Parse for Type {
                     "f80" => TypeKind::F80,
                     "f128" => TypeKind::F128,
                     "f128ppc" => TypeKind::F128PPC,
-                    "str" => TypeKind::Str,
                     "char" => TypeKind::Char,
                     _ => TypeKind::Custom(ident),
                 }

@@ -18,8 +18,8 @@ use crate::{
     error_raporting::ModuleMap,
     lexer::{FullToken, Position},
     mir::{
-        self, Metadata, NamedVariableRef, StructField, StructType, TypeDefinition,
-        TypeDefinitionKind, TypeKind, VagueLiteral,
+        self, implement::TypeCategory, Metadata, NamedVariableRef, StructField, StructType,
+        TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
     },
 };
 
@@ -247,7 +247,7 @@ impl mir::Module {
         insert_debug!(&TypeKind::I64);
         insert_debug!(&TypeKind::I128);
         insert_debug!(&TypeKind::Void);
-        insert_debug!(&TypeKind::Str);
+        insert_debug!(&TypeKind::Char);
 
         for typedef in &self.typedefs {
             let type_value = match &typedef.kind {
@@ -633,7 +633,11 @@ impl mir::Expression {
                     .expect("rhs has no return value")
                     .instr();
                 let lhs_type = lhs_exp.return_type(&Default::default()).unwrap().1;
-                let instr = match (binop, lhs_type.signed(), lhs_type.is_float()) {
+                let instr = match (
+                    binop,
+                    lhs_type.signed(),
+                    lhs_type.category() == TypeCategory::Real,
+                ) {
                     (mir::BinaryOperator::Add, _, false) => Instr::Add(lhs, rhs),
                     (mir::BinaryOperator::Add, _, true) => Instr::FAdd(lhs, rhs),
                     (mir::BinaryOperator::Minus, _, false) => Instr::Sub(lhs, rhs),
@@ -643,7 +647,6 @@ impl mir::Expression {
                     (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
                     (mir::BinaryOperator::Cmp(i), _, false) => Instr::ICmp(i.predicate(), lhs, rhs),
                     (mir::BinaryOperator::Cmp(i), _, true) => Instr::FCmp(i.predicate(), lhs, rhs),
-                    _ => todo!(),
                 };
                 Some(StackValue(
                     StackValueKind::Immutable(scope.block.build(instr).unwrap()),
@@ -1228,7 +1231,7 @@ impl TypeKind {
             TypeKind::F128 => Type::F128,
             TypeKind::F80 => Type::F80,
             TypeKind::F128PPC => Type::F128PPC,
-            TypeKind::Str => Type::I8,
+            TypeKind::Char => Type::I8,
             TypeKind::Array(elem_t, len) => {
                 Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)
             }
@@ -1368,7 +1371,7 @@ impl TypeKind {
                     | TypeKind::F128
                     | TypeKind::F128PPC => DwarfEncoding::Float,
                     TypeKind::Void => DwarfEncoding::Address,
-                    TypeKind::Str => DwarfEncoding::UnsignedChar,
+                    TypeKind::Char => DwarfEncoding::UnsignedChar,
                     TypeKind::Array(_, _) => DwarfEncoding::Address,
                     TypeKind::CustomType(_) => DwarfEncoding::Address,
                     _ => panic!("tried fetching debug-type for non-supported type!"),

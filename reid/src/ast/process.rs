@@ -311,7 +311,6 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::Array(type_kind, length) => {
                 mir::TypeKind::Array(Box::new(mir::TypeKind::from(*type_kind.clone())), *length)
             }
-            ast::TypeKind::Str => mir::TypeKind::Str,
             ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(name.clone()),
             ast::TypeKind::Borrow(type_kind, mutable) => {
                 mir::TypeKind::Borrow(Box::new(mir::TypeKind::from(*type_kind.clone())), *mutable)
@@ -326,7 +325,7 @@ impl From<ast::TypeKind> for mir::TypeKind {
             ast::TypeKind::F80 => mir::TypeKind::F80,
             ast::TypeKind::F128 => mir::TypeKind::F128,
             ast::TypeKind::F128PPC => mir::TypeKind::F128PPC,
-            ast::TypeKind::Char => todo!(),
+            ast::TypeKind::Char => mir::TypeKind::Char,
         }
     }
 }
