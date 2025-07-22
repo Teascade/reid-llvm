@@ -421,23 +421,23 @@ impl DebugMetadataHolder {
             match &self.data {
                 DebugMetadata::ParamVar(param) => LLVMDIBuilderCreateParameterVariable(
                     debug.builder,
-                    *debug.programs.get(&self.program).unwrap(),
+                    *debug.programs.get(&self.location.scope).unwrap(),
                     into_cstring(param.name.clone()).as_ptr(),
                     param.name.len(),
                     param.arg_idx + 1,
                     debug.file_ref,
-                    param.location.line,
+                    self.location.line,
                     *debug.types.get(&param.ty).unwrap(),
                     param.always_preserve as i32,
                     param.flags.as_llvm(),
                 ),
                 DebugMetadata::LocalVar(var) => LLVMDIBuilderCreateAutoVariable(
                     debug.builder,
-                    *debug.programs.get(&self.program).unwrap(),
+                    *debug.programs.get(&self.location.scope).unwrap(),
                     into_cstring(var.name.clone()).as_ptr(),
                     var.name.len(),
                     debug.file_ref,
-                    var.location.line,
+                    self.location.line,
                     *debug.types.get(&var.ty).unwrap(),
                     var.always_preserve as i32,
                     var.flags.as_llvm(),
@@ -504,7 +504,7 @@ impl DebugTypeHolder {
                         .map(|field| {
                             LLVMDIBuilderCreateMemberType(
                                 debug.builder,
-                                *debug.programs.get(&st.scope).unwrap(),
+                                *debug.programs.get(&st.location.scope).unwrap(),
                                 into_cstring(field.name.clone()).as_ptr(),
                                 field.name.len(),
                                 debug.file_ref,
@@ -519,7 +519,7 @@ impl DebugTypeHolder {
                         .collect::<Vec<_>>();
                     LLVMDIBuilderCreateStructType(
                         debug.builder,
-                        *debug.programs.get(&st.scope).unwrap(),
+                        *debug.programs.get(&st.location.scope).unwrap(),
                         into_cstring(st.name.clone()).as_ptr(),
                         st.name.len(),
                         debug.file_ref,

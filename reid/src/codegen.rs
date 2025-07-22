@@ -314,7 +314,9 @@ impl mir::Module {
             let mut entry = function.ir.block("entry");
 
             // Insert debug information
-            let debug_scope = if let Some(location) = mir_function.signature().into_debug(tokens) {
+            let debug_scope = if let Some(location) =
+                mir_function.signature().into_debug(tokens, compile_unit)
+            {
                 // let debug_scope = debug.inner_scope(&outer_scope, location);
 
                 let fn_param_ty = &mir_function.return_type.get_debug_type_hard(
@@ -376,15 +378,15 @@ impl mir::Module {
                 );
 
                 // Generate debug info
-                if let (Some(debug_scope), Some(location)) =
-                    (&debug_scope, mir_function.signature().into_debug(tokens))
-                {
+                if let (Some(debug_scope), Some(location)) = (
+                    &debug_scope,
+                    mir_function.signature().into_debug(tokens, compile_unit),
+                ) {
                     debug.metadata(
-                        &debug_scope,
+                        &location,
                         DebugMetadata::ParamVar(DebugParamVariable {
                             name: p_name.clone(),
                             arg_idx: i as u32,
-                            location,
                             ty: p_ty.get_debug_type_hard(
                                 *debug_scope,
                                 &debug,
@@ -434,7 +436,8 @@ impl mir::Module {
                     }
 
                     if let Some(debug) = scope.debug {
-                        let location = &block.return_meta().into_debug(tokens).unwrap();
+                        let location =
+                            &block.return_meta().into_debug(tokens, debug.scope).unwrap();
                         let location = debug.info.location(&debug.scope, *location);
                         scope.block.set_terminator_location(location).unwrap();
                     }
@@ -456,7 +459,7 @@ impl mir::Block {
         for stmt in &self.statements {
             stmt.codegen(&mut scope, state).map(|s| {
                 if let Some(debug) = &scope.debug {
-                    let location = stmt.1.into_debug(scope.tokens).unwrap();
+                    let location = stmt.1.into_debug(scope.tokens, debug.scope).unwrap();
                     let loc_val = debug.info.location(&debug.scope, location);
                     s.instr().with_location(&mut scope.block, loc_val);
                 }
@@ -480,11 +483,10 @@ impl mir::Block {
 
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Option<StackValue> {
-        let location = self.1.into_debug(scope.tokens).unwrap();
-        let location = scope
-            .debug
-            .as_ref()
-            .map(|d| d.info.location(&d.scope, location));
+        let location = scope.debug.clone().map(|d| {
+            let location = self.1.into_debug(scope.tokens, d.scope).unwrap();
+            d.info.location(&d.scope, location)
+        });
 
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
@@ -518,12 +520,11 @@ impl mir::Statement {
                     StackValue(stack_value, TypeKind::CodegenPtr(Box::new(value.clone().1))),
                 );
                 if let Some(debug) = &scope.debug {
-                    let location = self.1.into_debug(scope.tokens).unwrap();
+                    let location = self.1.into_debug(scope.tokens, debug.scope).unwrap();
                     let var = debug.info.metadata(
-                        &debug.scope,
+                        &location,
                         DebugMetadata::LocalVar(DebugLocalVariable {
                             name: name.clone(),
-                            location,
                             ty: ty.clone().get_debug_type(debug, scope),
                             always_preserve: true,
                             flags: DwarfFlags,
@@ -581,11 +582,10 @@ impl mir::Statement {
 impl mir::Expression {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Option<StackValue> {
         let location = if let Some(debug) = &scope.debug {
-            Some(
-                debug
-                    .info
-                    .location(&debug.scope, self.1.into_debug(scope.tokens).unwrap()),
-            )
+            Some(debug.info.location(
+                &debug.scope,
+                self.1.into_debug(scope.tokens, debug.scope).unwrap(),
+            ))
         } else {
             None
         };
@@ -687,7 +687,7 @@ impl mir::Expression {
                     .unwrap();
 
                 if let Some(debug) = &scope.debug {
-                    let location = call.meta.into_debug(scope.tokens).unwrap();
+                    let location = call.meta.into_debug(scope.tokens, debug.scope).unwrap();
                     let location_val = debug.info.location(&debug.scope, location);
                     val.with_location(&mut scope.block, location_val);
                 }
@@ -1078,16 +1078,23 @@ impl mir::IfExpression {
         let after_b = scope.function.ir.block("after");
 
         if let Some(debug) = &scope.debug {
-            let before_location = self.0 .1.into_debug(scope.tokens).unwrap();
+            let before_location = self.0 .1.into_debug(scope.tokens, debug.scope).unwrap();
             let before_v = debug.info.location(&debug.scope, before_location);
             scope.block.set_terminator_location(before_v).unwrap();
 
-            let then_location = self.1.return_meta().into_debug(scope.tokens).unwrap();
+            let then_location = self
+                .1
+                .return_meta()
+                .into_debug(scope.tokens, debug.scope)
+                .unwrap();
             let then_v = debug.info.location(&debug.scope, then_location);
             then_b.set_terminator_location(then_v).unwrap();
 
             let else_location = if let Some(else_block) = &self.2 {
-                else_block.return_meta().into_debug(scope.tokens).unwrap()
+                else_block
+                    .return_meta()
+                    .into_debug(scope.tokens, debug.scope)
+                    .unwrap()
             } else {
                 then_location
             };
@@ -1330,7 +1337,7 @@ impl TypeKind {
                         for field in &struct_type.0 {
                             fields.push(DebugFieldType {
                                 name: field.0.clone(),
-                                location: field.2.into_debug(tokens).unwrap(),
+                                location: field.2.into_debug(tokens, scope).unwrap(),
                                 size_bits: field.1.size_of(),
                                 offset: size_bits,
                                 flags: DwarfFlags,
@@ -1348,8 +1355,7 @@ impl TypeKind {
                         {
                             DebugTypeData::Struct(DebugStructType {
                                 name: key.0.clone(),
-                                scope,
-                                location: typedef.meta.into_debug(tokens).unwrap(),
+                                location: typedef.meta.into_debug(tokens, scope).unwrap(),
                                 size_bits,
                                 flags: DwarfFlags,
                                 fields,
@@ -1392,20 +1398,25 @@ impl TypeKind {
 }
 
 impl Metadata {
-    pub fn into_debug(&self, tokens: &Vec<FullToken>) -> Option<DebugLocation> {
+    pub fn into_debug(
+        &self,
+        tokens: &Vec<FullToken>,
+        scope: DebugProgramValue,
+    ) -> Option<DebugLocation> {
         if let Some((start, _)) = self.into_positions(tokens) {
-            Some(start.into())
+            Some(start.debug(scope))
         } else {
-            None
+            Some(Position(0, 0).debug(scope))
         }
     }
 }
 
-impl Into<DebugLocation> for Position {
-    fn into(self) -> DebugLocation {
+impl Position {
+    fn debug(self, scope: DebugProgramValue) -> DebugLocation {
         DebugLocation {
             line: self.1,
             column: self.0,
+            scope,
         }
     }
 }

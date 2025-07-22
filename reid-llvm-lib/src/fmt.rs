@@ -157,22 +157,16 @@ impl InstructionHolder {
 
 impl DebugMetadataValue {
     fn hr(&self, debug: &DebugInformation) -> String {
-        match debug.get_metadata(*self) {
+        let kind = match debug.get_metadata(*self) {
             DebugMetadata::ParamVar(DebugParamVariable {
-                name,
-                arg_idx,
-                location,
-                ty,
-                ..
-            }) => format!(
-                "param {} (idx {}) (type {:?}) at {}",
-                name, arg_idx, ty, location
-            ),
-            DebugMetadata::LocalVar(DebugLocalVariable {
-                name, location, ty, ..
-            }) => format!("var {} (type {:?}) at {}", name, ty, location),
+                name, arg_idx, ty, ..
+            }) => format!("param {} (idx {}) (type {:?}) ", name, arg_idx, ty),
+            DebugMetadata::LocalVar(DebugLocalVariable { name, ty, .. }) => {
+                format!("var {} (type {:?}) ", name, ty)
+            }
             DebugMetadata::VarAssignment => todo!(),
-        }
+        };
+        format!("{} at {}", kind, debug.get_metadata_location(*self))
     }
 }
 
@@ -490,7 +484,6 @@ impl Debug for DebugStructType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Struct")
             .field("name", &self.name)
-            .field("scope", &self.scope)
             .field("location", &self.location)
             .field("size_bit", &self.size_bits)
             .field("flags", &self.flags)

@@ -34,7 +34,7 @@ pub(crate) struct DebugScopeHolder {
 
 #[derive(Debug, Clone)]
 pub struct DebugMetadataHolder {
-    pub(crate) program: DebugProgramValue,
+    pub(crate) location: DebugLocation,
     pub(crate) value: DebugMetadataValue,
     pub(crate) data: DebugMetadata,
 }
@@ -140,11 +140,11 @@ impl DebugInformation {
         value
     }
 
-    pub fn metadata(&self, program: &DebugProgramValue, kind: DebugMetadata) -> DebugMetadataValue {
+    pub fn metadata(&self, location: &DebugLocation, kind: DebugMetadata) -> DebugMetadataValue {
         let mut metadata = self.metadata.borrow_mut();
         let value = DebugMetadataValue(metadata.len());
         metadata.push(DebugMetadataHolder {
-            program: *program,
+            location: *location,
             value: value.clone(),
             data: kind,
         });
@@ -163,6 +163,10 @@ impl DebugInformation {
 
     pub fn get_metadata(&self, value: DebugMetadataValue) -> DebugMetadata {
         unsafe { self.metadata.borrow().get_unchecked(value.0).data.clone() }
+    }
+
+    pub fn get_metadata_location(&self, value: DebugMetadataValue) -> DebugLocation {
+        unsafe { self.metadata.borrow().get_unchecked(value.0).location }
     }
 
     pub fn get_subprogram_data(&self, value: DebugProgramValue) -> Option<DebugSubprogramData> {
@@ -218,8 +222,9 @@ impl DebugInformation {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy)]
 pub struct DebugLocation {
+    pub scope: DebugProgramValue,
     pub line: u32,
     pub column: u32,
 }
@@ -238,8 +243,6 @@ pub struct DebugParamVariable {
     /// parameters. arg_idx should not conflict with other parameters of the
     /// same subprogram.
     pub arg_idx: u32,
-    /// Used for line number
-    pub location: DebugLocation,
     pub ty: DebugTypeValue,
     /// If this variable will be referenced from its containing subprogram, and
     /// will survive some optimizations.
@@ -250,7 +253,6 @@ pub struct DebugParamVariable {
 #[derive(Debug, Clone)]
 pub struct DebugLocalVariable {
     pub name: String,
-    pub location: DebugLocation,
     pub ty: DebugTypeValue,
     pub always_preserve: bool,
     pub flags: DwarfFlags,
@@ -308,7 +310,6 @@ pub struct DebugPointerType {
 #[derive(Clone)]
 pub struct DebugStructType {
     pub name: String,
-    pub scope: DebugProgramValue,
     pub location: DebugLocation,
     pub size_bits: u64,
     pub flags: DwarfFlags,
