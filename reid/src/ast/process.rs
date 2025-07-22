@@ -4,7 +4,7 @@ use crate::{
     ast::{self},
     mir::{
         self, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType,
-        TypeKey,
+        CustomTypeKey,
     },
 };
 
@@ -322,7 +322,7 @@ impl ast::TypeKind {
                 mir::TypeKind::Array(Box::new(type_kind.clone().into_mir(source_mod)), *length)
             }
             ast::TypeKind::Custom(name) => {
-                mir::TypeKind::CustomType(TypeKey(name.clone(), source_mod))
+                mir::TypeKind::CustomType(CustomTypeKey(name.clone(), source_mod))
             }
             ast::TypeKind::Borrow(type_kind, mutable) => {
                 mir::TypeKind::Borrow(Box::new(type_kind.clone().into_mir(source_mod)), *mutable)

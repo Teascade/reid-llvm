@@ -117,7 +117,7 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
 pub struct Scope<Data: Clone + Default> {
     pub function_returns: Storage<String, ScopeFunction>,
     pub variables: Storage<String, ScopeVariable>,
-    pub types: Storage<TypeKey, TypeDefinition>,
+    pub types: Storage<CustomTypeKey, TypeDefinition>,
     /// Hard Return type of this scope, if inside a function
     pub return_type_hint: Option<TypeKind>,
     pub data: Data,
@@ -134,18 +134,18 @@ impl<Data: Clone + Default> Scope<Data> {
         }
     }
 
-    pub fn get_struct_type(&self, key: &TypeKey) -> Option<&StructType> {
+    pub fn get_struct_type(&self, key: &CustomTypeKey) -> Option<&StructType> {
         let ty = self.types.get(&key)?;
         match &ty.kind {
             TypeDefinitionKind::Struct(struct_ty) => Some(struct_ty),
         }
     }
 
-    pub fn find_type(&self, name: &String) -> Option<&TypeKey> {
+    pub fn find_type(&self, name: &String) -> Option<&CustomTypeKey> {
         self.types
             .0
             .iter()
-            .find(|(TypeKey(n, _), _)| n == name)
+            .find(|(CustomTypeKey(n, _), _)| n == name)
             .map(|(key, _)| key)
     }
 }
@@ -295,7 +295,7 @@ impl Module {
             scope
                 .types
                 .set(
-                    TypeKey(typedef.name.clone(), self.module_id),
+                    CustomTypeKey(typedef.name.clone(), self.module_id),
                     typedef.clone(),
                 )
                 .ok();

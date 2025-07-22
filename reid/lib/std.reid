@@ -41,7 +41,7 @@ pub fn add_char(string: &mut String, c: char) {
         (*string).inner = allocate((*string).max_length) as *char;
     }
     (*string).inner[(*string).length] = c;
-    (*string).inner[((*string).length + 1)] = '\0';
+    (((*string).inner) as *u8)[((*string).length + 1)] = 0;
     (*string).length = (*string).length + 1;
 }
 

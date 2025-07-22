@@ -18,8 +18,8 @@ use crate::{
     error_raporting::ErrorModules,
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, Metadata, ModuleMap, NamedVariableRef, SourceModuleId,
-        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKey, TypeKind,
+        self, implement::TypeCategory, CustomTypeKey, Metadata, ModuleMap, NamedVariableRef,
+        SourceModuleId, StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind,
         VagueLiteral,
     },
 };
@@ -59,7 +59,7 @@ struct ModuleCodegen<'ctx> {
     module: Module<'ctx>,
     tokens: &'ctx Vec<FullToken>,
     debug_types: Option<HashMap<TypeKind, DebugTypeValue>>,
-    type_values: HashMap<TypeKey, TypeValue>,
+    type_values: HashMap<CustomTypeKey, TypeValue>,
 }
 
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
@@ -77,7 +77,7 @@ pub struct Scope<'ctx, 'scope> {
     function: &'ctx StackFunction<'ctx>,
     block: Block<'ctx>,
     types: &'scope HashMap<TypeValue, TypeDefinition>,
-    type_values: &'scope HashMap<TypeKey, TypeValue>,
+    type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
     functions: &'scope HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
@@ -169,7 +169,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
         old_block
     }
 
-    fn get_typedef(&self, key: &TypeKey) -> Option<&TypeDefinition> {
+    fn get_typedef(&self, key: &CustomTypeKey) -> Option<&TypeDefinition> {
         self.type_values.get(key).and_then(|v| self.types.get(v))
     }
 }
@@ -255,7 +255,7 @@ impl mir::Module {
         typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
 
         for typedef in typedefs {
-            let type_key = TypeKey(typedef.name.clone(), typedef.source_module);
+            let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
             let type_value = match &typedef.kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
                     module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
@@ -391,8 +391,6 @@ impl mir::Module {
                             &debug_scope,
                             mir_function.signature().into_debug(tokens, compile_unit),
                         ) {
-                            dbg!(mir_function.name.clone());
-                            dbg!(p_name.clone());
                             // debug.metadata(
                             //     &location,
                             //     DebugMetadata::ParamVar(DebugParamVariable {
@@ -956,7 +954,7 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Struct(name, items) => {
-                let type_key = TypeKey(name.clone(), scope.module_id);
+                let type_key = CustomTypeKey(name.clone(), scope.module_id);
                 let struct_ty = Type::CustomType(*scope.type_values.get(&type_key)?);
 
                 let load_n = format!("{}.load", name);
@@ -1062,35 +1060,57 @@ impl mir::Expression {
             }
             mir::ExprKind::CastTo(expression, type_kind) => {
                 let val = expression.codegen(scope, state)?;
+
                 if val.1 == *type_kind {
                     Some(val)
-                } else if let (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) = (&val.1, type_kind) {
-                    Some(StackValue(
-                        val.0.derive(
-                            scope
-                                .block
-                                .build(Instr::BitCast(
-                                    val.instr(),
-                                    type_kind.get_type(scope.type_values, scope.types),
-                                ))
-                                .unwrap(),
-                        ),
-                        type_kind.clone(),
-                    ))
                 } else {
-                    let cast_instr = val
-                        .1
-                        .get_type(scope.type_values, scope.types)
-                        .cast_instruction(
-                            val.instr(),
-                            &type_kind.get_type(scope.type_values, scope.types),
-                        )
-                        .unwrap();
+                    match (&val.1, type_kind) {
+                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(_)) => match *inner.clone()
+                        {
+                            TypeKind::UserPtr(_) => Some(StackValue(
+                                val.0.derive(
+                                    scope
+                                        .block
+                                        .build(Instr::BitCast(
+                                            val.instr(),
+                                            Type::Ptr(Box::new(
+                                                type_kind.get_type(scope.type_values, scope.types),
+                                            )),
+                                        ))
+                                        .unwrap(),
+                                ),
+                                TypeKind::CodegenPtr(Box::new(type_kind.clone())),
+                            )),
+                            _ => panic!(),
+                        },
+                        (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Some(StackValue(
+                            val.0.derive(
+                                scope
+                                    .block
+                                    .build(Instr::BitCast(
+                                        val.instr(),
+                                        type_kind.get_type(scope.type_values, scope.types),
+                                    ))
+                                    .unwrap(),
+                            ),
+                            type_kind.clone(),
+                        )),
+                        _ => {
+                            let cast_instr = val
+                                .1
+                                .get_type(scope.type_values, scope.types)
+                                .cast_instruction(
+                                    val.instr(),
+                                    &type_kind.get_type(scope.type_values, scope.types),
+                                )
+                                .unwrap();
 
-                    Some(StackValue(
-                        val.0.derive(scope.block.build(cast_instr).unwrap()),
-                        type_kind.clone(),
-                    ))
+                            Some(StackValue(
+                                val.0.derive(scope.block.build(cast_instr).unwrap()),
+                                type_kind.clone(),
+                            ))
+                        }
+                    }
                 }
             }
         };
@@ -1257,7 +1277,7 @@ impl mir::Literal {
 impl TypeKind {
     fn get_type(
         &self,
-        type_vals: &HashMap<TypeKey, TypeValue>,
+        type_vals: &HashMap<CustomTypeKey, TypeValue>,
         typedefs: &HashMap<TypeValue, TypeDefinition>,
     ) -> Type {
         match &self {
@@ -1321,7 +1341,7 @@ impl TypeKind {
         scope: DebugProgramValue,
         debug_info: &DebugInformation,
         debug_types: &HashMap<TypeKind, DebugTypeValue>,
-        type_values: &HashMap<TypeKey, TypeValue>,
+        type_values: &HashMap<CustomTypeKey, TypeValue>,
         types: &HashMap<TypeValue, TypeDefinition>,
         local_mod: SourceModuleId,
         tokens: &Vec<FullToken>,

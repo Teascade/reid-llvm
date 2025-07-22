@@ -78,7 +78,7 @@ impl TokenRange {
 }
 
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct TypeKey(pub String, pub SourceModuleId);
+pub struct CustomTypeKey(pub String, pub SourceModuleId);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TypeKind {
@@ -103,7 +103,7 @@ pub enum TypeKind {
     F128PPC,
     Char,
     Array(Box<TypeKind>, u64),
-    CustomType(TypeKey),
+    CustomType(CustomTypeKey),
     Borrow(Box<TypeKind>, bool),
     UserPtr(Box<TypeKind>),
     CodegenPtr(Box<TypeKind>),

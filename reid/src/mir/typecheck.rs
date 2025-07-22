@@ -138,7 +138,7 @@ fn check_typedefs_for_recursion<'a, 'b>(
     match &typedef.kind {
         TypeDefinitionKind::Struct(StructType(fields)) => {
             for field_ty in fields.iter().map(|StructField(_, ty, _)| ty) {
-                if let TypeKind::CustomType(TypeKey(name, _)) = field_ty {
+                if let TypeKind::CustomType(CustomTypeKey(name, _)) = field_ty {
                     if seen.contains(name) {
                         state.ok::<_, Infallible>(
                             Err(ErrorKind::RecursiveTypeDefinition(
@@ -636,7 +636,7 @@ impl Expression {
                 }
             }
             ExprKind::Struct(struct_name, items) => {
-                let type_key = TypeKey(struct_name.clone(), state.module_id.unwrap());
+                let type_key = CustomTypeKey(struct_name.clone(), state.module_id.unwrap());
                 let struct_def = state
                     .scope
                     .get_struct_type(&type_key)

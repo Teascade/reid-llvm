@@ -412,7 +412,7 @@ impl Expression {
             Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((
                 ReturnKind::Soft,
-                TypeKind::CustomType(TypeKey(name.clone(), mod_id)),
+                TypeKind::CustomType(CustomTypeKey(name.clone(), mod_id)),
             )),
             Borrow(var, mutable) => {
                 let ret_type = var.return_type()?;

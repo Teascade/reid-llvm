@@ -14,7 +14,7 @@ use super::{
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
-    ReturnKind, StmtKind, TypeKey,
+    ReturnKind, StmtKind, CustomTypeKey,
     TypeKind::*,
     VagueType::*,
 };
@@ -339,7 +339,7 @@ impl Expression {
                 }
             }
             ExprKind::Struct(struct_name, fields) => {
-                let type_key = TypeKey(struct_name.clone(), state.module_id.unwrap());
+                let type_key = CustomTypeKey(struct_name.clone(), state.module_id.unwrap());
                 let expected_struct_ty = state
                     .scope
                     .get_struct_type(&type_key)
