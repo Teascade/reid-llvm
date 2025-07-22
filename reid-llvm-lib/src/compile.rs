@@ -1070,12 +1070,12 @@ impl CmpPredicate {
         use CmpPredicate::*;
         use LLVMRealPredicate::*;
         match self {
-            LT => LLVMRealOLT,
-            LE => LLVMRealOLE,
-            GT => LLVMRealOGT,
-            GE => LLVMRealOGE,
-            EQ => LLVMRealOEQ,
-            NE => LLVMRealONE,
+            LT => LLVMRealULT,
+            LE => LLVMRealULE,
+            GT => LLVMRealUGT,
+            GE => LLVMRealUGE,
+            EQ => LLVMRealUEQ,
+            NE => LLVMRealUNE,
         }
     }
 }
