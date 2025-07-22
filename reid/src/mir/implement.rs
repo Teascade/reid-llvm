@@ -491,8 +491,8 @@ impl IfExpression {
         mod_id: SourceModuleId,
     ) -> Result<(ReturnKind, TypeKind), ReturnTypeOther> {
         let then_r = self.1.return_type(refs, mod_id)?;
-        if let Some(else_b) = &self.2 {
-            let else_r = else_b.return_type(refs, mod_id)?;
+        if let Some(else_e) = self.2.as_ref() {
+            let else_r = else_e.return_type(refs, mod_id)?;
 
             let kind = if then_r.0 == ReturnKind::Hard && else_r.0 == ReturnKind::Hard {
                 ReturnKind::Hard

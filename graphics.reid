@@ -1,0 +1,153 @@
+struct StringBuffer {
+    buffer: [char; 64],
+}
+
+struct SDL_Thing {} // TODO: replace with proper dummy structs now that we can cast
+struct SDL_FRect { x: f32, y: f32, w: f32, h: f32 }
+struct SDL_Rect { x: i32, y: i32, w: i32, h: i32 }
+extern fn SDL_malloc(size: u64) -> *SDL_Thing;
+extern fn SDL_Init(flags: u32) -> bool;
+extern fn SDL_Quit();
+extern fn SDL_CreateWindowAndRenderer(title: *char, width: i32, height: i32, flags: i32,
+    window_out: &mut *SDL_Thing, renderer_out: &mut *SDL_Thing) -> bool;
+extern fn SDL_Delay(ms: u32);
+extern fn SDL_SetRenderDrawColor(renderer: *SDL_Thing, r: u8, g: u8, b: u8, a: u8);
+extern fn SDL_RenderClear(renderer: *SDL_Thing);
+extern fn SDL_RenderPresent(renderer: *SDL_Thing);
+extern fn SDL_HasEvent(event_type: u32) -> bool;
+extern fn SDL_PumpEvents();
+extern fn SDL_FlushEvents(min_type: u32, max_type: u32);
+extern fn SDL_GetTicks() -> u64;
+extern fn SDL_snprintf(text: &mut StringBuffer, maxlen: u64, fmt: *char, var: u64) -> i32;
+extern fn SDL_SetWindowTitle(window: *SDL_Thing, title: &StringBuffer) -> bool;
+extern fn SDL_CreateTexture(renderer: *SDL_Thing, 
+    pixel_format: u32, texture_access: u32, width: u32, height: u32) -> *SDL_Thing;
+extern fn SDL_RenderTexture(renderer: *SDL_Thing,
+    texture: *SDL_Thing, srcfrect: &SDL_FRect, dstfrect: &SDL_FRect) -> bool;
+extern fn SDL_UpdateTexture(texture: *SDL_Thing, rect: &SDL_Rect, pixels: *u8, pitch: u32) -> bool;
+extern fn SDL_Log(fmt: *char, string_var: *char);
+extern fn SDL_GetError() -> *char;
+extern fn SDL_GetWindowSize(window: *SDL_Thing, w: &mut i32, h: &mut i32) -> bool;
+
+struct GameState {
+    renderer: *SDL_Thing,
+    window: *SDL_Thing,
+    render_texture: *SDL_Thing,
+    frame_counter: u64,
+    pixels: *u8,
+    pixels_w: u32,
+    pixels_h: u32,
+}
+
+fn main() -> i32 {
+    let SDL_INIT_VIDEO = 32;
+    let SDL_WINDOW_RESIZABLE = 32;
+    let SDL_PIXELFORMAT_RGBA8888 = 373694468;
+    let SDL_PIXELFORMAT_ABGR8888 = 376840196;
+    let SDL_TEXTUREACCESS_STREAMING = 1;
+
+    let init_success = SDL_Init(SDL_INIT_VIDEO);
+    if init_success == false {
+        SDL_Log("SDL init failed: %s", SDL_GetError());
+        return 1;
+    }
+
+    let mut window = placeholder_ptr();
+    let mut renderer = placeholder_ptr();
+    let gfx_init_success = SDL_CreateWindowAndRenderer(
+        "graphical reid program", 640, 480, SDL_WINDOW_RESIZABLE,
+        &mut window, &mut renderer
+    );
+    if gfx_init_success == false {
+        SDL_Log("SDL renderer and window creation failed: %s", SDL_GetError());
+        return 1;
+    }
+
+    let width = 256;
+    let height = 256;
+    let render_texture = SDL_CreateTexture(renderer, 
+        SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+
+    let pixels_len = (width * height * 4) as u64;
+    let pixels = SDL_malloc(pixels_len) as *u8;
+    let mut game_state = GameState {
+        renderer: renderer,
+        window: window,
+        render_texture: render_texture,
+        frame_counter: 0,
+        pixels: pixels,
+        pixels_w: width,
+        pixels_h: height,
+    };
+
+    frame_loop(game_state);
+
+    // TODO: maybe clean up resources here but also it's a bit of a waste of energy
+    SDL_Quit();
+    return 0;
+}
+
+fn frame_loop(game_state: GameState) -> GameState {
+    SDL_PumpEvents();
+    if SDL_HasEvent(256) { // SDL_EVENT_QUIT
+        return game_state;
+    }
+    SDL_FlushEvents(0, 4294967296);
+
+    let mut screen_width = 0;
+    let mut screen_height = 0;
+    SDL_GetWindowSize(game_state.window, &mut screen_width, &mut screen_height);
+
+    let renderer = game_state.renderer;
+    SDL_SetRenderDrawColor(renderer, 0, 50, 90, 255);
+    SDL_RenderClear(renderer);
+
+    let w = game_state.pixels_w;
+    let h = game_state.pixels_h;
+    draw_pixels(game_state.pixels, 0, 0, w, h, game_state.frame_counter);
+    let texture_area = SDL_Rect { x: 0, y: 0, w: w as i32, h: h as i32 };
+    if SDL_UpdateTexture(game_state.render_texture, &texture_area, game_state.pixels, 4 * w) == false {
+        SDL_Log("UpdateTexture error: %s", SDL_GetError());
+    }
+    let src = SDL_FRect { x: 0.0, y: 0.0, w: w as f32, h: h as f32 };
+    let dst = SDL_FRect { x: 0.0, y: 0.0, w: screen_width as f32, h: screen_height as f32 };
+    if SDL_RenderTexture(renderer, game_state.render_texture, &src, &dst) == false {
+        SDL_Log("RenderTexture error: %s", SDL_GetError());
+    }
+
+    SDL_RenderPresent(renderer);
+    SDL_Delay(16);
+
+    game_state.frame_counter = game_state.frame_counter + 1;
+    let mut s = StringBuffer {};
+    SDL_snprintf(&mut s, 64, "graphical reid program frame %u", game_state.frame_counter);
+    SDL_SetWindowTitle(game_state.window, &s);
+
+    return frame_loop(game_state);
+}
+
+fn placeholder_ptr() -> *SDL_Thing {
+    return SDL_malloc(1);
+}
+
+fn draw_pixels(pixels: *u8, x: u32, y: u32, w: u32, h: u32, frame_counter: u64) -> i32 {
+    if y >= h {
+        return 0;
+    }
+    let index = (x + y * w) * 4;
+
+    pixels[index + 0] = x as u8;
+    pixels[index + 1] = y as u8;
+    pixels[index + 2] = frame_counter as u8;
+    pixels[index + 3] = 255;
+
+    let mut new_x = x + 1;
+    let mut new_y = y;
+    if new_x >= w {
+        new_x = 0;
+        new_y = y + 1;
+    }
+
+    draw_pixels(pixels, new_x, new_y, w, h, frame_counter);
+    return 0;
+}

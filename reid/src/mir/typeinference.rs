@@ -227,22 +227,26 @@ impl Expression {
                 let lhs_res = lhs.infer_types(state, type_refs);
                 let lhs_hints = state.ok(lhs_res, cond.1);
 
-                if let Some(rhs) = rhs {
+                if let Some(rhs) = rhs.as_mut() {
                     // Infer RHS return type
                     let rhs_res = rhs.infer_types(state, type_refs);
                     let rhs_hints = state.ok(rhs_res, cond.1);
 
                     // Narrow LHS to the same type as RHS and return it's return type
                     if let (Some(mut lhs_hints), Some(mut rhs_hints)) = (lhs_hints, rhs_hints) {
-                        lhs_hints.1.narrow(&mut rhs_hints.1);
-                        Ok(pick_return(lhs_hints, rhs_hints).1)
+                        lhs_hints
+                            .narrow(&mut rhs_hints)
+                            .ok_or(ErrorKind::TypesIncompatible(
+                                lhs_hints.resolve_deep().unwrap(),
+                                rhs_hints.resolve_deep().unwrap(),
+                            ))
                     } else {
                         // Failed to retrieve types from either
                         Ok(type_refs.from_type(&Vague(Unknown)).unwrap())
                     }
                 } else {
                     // Return LHS return type
-                    if let Some((_, type_ref)) = lhs_hints {
+                    if let Some(type_ref) = lhs_hints {
                         Ok(type_ref)
                     } else {
                         Ok(type_refs.from_type(&Vague(Unknown)).unwrap())

@@ -275,7 +275,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 match character {
                     '\'' => Token::CharLit(value),
                     '\"' => Token::StringLit(value),
-                    _ => unsafe { unreachable_unchecked() },
+                    _ => unreachable!(),
                 }
             }
             // "words"

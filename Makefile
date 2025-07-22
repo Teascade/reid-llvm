@@ -3,7 +3,7 @@ BIN=$(SRC:.reid=.out)
 
 REID=cargo run --example cli
 LD=ld
-LDFLAGS=
+LDFLAGS=-lSDL3
 
 all: $(BIN)
 clean:

@@ -746,16 +746,19 @@ impl mir::Expression {
             }
             mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state),
             mir::ExprKind::Block(block) => {
-                let mut inner_scope = scope.with_block(scope.function.ir.block("inner"));
-                if let Some(ret) = block.codegen(&mut inner_scope, state) {
-                    inner_scope
-                        .block
-                        .terminate(Term::Br(scope.block.value()))
-                        .unwrap();
+                let inner = scope.function.ir.block("inner");
+                scope.block.terminate(Term::Br(inner.value())).unwrap();
+
+                let mut inner_scope = scope.with_block(inner);
+                let ret = if let Some(ret) = block.codegen(&mut inner_scope, state) {
                     Some(ret)
                 } else {
                     None
-                }
+                };
+                let outer = scope.function.ir.block("outer");
+                inner_scope.block.terminate(Term::Br(outer.value())).ok();
+                scope.swap_block(outer);
+                ret
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
                 let StackValue(kind, ty) = expression
@@ -1138,19 +1141,12 @@ impl mir::IfExpression {
             let before_v = debug.info.location(&debug.scope, before_location);
             scope.block.set_terminator_location(before_v).ok();
 
-            let then_location = self
-                .1
-                .return_meta()
-                .into_debug(scope.tokens, debug.scope)
-                .unwrap();
+            let then_location = self.1 .1.into_debug(scope.tokens, debug.scope).unwrap();
             let then_v = debug.info.location(&debug.scope, then_location);
             then_b.set_terminator_location(then_v).unwrap();
 
-            let else_location = if let Some(else_block) = &self.2 {
-                else_block
-                    .return_meta()
-                    .into_debug(scope.tokens, debug.scope)
-                    .unwrap()
+            let else_location = if let Some(else_expr) = self.2.as_ref() {
+                else_expr.1.into_debug(scope.tokens, debug.scope).unwrap()
             } else {
                 then_location
             };
@@ -1168,7 +1164,7 @@ impl mir::IfExpression {
         let then_res = self.1.codegen(&mut then_scope, state);
         then_scope.block.terminate(Term::Br(after_bb)).ok();
 
-        let else_res = if let Some(else_block) = &self.2 {
+        let else_res = if let Some(else_expr) = self.2.as_ref() {
             let mut else_scope = scope.with_block(else_b);
 
             scope
@@ -1176,7 +1172,7 @@ impl mir::IfExpression {
                 .terminate(Term::CondBr(condition.instr(), then_bb, else_bb))
                 .unwrap();
 
-            let opt = else_block.codegen(&mut else_scope, state);
+            let opt = else_expr.codegen(&mut else_scope, state);
 
             else_scope.block.terminate(Term::Br(after_bb)).ok();
 

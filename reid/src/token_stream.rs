@@ -166,8 +166,6 @@ impl<'a, 'b> TokenStream<'a, 'b> {
 
         match T::parse(clone) {
             Ok(res) => {
-                #[cfg(debug_assertions)]
-                // dbg!(&res);
                 let new_pos = ref_pos.max(self.position);
                 Ok((res, new_pos))
             }

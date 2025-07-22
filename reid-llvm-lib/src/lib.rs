@@ -199,6 +199,7 @@ pub struct BlockData {
     deleted: bool,
 }
 
+#[derive(Clone)]
 pub struct Block<'builder> {
     phantom: PhantomData<&'builder ()>,
     builder: Builder,

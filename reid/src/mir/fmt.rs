@@ -240,7 +240,7 @@ impl Display for IfExpression {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "if {} ", self.0)?;
         Display::fmt(&self.1, f)?;
-        if let Some(e) = *self.2 {
+        if let Some(e) = self.2.as_ref() {
             Display::fmt(&e, f)?;
         }
         Ok(())

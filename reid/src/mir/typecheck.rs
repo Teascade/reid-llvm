@@ -491,46 +491,31 @@ impl Expression {
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
                 let then_res = lhs.typecheck(state, &typerefs, hint_t);
-                let (then_ret_kind, then_ret_t) = state.or_else(
-                    then_res,
-                    (ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)),
-                    lhs.meta,
-                );
-                let else_ret_t = if let Some(else_block) = rhs {
-                    let res = else_block.typecheck(state, &typerefs, hint_t);
-                    let (else_ret_kind, else_ret_t) = state.or_else(
-                        res,
-                        (ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)),
-                        else_block.meta,
-                    );
+                let then_ret_t = state.or_else(then_res, TypeKind::Vague(Vague::Unknown), lhs.1);
+                let else_ret_t = if let Some(else_expr) = rhs.as_mut() {
+                    let res = else_expr.typecheck(state, &typerefs, hint_t);
+                    let else_ret_t =
+                        state.or_else(res, TypeKind::Vague(Vague::Unknown), else_expr.1);
 
-                    if else_ret_kind == ReturnKind::Hard {
-                        TypeKind::Void
-                    } else {
-                        else_ret_t
-                    }
+                    else_ret_t
                 } else {
                     // Else return type is Void if it does not exist
                     TypeKind::Void
                 };
-                let then_ret_t = if then_ret_kind == ReturnKind::Hard {
-                    TypeKind::Void
-                } else {
-                    then_ret_t
-                };
+                let then_ret_t = then_ret_t;
 
                 // Make sure then and else -blocks have the same return type
                 let collapsed = then_ret_t
                     .collapse_into(&else_ret_t)
                     .or(Err(ErrorKind::BranchTypesDiffer(then_ret_t, else_ret_t)))?;
 
-                if let Some(rhs) = rhs {
+                if let Some(rhs) = rhs.as_mut() {
                     // If rhs existed, typecheck both sides to perform type
                     // coercion.
                     let lhs_res = lhs.typecheck(state, &typerefs, Some(&collapsed));
                     let rhs_res = rhs.typecheck(state, &typerefs, Some(&collapsed));
-                    state.ok(lhs_res, lhs.meta);
-                    state.ok(rhs_res, rhs.meta);
+                    state.ok(lhs_res, lhs.1);
+                    state.ok(rhs_res, rhs.1);
                 }
 
                 Ok(collapsed)
