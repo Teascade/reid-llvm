@@ -21,6 +21,7 @@ use super::{
 };
 
 pub static STD_SOURCE: &str = include_str!("../../lib/std.reid");
+pub static STD_NAME: &str = "std";
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ErrorKind {
@@ -47,7 +48,7 @@ pub enum ErrorKind {
 }
 
 pub fn compile_std(module_map: &mut ErrorModules) -> Result<Module, ReidError> {
-    let (id, tokens) = parse_module(STD_SOURCE, "standard_library", module_map)?;
+    let (id, tokens) = parse_module(STD_SOURCE, STD_NAME, module_map)?;
     let module = compile_module(id, tokens, module_map, None, false)?;
 
     let module_id = module.module_id;
@@ -70,8 +71,9 @@ impl<'map> Pass for LinkerPass<'map> {
     type Data = ();
     type TError = ErrorKind;
     fn context(&mut self, context: &mut Context, mut state: LinkerPassState) -> PassResult {
-        let mains = (&mut context.modules)
-            .into_iter()
+        let mains = context
+            .modules
+            .iter_mut()
             .filter(|(_, module)| module.is_main)
             .collect::<Vec<_>>();
         if mains.len() > 1 {
@@ -115,11 +117,9 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 let module_name = unsafe { path.get_unchecked(0) };
 
-                let mut imported = if let Some(module) =
-                    modules.get_mut(module_ids.get(module_name).unwrap())
-                {
-                    module
-                } else if module_name == "std" {
+                let mut imported = if let Some(mod_id) = module_ids.get(module_name) {
+                    modules.get(mod_id).unwrap()
+                } else if module_name == STD_NAME {
                     let std = compile_std(&mut self.module_map)?;
                     modules.insert(
                         std.module_id,
@@ -324,10 +324,14 @@ impl<'map> Pass for LinkerPass<'map> {
             }
         }
 
-        let modules: Vec<Module> = modules
+        let mut modules: Vec<Module> = modules
             .into_values()
             .map(|v| Rc::into_inner(v).unwrap().into_inner())
             .collect();
+
+        for module in modules.drain(..) {
+            context.modules.insert(module.module_id, module);
+        }
 
         Ok(())
     }

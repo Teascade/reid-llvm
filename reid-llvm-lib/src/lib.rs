@@ -51,6 +51,7 @@ pub struct ModuleData {
     is_main: bool,
 }
 
+#[derive(Clone)]
 pub struct Module<'ctx> {
     phantom: PhantomData<&'ctx ()>,
     builder: Builder,

@@ -277,7 +277,7 @@ impl Context {
         let mut state = State::new();
         let mut scope = Scope::default();
         pass.context(self, PassState::from(&mut state, &mut scope, None))?;
-        for (_, module) in (&mut self.modules).into_iter() {
+        for (_, module) in &mut self.modules {
             module.pass(pass, &mut state, &mut scope.inner())?;
         }
         Ok(state)

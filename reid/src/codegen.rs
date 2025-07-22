@@ -1,7 +1,7 @@
-use std::{array, collections::HashMap, mem};
+use std::{array, collections::HashMap, hash::Hash, mem};
 
 use reid_lib::{
-    builder::{InstructionValue, TypeValue},
+    builder::{InstructionValue, ModuleValue, TypeValue},
     compile::CompiledModule,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugFileData, DebugInformation,
@@ -18,8 +18,9 @@ use crate::{
     error_raporting::ErrorModules,
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, Metadata, NamedVariableRef, SourceModuleId, StructField,
-        StructType, TypeDefinition, TypeDefinitionKind, TypeKey, TypeKind, VagueLiteral,
+        self, implement::TypeCategory, Metadata, ModuleMap, NamedVariableRef, SourceModuleId,
+        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKey, TypeKind,
+        VagueLiteral,
     },
 };
 
@@ -41,16 +42,22 @@ impl<'ctx> CodegenContext<'ctx> {
 impl mir::Context {
     /// Compile MIR [`Context`] into [`CodegenContext`] containing LLIR.
     pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
-        let mut modules = Vec::new();
-        for (_, module) in &self.modules {
-            modules.push(module.codegen(context));
+        let mut modules = HashMap::new();
+        let mut modules_sorted = self.modules.iter().map(|(_, m)| m).collect::<Vec<_>>();
+        modules_sorted.sort_by(|m1, m2| m2.module_id.cmp(&m1.module_id));
+
+        for module in &modules_sorted {
+            let codegen = module.codegen(context, modules.clone());
+            modules.insert(module.module_id, codegen);
         }
         CodegenContext { context }
     }
 }
 
+#[derive(Clone)]
 struct ModuleCodegen<'ctx> {
     module: Module<'ctx>,
+    type_values: HashMap<TypeKey, TypeValue>,
 }
 
 impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
@@ -59,16 +66,17 @@ impl<'ctx> std::fmt::Debug for ModuleCodegen<'ctx> {
     }
 }
 
-pub struct Scope<'ctx, 'a> {
+pub struct Scope<'ctx, 'scope> {
     context: &'ctx Context,
+    modules: &'scope HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
     tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
     module_id: SourceModuleId,
     function: &'ctx StackFunction<'ctx>,
     block: Block<'ctx>,
-    types: &'a HashMap<TypeValue, TypeDefinition>,
-    type_values: &'a HashMap<TypeKey, TypeValue>,
-    functions: &'a HashMap<String, StackFunction<'ctx>>,
+    types: &'scope HashMap<TypeValue, TypeDefinition>,
+    type_values: &'scope HashMap<TypeKey, TypeValue>,
+    functions: &'scope HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
 }
@@ -137,6 +145,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
     fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
         Scope {
             block,
+            modules: self.modules,
             tokens: self.tokens,
             function: self.function,
             context: self.context,
@@ -184,7 +193,11 @@ impl Default for State {
 }
 
 impl mir::Module {
-    fn codegen<'ctx>(&self, context: &'ctx Context) -> ModuleCodegen<'ctx> {
+    fn codegen<'ctx>(
+        &self,
+        context: &'ctx Context,
+        modules: HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
+    ) -> ModuleCodegen<'ctx> {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
 
@@ -236,9 +249,13 @@ impl mir::Module {
 
         for typedef in &self.typedefs {
             let type_key = TypeKey(typedef.name.clone(), typedef.source_module);
-
             let type_value = if typedef.source_module != self.module_id {
-                todo!()
+                *modules
+                    .get(&typedef.source_module)
+                    .unwrap()
+                    .type_values
+                    .get(&type_key)
+                    .unwrap()
             } else {
                 match &typedef.kind {
                     TypeDefinitionKind::Struct(StructType(fields)) => {
@@ -392,6 +409,7 @@ impl mir::Module {
 
             let mut scope = Scope {
                 context,
+                modules: &modules,
                 tokens,
                 module: &module,
                 module_id: self.module_id,
@@ -434,7 +452,10 @@ impl mir::Module {
             }
         }
 
-        ModuleCodegen { module }
+        ModuleCodegen {
+            module,
+            type_values,
+        }
     }
 }
 
@@ -879,7 +900,7 @@ impl mir::Expression {
             mir::ExprKind::Accessed(expression, type_kind, field) => {
                 let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
 
-                dbg!(&expression);
+                dbg!(&expression, &struct_val);
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
