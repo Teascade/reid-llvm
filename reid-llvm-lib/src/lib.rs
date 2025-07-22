@@ -250,7 +250,7 @@ impl Instr {
 }
 
 impl<'builder> Block<'builder> {
-    pub fn build<T: Into<String>>(
+    pub fn build_named<T: Into<String>>(
         &mut self,
         name: T,
         instruction: Instr,
@@ -268,7 +268,7 @@ impl<'builder> Block<'builder> {
         }
     }
 
-    pub fn build_anon(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
+    pub fn build(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
         unsafe {
             let name = instruction.default_name().to_owned();
             self.builder.add_instruction(

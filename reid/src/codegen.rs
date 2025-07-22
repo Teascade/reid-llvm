@@ -353,16 +353,16 @@ impl mir::Module {
                 // Codegen actual parameters
                 let arg_name = format!("arg.{}", p_name);
                 let param = entry
-                    .build(format!("{}.get", arg_name), Instr::Param(i))
+                    .build_named(format!("{}.get", arg_name), Instr::Param(i))
                     .unwrap();
                 let alloca = entry
-                    .build(
+                    .build_named(
                         &arg_name,
                         Instr::Alloca(p_ty.get_type(&type_values, &types)),
                     )
                     .unwrap();
                 entry
-                    .build(format!("{}.store", arg_name), Instr::Store(alloca, param))
+                    .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
                     .unwrap();
                 stack_values.insert(
                     p_name.clone(),
@@ -488,7 +488,7 @@ impl mir::Statement {
 
                 let alloca = scope
                     .block
-                    .build(
+                    .build_named(
                         name,
                         Instr::Alloca(value.1.get_type(scope.type_values, scope.types)),
                     )
@@ -497,7 +497,7 @@ impl mir::Statement {
 
                 scope
                     .block
-                    .build(
+                    .build_named(
                         format!("{}.store", name),
                         Instr::Store(alloca, value.instr()),
                     )
@@ -557,7 +557,7 @@ impl mir::Statement {
                     StackValueKind::Mutable(instr) => {
                         scope
                             .block
-                            .build(backing_var, Instr::Store(instr, rhs_value.instr()))
+                            .build_named(backing_var, Instr::Store(instr, rhs_value.instr()))
                             .unwrap()
                             .maybe_location(&mut scope.block, location);
                     }
@@ -600,7 +600,7 @@ impl mir::Expression {
                                 v.0.derive(
                                     scope
                                         .block
-                                        .build(
+                                        .build_named(
                                             format!("{}", varref.1),
                                             Instr::Load(
                                                 v.0.instr(),
@@ -647,7 +647,7 @@ impl mir::Expression {
                     _ => todo!(),
                 };
                 Some(StackValue(
-                    StackValueKind::Immutable(scope.block.build_anon(instr).unwrap()),
+                    StackValueKind::Immutable(scope.block.build(instr).unwrap()),
                     TypeKind::U32,
                 ))
             }
@@ -671,7 +671,7 @@ impl mir::Expression {
 
                 let val = scope
                     .block
-                    .build(
+                    .build_named(
                         call.name.clone(),
                         Instr::FunctionCall(callee.ir.value(), params),
                     )
@@ -686,11 +686,11 @@ impl mir::Expression {
                 let ptr = if ret_type_kind != TypeKind::Void {
                     let ptr = scope
                         .block
-                        .build(&call.name, Instr::Alloca(ret_type.clone()))
+                        .build_named(&call.name, Instr::Alloca(ret_type.clone()))
                         .unwrap();
                     scope
                         .block
-                        .build(format!("{}.store", call.name), Instr::Store(ptr, val))
+                        .build_named(format!("{}.store", call.name), Instr::Store(ptr, val))
                         .unwrap();
 
                     Some(ptr)
@@ -704,7 +704,7 @@ impl mir::Expression {
                             StackValueKind::Immutable(
                                 scope
                                     .block
-                                    .build(call.name.clone(), Instr::Load(ptr, ret_type))
+                                    .build_named(call.name.clone(), Instr::Load(ptr, ret_type))
                                     .unwrap(),
                             ),
                             ret_type_kind,
@@ -743,7 +743,7 @@ impl mir::Expression {
 
                 let first = scope
                     .block
-                    .build("array.zero", Instr::Constant(ConstValue::U32(0)))
+                    .build_named("array.zero", Instr::Constant(ConstValue::U32(0)))
                     .unwrap();
 
                 let TypeKind::CodegenPtr(inner) = ty else {
@@ -754,7 +754,7 @@ impl mir::Expression {
                     dbg!(&further_inner, &val_t);
                     let loaded = scope
                         .block
-                        .build(
+                        .build_named(
                             "array.load",
                             Instr::Load(
                                 kind.instr(),
@@ -765,7 +765,7 @@ impl mir::Expression {
                     (
                         scope
                             .block
-                            .build(format!("array.gep"), Instr::GetElemPtr(loaded, vec![idx]))
+                            .build_named(format!("array.gep"), Instr::GetElemPtr(loaded, vec![idx]))
                             .unwrap()
                             .maybe_location(&mut scope.block, location),
                         *further_inner,
@@ -777,7 +777,7 @@ impl mir::Expression {
                     (
                         scope
                             .block
-                            .build(
+                            .build_named(
                                 format!("array.gep"),
                                 Instr::GetElemPtr(kind.instr(), vec![first, idx]),
                             )
@@ -793,7 +793,7 @@ impl mir::Expression {
                         kind.derive(
                             scope
                                 .block
-                                .build(
+                                .build_named(
                                     "array.load",
                                     Instr::Load(
                                         ptr,
@@ -837,7 +837,7 @@ impl mir::Expression {
 
                 let array = scope
                     .block
-                    .build(&array_name, Instr::Alloca(array_ty.clone()))
+                    .build_named(&array_name, Instr::Alloca(array_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -847,30 +847,30 @@ impl mir::Expression {
 
                     let index_expr = scope
                         .block
-                        .build(
+                        .build_named(
                             index.to_string(),
                             Instr::Constant(ConstValue::U32(index as u32)),
                         )
                         .unwrap();
                     let first = scope
                         .block
-                        .build("zero", Instr::Constant(ConstValue::U32(0)))
+                        .build_named("zero", Instr::Constant(ConstValue::U32(0)))
                         .unwrap();
                     let ptr = scope
                         .block
-                        .build(gep_n, Instr::GetElemPtr(array, vec![first, index_expr]))
+                        .build_named(gep_n, Instr::GetElemPtr(array, vec![first, index_expr]))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                     scope
                         .block
-                        .build(store_n, Instr::Store(ptr, *instr))
+                        .build_named(store_n, Instr::Store(ptr, *instr))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                 }
 
                 let array_val = scope
                     .block
-                    .build(load_n, Instr::Load(array, array_ty))
+                    .build_named(load_n, Instr::Load(array, array_ty))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -897,7 +897,7 @@ impl mir::Expression {
 
                 let value = scope
                     .block
-                    .build(
+                    .build_named(
                         gep_n,
                         Instr::GetStructElemPtr(struct_val.instr(), idx as u32),
                     )
@@ -910,7 +910,7 @@ impl mir::Expression {
                         struct_val.0.derive(
                             scope
                                 .block
-                                .build(
+                                .build_named(
                                     load_n,
                                     Instr::Load(
                                         value,
@@ -937,7 +937,7 @@ impl mir::Expression {
 
                 let struct_ptr = scope
                     .block
-                    .build(name, Instr::Alloca(struct_ty.clone()))
+                    .build_named(name, Instr::Alloca(struct_ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -947,13 +947,13 @@ impl mir::Expression {
 
                     let elem_ptr = scope
                         .block
-                        .build(gep_n, Instr::GetStructElemPtr(struct_ptr, i as u32))
+                        .build_named(gep_n, Instr::GetStructElemPtr(struct_ptr, i as u32))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
                     if let Some(val) = exp.codegen(scope, state) {
                         scope
                             .block
-                            .build(store_n, Instr::Store(elem_ptr, val.instr()))
+                            .build_named(store_n, Instr::Store(elem_ptr, val.instr()))
                             .unwrap()
                             .maybe_location(&mut scope.block, location);
                     }
@@ -961,7 +961,7 @@ impl mir::Expression {
 
                 let struct_val = scope
                     .block
-                    .build(load_n, Instr::Load(struct_ptr, struct_ty))
+                    .build_named(load_n, Instr::Load(struct_ptr, struct_ty))
                     .unwrap();
 
                 Some(StackValue(
@@ -993,7 +993,7 @@ impl mir::Expression {
 
                 let var_ptr_instr = scope
                     .block
-                    .build(
+                    .build_named(
                         format!("{}.deref", varref.1),
                         Instr::Load(
                             v.0.instr(),
@@ -1009,7 +1009,7 @@ impl mir::Expression {
                                 v.0.derive(
                                     scope
                                         .block
-                                        .build(
+                                        .build_named(
                                             format!("{}.deref.inner", varref.1),
                                             Instr::Load(
                                                 var_ptr_instr,
@@ -1028,7 +1028,21 @@ impl mir::Expression {
                     }
                 })
             }
-            mir::ExprKind::CastTo(expression, type_kind) => todo!(),
+            mir::ExprKind::CastTo(expression, type_kind) => {
+                let val = expression.codegen(scope, state)?;
+                let cast_instr = val
+                    .1
+                    .get_type(scope.type_values, scope.types)
+                    .cast_instruction(
+                        val.instr(),
+                        &type_kind.get_type(scope.type_values, scope.types),
+                    )
+                    .unwrap();
+                Some(StackValue(
+                    val.0.derive(scope.block.build(cast_instr).unwrap()),
+                    type_kind.clone(),
+                ))
+            }
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
@@ -1109,7 +1123,7 @@ impl mir::IfExpression {
             incoming.extend(else_res.clone());
             let instr = scope
                 .block
-                .build(
+                .build_named(
                     "phi",
                     Instr::Phi(incoming.iter().map(|i| i.instr()).collect()),
                 )
@@ -1151,7 +1165,7 @@ impl mir::CmpOperator {
 impl mir::Literal {
     fn as_const(&self, block: &mut Block) -> InstructionValue {
         block
-            .build(format!("{}", self), self.as_const_kind())
+            .build_named(format!("{}", self), self.as_const_kind())
             .unwrap()
     }
 

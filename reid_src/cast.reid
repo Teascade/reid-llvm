@@ -1,6 +1,6 @@
 // Arithmetic, function calls and imports!
 
-fn other() -> u16 {
+fn other() -> i16 {
   return 6;
 }
 
