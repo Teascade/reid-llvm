@@ -4,8 +4,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData, NamedStruct,
-    TerminatorKind, Type, TypeCategory, TypeData,
+    Block, BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData,
+    NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
         DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
         InstructionDebugRecordData,
@@ -467,6 +467,18 @@ impl Builder {
                         _ => Err(()),
                     }
                 }
+                Instr::Trunc(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::ZExt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::SExt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::FPTrunc(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::FPExt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::FPToUI(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::FPToSI(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::UIToFP(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::SIToFP(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::PtrToInt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::IntToPtr(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
+                Instr::BitCast(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
             }
         }
     }
@@ -503,5 +515,127 @@ impl Builder {
 
             false
         }
+    }
+}
+
+impl InstructionValue {
+    pub fn with_location(self, block: &Block, location: DebugLocationValue) -> InstructionValue {
+        unsafe {
+            block.builder.add_instruction_location(&self, location);
+        }
+        self
+    }
+
+    pub fn maybe_location(
+        self,
+        block: &mut Block,
+        location: Option<DebugLocationValue>,
+    ) -> InstructionValue {
+        unsafe {
+            if let Some(location) = location {
+                block.builder.add_instruction_location(&self, location);
+            }
+        }
+        self
+    }
+
+    pub fn add_record(&self, block: &mut Block, record: InstructionDebugRecordData) {
+        unsafe {
+            block.builder.add_instruction_record(self, record);
+        }
+    }
+
+    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+        use Instr::*;
+        unsafe {
+            match &builder.instr_data(self).kind {
+                Param(nth) => builder
+                    .function_data(&self.0.0)
+                    .params
+                    .get(*nth)
+                    .cloned()
+                    .ok_or(()),
+                Constant(c) => Ok(c.get_type()),
+                Add(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FAdd(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FSub(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Mul(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FMul(lhs, rhs) => match_types(lhs, rhs, &builder),
+                UDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                SDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
+                URem(lhs, rhs) => match_types(lhs, rhs, &builder),
+                SRem(lhs, rhs) => match_types(lhs, rhs, &builder),
+                FRem(lhs, rhs) => match_types(lhs, rhs, &builder),
+                And(lhs, rhs) => match_types(lhs, rhs, &builder),
+                ICmp(_, _, _) => Ok(Type::Bool),
+                FCmp(_, _, _) => Ok(Type::Bool),
+                FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
+                Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
+                Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                Load(_, ty) => Ok(ty.clone()),
+                Store(_, value) => value.get_type(builder),
+                ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
+                GetElemPtr(instr, _) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    let Type::Ptr(inner_ty) = &instr_ty else {
+                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
+                    };
+                    match *inner_ty.clone() {
+                        Type::Array(elem_ty, _) => Ok(Type::Ptr(Box::new(*elem_ty.clone()))),
+                        _ => Ok(instr_ty),
+                    }
+                }
+                GetStructElemPtr(instr, idx) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    let Type::Ptr(inner_ty) = instr_ty else {
+                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
+                    };
+                    let Type::CustomType(ty_value) = *inner_ty else {
+                        panic!("GetStructElemPtr on non-struct! ({:?})", &inner_ty)
+                    };
+                    let field_ty = match builder.type_data(&ty_value).kind {
+                        CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
+                            fields.get_unchecked(*idx as usize).clone()
+                        }
+                    };
+                    Ok(Type::Ptr(Box::new(field_ty)))
+                }
+                ExtractValue(instr, idx) => {
+                    let instr_ty = instr.get_type(builder)?;
+                    Ok(match instr_ty {
+                        Type::CustomType(struct_ty) => {
+                            let data = builder.type_data(&struct_ty);
+                            match data.kind {
+                                CustomTypeKind::NamedStruct(named_struct) => {
+                                    named_struct.1.get(*idx as usize).unwrap().clone()
+                                }
+                            }
+                        }
+                        Type::Array(elem_ty, _) => *elem_ty.clone(),
+                        _ => return Err(()),
+                    })
+                }
+                Trunc(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                ZExt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                SExt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                FPTrunc(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                FPExt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                FPToUI(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                FPToSI(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                UIToFP(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                SIToFP(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                PtrToInt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                IntToPtr(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+                BitCast(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
+            }
+        }
+    }
+
+    fn cast_to(&self, builder: &Builder, ty: &Type) -> Result<Instr, ()> {
+        self.get_type(builder)?
+            .cast_instruction(*self, &ty)
+            .ok_or(())
     }
 }

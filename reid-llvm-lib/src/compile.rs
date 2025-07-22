@@ -943,6 +943,78 @@ impl InstructionHolder {
                     *idx,
                     name.as_ptr(),
                 ),
+                Trunc(instr_val, ty) => LLVMBuildTrunc(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                ZExt(instr_val, ty) => LLVMBuildZExt(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                SExt(instr_val, ty) => LLVMBuildSExt(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                FPTrunc(instr_val, ty) => LLVMBuildTrunc(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                FPExt(instr_val, ty) => LLVMBuildFPExt(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                FPToUI(instr_val, ty) => LLVMBuildFPToUI(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                FPToSI(instr_val, ty) => LLVMBuildFPToSI(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                UIToFP(instr_val, ty) => LLVMBuildUIToFP(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                SIToFP(instr_val, ty) => LLVMBuildSIToFP(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                PtrToInt(instr_val, ty) => LLVMBuildPtrToInt(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                IntToPtr(instr_val, ty) => LLVMBuildIntToPtr(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
+                BitCast(instr_val, ty) => LLVMBuildBitCast(
+                    module.builder_ref,
+                    module.values.get(instr_val).unwrap().value_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    name.as_ptr(),
+                ),
             }
         };
         if let Some(record) = &self.record {

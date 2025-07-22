@@ -233,6 +233,18 @@ impl Instr {
             Instr::ICmp(..) => "icmp",
             Instr::FunctionCall(..) => "call",
             Instr::FCmp(_, _, _) => "fcmp",
+            Instr::Trunc(_, _) => "trunc",
+            Instr::ZExt(_, _) => "zext",
+            Instr::SExt(_, _) => "sext",
+            Instr::FPTrunc(_, _) => "fptrunc",
+            Instr::FPExt(_, _) => "pfext",
+            Instr::FPToUI(_, _) => "fptoui",
+            Instr::FPToSI(_, _) => "fptosi",
+            Instr::UIToFP(_, _) => "uitofp",
+            Instr::SIToFP(_, _) => "sitofp",
+            Instr::PtrToInt(_, _) => "ptrtoint",
+            Instr::IntToPtr(_, _) => "inttoptr",
+            Instr::BitCast(_, _) => "bitcast",
         }
     }
 }
@@ -310,34 +322,6 @@ impl<'builder> Block<'builder> {
     }
 }
 
-impl InstructionValue {
-    pub fn with_location(self, block: &Block, location: DebugLocationValue) -> InstructionValue {
-        unsafe {
-            block.builder.add_instruction_location(&self, location);
-        }
-        self
-    }
-
-    pub fn maybe_location(
-        self,
-        block: &mut Block,
-        location: Option<DebugLocationValue>,
-    ) -> InstructionValue {
-        unsafe {
-            if let Some(location) = location {
-                block.builder.add_instruction_location(&self, location);
-            }
-        }
-        self
-    }
-
-    pub fn add_record(&self, block: &mut Block, record: InstructionDebugRecordData) {
-        unsafe {
-            block.builder.add_instruction_record(self, record);
-        }
-    }
-}
-
 #[derive(Clone)]
 pub struct InstructionData {
     kind: Instr,
@@ -355,6 +339,7 @@ pub enum CmpPredicate {
     NE,
 }
 
+/// https://llvm.org/docs/LangRef.html#instruction-reference
 #[derive(Clone)]
 pub enum Instr {
     Param(usize),
@@ -397,7 +382,55 @@ pub enum Instr {
 
     /// Integer Comparison
     ICmp(CmpPredicate, InstructionValue, InstructionValue),
+    /// FLoat Comparison
     FCmp(CmpPredicate, InstructionValue, InstructionValue),
+
+    /// The `trunc` instruction truncates the high order bits in value and
+    /// converts the remaining bits to ty2. Since the source size must be larger
+    /// than the destination size, `trunc` cannot be a no-op cast. It will
+    /// always truncate bits.
+    Trunc(InstructionValue, Type),
+    /// The `zext` fills the high order bits of the value with zero bits until
+    /// it reaches the size of the destination type, ty2.
+    ZExt(InstructionValue, Type),
+    /// The `sext` instruction performs a sign extension by copying the sign bit
+    /// (highest order bit) of the value until it reaches the bit size of the
+    /// type ty2.
+    SExt(InstructionValue, Type),
+    /// The `fptrunc` instruction casts a value from a larger floating-point
+    /// type to a smaller floating-point type.
+    FPTrunc(InstructionValue, Type),
+    /// The `fpext` instruction extends the value from a smaller floating-point
+    /// type to a larger floating-point type.
+    FPExt(InstructionValue, Type),
+    /// The `fptoui` instruction takes a value to cast, which must be a scalar
+    /// or vector floating-point value, and a type to cast it to ty2, which must
+    /// be an integer type.
+    FPToUI(InstructionValue, Type),
+    /// The `fptosi` instruction takes a value to cast, which must be a scalar
+    /// or vector floating-point value, and a type to cast it to ty2, which must
+    /// be an integer type.
+    FPToSI(InstructionValue, Type),
+    /// The `uitofp` instruction takes a value to cast, which must be a scalar
+    /// or vector integer value, and a type to cast it to ty2, which must be an
+    /// floating-point type.
+    UIToFP(InstructionValue, Type),
+    /// The `sitofp` instruction takes a value to cast, which must be a scalar
+    /// or vector integer value, and a type to cast it to ty2, which must be an
+    /// floating-point type
+    SIToFP(InstructionValue, Type),
+    /// The `ptrtoint` instruction converts value to integer type ty2 by
+    /// interpreting the all pointer representation bits as an integer
+    /// (equivalent to a bitcast) and either truncating or zero extending that
+    /// value to the size of the integer type.
+    PtrToInt(InstructionValue, Type),
+    /// The `inttoptr` instruction converts value to type ty2 by applying either
+    /// a zero extension or a truncation depending on the size of the integer
+    /// value.
+    IntToPtr(InstructionValue, Type),
+    /// The `bitcast` instruction converts value to type ty2. It is always a
+    /// no-op cast because no bits change with this conversion.
+    BitCast(InstructionValue, Type),
 
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }
@@ -472,84 +505,6 @@ pub enum CustomTypeKind {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct NamedStruct(pub String, pub Vec<Type>);
-
-impl InstructionValue {
-    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
-        use Instr::*;
-        unsafe {
-            match &builder.instr_data(self).kind {
-                Param(nth) => builder
-                    .function_data(&self.0.0)
-                    .params
-                    .get(*nth)
-                    .cloned()
-                    .ok_or(()),
-                Constant(c) => Ok(c.get_type()),
-                Add(lhs, rhs) => match_types(lhs, rhs, &builder),
-                FAdd(lhs, rhs) => match_types(lhs, rhs, &builder),
-                Sub(lhs, rhs) => match_types(lhs, rhs, &builder),
-                FSub(lhs, rhs) => match_types(lhs, rhs, &builder),
-                Mul(lhs, rhs) => match_types(lhs, rhs, &builder),
-                FMul(lhs, rhs) => match_types(lhs, rhs, &builder),
-                UDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
-                SDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
-                FDiv(lhs, rhs) => match_types(lhs, rhs, &builder),
-                URem(lhs, rhs) => match_types(lhs, rhs, &builder),
-                SRem(lhs, rhs) => match_types(lhs, rhs, &builder),
-                FRem(lhs, rhs) => match_types(lhs, rhs, &builder),
-                And(lhs, rhs) => match_types(lhs, rhs, &builder),
-                ICmp(_, _, _) => Ok(Type::Bool),
-                FCmp(_, _, _) => Ok(Type::Bool),
-                FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
-                Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
-                Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
-                Load(_, ty) => Ok(ty.clone()),
-                Store(_, value) => value.get_type(builder),
-                ArrayAlloca(ty, _) => Ok(Type::Ptr(Box::new(ty.clone()))),
-                GetElemPtr(instr, _) => {
-                    let instr_ty = instr.get_type(builder)?;
-                    let Type::Ptr(inner_ty) = &instr_ty else {
-                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
-                    };
-                    match *inner_ty.clone() {
-                        Type::Array(elem_ty, _) => Ok(Type::Ptr(Box::new(*elem_ty.clone()))),
-                        _ => Ok(instr_ty),
-                    }
-                }
-                GetStructElemPtr(instr, idx) => {
-                    let instr_ty = instr.get_type(builder)?;
-                    let Type::Ptr(inner_ty) = instr_ty else {
-                        panic!("GetStructElemPtr on non-pointer! ({:?})", &instr_ty)
-                    };
-                    let Type::CustomType(ty_value) = *inner_ty else {
-                        panic!("GetStructElemPtr on non-struct! ({:?})", &inner_ty)
-                    };
-                    let field_ty = match builder.type_data(&ty_value).kind {
-                        CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
-                            fields.get_unchecked(*idx as usize).clone()
-                        }
-                    };
-                    Ok(Type::Ptr(Box::new(field_ty)))
-                }
-                ExtractValue(instr, idx) => {
-                    let instr_ty = instr.get_type(builder)?;
-                    Ok(match instr_ty {
-                        Type::CustomType(struct_ty) => {
-                            let data = builder.type_data(&struct_ty);
-                            match data.kind {
-                                CustomTypeKind::NamedStruct(named_struct) => {
-                                    named_struct.1.get(*idx as usize).unwrap().clone()
-                                }
-                            }
-                        }
-                        Type::Array(elem_ty, _) => *elem_ty.clone(),
-                        _ => return Err(()),
-                    })
-                }
-            }
-        }
-    }
-}
 
 impl ConstValue {
     pub fn get_type(&self) -> Type {
@@ -655,6 +610,63 @@ impl Type {
             Type::Bool | Type::Void | Type::CustomType(_) | Type::Array(_, _) | Type::Ptr(_) => {
                 TypeCategory::Other
             }
+        }
+    }
+
+    pub fn cast_instruction(&self, value: InstructionValue, other: &Type) -> Option<Instr> {
+        use Type::*;
+        match (self, other) {
+            (I8, I16 | I32 | I64 | I128) => Some(Instr::SExt(value, other.clone())),
+            (I16, I32 | I64 | I128) => Some(Instr::SExt(value, other.clone())),
+            (I32, I64 | I128) => Some(Instr::SExt(value, other.clone())),
+            (I64, I128) => Some(Instr::SExt(value, other.clone())),
+            (I128 | U128, I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8) => {
+                Some(Instr::Trunc(value, other.clone()))
+            }
+            (I64 | U64, I32 | U32 | I16 | U16 | I8 | U8) => {
+                Some(Instr::Trunc(value, other.clone()))
+            }
+            (I32 | U32, I16 | U16 | I8 | U8) => Some(Instr::Trunc(value, other.clone())),
+            (I16 | U16, I8 | U8) => Some(Instr::Trunc(value, other.clone())),
+            (U8 | I8, U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
+                Some(Instr::ZExt(value, other.clone()))
+            }
+            (U16 | I16, U32 | I32 | U64 | I64 | U128 | I128) => {
+                Some(Instr::ZExt(value, other.clone()))
+            }
+            (U32 | I32, U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
+            (U64 | I64, U128 | I128) => Some(Instr::ZExt(value, other.clone())),
+            (U8 | U16 | U32 | U64 | U128, F16 | F32 | F32B | F64 | F80 | F128 | F128PPC) => {
+                Some(Instr::UIToFP(value, other.clone()))
+            }
+            (I8 | I16 | I32 | I64 | I128, F16 | F32 | F32B | F64 | F80 | F128 | F128PPC) => {
+                Some(Instr::SIToFP(value, other.clone()))
+            }
+            (F16 | F32 | F32B | F64 | F80 | F128 | F128PPC, U8 | U16 | U32 | U64 | U128) => {
+                Some(Instr::FPToUI(value, other.clone()))
+            }
+            (F16 | F32 | F32B | F64 | F80 | F128 | F128PPC, I8 | I16 | I32 | I64 | I128) => {
+                Some(Instr::FPToSI(value, other.clone()))
+            }
+            (I128 | U128 | I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8, Ptr(_)) => {
+                Some(Instr::IntToPtr(value, other.clone()))
+            }
+            (Ptr(_), I128 | U128 | I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8) => {
+                Some(Instr::PtrToInt(value, other.clone()))
+            }
+            (F16, F32 | F32B | F64 | F80 | F128 | F128PPC) => {
+                Some(Instr::FPExt(value, other.clone()))
+            }
+            (F32 | F32B, F64 | F80 | F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
+            (F64, F80 | F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
+            (F80, F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
+            (F128PPC | F128, F80 | F64 | F32B | F32 | F16) => {
+                Some(Instr::FPTrunc(value, other.clone()))
+            }
+            (F80, F64 | F32B | F32 | F16) => Some(Instr::FPTrunc(value, other.clone())),
+            (F64, F32B | F32 | F16) => Some(Instr::FPTrunc(value, other.clone())),
+            (F32B | F32, F16) => Some(Instr::FPTrunc(value, other.clone())),
+            _ => None,
         }
     }
 }

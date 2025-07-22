@@ -342,6 +342,42 @@ impl Debug for Instr {
             Instr::ExtractValue(instruction_value, index) => {
                 fmt_index(f, instruction_value, &index.to_string())
             }
+            Instr::Trunc(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::ZExt(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::SExt(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::FPTrunc(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::FPExt(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::FPToUI(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::FPToSI(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::UIToFP(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::SIToFP(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::PtrToInt(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::IntToPtr(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
+            Instr::BitCast(instr_val, ty) => {
+                write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
+            }
         }
     }
 }
