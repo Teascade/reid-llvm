@@ -1,0 +1,5 @@
+// Arithmetic, function calls and imports!
+
+pub fn main() -> char {
+  return 'b';
+}

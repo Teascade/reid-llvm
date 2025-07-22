@@ -1,6 +1,7 @@
 // Arithmetic, function calls and imports!
 
 import std::allocate;
+import std::print;
 
 fn other() -> i16 {
   return 6;
@@ -8,6 +9,8 @@ fn other() -> i16 {
 
 fn main() -> u32 {
   let value = other() as u32;
+  let other_value = other() as f32;
+  let same_value = other() as i16;
 
   let v = (allocate(4) as *u32);
 

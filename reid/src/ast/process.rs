@@ -289,6 +289,7 @@ impl ast::Literal {
             ast::Literal::Bool(v) => mir::Literal::Bool(*v),
             ast::Literal::String(val) => mir::Literal::String(val.clone()),
             ast::Literal::Decimal(v) => mir::Literal::Vague(mir::VagueLiteral::Decimal(*v)),
+            ast::Literal::Char(inner) => mir::Literal::Char(inner.chars().next().unwrap()),
         }
     }
 }

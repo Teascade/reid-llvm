@@ -1199,6 +1199,7 @@ impl mir::Literal {
             mir::Literal::F80(val) => ConstValue::F80(val),
             mir::Literal::F128(val) => ConstValue::F128(val),
             mir::Literal::F128PPC(val) => ConstValue::F128PPC(val),
+            mir::Literal::Char(c) => todo!(),
         })
     }
 }

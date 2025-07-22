@@ -1,4 +1,4 @@
-use std::{fmt::Debug, str::Chars};
+use std::{fmt::Debug, hint::unreachable_unchecked, str::Chars};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -8,7 +8,9 @@ pub enum Token {
     Identifier(String),
     /// Number with at most one decimal point
     DecimalValue(u64),
-    /// Some string literal that was surrounded by "quotes".
+    /// Some character literal that was surrounded by 'single-quotes'.
+    CharLit(String),
+    /// Some string literal that was surrounded by "double-quotes".
     StringLit(String),
 
     // Keywords
@@ -112,6 +114,7 @@ impl ToString for Token {
         match &self {
             Token::Identifier(ident) => ident.clone(),
             Token::DecimalValue(val) => val.to_string(),
+            Token::CharLit(lit) => format!("\'{}\'", lit),
             Token::StringLit(lit) => format!("\"{}\"", lit),
             Token::LetKeyword => String::from("let"),
             Token::MutKeyword => String::from("mut"),
@@ -245,10 +248,12 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 }
                 continue;
             }
-            '\"' => {
+            '\"' | '\'' => {
                 let mut value = String::new();
                 let mut ignore_next = false;
-                while cursor.first().is_some() && (cursor.first() != Some('\"') || ignore_next) {
+                while cursor.first().is_some()
+                    && (cursor.first() != Some(*character) || ignore_next)
+                {
                     if cursor.first() == Some('\\') && !ignore_next {
                         cursor.next(); // Consume backslash anjd always add next character
                         ignore_next = true;
@@ -257,12 +262,16 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                         value += &cursor.next().unwrap().to_string();
                     }
                 }
-                if cursor.first() == Some('\"') {
+                if cursor.first() == Some(*character) {
                     cursor.next();
                 } else {
                     return Err(Error::MissingQuotation(position));
                 }
-                Token::StringLit(value)
+                match character {
+                    '\'' => Token::StringLit(value),
+                    '\"' => Token::StringLit(value),
+                    _ => unsafe { unreachable_unchecked() },
+                }
             }
             // "words"
             c if c.is_alphabetic() => {

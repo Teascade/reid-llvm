@@ -1,6 +1,4 @@
-use crate::util::try_all;
-
-use super::{pass::ScopeFunction, typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
+use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {
@@ -81,8 +79,12 @@ impl TypeKind {
             let other_cat = other.category();
             match (self, other) {
                 (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Ok(other.clone()),
+                (TypeKind::Str, TypeKind::U8) => Ok(other.clone()),
+                (TypeKind::U8, TypeKind::Str) => Ok(other.clone()),
                 _ => match (&self_cat, &other_cat) {
                     (TypeCategory::Integer, TypeCategory::Integer) => Ok(other.clone()),
+                    (TypeCategory::Integer, TypeCategory::Real) => Ok(other.clone()),
+                    (TypeCategory::Real, TypeCategory::Integer) => Ok(other.clone()),
                     (TypeCategory::Real, TypeCategory::Real) => Ok(other.clone()),
                     _ => Err(ErrorKind::NotCastableTo(self.clone(), other.clone())),
                 },
@@ -610,6 +612,7 @@ impl Literal {
             Literal::F80(_) => None,
             Literal::F128(_) => None,
             Literal::F128PPC(_) => None,
+            Literal::Char(_) => None,
         }
     }
 }

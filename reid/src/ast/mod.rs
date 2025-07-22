@@ -44,6 +44,7 @@ pub enum Literal {
     Decimal(f64),
     Bool(bool),
     String(String),
+    Char(String),
 }
 
 #[derive(Debug, Clone)]

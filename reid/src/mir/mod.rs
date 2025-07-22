@@ -162,6 +162,7 @@ pub enum Literal {
     F128PPC(f64),
     Bool(bool),
     String(String),
+    Char(char),
     Vague(VagueLiteral),
 }
 
@@ -195,6 +196,7 @@ impl Literal {
             Literal::F80(_) => TypeKind::F80,
             Literal::F128(_) => TypeKind::F128,
             Literal::F128PPC(_) => TypeKind::F128PPC,
+            Literal::Char(_) => todo!(),
         }
     }
 }

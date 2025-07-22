@@ -269,6 +269,7 @@ impl Display for Literal {
             Literal::F80(val) => write!(f, "{}f80", val),
             Literal::F128(val) => write!(f, "{}f128", val),
             Literal::F128PPC(val) => write!(f, "{}f128ppc", val),
+            Literal::Char(c) => std::fmt::Debug::fmt(c, f),
         }
     }
 }
