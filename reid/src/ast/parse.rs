@@ -23,7 +23,10 @@ impl Parse for Type {
                 return Err(stream.expected_err("array length (number)")?);
             };
             stream.expect(Token::BracketClose)?;
-            TypeKind::Array(Box::new(inner.0), length)
+            TypeKind::Array(
+                Box::new(inner.0),
+                length.parse().expect("Array length not parseable as u64!"),
+            )
         } else if let Some(Token::Et) = stream.peek() {
             stream.expect(Token::Et)?;
             let mutable = if let Some(Token::MutKeyword) = stream.peek() {
@@ -157,15 +160,19 @@ impl Parse for PrimaryExpression {
                         let Some(Token::DecimalValue(fractional)) = stream.next() else {
                             return Err(stream.expected_err("fractional part")?);
                         };
-                        let log = (fractional as f64).log10().ceil() as u32;
-                        let value = (*v as f64) + (fractional as f64) / (10u64.pow(log) as f64);
                         Expression(
-                            Kind::Literal(Literal::Decimal(value)),
+                            Kind::Literal(Literal::Decimal(
+                                format!("{}.{}", v, fractional)
+                                    .parse()
+                                    .expect("Decimal is not parseable as f64!"),
+                            )),
                             stream.get_range().unwrap(),
                         )
                     } else {
                         Expression(
-                            Kind::Literal(Literal::Integer(*v)),
+                            Kind::Literal(Literal::Integer(
+                                v.parse().expect("Integer is not parseable as u128!"),
+                            )),
                             stream.get_range().unwrap(),
                         )
                     }

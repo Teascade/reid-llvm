@@ -7,7 +7,7 @@ pub enum Token {
     /// Values
     Identifier(String),
     /// Number with at most one decimal point
-    DecimalValue(u64),
+    DecimalValue(String),
     /// Some character literal that was surrounded by 'single-quotes'.
     CharLit(String),
     /// Some string literal that was surrounded by "double-quotes".
@@ -318,7 +318,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     value += &c.to_string();
                     cursor.next();
                 }
-                Token::DecimalValue(value.parse().expect("Decimal not parseable to u64"))
+                Token::DecimalValue(value)
             }
             '-' if cursor.first() == Some('>') => {
                 cursor.next(); // Eat `>`

@@ -40,7 +40,7 @@ pub enum TypeKind {
 
 #[derive(Debug, Clone)]
 pub enum Literal {
-    Integer(u64),
+    Integer(u128),
     Decimal(f64),
     Bool(bool),
     String(String),

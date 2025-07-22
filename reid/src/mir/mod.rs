@@ -171,7 +171,7 @@ pub enum Literal {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub enum VagueLiteral {
-    Number(u64),
+    Number(u128),
     Decimal(f64),
 }
 

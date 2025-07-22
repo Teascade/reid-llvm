@@ -163,7 +163,7 @@ impl TypeKind {
             TypeKind::U128 => 128,
             TypeKind::Void => 0,
             TypeKind::Char => 8,
-            TypeKind::Array(type_kind, len) => type_kind.size_of() * len,
+            TypeKind::Array(type_kind, len) => type_kind.size_of() * (*len as u64),
             TypeKind::CustomType(..) => 32,
             TypeKind::CodegenPtr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
