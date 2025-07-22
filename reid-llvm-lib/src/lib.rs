@@ -629,14 +629,17 @@ impl Type {
             }
             (I32 | U32, I16 | U16 | I8 | U8) => Some(Instr::Trunc(value, other.clone())),
             (I16 | U16, I8 | U8) => Some(Instr::Trunc(value, other.clone())),
-            (U8 | I8, U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
+            (U8 | I8, U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
                 Some(Instr::ZExt(value, other.clone()))
             }
-            (U16 | I16, U32 | I32 | U64 | I64 | U128 | I128) => {
+            (U16 | I16, U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
                 Some(Instr::ZExt(value, other.clone()))
             }
-            (U32 | I32, U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
-            (U64 | I64, U128 | I128) => Some(Instr::ZExt(value, other.clone())),
+            (U32 | I32, U32 | I32 | U64 | I64 | U128 | I128) => {
+                Some(Instr::ZExt(value, other.clone()))
+            }
+            (U64 | I64, U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
+            (U128 | I128, U128 | I128) => Some(Instr::ZExt(value, other.clone())),
             (U8 | U16 | U32 | U64 | U128, F16 | F32 | F32B | F64 | F80 | F128 | F128PPC) => {
                 Some(Instr::UIToFP(value, other.clone()))
             }

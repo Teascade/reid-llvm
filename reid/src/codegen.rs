@@ -1085,7 +1085,8 @@ impl mir::Expression {
                         },
                         (TypeKind::UserPtr(_), TypeKind::UserPtr(_))
                         | (TypeKind::Char, TypeKind::U8)
-                        | (TypeKind::U8, TypeKind::Char) => Some(StackValue(
+                        | (TypeKind::U8, TypeKind::Char)
+                        | (TypeKind::U8, TypeKind::I8) => Some(StackValue(
                             val.0.derive(
                                 scope
                                     .block
