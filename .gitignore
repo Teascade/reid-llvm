@@ -9,3 +9,5 @@ main
 *.ll
 *.asm
 *.out
+*.llir
+*.mir

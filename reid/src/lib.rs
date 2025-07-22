@@ -197,7 +197,7 @@ pub fn compile_and_pass<'map>(
     source: &str,
     path: PathBuf,
     module_map: &'map mut ErrorModules,
-) -> Result<CompileOutput, ReidError> {
+) -> Result<(CompileOutput, CustomIRs), ReidError> {
     let path = path.canonicalize().unwrap();
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
@@ -220,10 +220,24 @@ pub fn compile_and_pass<'map>(
     println!("{}", &codegen_modules.context);
 
     let compiled = codegen_modules.compile();
-    Ok(compiled.output())
+    Ok((
+        compiled.output(),
+        CustomIRs {
+            llir: format!("{}", codegen_modules.context),
+            mir: format!("{}", mir_context),
+        },
+    ))
 }
 
-pub fn compile_simple(source: &str, path: PathBuf) -> Result<CompileOutput, ReidError> {
+pub struct CustomIRs {
+    pub llir: String,
+    pub mir: String,
+}
+
+pub fn compile_simple(
+    source: &str,
+    path: PathBuf,
+) -> Result<(CompileOutput, CustomIRs), ReidError> {
     let mut map = ErrorModules::default();
     compile_and_pass(source, path, &mut map)
 }
