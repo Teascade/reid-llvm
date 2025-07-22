@@ -762,22 +762,26 @@ impl TypeKind {
         refs: &TypeRefs,
         state: &TypecheckPassState,
     ) -> Result<TypeKind, ErrorKind> {
+        self.is_known(refs, state).map(|_| self.clone())
+    }
+
+    fn is_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<(), ErrorKind> {
         match &self {
-            TypeKind::Array(type_kind, _) => type_kind.as_ref().assert_known(refs, state),
+            TypeKind::Array(type_kind, _) => type_kind.as_ref().is_known(refs, state),
             TypeKind::CustomType(custom_type_key) => state
                 .scope
                 .types
                 .get(custom_type_key)
-                .map(|_| self.clone())
+                .map(|_| ())
                 .ok_or(ErrorKind::NoSuchType(
                     custom_type_key.0.clone(),
                     state.module_id.unwrap(),
                 )),
-            TypeKind::Borrow(type_kind, _) => type_kind.assert_known(refs, state),
-            TypeKind::UserPtr(type_kind) => type_kind.assert_known(refs, state),
-            TypeKind::CodegenPtr(type_kind) => type_kind.assert_known(refs, state),
+            TypeKind::Borrow(type_kind, _) => type_kind.is_known(refs, state),
+            TypeKind::UserPtr(type_kind) => type_kind.is_known(refs, state),
+            TypeKind::CodegenPtr(type_kind) => type_kind.is_known(refs, state),
             TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(*vague_type)),
-            _ => Ok(self.clone()),
+            _ => Ok(()),
         }
     }
 }

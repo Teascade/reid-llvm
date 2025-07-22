@@ -1,7 +1,12 @@
-struct SDL_Thing {}
-
-extern fn SDL_malloc(size: u64) -> *SDL_Thing;
-
-fn main() {
-    let pixels = SDL_malloc(4 * 320 * 240);
+fn vec_sub(l: [f32; 3], r: [f32; 3]) -> [f32; 3] {
+    return [l[0]-r[0], l[1]-r[1], l[2]-r[2]];
 }
+
+fn foo(x: f32) {
+    let a = [x, x, 0.0];
+    let b = [x, x, x]; // works
+    // let b = [x * 0.5, x * 0.5, x]; // does not work
+    vec_sub(a, b);
+}
+
+fn main() {}
