@@ -36,13 +36,25 @@ pub fn new_string() -> String {
 
 pub fn add_char(string: &mut String, c: char) {
     if ((*string).length + 1) >= (*string).max_length {
+        let new = allocate((*string).max_length + 4) as *char;
+        copy_bits((*string).inner, new, 0, (*string).max_length);
+
         free((*string).inner as *u8);
         (*string).max_length = (*string).max_length + 4;
-        (*string).inner = allocate((*string).max_length) as *char;
+        (*string).inner = new;
+
     }
     (*string).inner[(*string).length] = c;
     (((*string).inner) as *u8)[((*string).length + 1)] = 0;
     (*string).length = (*string).length + 1;
+}
+
+fn copy_bits(from: *char, to: *char, pos: u64, max: u64) -> u8 {
+    if (pos >= max) {
+        return 0;
+    }
+    to[pos] = from[pos];
+    return copy_bits(from, to, pos + 1, max);
 }
 
 pub fn free_string(string: &mut String) {

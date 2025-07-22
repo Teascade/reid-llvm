@@ -13,8 +13,8 @@ use super::{
     pass::{Pass, PassResult, PassState},
     typecheck::ErrorKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
-    Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
-    ReturnKind, StmtKind, CustomTypeKey,
+    Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
+    IfExpression, Module, ReturnKind, StmtKind,
     TypeKind::*,
     VagueType::*,
 };
@@ -183,8 +183,8 @@ impl Expression {
                 type_refs
                     .binop(op, &mut lhs_ref, &mut rhs_ref)
                     .ok_or(ErrorKind::TypesIncompatible(
-                        lhs_ref.as_type(),
-                        rhs_ref.as_type(),
+                        lhs_ref.resolve_deep().unwrap(),
+                        rhs_ref.resolve_deep().unwrap(),
                     ))
             }
             ExprKind::FunctionCall(function_call) => {

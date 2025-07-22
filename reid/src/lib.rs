@@ -150,7 +150,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{:-^100}", "TYPE INFERRER OUTPUT");
     #[cfg(debug_assertions)]
-    dbg!(&refs);
+    println!("{}", &refs);
     #[cfg(debug_assertions)]
     println!("{}", &context);
     #[cfg(debug_assertions)]

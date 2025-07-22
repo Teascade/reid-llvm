@@ -9,7 +9,10 @@ use crate::mir::VagueType;
 use super::{typecheck::ErrorKind, BinaryOperator, TypeKind};
 
 #[derive(Clone)]
-pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);
+pub struct TypeRef<'scope>(
+    pub(super) TypeIdRef,
+    pub(super) &'scope ScopeTypeRefs<'scope>,
+);
 
 impl<'scope> TypeRef<'scope> {
     /// Resolve current type in a weak manner, not resolving any Arrays or
@@ -54,9 +57,9 @@ type TypeIdRef = Rc<RefCell<usize>>;
 #[derive(Debug, Default)]
 pub struct TypeRefs {
     /// Simple list of types that variables can refrence
-    hints: RefCell<Vec<TypeKind>>,
+    pub(super) hints: RefCell<Vec<TypeKind>>,
     /// Indirect ID-references, referring to hints-vec
-    type_refs: RefCell<Vec<TypeIdRef>>,
+    pub(super) type_refs: RefCell<Vec<TypeIdRef>>,
 }
 
 impl TypeRefs {
@@ -89,7 +92,7 @@ impl TypeRefs {
         }
     }
 
-    unsafe fn recurse_type_ref(&self, mut idx: usize) -> TypeIdRef {
+    pub(super) unsafe fn recurse_type_ref(&self, mut idx: usize) -> TypeIdRef {
         let refs = self.type_refs.borrow();
         let mut inner_idx = refs.get_unchecked(idx);
         let mut seen = HashSet::new();
