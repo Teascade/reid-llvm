@@ -267,7 +267,11 @@ pub struct Expression(pub ExprKind, pub Metadata);
 
 /// Condition, Then, Else
 #[derive(Debug)]
-pub struct IfExpression(pub Box<Expression>, pub Block, pub Option<Block>);
+pub struct IfExpression(
+    pub Box<Expression>,
+    pub Box<Expression>,
+    pub Box<Option<Expression>>,
+);
 
 #[derive(Debug)]
 pub struct FunctionCall {

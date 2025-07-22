@@ -115,8 +115,8 @@ pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRang
 #[derive(Debug, Clone)]
 pub struct IfExpression(
     pub Expression,
-    pub Block,
-    pub Option<Block>,
+    pub Expression,
+    pub Option<Expression>,
     #[allow(dead_code)] pub TokenRange,
 );
 

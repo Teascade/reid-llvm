@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crate::{
     ast::{self},
     mir::{
-        self, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField, StructType,
-        CustomTypeKey,
+        self, CustomTypeKey, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField,
+        StructType,
     },
 };
 
@@ -205,13 +205,17 @@ impl ast::Expression {
             }
             ast::ExpressionKind::IfExpr(if_expression) => {
                 let cond = if_expression.0.process(module_id);
-                let then_block = if_expression.1.into_mir(module_id);
+                let then_block = if_expression.1.process(module_id);
                 let else_block = if let Some(el) = &if_expression.2 {
-                    Some(el.into_mir(module_id))
+                    Some(el.process(module_id))
                 } else {
                     None
                 };
-                mir::ExprKind::If(mir::IfExpression(Box::new(cond), then_block, else_block))
+                mir::ExprKind::If(mir::IfExpression(
+                    Box::new(cond),
+                    Box::new(then_block),
+                    Box::new(else_block),
+                ))
             }
             ast::ExpressionKind::Array(expressions) => {
                 mir::ExprKind::Array(expressions.iter().map(|e| e.process(module_id)).collect())
