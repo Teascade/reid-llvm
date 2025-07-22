@@ -1,12 +1,12 @@
 
 extern fn puts(message: *str) -> i32;
+extern fn malloc(size: u64) -> *u8;
+extern fn div(numerator: i32, denominator: i32) -> div_t;
 
 struct div_t {
     quotient: i32,
     remainder: i32,
 }
-
-extern fn div(numerator: i32, denominator: i32) -> div_t;
 
 pub fn print(message: *str) {
     puts(message);
@@ -14,6 +14,10 @@ pub fn print(message: *str) {
 
 pub fn int_div(numerator: i32, denominator: i32) -> div_t {
     return div(numerator, denominator);
+}
+
+pub fn allocate(size: u64) -> *u8 {
+    malloc(size)
 }
 
 fn main() -> u16 {
