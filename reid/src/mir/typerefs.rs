@@ -6,7 +6,7 @@ use std::{
 
 use crate::mir::VagueType;
 
-use super::{implement::Collapsable, typecheck::ErrorKind, BinaryOperator, TypeKind};
+use super::{typecheck::ErrorKind, BinaryOperator, TypeKind};
 
 #[derive(Clone)]
 pub struct TypeRef<'scope>(TypeIdRef, &'scope ScopeTypeRefs<'scope>);

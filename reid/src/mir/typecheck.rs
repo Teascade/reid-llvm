@@ -6,7 +6,6 @@ use crate::{mir::*, util::try_all};
 use VagueType as Vague;
 
 use super::{
-    implement::Collapsable,
     pass::{Pass, PassResult, PassState, ScopeVariable},
     typerefs::TypeRefs,
 };
@@ -67,6 +66,8 @@ pub enum ErrorKind {
     ImpossibleMutLet(String),
     #[error("Cannot produce a negative unsigned value of type {0}!")]
     NegativeUnsignedValue(TypeKind),
+    #[error("Cannot cast type {0} into type {1}!")]
+    NotCastableTo(TypeKind, TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -712,7 +713,10 @@ impl Expression {
 
                 Ok(*inner)
             }
-            ExprKind::CastTo(expression, type_kind) => todo!(),
+            ExprKind::CastTo(expression, type_kind) => {
+                let expr = expression.typecheck(state, typerefs, None)?;
+                expr.resolve_ref(typerefs).cast_into(type_kind)
+            }
         }
     }
 }

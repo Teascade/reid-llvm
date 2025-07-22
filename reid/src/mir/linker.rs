@@ -72,7 +72,7 @@ impl<'map> Pass for LinkerPass<'map> {
     type Data = ();
     type TError = ErrorKind;
     fn context(&mut self, context: &mut Context, mut state: LinkerPassState) -> PassResult {
-        let mut mains = context
+        let mains = context
             .modules
             .iter_mut()
             .filter(|m| m.is_main)

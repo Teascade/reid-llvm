@@ -397,7 +397,10 @@ impl Expression {
                     _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
                 }
             }
-            ExprKind::CastTo(expression, type_kind) => todo!(),
+            ExprKind::CastTo(expression, type_kind) => {
+                expression.infer_types(state, type_refs)?;
+                Ok(type_refs.from_type(type_kind).unwrap())
+            }
         }
     }
 }

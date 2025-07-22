@@ -1,0 +1,11 @@
+// Arithmetic, function calls and imports!
+
+fn other() -> u16 {
+  return 6;
+}
+
+fn main() -> u32 {
+  let value = other() as u32;
+
+  return value;
+}

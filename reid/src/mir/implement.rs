@@ -14,6 +14,82 @@ pub enum ReturnTypeOther {
 }
 
 impl TypeKind {
+    pub fn collapse_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
+        if self == other {
+            return Ok(self.clone());
+        }
+
+        match (self, other) {
+            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
+                match other {
+                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
+                    TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
+                    TypeKind::I8
+                    | TypeKind::I16
+                    | TypeKind::I32
+                    | TypeKind::I64
+                    | TypeKind::I128
+                    | TypeKind::U8
+                    | TypeKind::U16
+                    | TypeKind::U32
+                    | TypeKind::U64
+                    | TypeKind::U128 => Ok(other.clone()),
+                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+                }
+            }
+            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
+                match other {
+                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
+                    TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
+                    TypeKind::F16
+                    | TypeKind::F32B
+                    | TypeKind::F32
+                    | TypeKind::F64
+                    | TypeKind::F80
+                    | TypeKind::F128
+                    | TypeKind::F128PPC => Ok(other.clone()),
+                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+                }
+            }
+            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
+                Ok(other.clone())
+            }
+            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
+                // Extracted to give priority for other collapse-error
+                let collapsed = val1.collapse_into(val2)?;
+                if mut1 == mut2 {
+                    Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
+                } else {
+                    Err(ErrorKind::TypesDifferMutability(
+                        self.clone(),
+                        other.clone(),
+                    ))
+                }
+            }
+            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
+                Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
+            }
+            _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+        }
+    }
+
+    pub fn cast_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
+        if let Ok(collapsed) = self.collapse_into(other) {
+            Ok(collapsed)
+        } else {
+            let self_cat = self.category();
+            let other_cat = other.category();
+            match (self, other) {
+                (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Ok(other.clone()),
+                _ => match (&self_cat, &other_cat) {
+                    (TypeCategory::Integer, TypeCategory::Integer) => Ok(other.clone()),
+                    (TypeCategory::Real, TypeCategory::Real) => Ok(other.clone()),
+                    _ => Err(ErrorKind::NotCastableTo(self.clone(), other.clone())),
+                },
+            }
+        }
+    }
+
     /// Return the type that is the result of a binary operator between two
     /// values of this type
     pub fn binop_type(&self, op: &BinaryOperator) -> TypeKind {
@@ -159,6 +235,49 @@ impl TypeKind {
             _ => true,
         }
     }
+
+    pub fn category(&self) -> TypeCategory {
+        match self {
+            TypeKind::I8
+            | TypeKind::I16
+            | TypeKind::I32
+            | TypeKind::I64
+            | TypeKind::I128
+            | TypeKind::U8
+            | TypeKind::U16
+            | TypeKind::U32
+            | TypeKind::U64
+            | TypeKind::U128
+            | TypeKind::Str => TypeCategory::Integer,
+            TypeKind::F16
+            | TypeKind::F32B
+            | TypeKind::F32
+            | TypeKind::F64
+            | TypeKind::F128
+            | TypeKind::F80
+            | TypeKind::F128PPC => TypeCategory::Real,
+            TypeKind::Void => TypeCategory::Other,
+            TypeKind::Bool => TypeCategory::Other,
+            TypeKind::Array(_, _) => TypeCategory::Other,
+            TypeKind::CustomType(_) => TypeCategory::Other,
+            TypeKind::Borrow(_, _) => TypeCategory::Other,
+            TypeKind::UserPtr(_) => TypeCategory::Other,
+            TypeKind::CodegenPtr(_) => TypeCategory::Other,
+            TypeKind::Vague(vague_type) => match vague_type {
+                VagueType::Unknown => TypeCategory::Other,
+                VagueType::Integer => TypeCategory::Integer,
+                VagueType::Decimal => TypeCategory::Real,
+                VagueType::TypeRef(_) => TypeCategory::TypeRef,
+            },
+        }
+    }
+}
+
+pub enum TypeCategory {
+    Integer,
+    Real,
+    Other,
+    TypeRef,
 }
 
 impl StructType {
@@ -467,73 +586,6 @@ impl TypeKind {
     }
 }
 
-pub trait Collapsable: Sized + Clone {
-    /// Try to narrow two types into one singular type. E.g. Vague(Number) and
-    /// I32 could be narrowed to just I32.
-    fn collapse_into(&self, other: &Self) -> Result<Self, ErrorKind>;
-}
-
-impl Collapsable for TypeKind {
-    fn collapse_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        if self == other {
-            return Ok(self.clone());
-        }
-
-        match (self, other) {
-            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::I8
-                    | TypeKind::I16
-                    | TypeKind::I32
-                    | TypeKind::I64
-                    | TypeKind::I128
-                    | TypeKind::U8
-                    | TypeKind::U16
-                    | TypeKind::U32
-                    | TypeKind::U64
-                    | TypeKind::U128 => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::F16
-                    | TypeKind::F32B
-                    | TypeKind::F32
-                    | TypeKind::F64
-                    | TypeKind::F80
-                    | TypeKind::F128
-                    | TypeKind::F128PPC => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
-                Ok(other.clone())
-            }
-            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
-                // Extracted to give priority for other collapse-error
-                let collapsed = val1.collapse_into(val2)?;
-                if mut1 == mut2 {
-                    Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
-                } else {
-                    Err(ErrorKind::TypesDifferMutability(
-                        self.clone(),
-                        other.clone(),
-                    ))
-                }
-            }
-            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
-                Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
-            }
-            _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-        }
-    }
-}
-
 impl Literal {
     pub fn num_value(&self) -> Option<i128> {
         match self {
@@ -559,22 +611,6 @@ impl Literal {
             Literal::F128(_) => None,
             Literal::F128PPC(_) => None,
         }
-    }
-}
-
-impl Collapsable for ScopeFunction {
-    fn collapse_into(&self, other: &ScopeFunction) -> Result<ScopeFunction, ErrorKind> {
-        Ok(ScopeFunction {
-            ret: self.ret.collapse_into(&other.ret)?,
-            params: try_all(
-                self.params
-                    .iter()
-                    .zip(&other.params)
-                    .map(|(p1, p2)| p1.collapse_into(&p2))
-                    .collect(),
-            )
-            .map_err(|e| e.first().unwrap().clone())?,
-        })
     }
 }
 
