@@ -1030,22 +1030,25 @@ impl mir::Expression {
             }
             mir::ExprKind::CastTo(expression, type_kind) => {
                 let val = expression.codegen(scope, state)?;
-                let instr =
-                    if let (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) = (&val.1, type_kind) {
-                        val.0.instr()
-                    } else {
-                        let cast_instr = val
-                            .1
-                            .get_type(scope.type_values, scope.types)
-                            .cast_instruction(
-                                val.instr(),
-                                &type_kind.get_type(scope.type_values, scope.types),
-                            )
-                            .unwrap();
-                        scope.block.build(cast_instr).unwrap()
-                    };
+                if val.1 == *type_kind {
+                    Some(val)
+                } else if let (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) = (&val.1, type_kind) {
+                    Some(val)
+                } else {
+                    let cast_instr = val
+                        .1
+                        .get_type(scope.type_values, scope.types)
+                        .cast_instruction(
+                            val.instr(),
+                            &type_kind.get_type(scope.type_values, scope.types),
+                        )
+                        .unwrap();
 
-                Some(StackValue(val.0.derive(instr), type_kind.clone()))
+                    Some(StackValue(
+                        val.0.derive(scope.block.build(cast_instr).unwrap()),
+                        type_kind.clone(),
+                    ))
+                }
             }
         };
         if let Some(value) = &value {
