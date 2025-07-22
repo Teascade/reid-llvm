@@ -40,7 +40,7 @@ fn main() -> Result<(), std::io::Error> {
                 fs::write(&llir_path, &llir).expect("Could not write LLIR-file!");
                 println!("Output LLIR-file to {:?}\n", llir_path);
                 fs::write(&mir_path, &mir).expect("Could not write MIR-file!");
-                println!("Output MIR-file to {:?}\n", llir_path);
+                println!("Output MIR-file to {:?}\n", mir_path);
                 println!(
                     "Compilation took: {:.2}ms\n",
                     (after.duration_since(before).unwrap().as_micros() as f32) / 1000.
