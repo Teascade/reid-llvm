@@ -835,11 +835,7 @@ impl mir::Expression {
                     .expect("index returned none!")
                     .instr();
 
-                let first = scope
-                    .block
-                    .build_named("array.zero", Instr::Constant(ConstValue::U32(0)))
-                    .unwrap();
-
+                dbg!(&ty);
                 let TypeKind::CodegenPtr(inner) = ty else {
                     panic!();
                 };
@@ -848,7 +844,7 @@ impl mir::Expression {
                     let loaded = scope
                         .block
                         .build_named(
-                            "array.load",
+                            "load",
                             Instr::Load(
                                 kind.instr(),
                                 inner.get_type(scope.type_values, scope.types),
@@ -858,15 +854,36 @@ impl mir::Expression {
                     (
                         scope
                             .block
-                            .build_named(format!("array.gep"), Instr::GetElemPtr(loaded, vec![idx]))
+                            .build_named(format!("gep"), Instr::GetElemPtr(loaded, vec![idx]))
                             .unwrap()
                             .maybe_location(&mut scope.block, location),
                         *further_inner,
+                    )
+                } else if let TypeKind::CodegenPtr(further_inner) = *inner.clone() {
+                    let TypeKind::Array(_, _) = *further_inner else {
+                        panic!();
+                    };
+
+                    (
+                        scope
+                            .block
+                            .build_named(
+                                format!("array.gep"),
+                                Instr::GetElemPtr(kind.instr(), vec![idx]),
+                            )
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location),
+                        val_t.clone(),
                     )
                 } else {
                     let TypeKind::Array(_, _) = *inner else {
                         panic!();
                     };
+
+                    let first = scope
+                        .block
+                        .build_named("array.zero", Instr::Constant(ConstValue::U32(0)))
+                        .unwrap();
                     (
                         scope
                             .block
@@ -1082,7 +1099,7 @@ impl mir::Expression {
                     .expect("Variable reference not found?!");
                 Some(StackValue(
                     StackValueKind::mutable(*mutable, v.0.instr()),
-                    v.1.clone(),
+                    TypeKind::Borrow(Box::new(v.1.clone()), *mutable),
                 ))
             }
             mir::ExprKind::Deref(varref) => {
