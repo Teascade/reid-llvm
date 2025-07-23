@@ -109,3 +109,20 @@ pub fn add_num_to_str(string: &mut String, num: u64) {
     else if rem == 8 { add_char(string, '8'); }
     else if rem == 9 { add_char(string, '9'); }
 }
+
+pub fn clamp(min: f32, max: f32, value: f32) -> f32 {
+    if value > max {
+        return max;
+    }
+    if value < min {
+        return min;
+    }
+    return value;
+}
+
+pub fn abs(f: f32) -> f32 {
+    if f < 0.0 {
+        return f * (0.0 - 1.0);
+    }
+    return f;
+}
