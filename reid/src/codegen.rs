@@ -256,7 +256,6 @@ impl mir::Module {
         let mut typedefs = self.typedefs.clone();
         typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
 
-        dbg!(&self.module_id, &typedefs);
         for typedef in typedefs {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
             let type_value = match &typedef.kind {
@@ -1001,6 +1000,7 @@ impl mir::Expression {
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
+                dbg!(&inner);
                 let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };
@@ -1097,9 +1097,14 @@ impl mir::Expression {
                     .stack_values
                     .get(&varref.1)
                     .expect("Variable reference not found?!");
+
+                let TypeKind::CodegenPtr(ptr_inner) = &v.1 else {
+                    panic!();
+                };
+
                 Some(StackValue(
                     StackValueKind::mutable(*mutable, v.0.instr()),
-                    TypeKind::Borrow(Box::new(v.1.clone()), *mutable),
+                    TypeKind::Borrow(Box::new(*ptr_inner.clone()), *mutable),
                 ))
             }
             mir::ExprKind::Deref(varref) => {
