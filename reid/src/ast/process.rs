@@ -186,7 +186,7 @@ impl ast::Block {
                         counter_range.as_meta(module_id),
                     );
                     let mut block = block.into_mir(module_id);
-                    block.statements.insert(0, set_new);
+                    block.statements.push(set_new);
                     (
                         StmtKind::While(WhileStatement {
                             condition: mir::Expression(
