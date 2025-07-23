@@ -6,7 +6,7 @@ import std::add_num_to_str;
 import std::free_string;
 
 fn main() -> u32 {
-  for i in 0 .. 5 {
+  for i in 0 .. 15 {
     let mut text = new_string();
     add_num_to_str(&mut text, i);
     print(&text);

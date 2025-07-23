@@ -93,7 +93,7 @@ fn str_length(string: *char, position: u32) -> u32 {
 }
 
 pub fn add_num_to_str(string: &mut String, num: u64) {
-    if num > 10 {
+    if num >= 10 {
         add_num_to_str(string, num / 10)
     }
     let rem = num % 10;
