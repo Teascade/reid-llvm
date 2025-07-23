@@ -9,18 +9,17 @@ import std::concat_strings;
 
 fn main() -> i32 {
     let mut test = from_str("hello");
-    let mut other = from_str(" world");
 
-    concat_strings(&mut test, &other);
+    concat_strings(&mut test, from_str(" world"));
 
     add_char(&mut test, '!');
     add_char(&mut test, '\n');
 
     add_num_to_str(&mut test, 175);
     
-    print(&test);
+    print(test);
 
-    free_string(&mut test);
+    free_string(&test);
 
     return 0;
 }

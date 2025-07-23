@@ -9,8 +9,8 @@ struct div_t {
     remainder: i32,
 }
 
-pub fn print(message: &String) {
-    puts(*message.inner);
+pub fn print(message: String) {
+    puts(message.inner);
 }
 
 pub fn int_div(numerator: i32, denominator: i32) -> div_t {
@@ -46,7 +46,7 @@ pub fn from_str(str: *char) -> String {
         max_length: length,
         must_be_freed: false,
     };
-    concat_strings(&mut new, &static);
+    concat_strings(&mut new, static);
     return new;
 }
 
@@ -74,7 +74,7 @@ pub fn set_char(string: &mut String, c: char, position: u64) {
     }
 }
 
-pub fn free_string(string: &mut String) {
+pub fn free_string(string: &String) {
     free((*string).inner as *u8);
 }
 
@@ -110,6 +110,12 @@ pub fn add_num_to_str(string: &mut String, num: u64) {
     else if rem == 9 { add_char(string, '9'); }
 }
 
+pub fn concat_strings(destination: &mut String, source: String) {
+    for i in 0 .. (str_length(source.inner) - 1) {
+        add_char(destination, source.inner[i]);
+    }
+}
+
 pub fn clamp(min: f32, max: f32, value: f32) -> f32 {
     if value > max {
         return max;
@@ -125,10 +131,4 @@ pub fn abs(f: f32) -> f32 {
         return f * (0.0 - 1.0);
     }
     return f;
-}
-
-pub fn concat_strings(destination: &mut String, source: &String) {
-    for i in 0 .. (str_length((*source).inner) - 1) {
-        add_char(destination, (*source).inner[i]);
-    }
 }
