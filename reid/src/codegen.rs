@@ -256,6 +256,7 @@ impl mir::Module {
         let mut typedefs = self.typedefs.clone();
         typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
 
+        dbg!(&self.module_id, &typedefs);
         for typedef in typedefs {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
             let type_value = match &typedef.kind {
@@ -835,7 +836,6 @@ impl mir::Expression {
                     .expect("index returned none!")
                     .instr();
 
-                dbg!(&ty);
                 let TypeKind::CodegenPtr(inner) = ty else {
                     panic!();
                 };

@@ -322,7 +322,6 @@ impl Expression {
                 // Check that the resolved type is at least a struct, no
                 // need for further resolution.
                 let kind = expr_ty.resolve_weak().unwrap();
-                dbg!(&state.scope);
                 match kind {
                     CustomType(key) => {
                         let struct_ty = state

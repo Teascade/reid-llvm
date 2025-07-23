@@ -103,6 +103,8 @@ impl<'map> Pass for LinkerPass<'map> {
 
         let mut modules_to_process: Vec<Rc<RefCell<_>>> = modules.values().cloned().collect();
 
+        let mut already_imported_types = HashSet::<CustomTypeKey>::new();
+
         while let Some(module) = modules_to_process.pop() {
             let mut importer_module = module.borrow_mut();
 
@@ -232,28 +234,30 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
 
-                fn import_type(_: &String, ty: &TypeKind) -> (TypeKind, Vec<CustomTypeKey>) {
+                fn import_type(ty: &TypeKind) -> Vec<CustomTypeKey> {
                     let mut imported_types = Vec::new();
-                    let ty = match &ty {
-                        TypeKind::CustomType(key) => {
-                            imported_types.push(key.clone());
-                            TypeKind::CustomType(key.clone())
-                        }
-                        _ => ty.clone(),
+                    match &ty {
+                        TypeKind::CustomType(key) => imported_types.push(key.clone()),
+                        TypeKind::Borrow(ty, _) => imported_types.extend(import_type(ty)),
+                        TypeKind::Array(ty, _) => imported_types.extend(import_type(ty)),
+                        TypeKind::UserPtr(ty) => imported_types.extend(import_type(ty)),
+                        TypeKind::CodegenPtr(ty) => imported_types.extend(import_type(ty)),
+                        _ => {}
                     };
-                    (ty, imported_types)
+                    imported_types
                 }
 
                 let mut imported_types = Vec::new();
 
-                let (return_type, types) = import_type(&imported_mod_name, &func.return_type);
+                let types = import_type(&func.return_type);
+                let return_type = func.return_type.clone();
                 imported_types.extend(types);
 
                 let mut param_tys = Vec::new();
                 for (param_name, param_ty) in &func.parameters {
-                    let (param_type, types) = import_type(&imported_mod_name, &param_ty);
+                    let types = import_type(&param_ty);
                     imported_types.extend(types);
-                    param_tys.push((param_name.clone(), param_type));
+                    param_tys.push((param_name.clone(), param_ty.clone()));
                 }
 
                 fn find_inner_types(
@@ -303,6 +307,14 @@ impl<'map> Pass for LinkerPass<'map> {
                     seen.extend(inner);
                 }
 
+                // TODO: Unable to import same-named type from multiple places..
+                let seen = seen
+                    .difference(&already_imported_types)
+                    .cloned()
+                    .collect::<HashSet<_>>();
+
+                already_imported_types.extend(seen.clone());
+
                 for typekey in seen.into_iter() {
                     let typedef = imported_mod_typedefs
                         .iter()
@@ -317,7 +329,7 @@ impl<'map> Pass for LinkerPass<'map> {
                     name: func_name,
                     is_pub: false,
                     is_imported: false,
-                    return_type: return_type,
+                    return_type,
                     parameters: param_tys,
                     kind: super::FunctionDefinitionKind::Extern(true),
                     source: imported_mod_id,
