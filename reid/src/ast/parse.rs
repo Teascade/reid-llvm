@@ -231,10 +231,10 @@ impl Parse for PrimaryExpression {
                     stream.expect(Token::BracketClose)?;
                     Expression(Kind::Array(expressions), stream.get_range().unwrap())
                 }
-                _ => Err(stream.expected_err("expression inner")?)?,
+                _ => Err(stream.expecting_err("expression")?)?,
             }
         } else {
-            Err(stream.expected_err("expression")?)?
+            Err(stream.expecting_err("expression")?)?
         };
 
         while let Ok(index) = stream.parse::<ValueIndex>() {

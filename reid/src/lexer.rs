@@ -42,6 +42,10 @@ pub enum Token {
     Extern,
     /// `struct`
     Struct,
+    /// `while`
+    While,
+    /// `for`
+    For,
 
     // Symbols
     /// `;`
@@ -136,6 +140,8 @@ impl ToString for Token {
             Token::Extern => String::from("extern"),
             Token::Struct => String::from("struct"),
             Token::AsKeyword => String::from("as"),
+            Token::For => String::from("for"),
+            Token::While => String::from("while"),
             Token::Semi => String::from(';'),
             Token::Equals => String::from('='),
             Token::Colon => String::from(':'),
@@ -322,6 +328,8 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "pub" => Token::PubKeyword,
                     "struct" => Token::Struct,
                     "as" => Token::AsKeyword,
+                    "for" => Token::For,
+                    "while" => Token::While,
                     _ => Token::Identifier(value),
                 };
                 variant

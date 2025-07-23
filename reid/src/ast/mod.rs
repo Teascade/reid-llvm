@@ -178,6 +178,8 @@ pub enum BlockLevelStatement {
     },
     Expression(Expression),
     Return(ReturnType, Expression),
+    ForLoop(String, Expression, Block),
+    WhileLoop(Expression, Block),
 }
 
 #[derive(Debug, Clone)]
