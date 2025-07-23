@@ -1,11 +1,12 @@
 
+import std::from_str;
 import std::print;
 import std::int_div;
 
 fn main() -> i32 {
-    let hello = "hello world";
+    let hello = from_str("hello world");
 
-    print(hello);
+    print(&hello);
 
     return int_div(15, 5).quotient;
 }
