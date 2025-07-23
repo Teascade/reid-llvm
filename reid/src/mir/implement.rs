@@ -675,6 +675,8 @@ pub enum EqualsIssue {
     AlreadyExtern(String, Metadata),
     #[error("Function {0} is already imported from another module")]
     ConflictWithImport(String),
+    #[error("Function is defined as an intrinsic")]
+    ExistsAsIntrinsic,
 }
 
 impl FunctionDefinition {
@@ -701,6 +703,7 @@ impl FunctionDefinition {
                     }
                 }
             }
+            FunctionDefinitionKind::Intrinsic(_) => Err(EqualsIssue::ExistsAsIntrinsic),
         }
     }
 }

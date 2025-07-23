@@ -108,12 +108,13 @@ impl Display for FunctionDefinition {
 impl Display for FunctionDefinitionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Local(block, _) => {
+            FunctionDefinitionKind::Local(block, _) => {
                 write!(f, "{}", block)?;
                 Ok(())
             }
-            Self::Extern(true) => write!(f, "<Imported Extern>"),
-            Self::Extern(false) => write!(f, "<Linked Extern>"),
+            FunctionDefinitionKind::Extern(true) => write!(f, "<Imported Extern>"),
+            FunctionDefinitionKind::Extern(false) => write!(f, "<Linked Extern>"),
+            FunctionDefinitionKind::Intrinsic(_) => write!(f, "<Intrinsic>"),
         }
     }
 }

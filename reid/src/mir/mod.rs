@@ -302,6 +302,8 @@ pub enum FunctionDefinitionKind {
     Local(Block, Metadata),
     /// True = imported from other module, False = Is user defined extern
     Extern(bool),
+    /// Intrinsic definition, defined within the compiler
+    Intrinsic(Block),
 }
 
 impl FunctionDefinition {
@@ -309,6 +311,7 @@ impl FunctionDefinition {
         match &self.kind {
             FunctionDefinitionKind::Local(block, _) => block.meta.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
+            FunctionDefinitionKind::Intrinsic(_) => Metadata::default(),
         }
     }
 
@@ -316,6 +319,7 @@ impl FunctionDefinition {
         match &self.kind {
             FunctionDefinitionKind::Local(_, metadata) => metadata.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
+            FunctionDefinitionKind::Intrinsic(_) => Metadata::default(),
         }
     }
 }
