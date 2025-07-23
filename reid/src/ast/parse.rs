@@ -155,11 +155,12 @@ impl Parse for PrimaryExpression {
                 }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
-                    if let Some(Token::Dot) = stream.peek() {
+                    if let (Some(Token::Dot), Some(Token::DecimalValue(fractional))) =
+                        (stream.peek(), stream.peek2())
+                    {
                         stream.next(); // Consume dot
-                        let Some(Token::DecimalValue(fractional)) = stream.next() else {
-                            return Err(stream.expected_err("fractional part")?);
-                        };
+                        stream.next(); // Consume fractional
+
                         Expression(
                             Kind::Literal(Literal::Decimal(
                                 format!("{}.{}", v, fractional)
@@ -231,10 +232,10 @@ impl Parse for PrimaryExpression {
                     stream.expect(Token::BracketClose)?;
                     Expression(Kind::Array(expressions), stream.get_range().unwrap())
                 }
-                _ => Err(stream.expected_err("expression inner")?)?,
+                _ => Err(stream.expecting_err("expression")?)?,
             }
         } else {
-            Err(stream.expected_err("expression")?)?
+            Err(stream.expecting_err("expression")?)?
         };
 
         while let Ok(index) = stream.parse::<ValueIndex>() {
@@ -667,6 +668,14 @@ impl Parse for BlockLevelStatement {
                 stream.expect(Token::Semi)?;
                 Stmt::Return(ReturnType::Hard, exp)
             }
+            Some(Token::For) => {
+                let for_stmt = stream.parse::<ForStatement>()?;
+                Stmt::ForLoop(for_stmt.0, for_stmt.1, for_stmt.2, for_stmt.3, for_stmt.4)
+            }
+            Some(Token::While) => {
+                let while_stmt = stream.parse::<WhileStatement>()?;
+                Stmt::WhileLoop(while_stmt.0, while_stmt.1)
+            }
             _ => {
                 if let Ok(SetStatement(ident, expr, range)) = stream.parse() {
                     Stmt::Set(ident, expr, range)
@@ -683,6 +692,36 @@ impl Parse for BlockLevelStatement {
     }
 }
 
+#[derive(Debug)]
+pub struct ForStatement(String, TokenRange, Expression, Expression, Block);
+
+#[derive(Debug)]
+pub struct WhileStatement(pub Expression, pub Block);
+
+impl Parse for ForStatement {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::For)?;
+        let Some(Token::Identifier(idx)) = stream.next() else {
+            return Err(stream.expected_err("loop counter")?);
+        };
+        let start_range = stream.get_range().unwrap();
+        stream.expect(Token::In)?;
+        let start = stream.parse()?;
+        stream.expect(Token::Dot)?;
+        stream.expect(Token::Dot)?;
+        let end = stream.parse()?;
+
+        Ok(ForStatement(idx, start_range, start, end, stream.parse()?))
+    }
+}
+
+impl Parse for WhileStatement {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::While)?;
+
+        Ok(WhileStatement(stream.parse()?, stream.parse()?))
+    }
+}
 #[derive(Debug)]
 pub struct SetStatement(Expression, Expression, TokenRange);
 

@@ -120,3 +120,7 @@ fn strings_compiles_well() {
 fn struct_compiles_well() {
     test(include_str!("../../examples/struct.reid"), "test", 17);
 }
+#[test]
+fn loops_compiles_well() {
+    test(include_str!("../../examples/loops.reid"), "test", 10);
+}

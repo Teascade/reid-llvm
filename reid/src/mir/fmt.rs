@@ -147,7 +147,7 @@ impl Display for Statement {
 impl Display for StmtKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Let(var, mutable, block) => {
+            StmtKind::Let(var, mutable, block) => {
                 write!(
                     f,
                     "let{} {} = {}",
@@ -156,9 +156,17 @@ impl Display for StmtKind {
                     block
                 )
             }
-            Self::Set(var, expr) => write!(f, "{} = {}", var, expr),
-            Self::Import(n) => write!(f, "import {}", n),
-            Self::Expression(exp) => Display::fmt(exp, f),
+            StmtKind::Set(var, expr) => write!(f, "{} = {}", var, expr),
+            StmtKind::Import(n) => write!(f, "import {}", n),
+            StmtKind::Expression(exp) => Display::fmt(exp, f),
+
+            StmtKind::While(while_statement) => {
+                write!(
+                    f,
+                    "while {} {}",
+                    while_statement.condition, while_statement.block,
+                )
+            }
         }
     }
 }

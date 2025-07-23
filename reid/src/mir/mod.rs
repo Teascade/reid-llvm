@@ -241,7 +241,7 @@ pub enum ReturnKind {
     Soft,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -338,6 +338,14 @@ pub enum StmtKind {
     Set(Expression, Expression),
     Import(Import),
     Expression(Expression),
+    While(WhileStatement),
+}
+
+#[derive(Debug)]
+pub struct WhileStatement {
+    pub condition: Expression,
+    pub block: Block,
+    pub meta: Metadata,
 }
 
 #[derive(Debug, Clone)]

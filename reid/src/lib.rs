@@ -112,6 +112,9 @@ pub fn compile_module<'map>(
         is_main,
     };
 
+    #[cfg(debug_assertions)]
+    dbg!(&ast_module);
+
     Ok(ast_module.process(module_id))
 }
 

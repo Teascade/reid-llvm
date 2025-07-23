@@ -16,6 +16,7 @@ use super::{
     IfExpression, Module, ReturnKind, StmtKind,
     TypeKind::*,
     VagueType::*,
+    WhileStatement,
 };
 
 /// Struct used to implement Type Inference, where an intermediary
@@ -125,6 +126,12 @@ impl Block {
                 StmtKind::Expression(expr) => {
                     let expr_res = expr.infer_types(&mut state, &inner_refs);
                     state.ok(expr_res, expr.1);
+                }
+                StmtKind::While(WhileStatement {
+                    condition, block, ..
+                }) => {
+                    condition.infer_types(&mut state, &inner_refs)?;
+                    block.infer_types(&mut state, &inner_refs)?;
                 }
             };
         }

@@ -19,6 +19,7 @@ use crate::{
     mir::{
         self, implement::TypeCategory, CustomTypeKey, Metadata, NamedVariableRef, SourceModuleId,
         StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
+        WhileStatement,
     },
     util::try_all,
 };
@@ -598,6 +599,54 @@ impl mir::Statement {
             }
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope, state),
+            mir::StmtKind::While(WhileStatement {
+                condition, block, ..
+            }) => {
+                let condition_block = scope.function.ir.block("condition_block");
+                let condition_true_block = scope.function.ir.block("condition_true");
+                let condition_failed_block = scope.function.ir.block("condition_failed");
+
+                scope
+                    .block
+                    .terminate(Term::Br(condition_block.value()))
+                    .unwrap();
+                let mut condition_scope = scope.with_block(condition_block);
+                let condition_res = condition.codegen(&mut condition_scope, state)?.unwrap();
+                let true_instr = condition_scope
+                    .block
+                    .build(Instr::Constant(ConstValue::Bool(true)))
+                    .unwrap();
+                let check = condition_scope
+                    .block
+                    .build(Instr::ICmp(
+                        CmpPredicate::EQ,
+                        condition_res.instr(),
+                        true_instr,
+                    ))
+                    .unwrap();
+
+                condition_scope
+                    .block
+                    .terminate(Term::CondBr(
+                        check,
+                        condition_true_block.value(),
+                        condition_failed_block.value(),
+                    ))
+                    .unwrap();
+
+                let mut condition_true_scope = scope.with_block(condition_true_block);
+                block.codegen(&mut condition_true_scope, state)?;
+
+                condition_true_scope
+                    .block
+                    .terminate(Term::Br(condition_scope.block.value()))
+                    // Can hard return inside the condition_true_scope
+                    .ok();
+
+                scope.swap_block(condition_failed_block);
+
+                Ok(None)
+            }
         }
     }
 }
@@ -1000,7 +1049,6 @@ impl mir::Expression {
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
-                dbg!(&inner);
                 let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };

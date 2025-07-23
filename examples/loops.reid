@@ -1,0 +1,18 @@
+// Arithmetic, function calls and imports!
+
+import std::print;
+import std::from_str;
+
+fn main() -> u32 {
+  let text = from_str("hello");
+  for i in 0 .. 10 {
+    print(&text)
+  }
+
+  let mut num = 0;
+  while num < 10 {
+    num = num + 1;
+  }
+
+  return num;
+}

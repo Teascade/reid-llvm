@@ -188,7 +188,6 @@ impl<'map> Pass for LinkerPass<'map> {
                 .borrow_mut();
 
                 let func_name = unsafe { path.get_unchecked(1) };
-                let imported_mod_name = imported.name.clone();
 
                 let Some(func) = imported.functions.iter_mut().find(|f| f.name == *func_name)
                 else {

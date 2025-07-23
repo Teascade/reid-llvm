@@ -323,7 +323,7 @@ impl Block {
 
                     None
                 }
-                StmtKind::Import(_) => todo!(), // TODO
+                StmtKind::Import(_) => todo!(),
                 StmtKind::Expression(expression) => {
                     let res = expression.typecheck(&mut state, &typerefs, None);
                     state.or_else(res, TypeKind::Void, expression.1);
@@ -334,6 +334,24 @@ impl Block {
                     } else {
                         None
                     }
+                }
+                StmtKind::While(WhileStatement {
+                    condition,
+                    block,
+                    meta,
+                }) => {
+                    let condition_ty =
+                        condition.typecheck(&mut state, typerefs, Some(&TypeKind::Bool))?;
+                    if condition_ty.assert_known(typerefs, &state)? != TypeKind::Bool {
+                        state.note_errors(
+                            &vec![ErrorKind::TypesIncompatible(condition_ty, TypeKind::Bool)],
+                            *meta,
+                        );
+                    }
+
+                    block.typecheck(&mut state, typerefs, None)?;
+
+                    None
                 }
             };
 
