@@ -1,7 +1,0 @@
-fn foo() -> f32 { return 1.0; }
-
-fn main() -> u8 {
-    let mut a = 0;
-    a = (foo() * 1.0) as u8;
-    return a;
-}

@@ -18,62 +18,67 @@ fn test(source: &str, name: &str) {
     ));
 }
 
-pub static ARRAY: &str = include_str!("../../examples/array.reid");
-pub static FIBONACCI: &str = include_str!("../../examples/fibonacci.reid");
-pub static HELLO_WORLD: &str = include_str!("../../examples/hello_world.reid");
-pub static MUTABLE: &str = include_str!("../../examples/mutable.reid");
-pub static STRINGS: &str = include_str!("../../examples/strings.reid");
-pub static STRUCTS: &str = include_str!("../../examples/struct.reid");
-pub static ARRAY_STRUCTS: &str = include_str!("../../examples/array_structs.reid");
-pub static BORROW: &str = include_str!("../../examples/borrow.reid");
-pub static ARITHMETIC: &str = include_str!("../../examples/arithmetic.reid");
-
+#[test]
+fn arithmetic_compiles_well() {
+    test(include_str!("../../examples/arithmetic.reid"), "test");
+}
 #[test]
 fn array_compiles_well() {
-    test(ARRAY, "array");
+    test(include_str!("../../examples/array.reid"), "test");
 }
-
-#[test]
-fn fibonacci_compiles_well() {
-    test(FIBONACCI, "fibonacci");
-}
-
-#[test]
-fn hello_world_compiles_well() {
-    test(HELLO_WORLD, "hello_world");
-}
-
-#[test]
-fn mutable_compiles_well() {
-    test(MUTABLE, "mutable");
-}
-
-#[test]
-fn strings_compiles_well() {
-    test(STRINGS, "strings");
-}
-
-#[test]
-fn arrays_compiles_well() {
-    test(ARRAY, "array");
-}
-
-#[test]
-fn struct_compiles_well() {
-    test(STRUCTS, "struct");
-}
-
 #[test]
 fn array_structs_compiles_well() {
-    test(ARRAY_STRUCTS, "array_structs");
+    test(include_str!("../../examples/array_structs.reid"), "test");
 }
-
 #[test]
-fn borrow_structs_compiles_well() {
-    test(BORROW, "borrow");
+fn borrow_compiles_well() {
+    test(include_str!("../../examples/borrow.reid"), "test");
 }
-
 #[test]
-fn arithmetic_structs_compiles_well() {
-    test(ARITHMETIC, "arithmetic");
+fn borrow_hard_compiles_well() {
+    test(include_str!("../../examples/borrow_hard.reid"), "test");
+}
+#[test]
+fn cast_compiles_well() {
+    test(include_str!("../../examples/cast.reid"), "test");
+}
+#[test]
+fn char_compiles_well() {
+    test(include_str!("../../examples/char.reid"), "test");
+}
+#[test]
+fn div_mod_compiles_well() {
+    test(include_str!("../../examples/div_mod.reid"), "test");
+}
+#[test]
+fn fibonacci_compiles_well() {
+    test(include_str!("../../examples/fibonacci.reid"), "test");
+}
+#[test]
+fn float_compiles_well() {
+    test(include_str!("../../examples/float.reid"), "test");
+}
+#[test]
+fn hello_world_compiles_well() {
+    test(include_str!("../../examples/hello_world.reid"), "test");
+}
+#[test]
+fn mutable_compiles_well() {
+    test(include_str!("../../examples/mutable.reid"), "test");
+}
+#[test]
+fn ptr_compiles_well() {
+    test(include_str!("../../examples/ptr.reid"), "test");
+}
+#[test]
+fn std_test_compiles_well() {
+    test(include_str!("../../examples/std_test.reid"), "test");
+}
+#[test]
+fn strings_compiles_well() {
+    test(include_str!("../../examples/strings.reid"), "test");
+}
+#[test]
+fn struct_compiles_well() {
+    test(include_str!("../../examples/struct.reid"), "test");
 }
