@@ -1,6 +1,7 @@
-fn main() {
+fn main() -> u8 {
     let mut a = 5;
     inner(&mut a);
+    return 0;
 }
 
 fn inner(a: &mut i32) {

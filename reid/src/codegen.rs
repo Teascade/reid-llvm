@@ -1179,7 +1179,7 @@ impl mir::Expression {
 
                 Some({
                     if state.should_load {
-                        if let TypeKind::CodegenPtr(inner) = *ptr_inner.clone() {
+                        if let TypeKind::Borrow(inner, _) = *ptr_inner.clone() {
                             StackValue(
                                 v.0.derive(
                                     scope
