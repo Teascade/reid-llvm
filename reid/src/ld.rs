@@ -1,4 +1,4 @@
-use std::{path::PathBuf, process::Command};
+use std::{path::PathBuf, process::Command, thread, time::Duration};
 
 pub struct LDRunner {
     command: String,
@@ -7,21 +7,21 @@ pub struct LDRunner {
 }
 
 impl LDRunner {
-    pub fn from_command(command: String) -> LDRunner {
+    pub fn from_command(command: &str) -> LDRunner {
         LDRunner {
-            command,
+            command: command.to_owned(),
             dynamic_linker: "ld-linux-x86-64.so.2".to_string(),
             libraries: Default::default(),
         }
     }
 
-    pub fn with_library(mut self, lib: String) -> LDRunner {
-        self.libraries.push(lib);
+    pub fn with_library(mut self, lib: &str) -> LDRunner {
+        self.libraries.push(lib.to_owned());
         self
     }
 
-    pub fn invoke(&self, file: PathBuf) {
-        let filepath = file.canonicalize().unwrap();
+    pub fn invoke(&self, input: &PathBuf, out_path: &PathBuf) {
+        let input_path = input.canonicalize().unwrap();
 
         let dyn_linker_path = find_objectfile(&self.dynamic_linker);
         let crt1_path = find_objectfile("crt1.o");
@@ -37,14 +37,27 @@ impl LDRunner {
             ld.arg(format!("-l{}", library));
         }
 
-        ld.arg(filepath.to_str().unwrap())
+        ld.arg(input_path.to_str().unwrap())
             .arg("-o")
-            .arg(filepath.with_extension("out"));
+            .arg(out_path.to_str().unwrap());
 
-        println!("LDRunner: Executing linker to objfile at {:?}", filepath);
+        println!(
+            "LDRunner: Executing linker to objfile at {:?} => {:?}",
+            input_path, out_path
+        );
         dbg!(&ld);
 
         ld.spawn().expect("Unable to execute ld!");
+
+        thread::sleep(Duration::from_millis(100));
+
+        println!("Setting executable bit to {:?}..", out_path);
+        Command::new("chmod")
+            .arg("+x")
+            .arg(out_path)
+            .spawn()
+            .unwrap();
+        thread::sleep(Duration::from_millis(100));
     }
 }
 

@@ -57,11 +57,11 @@ fn main() -> Result<(), std::io::Error> {
                 println!("Linking {:?}", &object_path);
 
                 let linker = std::env::var("LD").unwrap_or("ld".to_owned());
-                let mut linker = LDRunner::from_command(linker).with_library("c".to_owned());
+                let mut linker = LDRunner::from_command(&linker).with_library("c");
                 for library in libraries {
-                    linker = linker.with_library(library);
+                    linker = linker.with_library(&library);
                 }
-                linker.invoke(object_path);
+                linker.invoke(&object_path, &object_path.with_extension("out"));
             }
             Err(e) => panic!("{}", e),
         };
