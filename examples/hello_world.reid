@@ -3,14 +3,20 @@ import std::from_str;
 import std::add_char;
 import std::set_char;
 import std::free_string;
+import std::new_string;
 import std::add_num_to_str;
+import std::concat_strings;
 
 fn main() -> i32 {
-    let mut test = from_str("hello world");
+    let mut test = from_str("hello");
+    let mut other = from_str(" world");
+
+    concat_strings(&mut test, &other);
 
     add_char(&mut test, '!');
-    set_char(&mut test, 'B', 0);
-    add_num_to_str(&mut test, 1234);
+    add_char(&mut test, '\n');
+
+    add_num_to_str(&mut test, 175);
     
     print(&test);
 
