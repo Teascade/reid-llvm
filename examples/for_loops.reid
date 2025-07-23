@@ -1,9 +1,11 @@
 import std::print;
+import std::from_str;
+
 fn main() {
     for i in 0..1 {
-        print("Hello!");
+        print(from_str("Hello!"));
     }
     for i in 0..1 {
-        print("World!");
+        print(from_str("Hello!"));
     }
 }
