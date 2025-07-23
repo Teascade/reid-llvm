@@ -32,7 +32,7 @@ impl Display for Context {
 
 impl Display for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Module({}) {{", self.name)?;
+        writeln!(f, "Module({}) ({}) {{", self.name, self.module_id)?;
 
         let mut state = Default::default();
         let mut inner_f = PadAdapter::wrap(f, &mut state);
