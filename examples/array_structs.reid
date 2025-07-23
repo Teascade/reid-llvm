@@ -18,7 +18,7 @@ fn main() -> u32 {
 
     let mut a = &mut value;
 
-    let test = *a.field;
+    *a.second[2] = 5;
 
-    return 0;
+    return *a.second[2];
 }

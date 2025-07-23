@@ -8,11 +8,9 @@ fn other() -> i16 {
 }
 
 fn main() -> u32 {
-  let value = other() as u32;
-  let other_value = other() as f32;
-  let same_value = other() as i16;
 
-  let v = (allocate(4) as *u32);
+  let mut v = (allocate(4) as *u32);
+  v[0] = other() as u32;
 
   return v[0];
 }
