@@ -390,9 +390,18 @@ impl Statement {
             StmtKind::Set(_, expression) => {
                 expression.pass(pass, state, scope, mod_id)?;
             }
-            StmtKind::Import(_) => {} // Never exists at this stage
+            StmtKind::Import(_) => {}
             StmtKind::Expression(expression) => {
                 expression.pass(pass, state, scope, mod_id)?;
+            }
+            StmtKind::For(for_statement) => {
+                for_statement.start.pass(pass, state, scope, mod_id);
+                for_statement.end.pass(pass, state, scope, mod_id);
+                for_statement.block.pass(pass, state, scope, mod_id);
+            }
+            StmtKind::While(while_statement) => {
+                while_statement.condition.pass(pass, state, scope, mod_id);
+                while_statement.block.pass(pass, state, scope, mod_id);
             }
         }
 
@@ -412,8 +421,10 @@ impl Statement {
                     .ok();
             }
             StmtKind::Set(_, _) => {}
-            StmtKind::Import(_) => {} // Never exists at this stage
+            StmtKind::Import(_) => {}
             StmtKind::Expression(_) => {}
+            StmtKind::For(_) => {}
+            StmtKind::While(_) => {}
         };
         Ok(())
     }

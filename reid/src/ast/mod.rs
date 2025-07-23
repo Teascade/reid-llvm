@@ -178,7 +178,7 @@ pub enum BlockLevelStatement {
     },
     Expression(Expression),
     Return(ReturnType, Expression),
-    ForLoop(String, Expression, Expression, Block),
+    ForLoop(String, TokenRange, Expression, Expression, Block),
     WhileLoop(Expression, Block),
 }
 

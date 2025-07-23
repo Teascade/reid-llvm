@@ -669,7 +669,7 @@ impl Parse for BlockLevelStatement {
             }
             Some(Token::For) => {
                 let for_stmt = stream.parse::<ForStatement>()?;
-                Stmt::ForLoop(for_stmt.0, for_stmt.1, for_stmt.2, for_stmt.3)
+                Stmt::ForLoop(for_stmt.0, for_stmt.1, for_stmt.2, for_stmt.3, for_stmt.4)
             }
             Some(Token::While) => {
                 let while_stmt = stream.parse::<WhileStatement>()?;
@@ -692,7 +692,7 @@ impl Parse for BlockLevelStatement {
 }
 
 #[derive(Debug)]
-pub struct ForStatement(String, Expression, Expression, Block);
+pub struct ForStatement(String, TokenRange, Expression, Expression, Block);
 
 #[derive(Debug)]
 pub struct WhileStatement(Expression, Block);
@@ -703,12 +703,13 @@ impl Parse for ForStatement {
         let Some(Token::Identifier(idx)) = stream.next() else {
             return Err(stream.expected_err("loop counter")?);
         };
+        let start_range = stream.get_range().unwrap();
         stream.expect(Token::In)?;
         let start = stream.parse()?;
         stream.expect(Token::To)?;
         let end = stream.parse()?;
 
-        Ok(ForStatement(idx, start, end, stream.parse()?))
+        Ok(ForStatement(idx, start_range, start, end, stream.parse()?))
     }
 }
 

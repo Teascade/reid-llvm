@@ -338,6 +338,24 @@ pub enum StmtKind {
     Set(Expression, Expression),
     Import(Import),
     Expression(Expression),
+    For(ForStatement),
+    While(WhileStatement),
+}
+
+#[derive(Debug)]
+pub struct ForStatement {
+    pub counter: NamedVariableRef,
+    pub start: Expression,
+    pub end: Expression,
+    pub block: Block,
+    pub meta: Metadata,
+}
+
+#[derive(Debug)]
+pub struct WhileStatement {
+    pub condition: Expression,
+    pub block: Block,
+    pub meta: Metadata,
 }
 
 #[derive(Debug, Clone)]
