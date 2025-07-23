@@ -16,6 +16,9 @@ fn test() -> Test {
 fn main() -> u32 {
     let mut value = test();
 
+    let beep = [2, 3, 4];
+    let boop = 3;
+
     let mut a = &mut value;
 
     *a.second[2] = 5;

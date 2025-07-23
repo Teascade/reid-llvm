@@ -9,8 +9,8 @@ fn main() -> u32 {
   for i in 0 .. 15 {
     let mut text = from_str("num: ");
     add_num_to_str(&mut text, i);
-    print(&text);
-    free_string(&mut text);
+    print(text);
+    free_string(&text);
   }
 
   let mut num = 0;
