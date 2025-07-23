@@ -10,7 +10,7 @@ fn main() -> i32 {
 
     add_char(&mut test, '!');
     set_char(&mut test, 'B', 0);
-    add_num_to_str(&mut test, 7);
+    add_num_to_str(&mut test, 1234);
     
     print(&test);
 

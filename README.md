@@ -42,7 +42,7 @@ Currently missing big features (TODOs) are:
 - ~~Unary operators~~
 - ~~Floats~~ (DONE)
 - ~~Type casting~~ (DONE)
-- Built-in Int/Float division and modulo
+- ~~Built-in Int/Float division and modulo~~
 - Loops
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions
