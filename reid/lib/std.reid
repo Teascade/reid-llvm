@@ -38,12 +38,12 @@ pub fn new_string() -> String {
 }
 
 pub fn from_str(str: *char) -> String {
-    let length = str_length(str, 0);
+    let length = str_length(str);
     let cloned = malloc(length as u64) as *char;
-    copy_bits(str, cloned, 0, length as u64);
+    copy_bits(str, cloned, length as u64);
     return String {
         inner: cloned,
-        length: length,
+        length: length -1,
         max_length: length,
         must_be_freed: false,
     };
@@ -52,7 +52,7 @@ pub fn from_str(str: *char) -> String {
 pub fn add_char(string: &mut String, c: char) {
     if ((*string).length + 1) >= (*string).max_length {
         let new = allocate((*string).max_length + 4) as *char;
-        copy_bits((*string).inner, new, 0, (*string).max_length);
+        copy_bits((*string).inner, new, (*string).max_length);
 
         if (*string).must_be_freed == true {
             free((*string).inner as *u8);
@@ -77,19 +77,18 @@ pub fn free_string(string: &mut String) {
     free((*string).inner as *u8);
 }
 
-fn copy_bits(from: *char, to: *char, pos: u64, max: u64) -> u8 {
-    if (pos >= max) {
-        return 0;
+fn copy_bits(from: *char, to: *char, length: u64) {
+    for i in 0 .. length {
+        to[i] = from[i];
     }
-    to[pos] = from[pos];
-    return copy_bits(from, to, pos + 1, max);
 }
 
-fn str_length(string: *char, position: u32) -> u32 {
-    if (string[position] == '\0') {
-        return 0;
+fn str_length(string: *char) -> u32 {
+    let mut pos = 0;
+    while ((string[pos] == '\0') == false) {
+        pos = pos + 1;
     }
-    return str_length(string, position + 1) + 1;
+    return pos + 1;
 }
 
 pub fn add_num_to_str(string: &mut String, num: u64) {

@@ -1,13 +1,13 @@
 // Arithmetic, function calls and imports!
 
 import std::print;
-import std::new_string;
+import std::from_str;
 import std::add_num_to_str;
 import std::free_string;
 
 fn main() -> u32 {
   for i in 0 .. 15 {
-    let mut text = new_string();
+    let mut text = from_str("num: ");
     add_num_to_str(&mut text, i);
     print(&text);
     free_string(&mut text);
