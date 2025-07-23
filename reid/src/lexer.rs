@@ -46,6 +46,12 @@ pub enum Token {
     While,
     /// `for`
     For,
+    /// `from`
+    From,
+    /// `to`
+    To,
+    /// `to`
+    In,
 
     // Symbols
     /// `;`
@@ -141,6 +147,9 @@ impl ToString for Token {
             Token::Struct => String::from("struct"),
             Token::AsKeyword => String::from("as"),
             Token::For => String::from("for"),
+            Token::From => String::from("from"),
+            Token::In => String::from("in"),
+            Token::To => String::from("to"),
             Token::While => String::from("while"),
             Token::Semi => String::from(';'),
             Token::Equals => String::from('='),
@@ -330,6 +339,9 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "as" => Token::AsKeyword,
                     "for" => Token::For,
                     "while" => Token::While,
+                    "in" => Token::In,
+                    "from" => Token::From,
+                    "to" => Token::To,
                     _ => Token::Identifier(value),
                 };
                 variant
