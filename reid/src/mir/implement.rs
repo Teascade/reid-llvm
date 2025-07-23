@@ -596,15 +596,25 @@ impl TypeKind {
     /// Try to collapse a type on itself producing a default type if one exists,
     /// Error if not.
     pub fn or_default(&self) -> Result<TypeKind, ErrorKind> {
-        match self {
+        Ok(match self {
             TypeKind::Vague(vague_type) => match &vague_type {
-                Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type)),
-                Vague::Integer => Ok(TypeKind::I32),
+                Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type))?,
+                Vague::Integer => TypeKind::I32,
                 Vague::TypeRef(_) => panic!("Hinted default!"),
-                VagueType::Decimal => Ok(TypeKind::F32),
+                VagueType::Decimal => TypeKind::F32,
             },
-            _ => Ok(self.clone()),
-        }
+            TypeKind::Array(type_kind, len) => {
+                TypeKind::Array(Box::new(type_kind.or_default()?), *len)
+            }
+            TypeKind::Borrow(type_kind, mutable) => {
+                TypeKind::Borrow(Box::new(type_kind.or_default()?), *mutable)
+            }
+            TypeKind::UserPtr(type_kind) => TypeKind::UserPtr(Box::new(type_kind.or_default()?)),
+            TypeKind::CodegenPtr(type_kind) => {
+                TypeKind::CodegenPtr(Box::new(type_kind.or_default()?))
+            }
+            _ => self.clone(),
+        })
     }
 
     pub fn resolve_weak(&self, refs: &TypeRefs) -> TypeKind {

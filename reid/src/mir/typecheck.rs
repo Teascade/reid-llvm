@@ -222,7 +222,11 @@ impl Block {
             let ret = match &mut statement.0 {
                 StmtKind::Let(variable_reference, mutable, expression) => {
                     // Resolve possible hint in var reference
-                    let var_t_resolved = variable_reference.0.resolve_ref(&typerefs);
+                    let var_t_resolved = state.or_else(
+                        variable_reference.0.resolve_ref(&typerefs).or_default(),
+                        TypeKind::Vague(VagueType::Unknown),
+                        variable_reference.2,
+                    );
 
                     // Typecheck (and coerce) expression with said type
                     let res = expression.typecheck(&mut state, &typerefs, Some(&var_t_resolved));
