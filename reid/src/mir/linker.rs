@@ -320,6 +320,7 @@ impl<'map> Pass for LinkerPass<'map> {
                     return_type: return_type,
                     parameters: param_tys,
                     kind: super::FunctionDefinitionKind::Extern(true),
+                    source: imported_mod_id,
                 });
             }
         }

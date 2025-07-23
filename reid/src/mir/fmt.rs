@@ -326,7 +326,7 @@ impl Display for Metadata {
 
 impl Display for SourceModuleId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Mod {}", self.0)
+        write!(f, "{}", self.0)
     }
 }
 
@@ -364,7 +364,7 @@ impl Display for TypeKind {
                 Display::fmt(len, f)?;
                 f.write_char(']')
             }
-            TypeKind::CustomType(CustomTypeKey(name, mod_id)) => write!(f, "{}:{}", mod_id, name),
+            TypeKind::CustomType(CustomTypeKey(name, mod_id)) => write!(f, "{}@{}", name, mod_id),
             TypeKind::Borrow(type_kind, false) => {
                 write!(f, "&")?;
                 Display::fmt(type_kind, f)

@@ -295,7 +295,7 @@ impl Module {
             scope
                 .types
                 .set(
-                    CustomTypeKey(typedef.name.clone(), self.module_id),
+                    CustomTypeKey(typedef.name.clone(), typedef.source_module),
                     typedef.clone(),
                 )
                 .ok();
