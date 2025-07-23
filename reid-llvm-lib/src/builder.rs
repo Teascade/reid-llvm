@@ -440,7 +440,6 @@ impl Builder {
                 }
                 Instr::GetStructElemPtr(ptr_val, idx) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
-                    dbg!(&ptr_ty);
                     if let Type::Ptr(ty) = ptr_ty {
                         if let Type::CustomType(val) = *ty {
                             match self.type_data(&val).kind {

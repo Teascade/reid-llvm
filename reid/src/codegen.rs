@@ -1001,7 +1001,6 @@ impl mir::Expression {
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
                 };
-                dbg!(&inner);
                 let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };

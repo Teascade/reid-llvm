@@ -335,7 +335,14 @@ impl Block {
                         None
                     }
                 }
-                StmtKind::While(while_statement) => todo!(),
+                StmtKind::While(WhileStatement {
+                    condition, block, ..
+                }) => {
+                    condition.typecheck(&mut state, typerefs, Some(&TypeKind::Bool))?;
+                    block.typecheck(&mut state, typerefs, None)?;
+
+                    None
+                }
             };
 
             if let Some((ReturnKind::Hard, _)) = ret {

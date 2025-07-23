@@ -1,9 +1,12 @@
 // Arithmetic, function calls and imports!
 
+import std::print;
+import std::from_str;
 
 fn main() -> u32 {
-  for i in 0 to 10 {
-    print("hello")
+  let text = from_str("hello");
+  for i in 0 .. 10 {
+    print(&text)
   }
 
   let mut num = 0;

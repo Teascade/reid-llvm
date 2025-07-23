@@ -155,11 +155,12 @@ impl Parse for PrimaryExpression {
                 }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
-                    if let Some(Token::Dot) = stream.peek() {
+                    if let (Some(Token::Dot), Some(Token::DecimalValue(fractional))) =
+                        (stream.peek(), stream.peek2())
+                    {
                         stream.next(); // Consume dot
-                        let Some(Token::DecimalValue(fractional)) = stream.next() else {
-                            return Err(stream.expected_err("fractional part")?);
-                        };
+                        stream.next(); // Consume fractional
+
                         Expression(
                             Kind::Literal(Literal::Decimal(
                                 format!("{}.{}", v, fractional)
@@ -706,7 +707,8 @@ impl Parse for ForStatement {
         let start_range = stream.get_range().unwrap();
         stream.expect(Token::In)?;
         let start = stream.parse()?;
-        stream.expect(Token::To)?;
+        stream.expect(Token::Dot)?;
+        stream.expect(Token::Dot)?;
         let end = stream.parse()?;
 
         Ok(ForStatement(idx, start_range, start, end, stream.parse()?))
