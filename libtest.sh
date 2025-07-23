@@ -16,8 +16,9 @@ BINARY="$(echo $1 | cut -d'.' -f1)"".out"
 
 echo $1
 
-make clean SRC=$1 ; make SRC=$1 && echo ""
-
+cargo run --example cli $@ && \
+sleep 0.1 && \
+chmod +x $BINARY && \
 $BINARY ; echo "Return value: ""$?"
 
 ## Command from: clang -v hello.o -o test

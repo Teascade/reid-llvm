@@ -1,11 +1,18 @@
 use std::{env, fs, path::PathBuf};
 
-use reid::{compile_simple, CustomIRs};
+use reid::{compile_simple, ld::LDRunner, CustomIRs};
 use reid_lib::compile::CompileOutput;
 
 fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = env::args().collect();
-    if let Some(filename) = args.get(1) {
+    let mut iter = args.into_iter().skip(1);
+    if let Some(filename) = iter.next() {
+        let mut libraries = Vec::new();
+        while let Some(libname) = iter.next() {
+            libraries.push(libname);
+        }
+
+        dbg!(&filename);
         let path = PathBuf::from(filename).canonicalize().unwrap();
         let parent = path.with_extension("");
         let llvm_ir_path = parent.with_extension("ll");
@@ -46,6 +53,14 @@ fn main() -> Result<(), std::io::Error> {
                     "Compilation took: {:.2}ms\n",
                     (after.duration_since(before).unwrap().as_micros() as f32) / 1000.
                 );
+
+                println!("Linking {:?}", &object_path);
+                let linker = option_env!("LD").unwrap_or("ld").to_owned();
+                let mut linker = LDRunner::from_command(linker).with_library("c".to_owned());
+                for library in libraries {
+                    linker = linker.with_library(library);
+                }
+                linker.invoke(object_path);
             }
             Err(e) => panic!("{}", e),
         };

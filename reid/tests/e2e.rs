@@ -19,7 +19,9 @@ fn test(source: &str, name: &str) {
 
         let context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
 
-        assert_err(mir_context.codegen(&context));
+        let codegen = assert_err(mir_context.codegen(&context));
+
+        codegen.compile();
 
         Ok::<(), ()>(())
     })))
