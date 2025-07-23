@@ -3,19 +3,26 @@ use reid::{
     mir::{self},
     parse_module, perform_all_passes,
 };
+use reid_lib::Context;
 use util::assert_err;
 
 mod util;
 
 fn test(source: &str, name: &str) {
-    let mut map = Default::default();
-    let (id, tokens) = assert_err(parse_module(source, name, &mut map));
-    let module = assert_err(compile_module(id, tokens, &mut map, None, true));
+    assert_err(assert_err(std::panic::catch_unwind(|| {
+        let mut map = Default::default();
+        let (id, tokens) = assert_err(parse_module(source, name, &mut map));
 
-    assert_err(perform_all_passes(
-        &mut mir::Context::from(vec![module], Default::default()),
-        &mut map,
-    ));
+        let module = assert_err(compile_module(id, tokens, &mut map, None, true));
+        let mut mir_context = mir::Context::from(vec![module], Default::default());
+        assert_err(perform_all_passes(&mut mir_context, &mut map));
+
+        let context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
+
+        assert_err(mir_context.codegen(&context));
+
+        Ok::<(), ()>(())
+    })))
 }
 
 #[test]
@@ -66,6 +73,7 @@ fn hello_world_compiles_well() {
 fn mutable_compiles_well() {
     test(include_str!("../../examples/mutable.reid"), "test");
 }
+
 #[test]
 fn ptr_compiles_well() {
     test(include_str!("../../examples/ptr.reid"), "test");

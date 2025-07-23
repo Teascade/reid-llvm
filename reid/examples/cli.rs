@@ -17,6 +17,7 @@ fn main() -> Result<(), std::io::Error> {
         let before = std::time::SystemTime::now();
 
         let text = fs::read_to_string(&path)?;
+
         match compile_simple(&text, PathBuf::from(&path)) {
             Ok((
                 CompileOutput {

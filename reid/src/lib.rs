@@ -54,7 +54,7 @@ use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
 mod ast;
 mod codegen;
-mod error_raporting;
+pub mod error_raporting;
 mod lexer;
 pub mod mir;
 mod pad_adapter;
