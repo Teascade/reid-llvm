@@ -137,7 +137,7 @@ pub fn perform_all_passes<'map>(
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(
+        return Err(ReidError::from_kind(
             state.errors.iter().map(|e| e.clone().into()).collect(),
             module_map.clone(),
         ));
@@ -157,7 +157,7 @@ pub fn perform_all_passes<'map>(
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(
+        return Err(ReidError::from_kind(
             state
                 .errors
                 .iter()
@@ -177,7 +177,7 @@ pub fn perform_all_passes<'map>(
     dbg!(&state);
 
     if !state.errors.is_empty() {
-        return Err(ReidError::from_kind::<()>(
+        return Err(ReidError::from_kind(
             state
                 .errors
                 .iter()
@@ -214,7 +214,10 @@ pub fn compile_and_pass<'map>(
     println!("{}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
-    let codegen_modules = mir_context.codegen(&mut context);
+    let codegen_modules = match mir_context.codegen(&mut context) {
+        Ok(modules) => modules,
+        Err(e) => Err(ReidError::from_kind(vec![e.into()], module_map.clone()))?,
+    };
 
     #[cfg(debug_assertions)]
     println!("{}", &codegen_modules.context);

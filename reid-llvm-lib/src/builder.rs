@@ -4,8 +4,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    Block, BlockData, CustomTypeKind, FunctionData, Instr, InstructionData, ModuleData,
-    NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
+    Block, BlockData, CompileResult, CustomTypeKind, ErrorKind, FunctionData, Instr,
+    InstructionData, ModuleData, NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
         DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
         InstructionDebugRecordData,
@@ -151,7 +151,7 @@ impl Builder {
         block_val: &BlockValue,
         data: InstructionData,
         name: String,
-    ) -> Result<InstructionValue, ()> {
+    ) -> CompileResult<InstructionValue> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(block_val.0.0.0);
@@ -236,14 +236,14 @@ impl Builder {
         &self,
         block: &BlockValue,
         value: TerminatorKind,
-    ) -> Result<(), ()> {
+    ) -> CompileResult<()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(block.0.0.0);
             let function = module.functions.get_unchecked_mut(block.0.1);
             let block = function.blocks.get_unchecked_mut(block.1);
             if let Some(_) = &block.data.terminator {
-                Err(())
+                Err(ErrorKind::Null)
             } else {
                 block.data.terminator = Some(value);
                 Ok(())
@@ -255,14 +255,14 @@ impl Builder {
         &self,
         block: &BlockValue,
         location: DebugLocationValue,
-    ) -> Result<(), ()> {
+    ) -> CompileResult<()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(block.0.0.0);
             let function = module.functions.get_unchecked_mut(block.0.1);
             let block = function.blocks.get_unchecked_mut(block.1);
             if let Some(_) = &block.data.terminator_location {
-                Err(())
+                Err(ErrorKind::Null)
             } else {
                 block.data.terminator_location = Some(location);
                 Ok(())
@@ -270,7 +270,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn delete_block(&self, block: &BlockValue) -> Result<(), ()> {
+    pub(crate) unsafe fn delete_block(&self, block: &BlockValue) -> CompileResult<()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(block.0.0.0);
@@ -349,7 +349,7 @@ impl Builder {
         self.modules.clone()
     }
 
-    pub fn check_instruction(&self, instruction: &InstructionValue) -> Result<(), ()> {
+    pub fn check_instruction(&self, instruction: &InstructionValue) -> CompileResult<()> {
         unsafe {
             match self.instr_data(&instruction).kind {
                 Instr::Param(_) => Ok(()),
@@ -372,7 +372,7 @@ impl Builder {
                     if t.comparable() || t.category() != TypeCategory::Integer {
                         Ok(())
                     } else {
-                        Err(()) // TODO error: Types not comparable
+                        Err(ErrorKind::Null) // TODO error: Types not comparable
                     }
                 }
                 Instr::FCmp(_, lhs, rhs) => {
@@ -380,17 +380,17 @@ impl Builder {
                     if t.comparable() || t.category() != TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(()) // TODO error: Types not comparable
+                        Err(ErrorKind::Null) // TODO error: Types not comparable
                     }
                 }
                 Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
                     if param_types.len() != params.len() {
-                        return Err(()); // TODO error: invalid amount of params
+                        return Err(ErrorKind::Null); // TODO error: invalid amount of params
                     }
                     for (a, b) in param_types.iter().zip(params) {
                         if *a != b.get_type(&self)? {
-                            return Err(()); // TODO error: params do not match
+                            return Err(ErrorKind::Null); // TODO error: params do not match
                         }
                     }
                     Ok(())
@@ -403,7 +403,7 @@ impl Builder {
                     // incoming values come from blocks that are added later
                     // than the one where this one exists.
 
-                    let first = iter.next().ok_or(())?;
+                    let first = iter.next().ok_or(ErrorKind::Null)?;
                     for item in iter {
                         match_types(first, item, &self)?;
                     }
@@ -416,10 +416,10 @@ impl Builder {
                         if *ptr_ty_inner == load_ty {
                             Ok(())
                         } else {
-                            Err(()) // TODO error: inner type mismatch
+                            Err(ErrorKind::Null) // TODO error: inner type mismatch
                         }
                     } else {
-                        Err(()) // TODO error: not a pointer
+                        Err(ErrorKind::Null) // TODO error: not a pointer
                     }
                 }
                 Instr::Store(ptr, _) => {
@@ -427,7 +427,7 @@ impl Builder {
                     if let Type::Ptr(_) = ty {
                         Ok(())
                     } else {
-                        Err(()) // TODO error: not a pointer
+                        Err(ErrorKind::Null) // TODO error: not a pointer
                     }
                 }
                 Instr::ArrayAlloca(_, _) => Ok(()),
@@ -435,7 +435,7 @@ impl Builder {
                     let ptr_ty = ptr_val.get_type(&self)?;
                     match ptr_ty {
                         Type::Ptr(_) => Ok(()),
-                        _ => Err(()),
+                        _ => Err(ErrorKind::Null),
                     }
                 }
                 Instr::GetStructElemPtr(ptr_val, idx) => {
@@ -445,16 +445,16 @@ impl Builder {
                             match self.type_data(&val).kind {
                                 CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
                                     if fields.len() <= idx as usize {
-                                        return Err(()); // TODO error: no such field
+                                        return Err(ErrorKind::Null); // TODO error: no such field
                                     }
                                 }
                             }
                             Ok(())
                         } else {
-                            Err(()) // TODO error: not a struct
+                            Err(ErrorKind::Null) // TODO error: not a struct
                         }
                     } else {
-                        Err(()) // TODO error: not a pointer
+                        Err(ErrorKind::Null) // TODO error: not a pointer
                     }
                 }
                 Instr::ExtractValue(val, _) => {
@@ -464,7 +464,7 @@ impl Builder {
                             CustomTypeKind::NamedStruct(_) => Ok(()),
                         },
                         Type::Array(_, _) => Ok(()),
-                        _ => Err(()),
+                        _ => Err(ErrorKind::Null),
                     }
                 }
                 Instr::Trunc(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
@@ -545,7 +545,7 @@ impl InstructionValue {
         }
     }
 
-    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+    pub(crate) fn get_type(&self, builder: &Builder) -> CompileResult<Type> {
         use Instr::*;
         unsafe {
             match &builder.instr_data(self).kind {
@@ -554,7 +554,7 @@ impl InstructionValue {
                     .params
                     .get(*nth)
                     .cloned()
-                    .ok_or(()),
+                    .ok_or(ErrorKind::Null),
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
                 FAdd(lhs, rhs) => match_types(lhs, rhs, &builder),
@@ -572,7 +572,10 @@ impl InstructionValue {
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FCmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
-                Phi(values) => values.first().ok_or(()).and_then(|v| v.get_type(&builder)),
+                Phi(values) => values
+                    .first()
+                    .ok_or(ErrorKind::Null)
+                    .and_then(|v| v.get_type(&builder)),
                 Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
@@ -614,7 +617,7 @@ impl InstructionValue {
                             }
                         }
                         Type::Array(elem_ty, _) => *elem_ty.clone(),
-                        _ => return Err(()),
+                        _ => return Err(ErrorKind::Null),
                     })
                 }
                 Trunc(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
@@ -633,9 +636,9 @@ impl InstructionValue {
         }
     }
 
-    fn cast_to(&self, builder: &Builder, ty: &Type) -> Result<Instr, ()> {
+    fn cast_to(&self, builder: &Builder, ty: &Type) -> CompileResult<Instr> {
         self.get_type(builder)?
             .cast_instruction(*self, &ty)
-            .ok_or(())
+            .ok_or(ErrorKind::Null)
     }
 }

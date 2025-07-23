@@ -17,6 +17,14 @@ mod fmt;
 mod pad_adapter;
 mod util;
 
+#[derive(thiserror::Error, Debug, Clone, PartialEq, PartialOrd)]
+pub enum ErrorKind {
+    #[error("NULL error, should never occur!")]
+    Null,
+}
+
+pub type CompileResult<T> = Result<T, ErrorKind>;
+
 #[derive(Debug)]
 pub struct Context {
     builder: Builder,
@@ -254,7 +262,7 @@ impl<'builder> Block<'builder> {
         &mut self,
         name: T,
         instruction: Instr,
-    ) -> Result<InstructionValue, ()> {
+    ) -> CompileResult<InstructionValue> {
         unsafe {
             self.builder.add_instruction(
                 &self.value,
@@ -268,7 +276,7 @@ impl<'builder> Block<'builder> {
         }
     }
 
-    pub fn build(&mut self, instruction: Instr) -> Result<InstructionValue, ()> {
+    pub fn build(&mut self, instruction: Instr) -> CompileResult<InstructionValue> {
         unsafe {
             let name = instruction.default_name().to_owned();
             self.builder.add_instruction(
@@ -297,16 +305,16 @@ impl<'builder> Block<'builder> {
         }
     }
 
-    pub fn terminate(&mut self, instruction: TerminatorKind) -> Result<(), ()> {
+    pub fn terminate(&mut self, instruction: TerminatorKind) -> CompileResult<()> {
         unsafe { self.builder.terminate(&self.value, instruction) }
     }
 
-    pub fn set_terminator_location(&mut self, location: DebugLocationValue) -> Result<(), ()> {
+    pub fn set_terminator_location(&mut self, location: DebugLocationValue) -> CompileResult<()> {
         unsafe { self.builder.set_terminator_location(&self.value, location) }
     }
 
     /// Delete block if it is unused. Return true if deleted, false if not.
-    pub fn delete_if_unused(&mut self) -> Result<bool, ()> {
+    pub fn delete_if_unused(&mut self) -> CompileResult<bool> {
         unsafe {
             if !self.builder.is_block_used(self.value()) {
                 self.builder.delete_block(&self.value)?;
@@ -682,7 +690,7 @@ pub enum TypeCategory {
 }
 
 impl TerminatorKind {
-    pub(crate) fn get_type(&self, builder: &Builder) -> Result<Type, ()> {
+    pub(crate) fn get_type(&self, builder: &Builder) -> CompileResult<Type> {
         use TerminatorKind::*;
         match self {
             Ret(instr_val) => instr_val.get_type(builder),

@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    codegen,
     lexer::{self, Cursor, FullToken, Position},
     mir::{self, pass, Metadata, SourceModuleId},
     token_stream::{self, TokenRange},
@@ -30,6 +31,8 @@ pub enum ErrorKind {
     TypeInferenceError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
     #[error("{}{}", label("(Linker) "), .0.kind)]
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
+    #[error("{}{}", label("(Codegen) "), .0)]
+    CodegenError(#[from] codegen::ErrorKind),
 }
 
 impl ErrorKind {
@@ -50,6 +53,9 @@ impl ErrorKind {
             ErrorKind::TypeCheckError(error) => error.metadata,
             ErrorKind::TypeInferenceError(error) => error.metadata,
             ErrorKind::LinkerError(error) => error.metadata,
+            ErrorKind::CodegenError(error) => match error {
+                codegen::ErrorKind::Null => Default::default(),
+            },
         }
     }
 }
@@ -155,7 +161,7 @@ impl ReidError {
         })
     }
 
-    pub fn from_kind<U>(errors: Vec<ErrorKind>, map: ErrorModules) -> ReidError {
+    pub fn from_kind(errors: Vec<ErrorKind>, map: ErrorModules) -> ReidError {
         ReidError { map, errors }
     }
 }

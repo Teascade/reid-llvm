@@ -20,7 +20,14 @@ use crate::{
         self, implement::TypeCategory, CustomTypeKey, Metadata, NamedVariableRef, SourceModuleId,
         StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
     },
+    util::try_all,
 };
+
+#[derive(thiserror::Error, Debug, Clone, PartialEq, PartialOrd)]
+pub enum ErrorKind {
+    #[error("NULL error, should never occur!")]
+    Null,
+}
 
 /// Context that contains all of the given modules as complete codegenerated
 /// LLIR that can then be finally compiled into LLVM IR.
@@ -39,16 +46,16 @@ impl<'ctx> CodegenContext<'ctx> {
 
 impl mir::Context {
     /// Compile MIR [`Context`] into [`CodegenContext`] containing LLIR.
-    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> CodegenContext<'ctx> {
+    pub fn codegen<'ctx>(&self, context: &'ctx Context) -> Result<CodegenContext<'ctx>, ErrorKind> {
         let mut modules = HashMap::new();
         let mut modules_sorted = self.modules.iter().map(|(_, m)| m).collect::<Vec<_>>();
         modules_sorted.sort_by(|m1, m2| m2.module_id.cmp(&m1.module_id));
 
         for module in &modules_sorted {
-            let codegen = module.codegen(context, modules.clone());
+            let codegen = module.codegen(context, modules.clone())?;
             modules.insert(module.module_id, codegen);
         }
-        CodegenContext { context }
+        Ok(CodegenContext { context })
     }
 }
 
@@ -194,7 +201,7 @@ impl mir::Module {
         &'ctx self,
         context: &'ctx Context,
         modules: HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
-    ) -> ModuleCodegen<'ctx> {
+    ) -> Result<ModuleCodegen<'ctx>, ErrorKind> {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
 
@@ -430,7 +437,7 @@ impl mir::Module {
                     };
 
                     let state = State::default();
-                    if let Some(ret) = block.codegen(&mut scope, &state) {
+                    if let Some(ret) = block.codegen(&mut scope, &state)? {
                         scope.block.terminate(Term::Ret(ret.instr())).unwrap();
                     } else {
                         if !scope.block.delete_if_unused().unwrap() {
@@ -451,7 +458,7 @@ impl mir::Module {
             }
         }
 
-        ModuleCodegen { module }
+        Ok(ModuleCodegen { module })
     }
 }
 
@@ -460,9 +467,9 @@ impl mir::Block {
         &self,
         mut scope: &mut Scope<'ctx, 'a>,
         state: &State,
-    ) -> Option<StackValue> {
+    ) -> Result<Option<StackValue>, ErrorKind> {
         for stmt in &self.statements {
-            stmt.codegen(&mut scope, state).map(|s| {
+            stmt.codegen(&mut scope, state)?.map(|s| {
                 if let Some(debug) = &scope.debug {
                     let location = stmt.1.into_debug(scope.tokens, debug.scope).unwrap();
                     let loc_val = debug.info.location(&debug.scope, location);
@@ -472,22 +479,30 @@ impl mir::Block {
         }
 
         if let Some((kind, expr)) = &self.return_expression {
-            let ret = expr.codegen(&mut scope, &mut state.load(true));
+            let ret = expr.codegen(&mut scope, &mut state.load(true))?;
             match kind {
                 mir::ReturnKind::Hard => {
-                    scope.block.terminate(Term::Ret(ret?.instr())).unwrap();
-                    None
+                    if let Some(ret) = ret {
+                        scope.block.terminate(Term::Ret(ret.instr())).unwrap();
+                    } else {
+                        scope.block.terminate(Term::RetVoid).unwrap();
+                    }
+                    Ok(None)
                 }
-                mir::ReturnKind::Soft => ret,
+                mir::ReturnKind::Soft => Ok(ret),
             }
         } else {
-            None
+            Ok(None)
         }
     }
 }
 
 impl mir::Statement {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Option<StackValue> {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        state: &State,
+    ) -> Result<Option<StackValue>, ErrorKind> {
         let location = scope.debug.clone().map(|d| {
             let location = self.1.into_debug(scope.tokens, d.scope).unwrap();
             d.info.location(&d.scope, location)
@@ -495,7 +510,7 @@ impl mir::Statement {
 
         match &self.0 {
             mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
-                let value = expression.codegen(scope, &state).unwrap();
+                let value = expression.codegen(scope, &state)?.unwrap();
 
                 let alloca = scope
                     .block
@@ -545,14 +560,17 @@ impl mir::Statement {
                         },
                     );
                 }
-                None
+                Ok(None)
             }
             mir::StmtKind::Set(lhs, rhs) => {
                 let lhs_value = lhs
-                    .codegen(scope, &state.load(false))
+                    .codegen(scope, &state.load(false))?
                     .expect("non-returning LHS snuck into codegen!");
 
                 let rhs_value = rhs.codegen(scope, state)?;
+                let Some(rhs_value) = rhs_value else {
+                    return Ok(None);
+                };
 
                 let backing_var = if let Some(var) = lhs.backing_var() {
                     &format!("store.{}", var.1)
@@ -576,7 +594,7 @@ impl mir::Statement {
                     }
                 };
 
-                None
+                Ok(None)
             }
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope, state),
@@ -585,7 +603,11 @@ impl mir::Statement {
 }
 
 impl mir::Expression {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Option<StackValue> {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        state: &State,
+    ) -> Result<Option<StackValue>, ErrorKind> {
         let location = if let Some(debug) = &scope.debug {
             Some(debug.info.location(
                 &debug.scope,
@@ -634,11 +656,11 @@ impl mir::Expression {
             )),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
                 let lhs = lhs_exp
-                    .codegen(scope, state)
+                    .codegen(scope, state)?
                     .expect("lhs has no return value")
                     .instr();
                 let rhs = rhs_exp
-                    .codegen(scope, state)
+                    .codegen(scope, state)?
                     .expect("rhs has no return value")
                     .instr();
                 let lhs_type = lhs_exp
@@ -721,11 +743,17 @@ impl mir::Expression {
 
                 let ret_type = ret_type_kind.get_type(scope.type_values, scope.types);
 
-                let params = call
-                    .parameters
-                    .iter()
-                    .map(|e| e.codegen(scope, state).unwrap())
-                    .collect::<Vec<_>>();
+                let params = try_all(
+                    call.parameters
+                        .iter()
+                        .map(|e| e.codegen(scope, state))
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|e| e.first().cloned().unwrap())?
+                .into_iter()
+                .map(|v| v.unwrap())
+                .collect::<Vec<_>>();
+
                 let param_instrs = params.iter().map(|e| e.instr()).collect();
                 let callee = scope
                     .functions
@@ -782,13 +810,13 @@ impl mir::Expression {
                     None
                 }
             }
-            mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state),
+            mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state)?,
             mir::ExprKind::Block(block) => {
                 let inner = scope.function.ir.block("inner");
                 scope.block.terminate(Term::Br(inner.value())).unwrap();
 
                 let mut inner_scope = scope.with_block(inner);
-                let ret = if let Some(ret) = block.codegen(&mut inner_scope, state) {
+                let ret = if let Some(ret) = block.codegen(&mut inner_scope, state)? {
                     Some(ret)
                 } else {
                     None
@@ -800,10 +828,10 @@ impl mir::Expression {
             }
             mir::ExprKind::Indexed(expression, val_t, idx_expr) => {
                 let StackValue(kind, ty) = expression
-                    .codegen(scope, &state.load(false))
+                    .codegen(scope, &state.load(false))?
                     .expect("array returned none!");
                 let idx = idx_expr
-                    .codegen(scope, &state.load(true))
+                    .codegen(scope, &state.load(true))?
                     .expect("index returned none!")
                     .instr();
 
@@ -877,10 +905,17 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Array(expressions) => {
-                let stack_value_list = expressions
-                    .iter()
-                    .map(|e| e.codegen(scope, state).unwrap())
-                    .collect::<Vec<_>>();
+                let stack_value_list: Vec<_> = try_all(
+                    expressions
+                        .iter()
+                        .map(|e| e.codegen(scope, state))
+                        .collect::<Vec<_>>(),
+                )
+                .map_err(|e| e.first().cloned().unwrap())?
+                .into_iter()
+                .map(|v| v.unwrap())
+                .collect();
+
                 let instr_list = stack_value_list
                     .iter()
                     .map(|s| s.instr())
@@ -944,7 +979,7 @@ impl mir::Expression {
                 ))
             }
             mir::ExprKind::Accessed(expression, type_kind, field) => {
-                let struct_val = expression.codegen(scope, &state.load(false)).unwrap();
+                let struct_val = expression.codegen(scope, &state.load(false))?.unwrap();
 
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
                     panic!("tried accessing non-pointer");
@@ -996,7 +1031,12 @@ impl mir::Expression {
             }
             mir::ExprKind::Struct(name, items) => {
                 let type_key = CustomTypeKey(name.clone(), scope.module_id);
-                let struct_ty = Type::CustomType(*scope.type_values.get(&type_key)?);
+                let struct_ty = Type::CustomType({
+                    let Some(a) = scope.type_values.get(&type_key) else {
+                        return Ok(None);
+                    };
+                    *a
+                });
 
                 let load_n = format!("{}.load", name);
 
@@ -1015,7 +1055,7 @@ impl mir::Expression {
                         .build_named(gep_n, Instr::GetStructElemPtr(struct_ptr, i as u32))
                         .unwrap()
                         .maybe_location(&mut scope.block, location);
-                    if let Some(val) = exp.codegen(scope, state) {
+                    if let Some(val) = exp.codegen(scope, state)? {
                         scope
                             .block
                             .build_named(store_n, Instr::Store(elem_ptr, val.instr()))
@@ -1101,6 +1141,7 @@ impl mir::Expression {
             }
             mir::ExprKind::CastTo(expression, type_kind) => {
                 let val = expression.codegen(scope, state)?;
+                let Some(val) = val else { return Ok(None) };
 
                 if val.1 == *type_kind {
                     Some(val)
@@ -1161,13 +1202,17 @@ impl mir::Expression {
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
         }
-        value
+        Ok(value)
     }
 }
 
 impl mir::IfExpression {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Option<StackValue> {
-        let condition = self.0.codegen(scope, state).unwrap();
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        state: &State,
+    ) -> Result<Option<StackValue>, ErrorKind> {
+        let condition = self.0.codegen(scope, state)?.unwrap();
 
         // Create blocks
         let mut then_b = scope.function.ir.block("then");
@@ -1199,7 +1244,7 @@ impl mir::IfExpression {
 
         // Generate then-block content
         let mut then_scope = scope.with_block(then_b);
-        let then_res = self.1.codegen(&mut then_scope, state);
+        let then_res = self.1.codegen(&mut then_scope, state)?;
         then_scope.block.terminate(Term::Br(after_bb)).ok();
 
         let else_res = if let Some(else_expr) = self.2.as_ref() {
@@ -1210,7 +1255,7 @@ impl mir::IfExpression {
                 .terminate(Term::CondBr(condition.instr(), then_bb, else_bb))
                 .unwrap();
 
-            let opt = else_expr.codegen(&mut else_scope, state);
+            let opt = else_expr.codegen(&mut else_scope, state)?;
 
             else_scope.block.terminate(Term::Br(after_bb)).ok();
 
@@ -1232,7 +1277,7 @@ impl mir::IfExpression {
         scope.swap_block(after_b);
 
         if then_res.is_none() && else_res.is_none() {
-            None
+            Ok(None)
         } else {
             let mut incoming = Vec::from(then_res.as_slice());
             incoming.extend(else_res.clone());
@@ -1260,7 +1305,7 @@ impl mir::IfExpression {
                     (Mutable(_), Mutable(_)) => StackValue(Mutable(instr), lhs_val.1),
                 },
             };
-            Some(value)
+            Ok(Some(value))
         }
     }
 }
