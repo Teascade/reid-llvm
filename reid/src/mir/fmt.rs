@@ -299,6 +299,8 @@ impl Display for BinaryOperator {
             BinaryOperator::Mult => write!(f, "*"),
             BinaryOperator::And => write!(f, "&&"),
             BinaryOperator::Cmp(op) => Display::fmt(op, f),
+            BinaryOperator::Div => write!(f, "/"),
+            BinaryOperator::Mod => write!(f, "%"),
         }
     }
 }

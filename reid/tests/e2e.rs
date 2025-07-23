@@ -18,15 +18,15 @@ fn test(source: &str, name: &str) {
     ));
 }
 
-pub static ARRAY: &str = include_str!("../../reid_src/array.reid");
-pub static FIBONACCI: &str = include_str!("../../reid_src/fibonacci.reid");
-pub static HELLO_WORLD: &str = include_str!("../../reid_src/hello_world.reid");
-pub static MUTABLE: &str = include_str!("../../reid_src/mutable.reid");
-pub static STRINGS: &str = include_str!("../../reid_src/strings.reid");
-pub static STRUCTS: &str = include_str!("../../reid_src/struct.reid");
-pub static ARRAY_STRUCTS: &str = include_str!("../../reid_src/array_structs.reid");
-pub static BORROW: &str = include_str!("../../reid_src/borrow.reid");
-pub static ARITHMETIC: &str = include_str!("../../reid_src/arithmetic.reid");
+pub static ARRAY: &str = include_str!("../../examples/array.reid");
+pub static FIBONACCI: &str = include_str!("../../examples/fibonacci.reid");
+pub static HELLO_WORLD: &str = include_str!("../../examples/hello_world.reid");
+pub static MUTABLE: &str = include_str!("../../examples/mutable.reid");
+pub static STRINGS: &str = include_str!("../../examples/strings.reid");
+pub static STRUCTS: &str = include_str!("../../examples/struct.reid");
+pub static ARRAY_STRUCTS: &str = include_str!("../../examples/array_structs.reid");
+pub static BORROW: &str = include_str!("../../examples/borrow.reid");
+pub static ARITHMETIC: &str = include_str!("../../examples/arithmetic.reid");
 
 #[test]
 fn array_compiles_well() {

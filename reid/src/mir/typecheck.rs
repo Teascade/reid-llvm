@@ -68,6 +68,8 @@ pub enum ErrorKind {
     NegativeUnsignedValue(TypeKind),
     #[error("Cannot cast type {0} into type {1}!")]
     NotCastableTo(TypeKind, TypeKind),
+    #[error("Cannot divide by zero")]
+    DivideZero,
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -426,7 +428,7 @@ impl Expression {
                 let both_t = lhs_type.collapse_into(&rhs_type)?;
 
                 if *op == BinaryOperator::Minus && !lhs_type.signed() {
-                    if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value(), rhs.num_value()) {
+                    if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?) {
                         if lhs_val < rhs_val {
                             return Err(ErrorKind::NegativeUnsignedValue(lhs_type));
                         }

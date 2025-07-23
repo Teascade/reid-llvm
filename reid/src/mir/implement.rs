@@ -104,14 +104,20 @@ impl TypeKind {
             BinaryOperator::Mult => self.clone(),
             BinaryOperator::And => TypeKind::Bool,
             BinaryOperator::Cmp(_) => TypeKind::Bool,
+            BinaryOperator::Div => self.clone(),
+            BinaryOperator::Mod => self.clone(),
         }
     }
 
+    /// Reverse of binop_type, where the given hint is the known required output
+    /// type of the binop, and the output is the hint for the lhs/rhs type.
     pub fn binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
         match op {
-            BinaryOperator::Add | BinaryOperator::Minus | BinaryOperator::Mult => {
-                Some(self.clone())
-            }
+            BinaryOperator::Add
+            | BinaryOperator::Minus
+            | BinaryOperator::Mult
+            | BinaryOperator::Div
+            | BinaryOperator::Mod => Some(self.clone()),
             BinaryOperator::And => None,
             BinaryOperator::Cmp(_) => None,
         }
@@ -465,12 +471,16 @@ impl Expression {
         }
     }
 
-    pub fn is_zero(&self) -> Option<bool> {
-        Some(self.num_value()? == 0)
+    pub fn is_zero(&self) -> Result<Option<bool>, ErrorKind> {
+        if let Some(val) = self.num_value()? {
+            Ok(Some(val == 0))
+        } else {
+            Ok(None)
+        }
     }
 
-    pub fn num_value(&self) -> Option<i128> {
-        match &self.0 {
+    pub fn num_value(&self) -> Result<Option<i128>, ErrorKind> {
+        Ok(match &self.0 {
             ExprKind::Variable(_) => None,
             ExprKind::Indexed(..) => None,
             ExprKind::Accessed(..) => None,
@@ -478,22 +488,46 @@ impl Expression {
             ExprKind::Struct(..) => None,
             ExprKind::Literal(literal) => literal.num_value(),
             ExprKind::BinOp(op, lhs, rhs) => match op {
-                BinaryOperator::Add => Some(lhs.num_value()? + rhs.num_value()?),
-                BinaryOperator::Minus => Some(lhs.num_value()? - rhs.num_value()?),
-                BinaryOperator::Mult => Some(lhs.num_value()? * rhs.num_value()?),
+                BinaryOperator::Add => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a + b),
+                BinaryOperator::Minus => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a - b),
+                BinaryOperator::Mult => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a * b),
                 BinaryOperator::And => None,
                 BinaryOperator::Cmp(_) => None,
+                BinaryOperator::Div => {
+                    let rhs_value = rhs.num_value()?;
+                    if rhs_value == Some(0) {
+                        Err(ErrorKind::DivideZero)?
+                    }
+                    maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a / b)
+                }
+                BinaryOperator::Mod => {
+                    let rhs_value = rhs.num_value()?;
+                    if rhs_value == Some(0) {
+                        Err(ErrorKind::DivideZero)?
+                    }
+                    maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a % b)
+                }
             },
             ExprKind::FunctionCall(..) => None,
             ExprKind::If(_) => None,
             ExprKind::Block(_) => None,
             ExprKind::Borrow(_, _) => None,
             ExprKind::Deref(_) => None,
-            ExprKind::CastTo(expression, _) => expression.num_value(),
-        }
+            ExprKind::CastTo(expression, _) => expression.num_value()?,
+        })
     }
 }
 
+fn maybe<T>(lhs: Option<i128>, rhs: Option<i128>, fun: T) -> Option<i128>
+where
+    T: FnOnce(i128, i128) -> i128,
+{
+    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
+        Some(fun(lhs, rhs))
+    } else {
+        None
+    }
+}
 impl IfExpression {
     pub fn return_type(
         &self,

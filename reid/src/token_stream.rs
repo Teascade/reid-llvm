@@ -235,7 +235,7 @@ impl std::iter::Sum for TokenRange {
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Error {
-    #[error("Expected {} got \"{}\"", .0, .1.to_string())]
+    #[error("Expected {} got \"{:?}\"", .0, .1)]
     Expected(String, Token, TokenRange),
     #[error("Source file contains no tokens")]
     FileEmpty,

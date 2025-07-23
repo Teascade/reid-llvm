@@ -218,6 +218,8 @@ pub enum BinaryOperator {
     Add,
     Minus,
     Mult,
+    Div,
+    Mod,
     And,
     Cmp(CmpOperator),
 }

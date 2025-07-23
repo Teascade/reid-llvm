@@ -46,11 +46,16 @@ Currently missing big features (TODOs) are:
 - Loops
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions
+- Intrinsic functions
+- Not-Unary
 
 Big features that I want later but are not necessary:
 - Associated functions
 - User-defined binary operations
 - Asymmetric binary operations (e.g. string + u32)
+- Error handling
+- Lexing & parsing of whitespace and comments as well
+- LSP implementation
 
 Smaller features:
 - Hex-numbers

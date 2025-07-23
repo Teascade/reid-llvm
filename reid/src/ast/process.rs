@@ -286,6 +286,8 @@ impl ast::BinaryOperator {
             ast::BinaryOperator::Minus => mir::BinaryOperator::Minus,
             ast::BinaryOperator::Mult => mir::BinaryOperator::Mult,
             ast::BinaryOperator::And => mir::BinaryOperator::And,
+            ast::BinaryOperator::Div => mir::BinaryOperator::Div,
+            ast::BinaryOperator::Mod => mir::BinaryOperator::Mod,
             ast::BinaryOperator::LT => mir::BinaryOperator::Cmp(mir::CmpOperator::LT),
             ast::BinaryOperator::LE => mir::BinaryOperator::Cmp(mir::CmpOperator::LE),
             ast::BinaryOperator::GT => mir::BinaryOperator::Cmp(mir::CmpOperator::GT),

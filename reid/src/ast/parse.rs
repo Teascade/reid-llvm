@@ -350,6 +350,8 @@ impl Parse for BinaryOperator {
             (Some(Token::Plus), _) => BinaryOperator::Add,
             (Some(Token::Minus), _) => BinaryOperator::Minus,
             (Some(Token::Star), _) => BinaryOperator::Mult,
+            (Some(Token::Slash), _) => BinaryOperator::Div,
+            (Some(Token::Percent), _) => BinaryOperator::Mod,
             (_, _) => Err(stream.expected_err("expected operator")?)?,
         })
     }

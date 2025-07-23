@@ -2,7 +2,7 @@ use std::{fmt::Debug, str::Chars};
 
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
-#[derive(Debug, Eq, PartialEq, Clone, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub enum Token {
     /// Values
     Identifier(String),
@@ -56,6 +56,10 @@ pub enum Token {
     Star,
     /// `-`
     Minus,
+    /// `/`
+    Slash,
+    /// `%`
+    Percent,
 
     /// `>`
     GreaterThan,
@@ -82,6 +86,8 @@ pub enum Token {
     Comma,
     /// `.`
     Dot,
+
+    Unknown(char),
 
     Eof,
 }
@@ -149,6 +155,18 @@ impl ToString for Token {
             Token::Comma => String::from(','),
             Token::Dot => String::from('.'),
             Token::Eof => String::new(),
+            Token::Slash => String::from('/'),
+            Token::Percent => String::from('%'),
+            Token::Unknown(val) => val.to_string(),
+        }
+    }
+}
+
+impl std::fmt::Debug for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Unknown(value) => write!(f, "Unknown(\'{}\')", value.to_string()),
+            _ => write!(f, "{}", self.to_string()),
         }
     }
 }
@@ -163,7 +181,7 @@ pub struct FullToken {
 impl Debug for FullToken {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_fmt(format_args!(
-            "{:?} (Ln {}, Col {})",
+            "Token({:?}) (Ln {}, Col {})",
             self.token, self.position.1, self.position.0
         ))
     }
@@ -343,8 +361,10 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '}' => Token::BraceClose,
             ',' => Token::Comma,
             '.' => Token::Dot,
-            // Invalid token
-            _ => Err(Error::InvalidToken(*character, cursor.position))?,
+            '/' => Token::Slash,
+            '%' => Token::Percent,
+            // Unknown token
+            value => Token::Unknown(*value),
         };
 
         tokens.push(FullToken {

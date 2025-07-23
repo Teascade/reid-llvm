@@ -1,0 +1,6 @@
+// Arithmetic, function calls and imports!
+
+fn main() -> u16 {
+
+  return (50 / 5 + 52 % 5);
+}

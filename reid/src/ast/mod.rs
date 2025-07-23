@@ -81,6 +81,8 @@ pub enum BinaryOperator {
     Add,
     Minus,
     Mult,
+    Div,
+    Mod,
 
     And,
     LT,
@@ -95,9 +97,11 @@ impl BinaryOperator {
     pub fn get_precedence(&self) -> i8 {
         use BinaryOperator::*;
         match &self {
+            Minus => 5,
             Add => 10,
-            Minus => 10,
-            Mult => 20,
+            Mult => 15,
+            Div => 20,
+            Mod => 20,
             And => 100,
             LT => 100,
             LE => 100,
