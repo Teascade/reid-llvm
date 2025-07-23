@@ -659,17 +659,57 @@ impl mir::Expression {
                     (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
                     (mir::BinaryOperator::Cmp(i), _, false) => Instr::ICmp(i.predicate(), lhs, rhs),
                     (mir::BinaryOperator::Cmp(i), _, true) => Instr::FCmp(i.predicate(), lhs, rhs),
-                    (mir::BinaryOperator::Div, true, true) => todo!(),
-                    (mir::BinaryOperator::Div, true, false) => todo!(),
-                    (mir::BinaryOperator::Div, false, true) => todo!(),
-                    (mir::BinaryOperator::Div, false, false) => todo!(),
-                    (mir::BinaryOperator::Mod, true, true) => todo!(),
-                    (mir::BinaryOperator::Mod, true, false) => todo!(),
-                    (mir::BinaryOperator::Mod, false, true) => todo!(),
-                    (mir::BinaryOperator::Mod, false, false) => todo!(),
+                    (mir::BinaryOperator::Div, false, false) => Instr::UDiv(lhs, rhs),
+                    (mir::BinaryOperator::Div, true, false) => Instr::SDiv(lhs, rhs),
+                    (mir::BinaryOperator::Div, _, true) => Instr::FDiv(lhs, rhs),
+                    (mir::BinaryOperator::Mod, false, false) => {
+                        let div = scope
+                            .block
+                            .build(Instr::UDiv(lhs, rhs))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        let mul = scope
+                            .block
+                            .build(Instr::Mul(rhs, div))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        Instr::Sub(lhs, mul)
+                    }
+                    (mir::BinaryOperator::Mod, true, false) => {
+                        let div = scope
+                            .block
+                            .build(Instr::SDiv(lhs, rhs))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        let mul = scope
+                            .block
+                            .build(Instr::Mul(rhs, div))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        Instr::Sub(lhs, mul)
+                    }
+                    (mir::BinaryOperator::Mod, _, true) => {
+                        let div = scope
+                            .block
+                            .build(Instr::FDiv(lhs, rhs))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        let mul = scope
+                            .block
+                            .build(Instr::Mul(rhs, div))
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location);
+                        Instr::Sub(lhs, mul)
+                    }
                 };
                 Some(StackValue(
-                    StackValueKind::Immutable(scope.block.build(instr).unwrap()),
+                    StackValueKind::Immutable(
+                        scope
+                            .block
+                            .build(instr)
+                            .unwrap()
+                            .maybe_location(&mut scope.block, location),
+                    ),
                     lhs_type,
                 ))
             }
