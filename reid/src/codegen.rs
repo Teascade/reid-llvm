@@ -598,8 +598,7 @@ impl mir::Statement {
             }
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope, state),
-            mir::StmtKind::For(for_statement) => todo!(),
-            mir::StmtKind::While(while_statement) => todo!(),
+            mir::StmtKind::While(_) => todo!(),
         }
     }
 }

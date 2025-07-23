@@ -126,7 +126,6 @@ impl Block {
                     let expr_res = expr.infer_types(&mut state, &inner_refs);
                     state.ok(expr_res, expr.1);
                 }
-                StmtKind::For(for_statement) => todo!(),
                 StmtKind::While(while_statement) => todo!(),
             };
         }

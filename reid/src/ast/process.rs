@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crate::{
     ast::{self},
     mir::{
-        self, CustomTypeKey, ForStatement, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind,
-        StructField, StructType, WhileStatement,
+        self, CustomTypeKey, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField,
+        StructType, WhileStatement,
     },
 };
 
@@ -148,20 +148,64 @@ impl ast::Block {
                 ast::BlockLevelStatement::Return(_, e) => {
                     (StmtKind::Expression(e.process(module_id)), e.1)
                 }
-                ast::BlockLevelStatement::ForLoop(counter, counter_range, start, end, block) => (
-                    StmtKind::For(ForStatement {
-                        counter: NamedVariableRef(
-                            mir::TypeKind::Vague(mir::VagueType::Unknown),
-                            counter.clone(),
-                            counter_range.as_meta(module_id),
+                ast::BlockLevelStatement::ForLoop(counter, counter_range, start, end, block) => {
+                    let counter_var = NamedVariableRef(
+                        mir::TypeKind::Vague(mir::VagueType::Unknown),
+                        counter.clone(),
+                        counter_range.as_meta(module_id),
+                    );
+                    let let_statement = mir::Statement(
+                        StmtKind::Let(counter_var.clone(), true, start.process(module_id)),
+                        counter_range.as_meta(module_id),
+                    );
+                    mir_statements.push(let_statement);
+
+                    let set_new = mir::Statement(
+                        StmtKind::Set(
+                            mir::Expression(
+                                mir::ExprKind::Variable(counter_var.clone()),
+                                counter_range.as_meta(module_id),
+                            ),
+                            mir::Expression(
+                                mir::ExprKind::BinOp(
+                                    mir::BinaryOperator::Add,
+                                    Box::new(mir::Expression(
+                                        mir::ExprKind::Variable(counter_var.clone()),
+                                        counter_range.as_meta(module_id),
+                                    )),
+                                    Box::new(mir::Expression(
+                                        mir::ExprKind::Literal(mir::Literal::Vague(
+                                            mir::VagueLiteral::Number(1),
+                                        )),
+                                        counter_range.as_meta(module_id),
+                                    )),
+                                ),
+                                counter_range.as_meta(module_id),
+                            ),
                         ),
-                        start: start.process(module_id),
-                        end: end.process(module_id),
-                        block: block.into_mir(module_id),
-                        meta: self.2.as_meta(module_id),
-                    }),
-                    self.2,
-                ),
+                        counter_range.as_meta(module_id),
+                    );
+                    let mut block = block.into_mir(module_id);
+                    block.statements.insert(0, set_new);
+                    (
+                        StmtKind::While(WhileStatement {
+                            condition: mir::Expression(
+                                mir::ExprKind::BinOp(
+                                    mir::BinaryOperator::Cmp(mir::CmpOperator::LT),
+                                    Box::new(mir::Expression(
+                                        mir::ExprKind::Variable(counter_var),
+                                        counter_range.as_meta(module_id),
+                                    )),
+                                    Box::new(end.process(module_id)),
+                                ),
+                                counter_range.as_meta(module_id),
+                            ),
+                            block,
+                            meta: self.2.as_meta(module_id),
+                        }),
+                        self.2,
+                    )
+                }
                 ast::BlockLevelStatement::WhileLoop(expression, block) => (
                     StmtKind::While(WhileStatement {
                         condition: expression.process(module_id),

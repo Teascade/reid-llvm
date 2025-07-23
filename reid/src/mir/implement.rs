@@ -375,7 +375,6 @@ impl Statement {
             ),
             Import(_) => todo!(),
             Expression(expression) => expression.return_type(refs, mod_id),
-            For(_) => Err(ReturnTypeOther::Loop),
             While(_) => Err(ReturnTypeOther::Loop),
         }
     }
@@ -386,7 +385,6 @@ impl Statement {
             StmtKind::Set(_, _) => None,
             StmtKind::Import(_) => None,
             StmtKind::Expression(expr) => expr.backing_var(),
-            StmtKind::For(_) => None,
             StmtKind::While(_) => None,
         }
     }

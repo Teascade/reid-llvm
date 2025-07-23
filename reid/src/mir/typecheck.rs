@@ -335,7 +335,6 @@ impl Block {
                         None
                     }
                 }
-                StmtKind::For(for_statement) => todo!(),
                 StmtKind::While(while_statement) => todo!(),
             };
 
