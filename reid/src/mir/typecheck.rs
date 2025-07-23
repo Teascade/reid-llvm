@@ -336,9 +336,19 @@ impl Block {
                     }
                 }
                 StmtKind::While(WhileStatement {
-                    condition, block, ..
+                    condition,
+                    block,
+                    meta,
                 }) => {
-                    condition.typecheck(&mut state, typerefs, Some(&TypeKind::Bool))?;
+                    let condition_ty =
+                        condition.typecheck(&mut state, typerefs, Some(&TypeKind::Bool))?;
+                    if condition_ty.assert_known(typerefs, &state)? != TypeKind::Bool {
+                        state.note_errors(
+                            &vec![ErrorKind::TypesIncompatible(condition_ty, TypeKind::Bool)],
+                            *meta,
+                        );
+                    }
+
                     block.typecheck(&mut state, typerefs, None)?;
 
                     None

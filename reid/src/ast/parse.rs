@@ -696,7 +696,7 @@ impl Parse for BlockLevelStatement {
 pub struct ForStatement(String, TokenRange, Expression, Expression, Block);
 
 #[derive(Debug)]
-pub struct WhileStatement(Expression, Block);
+pub struct WhileStatement(pub Expression, pub Block);
 
 impl Parse for ForStatement {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
