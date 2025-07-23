@@ -395,8 +395,8 @@ impl Statement {
                 expression.pass(pass, state, scope, mod_id)?;
             }
             StmtKind::While(while_statement) => {
-                while_statement.condition.pass(pass, state, scope, mod_id);
-                while_statement.block.pass(pass, state, scope, mod_id);
+                while_statement.condition.pass(pass, state, scope, mod_id)?;
+                while_statement.block.pass(pass, state, scope, mod_id)?;
             }
         }
 
