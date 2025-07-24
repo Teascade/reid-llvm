@@ -89,7 +89,9 @@ impl mir::Block {
         }
 
         if let Some((_, ret_expr)) = &self.return_expression {
-            allocated.extend(ret_expr.allocate(scope));
+            if let Some(ret_expr) = ret_expr {
+                allocated.extend(ret_expr.allocate(scope));
+            }
         }
 
         allocated

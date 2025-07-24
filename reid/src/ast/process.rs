@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crate::{
     ast::{self},
     mir::{
-        self, CustomTypeKey, ModuleMap, NamedVariableRef, SourceModuleId, StmtKind, StructField,
-        StructType, WhileStatement,
+        self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind,
+        StructField, StructType, WhileStatement,
     },
 };
 
@@ -166,7 +166,11 @@ impl ast::Block {
                     (StmtKind::Expression(e.process(module_id)), e.1)
                 }
                 ast::BlockLevelStatement::Return(_, e) => {
-                    (StmtKind::Expression(e.process(module_id)), e.1)
+                    if let Some(e) = e {
+                        (StmtKind::Expression(e.process(module_id)), e.1)
+                    } else {
+                        panic!(); // Should never happen?
+                    }
                 }
                 ast::BlockLevelStatement::ForLoop(counter, counter_range, start, end, block) => {
                     let counter_var = NamedVariableRef(
@@ -249,7 +253,11 @@ impl ast::Block {
         }
 
         let return_expression = if let Some(r) = &self.1 {
-            Some((r.0.into(), Box::new(r.1.process(module_id))))
+            if let Some(expr) = &r.1 {
+                Some((r.0.into(), Some(Box::new(expr.process(module_id)))))
+            } else {
+                Some((ReturnKind::Hard, None))
+            }
         } else {
             None
         };

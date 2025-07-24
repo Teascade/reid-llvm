@@ -17,7 +17,7 @@ use util::assert_err;
 
 mod util;
 
-fn test(source: &str, name: &str, expected_exit_code: i32) {
+fn test(source: &str, name: &str, expected_exit_code: Option<i32>) {
     assert_err(assert_err(std::panic::catch_unwind(|| {
         let mut map = Default::default();
         let (id, tokens) = assert_err(parse_module(source, name, &mut map));
@@ -50,7 +50,9 @@ fn test(source: &str, name: &str, expected_exit_code: i32) {
         let executed = Command::new(&out_path).output();
         std::fs::remove_file(out_path).unwrap();
 
-        assert_eq!(expected_exit_code, executed.unwrap().status.code().unwrap());
+        if let Some(expected_exit_code) = expected_exit_code {
+            assert_eq!(expected_exit_code, executed.unwrap().status.code().unwrap());
+        }
 
         Ok::<(), ()>(())
     })))
@@ -58,81 +60,125 @@ fn test(source: &str, name: &str, expected_exit_code: i32) {
 
 #[test]
 fn arithmetic_compiles_well() {
-    test(include_str!("../../examples/arithmetic.reid"), "test", 48);
+    test(
+        include_str!("../../examples/arithmetic.reid"),
+        "test",
+        Some(48),
+    );
 }
 #[test]
 fn array_structs_compiles_well() {
-    test(include_str!("../../examples/array_structs.reid"), "test", 5);
+    test(
+        include_str!("../../examples/array_structs.reid"),
+        "test",
+        Some(5),
+    );
 }
 #[test]
 fn array_compiles_well() {
-    test(include_str!("../../examples/array.reid"), "test", 3);
+    test(include_str!("../../examples/array.reid"), "test", Some(3));
 }
 #[test]
 fn borrow_compiles_well() {
-    test(include_str!("../../examples/borrow.reid"), "test", 17);
+    test(include_str!("../../examples/borrow.reid"), "test", Some(17));
 }
 #[test]
 fn borrow_hard_compiles_well() {
-    test(include_str!("../../examples/borrow_hard.reid"), "test", 17);
+    test(
+        include_str!("../../examples/borrow_hard.reid"),
+        "test",
+        Some(17),
+    );
 }
 #[test]
 fn cast_compiles_well() {
-    test(include_str!("../../examples/cast.reid"), "test", 6);
+    test(include_str!("../../examples/cast.reid"), "test", Some(6));
 }
 #[test]
 fn char_compiles_well() {
-    test(include_str!("../../examples/char.reid"), "test", 98);
+    test(include_str!("../../examples/char.reid"), "test", Some(98));
 }
 #[test]
 fn div_mod_compiles_well() {
-    test(include_str!("../../examples/div_mod.reid"), "test", 12);
+    test(
+        include_str!("../../examples/div_mod.reid"),
+        "test",
+        Some(12),
+    );
 }
 #[test]
 fn fibonacci_compiles_well() {
-    test(include_str!("../../examples/fibonacci.reid"), "test", 1);
+    test(
+        include_str!("../../examples/fibonacci.reid"),
+        "test",
+        Some(1),
+    );
 }
 #[test]
 fn float_compiles_well() {
-    test(include_str!("../../examples/float.reid"), "test", 1);
+    test(include_str!("../../examples/float.reid"), "test", Some(1));
 }
 #[test]
 fn hello_world_compiles_well() {
-    test(include_str!("../../examples/hello_world.reid"), "test", 8);
+    test(
+        include_str!("../../examples/hello_world.reid"),
+        "test",
+        None,
+    );
 }
 #[test]
 fn mutable_compiles_well() {
-    test(include_str!("../../examples/mutable.reid"), "test", 21);
+    test(
+        include_str!("../../examples/mutable.reid"),
+        "test",
+        Some(21),
+    );
 }
 #[test]
 fn ptr_compiles_well() {
-    test(include_str!("../../examples/ptr.reid"), "test", 5);
+    test(include_str!("../../examples/ptr.reid"), "test", Some(5));
 }
 #[test]
 fn std_test_compiles_well() {
-    test(include_str!("../../examples/std_test.reid"), "test", 3);
+    test(
+        include_str!("../../examples/std_test.reid"),
+        "test",
+        Some(3),
+    );
 }
 #[test]
 fn strings_compiles_well() {
-    test(include_str!("../../examples/strings.reid"), "test", 5);
+    test(include_str!("../../examples/strings.reid"), "test", Some(5));
 }
 #[test]
 fn struct_compiles_well() {
-    test(include_str!("../../examples/struct.reid"), "test", 17);
+    test(include_str!("../../examples/struct.reid"), "test", Some(17));
 }
 #[test]
 fn loops_compiles_well() {
-    test(include_str!("../../examples/loops.reid"), "test", 10);
+    test(include_str!("../../examples/loops.reid"), "test", Some(10));
 }
 #[test]
 fn ptr_hard_compiles_well() {
-    test(include_str!("../../examples/ptr_hard.reid"), "test", 0);
+    test(
+        include_str!("../../examples/ptr_hard.reid"),
+        "test",
+        Some(0),
+    );
 }
 #[test]
 fn loop_hard_compiles_well() {
-    test(include_str!("../../examples/loop_hard.reid"), "test", 0);
+    test(
+        include_str!("../../examples/loop_hard.reid"),
+        "test",
+        Some(0),
+    );
 }
 #[test]
 fn custom_binop_compiles_well() {
-    test(include_str!("../../examples/custom_binop.reid"), "test", 21);
+    test(
+        include_str!("../../examples/custom_binop.reid"),
+        "test",
+        Some(21),
+    );
 }

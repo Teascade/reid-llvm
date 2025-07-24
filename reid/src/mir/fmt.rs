@@ -142,9 +142,15 @@ impl Display for Block {
             write!(inner_f, "{}", statement)?;
         }
         if let Some(ret) = &self.return_expression {
+            let ret_fmt = if let Some(ret) = &ret.1 {
+                format!("{}", ret)
+            } else {
+                String::from("void")
+            };
+
             match ret.0 {
-                ReturnKind::Hard => writeln!(inner_f, "Return(Hard): {}", ret.1),
-                ReturnKind::Soft => writeln!(inner_f, "Return(Soft): {}", ret.1),
+                ReturnKind::Hard => writeln!(inner_f, "Return(Hard): {}", ret_fmt),
+                ReturnKind::Soft => writeln!(inner_f, "Return(Soft): {}", ret_fmt),
             }?;
         } else {
             writeln!(inner_f, "No Return")?;

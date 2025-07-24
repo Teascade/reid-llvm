@@ -556,7 +556,7 @@ impl Parse for Block {
         stream.expect(Token::BraceOpen)?;
 
         while !matches!(stream.peek(), Some(Token::BraceClose)) {
-            if let Some((_, e)) = return_stmt.take() {
+            if let Some((_, Some(e))) = return_stmt.take() {
                 // Special list of expressions that are simply not warned about,
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
@@ -697,7 +697,7 @@ impl Parse for BlockLevelStatement {
             },
             Some(Token::ReturnKeyword) => {
                 stream.next();
-                let exp = stream.parse()?;
+                let exp = stream.parse().ok();
                 stream.expect(Token::Semi)?;
                 Stmt::Return(ReturnType::Hard, exp)
             }
@@ -717,7 +717,7 @@ impl Parse for BlockLevelStatement {
                     if stream.expect(Token::Semi).is_ok() {
                         Stmt::Expression(e)
                     } else {
-                        Stmt::Return(ReturnType::Soft, e)
+                        Stmt::Return(ReturnType::Soft, Some(e))
                     }
                 }
             }

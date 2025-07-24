@@ -266,8 +266,10 @@ impl Block {
 
         // If there is a return expression, infer it's type
         if let Some(ret_expr) = &mut self.return_expression {
-            let ret_res = ret_expr.1.infer_types(&mut state, &inner_refs);
-            state.ok(ret_res, ret_expr.1 .1);
+            if let Some(expr) = &mut ret_expr.1 {
+                let ret_res = expr.infer_types(&mut state, &inner_refs);
+                state.ok(ret_res, expr.1);
+            }
         }
 
         // Fetch the declared return type

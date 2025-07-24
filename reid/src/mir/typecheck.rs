@@ -462,11 +462,15 @@ impl Block {
                 ReturnKind::Hard => state.scope.return_type_hint.clone(),
                 ReturnKind::Soft => hint_t.cloned(),
             };
-            let res = expr.typecheck(&mut state, &typerefs, ret_hint_t.as_ref());
-            Ok((
-                *return_kind,
-                state.or_else(res, TypeKind::Vague(Vague::Unknown), expr.1),
-            ))
+            if let Some(expr) = expr {
+                let res = expr.typecheck(&mut state, &typerefs, ret_hint_t.as_ref());
+                Ok((
+                    *return_kind,
+                    state.or_else(res, TypeKind::Vague(Vague::Unknown), expr.1),
+                ))
+            } else {
+                Ok((*return_kind, TypeKind::Void))
+            }
         } else {
             Ok((ReturnKind::Soft, TypeKind::Void))
         }

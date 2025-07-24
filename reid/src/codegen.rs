@@ -632,12 +632,12 @@ impl FunctionDefinitionKind {
                 }
 
                 if let Some(debug) = &scope.debug {
-                    let location = &block
-                        .return_meta()
-                        .into_debug(scope.tokens, debug.scope)
-                        .unwrap();
-                    let location = debug.info.location(&debug.scope, *location);
-                    scope.block.set_terminator_location(location).unwrap();
+                    if let Some(location) =
+                        &block.return_meta().into_debug(scope.tokens, debug.scope)
+                    {
+                        let location = debug.info.location(&debug.scope, *location);
+                        scope.block.set_terminator_location(location).unwrap();
+                    }
                 }
             }
             mir::FunctionDefinitionKind::Extern(_) => {}
@@ -664,17 +664,25 @@ impl mir::Block {
         }
 
         if let Some((kind, expr)) = &self.return_expression {
-            let ret = expr.codegen(&mut scope, &mut state.load(true))?;
-            match kind {
-                mir::ReturnKind::Hard => {
-                    if let Some(ret) = ret {
-                        scope.block.terminate(Term::Ret(ret.instr())).unwrap();
-                    } else {
-                        scope.block.terminate(Term::RetVoid).unwrap();
+            if let Some(expr) = expr {
+                let ret = expr.codegen(&mut scope, &mut state.load(true))?;
+                match kind {
+                    mir::ReturnKind::Hard => {
+                        if let Some(ret) = ret {
+                            scope.block.terminate(Term::Ret(ret.instr())).unwrap();
+                        } else {
+                            scope.block.terminate(Term::RetVoid).unwrap();
+                        }
+                        Ok(None)
                     }
-                    Ok(None)
+                    mir::ReturnKind::Soft => Ok(ret),
                 }
-                mir::ReturnKind::Soft => Ok(ret),
+            } else {
+                match kind {
+                    mir::ReturnKind::Hard => scope.block.terminate(Term::RetVoid).unwrap(),
+                    mir::ReturnKind::Soft => {}
+                }
+                Ok(None)
             }
         } else {
             Ok(None)

@@ -328,7 +328,7 @@ impl FunctionDefinition {
 pub struct Block {
     /// List of non-returning statements
     pub statements: Vec<Statement>,
-    pub return_expression: Option<(ReturnKind, Box<Expression>)>,
+    pub return_expression: Option<(ReturnKind, Option<Box<Expression>>)>,
     pub meta: Metadata,
 }
 

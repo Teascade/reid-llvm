@@ -367,7 +367,7 @@ impl StructType {
 
 enum BlockReturn<'b> {
     Early(&'b Statement),
-    Normal(ReturnKind, &'b Expression),
+    Normal(ReturnKind, &'b Option<Box<Expression>>),
 }
 
 impl Block {
@@ -394,7 +394,7 @@ impl Block {
     pub fn return_meta(&self) -> Metadata {
         self.return_expression
             .as_ref()
-            .map(|e| e.1 .1)
+            .map(|e| e.1.as_ref().map(|e| e.1).unwrap_or(Metadata::default()))
             .or(self.statements.last().map(|s| s.1))
             .unwrap_or(self.meta)
     }
@@ -420,15 +420,27 @@ impl Block {
         self.return_expression
             .as_ref()
             .ok_or(ReturnTypeOther::NoBlockReturn(self.meta))
-            .and_then(|(kind, stmt)| Ok((*kind, stmt.return_type(refs, mod_id)?.1)))
+            .and_then(|(kind, stmt)| {
+                Ok((
+                    *kind,
+                    stmt.as_ref()
+                        .and_then(|s| s.return_type(refs, mod_id).ok())
+                        .map(|s| s.1)
+                        .unwrap_or(TypeKind::Void),
+                ))
+            })
     }
 
     pub fn backing_var(&self) -> Option<&NamedVariableRef> {
         match self.return_expr().ok()? {
             BlockReturn::Early(statement) => statement.backing_var(),
             BlockReturn::Normal(kind, expr) => {
-                if kind == ReturnKind::Soft {
-                    expr.backing_var()
+                if let Some(expr) = expr {
+                    if kind == ReturnKind::Soft {
+                        expr.backing_var()
+                    } else {
+                        None
+                    }
                 } else {
                     None
                 }

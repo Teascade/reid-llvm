@@ -164,7 +164,7 @@ pub struct StructExpression {
 #[derive(Debug, Clone)]
 pub struct Block(
     pub Vec<BlockLevelStatement>,
-    pub Option<(ReturnType, Expression)>,
+    pub Option<(ReturnType, Option<Expression>)>,
     pub TokenRange,
 );
 
@@ -177,7 +177,7 @@ pub enum BlockLevelStatement {
         _i: ImportStatement,
     },
     Expression(Expression),
-    Return(ReturnType, Expression),
+    Return(ReturnType, Option<Expression>),
     ForLoop(String, TokenRange, Expression, Expression, Block),
     WhileLoop(Expression, Block),
 }
