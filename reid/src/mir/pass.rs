@@ -352,6 +352,7 @@ impl FunctionDefinition {
                 block.pass(pass, state, scope, mod_id)?;
             }
             FunctionDefinitionKind::Extern(_) => {}
+            FunctionDefinitionKind::Intrinsic(..) => {}
         };
         Ok(())
     }

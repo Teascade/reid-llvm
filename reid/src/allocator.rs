@@ -18,11 +18,16 @@ pub struct Allocator {
 pub struct AllocatorScope<'ctx, 'a> {
     pub(super) block: &'a mut Block<'ctx>,
     pub(super) module_id: SourceModuleId,
-    pub(super) types: &'a HashMap<TypeValue, TypeDefinition>,
     pub(super) type_values: &'a HashMap<CustomTypeKey, TypeValue>,
 }
 
 impl Allocator {
+    pub fn empty() -> Allocator {
+        Allocator {
+            allocations: Vec::new(),
+        }
+    }
+
     pub fn from(func: &FunctionDefinition, scope: &mut AllocatorScope) -> Allocator {
         func.allocate(scope)
     }
@@ -44,22 +49,21 @@ impl mir::FunctionDefinition {
     fn allocate<'ctx, 'a>(&self, scope: &mut AllocatorScope<'ctx, 'a>) -> Allocator {
         let mut allocated = Vec::new();
         match &self.kind {
-            crate::mir::FunctionDefinitionKind::Local(block, _) => {
+            mir::FunctionDefinitionKind::Local(block, _) => {
                 for param in &self.parameters {
                     let allocation = scope
                         .block
                         .build_named(
                             param.0.clone(),
-                            reid_lib::Instr::Alloca(
-                                param.1.get_type(scope.type_values, scope.types),
-                            ),
+                            reid_lib::Instr::Alloca(param.1.get_type(scope.type_values)),
                         )
                         .unwrap();
                     allocated.push(Allocation(param.0.clone(), param.1.clone(), allocation));
                 }
                 allocated.extend(block.allocate(scope));
             }
-            crate::mir::FunctionDefinitionKind::Extern(_) => {}
+            mir::FunctionDefinitionKind::Extern(_) => {}
+            mir::FunctionDefinitionKind::Intrinsic(_) => {}
         }
 
         Allocator {
@@ -95,11 +99,7 @@ impl mir::Statement {
                     .block
                     .build_named(
                         named_variable_ref.1.clone(),
-                        reid_lib::Instr::Alloca(
-                            named_variable_ref
-                                .0
-                                .get_type(scope.type_values, scope.types),
-                        ),
+                        reid_lib::Instr::Alloca(named_variable_ref.0.get_type(scope.type_values)),
                     )
                     .unwrap();
                 allocated.push(Allocation(

@@ -56,6 +56,7 @@ mod allocator;
 mod ast;
 mod codegen;
 pub mod error_raporting;
+pub mod intrinsics;
 pub mod ld;
 mod lexer;
 pub mod mir;

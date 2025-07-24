@@ -275,7 +275,7 @@ impl mir::Module {
                             // TODO: Reorder custom-type definitions such that
                             // inner types get evaluated first. Otherwise this
                             // will cause a panic!
-                            .map(|StructField(_, t, _)| t.get_type(&type_values, &types))
+                            .map(|StructField(_, t, _)| t.get_type(&type_values))
                             .collect(),
                     )))
                 }
@@ -291,14 +291,14 @@ impl mir::Module {
             let param_types: Vec<Type> = function
                 .parameters
                 .iter()
-                .map(|(_, p)| p.get_type(&type_values, &types))
+                .map(|(_, p)| p.get_type(&type_values))
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => module.function(
                     &function.name,
-                    function.return_type.get_type(&type_values, &types),
+                    function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
                         is_pub: function.is_pub || is_main,
@@ -309,7 +309,7 @@ impl mir::Module {
                 ),
                 mir::FunctionDefinitionKind::Extern(imported) => module.function(
                     &function.name,
-                    function.return_type.get_type(&type_values, &types),
+                    function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
                         is_extern: true,
@@ -317,6 +317,7 @@ impl mir::Module {
                         ..FunctionFlags::default()
                     },
                 ),
+                mir::FunctionDefinitionKind::Intrinsic(instrinsic_kind) => todo!(),
             };
 
             functions.insert(function.name.clone(), StackFunction { ir: func });
@@ -333,7 +334,6 @@ impl mir::Module {
                         &mut AllocatorScope {
                             block: &mut entry,
                             module_id: self.module_id,
-                            types: &types,
                             type_values: &type_values,
                         },
                     );
@@ -470,6 +470,26 @@ impl mir::Module {
                     }
                 }
                 mir::FunctionDefinitionKind::Extern(_) => {}
+                mir::FunctionDefinitionKind::Intrinsic(kind) => {
+                    let mut entry = function.ir.block("entry");
+                    let mut scope = Scope {
+                        context,
+                        modules: &modules,
+                        tokens,
+                        module: &module,
+                        module_id: self.module_id,
+                        function,
+                        block: entry,
+                        functions: &functions,
+                        types: &types,
+                        type_values: &type_values,
+                        stack_values: Default::default(),
+                        debug: None,
+                        allocator: Rc::new(RefCell::new(Allocator::empty())),
+                    };
+
+                    kind.codegen(&mut scope)?
+                }
             }
         }
 
@@ -694,7 +714,7 @@ impl mir::Expression {
                                             format!("{}", varref.1),
                                             Instr::Load(
                                                 v.0.instr(),
-                                                inner.get_type(scope.type_values, scope.types),
+                                                inner.get_type(scope.type_values),
                                             ),
                                         )
                                         .unwrap(),
@@ -800,7 +820,7 @@ impl mir::Expression {
                     .known()
                     .expect("function return type unknown");
 
-                let ret_type = ret_type_kind.get_type(scope.type_values, scope.types);
+                let ret_type = ret_type_kind.get_type(scope.type_values);
 
                 let params = try_all(
                     call.parameters
@@ -903,10 +923,7 @@ impl mir::Expression {
                         .block
                         .build_named(
                             "load",
-                            Instr::Load(
-                                kind.instr(),
-                                inner.get_type(scope.type_values, scope.types),
-                            ),
+                            Instr::Load(kind.instr(), inner.get_type(scope.type_values)),
                         )
                         .unwrap();
                     (
@@ -962,10 +979,7 @@ impl mir::Expression {
                                 .block
                                 .build_named(
                                     "array.load",
-                                    Instr::Load(
-                                        ptr,
-                                        contained_ty.get_type(scope.type_values, scope.types),
-                                    ),
+                                    Instr::Load(ptr, contained_ty.get_type(scope.type_values)),
                                 )
                                 .unwrap()
                                 .maybe_location(&mut scope.block, location),
@@ -1003,7 +1017,7 @@ impl mir::Expression {
                     .unwrap_or(TypeKind::Void);
 
                 let array_ty = Type::Array(
-                    Box::new(elem_ty_kind.get_type(scope.type_values, scope.types)),
+                    Box::new(elem_ty_kind.get_type(scope.type_values)),
                     instr_list.len() as u64,
                 );
                 let array_name = format!("{}.{}", elem_ty_kind, instr_list.len());
@@ -1086,10 +1100,7 @@ impl mir::Expression {
                                 .block
                                 .build_named(
                                     load_n,
-                                    Instr::Load(
-                                        value,
-                                        type_kind.get_type(scope.type_values, scope.types),
-                                    ),
+                                    Instr::Load(value, type_kind.get_type(scope.type_values)),
                                 )
                                 .unwrap(),
                         ),
@@ -1180,10 +1191,7 @@ impl mir::Expression {
                     .block
                     .build_named(
                         format!("{}.deref", varref.1),
-                        Instr::Load(
-                            v.0.instr(),
-                            ptr_inner.get_type(scope.type_values, scope.types),
-                        ),
+                        Instr::Load(v.0.instr(), ptr_inner.get_type(scope.type_values)),
                     )
                     .unwrap();
 
@@ -1198,7 +1206,7 @@ impl mir::Expression {
                                             format!("{}.deref.inner", varref.1),
                                             Instr::Load(
                                                 var_ptr_instr,
-                                                inner.get_type(scope.type_values, scope.types),
+                                                inner.get_type(scope.type_values),
                                             ),
                                         )
                                         .unwrap(),
@@ -1236,7 +1244,7 @@ impl mir::Expression {
                                         .build(Instr::BitCast(
                                             val.instr(),
                                             Type::Ptr(Box::new(
-                                                type_kind.get_type(scope.type_values, scope.types),
+                                                type_kind.get_type(scope.type_values),
                                             )),
                                         ))
                                         .unwrap(),
@@ -1254,7 +1262,7 @@ impl mir::Expression {
                                     .block
                                     .build(Instr::BitCast(
                                         val.instr(),
-                                        type_kind.get_type(scope.type_values, scope.types),
+                                        type_kind.get_type(scope.type_values),
                                     ))
                                     .unwrap(),
                             ),
@@ -1263,10 +1271,10 @@ impl mir::Expression {
                         _ => {
                             let cast_instr = val
                                 .1
-                                .get_type(scope.type_values, scope.types)
+                                .get_type(scope.type_values)
                                 .cast_instruction(
                                     val.instr(),
-                                    &type_kind.get_type(scope.type_values, scope.types),
+                                    &type_kind.get_type(scope.type_values),
                                 )
                                 .unwrap();
 
@@ -1438,11 +1446,7 @@ impl mir::Literal {
 }
 
 impl TypeKind {
-    pub(super) fn get_type(
-        &self,
-        type_vals: &HashMap<CustomTypeKey, TypeValue>,
-        typedefs: &HashMap<TypeValue, TypeDefinition>,
-    ) -> Type {
+    pub(super) fn get_type(&self, type_vals: &HashMap<CustomTypeKey, TypeValue>) -> Type {
         match &self {
             TypeKind::I8 => Type::I8,
             TypeKind::I16 => Type::I16,
@@ -1463,24 +1467,16 @@ impl TypeKind {
             TypeKind::F80 => Type::F80,
             TypeKind::F128PPC => Type::F128PPC,
             TypeKind::Char => Type::U8,
-            TypeKind::Array(elem_t, len) => {
-                Type::Array(Box::new(elem_t.get_type(type_vals, typedefs)), *len)
-            }
+            TypeKind::Array(elem_t, len) => Type::Array(Box::new(elem_t.get_type(type_vals)), *len),
             TypeKind::Void => Type::Void,
             TypeKind::Vague(_) => panic!("Tried to compile a vague type!"),
             TypeKind::CustomType(n) => {
                 let type_val = type_vals.get(n).unwrap().clone();
                 Type::CustomType(type_val)
             }
-            TypeKind::UserPtr(type_kind) => {
-                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
-            }
-            TypeKind::CodegenPtr(type_kind) => {
-                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
-            }
-            TypeKind::Borrow(type_kind, _) => {
-                Type::Ptr(Box::new(type_kind.get_type(type_vals, typedefs)))
-            }
+            TypeKind::UserPtr(type_kind) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
+            TypeKind::CodegenPtr(type_kind) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
+            TypeKind::Borrow(type_kind, _) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
         }
     }
 }

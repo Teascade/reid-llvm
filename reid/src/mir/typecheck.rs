@@ -196,6 +196,9 @@ impl FunctionDefinition {
             FunctionDefinitionKind::Extern(_) => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
             }
+            FunctionDefinitionKind::Intrinsic(..) => {
+                Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
+            }
         };
 
         match inferred {

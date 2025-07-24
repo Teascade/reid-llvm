@@ -69,6 +69,7 @@ impl FunctionDefinition {
                 }
             }
             FunctionDefinitionKind::Extern(_) => {}
+            FunctionDefinitionKind::Intrinsic(_) => todo!(),
         };
 
         Ok(())
