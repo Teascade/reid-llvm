@@ -170,7 +170,8 @@ pub struct ScopeVariable {
 
 #[derive(Clone, Debug, Eq)]
 pub struct ScopeBinopKey {
-    pub operators: (TypeKind, TypeKind),
+    pub params: (TypeKind, TypeKind),
+    pub operator: BinaryOperator,
     pub commutative: CommutativeKind,
 }
 
@@ -183,14 +184,16 @@ pub enum CommutativeKind {
 
 impl PartialEq for ScopeBinopKey {
     fn eq(&self, other: &Self) -> bool {
+        if self.operator != other.operator {
+            return false;
+        }
         if self.commutative != CommutativeKind::Any && other.commutative != CommutativeKind::Any {
             if self.commutative != other.commutative {
                 return false;
             }
         }
-        let operators_eq = self.operators == other.operators;
-        let swapped_ops_eq =
-            (self.operators.1.clone(), self.operators.0.clone()) == other.operators;
+        let operators_eq = self.params == other.params;
+        let swapped_ops_eq = (self.params.1.clone(), self.params.0.clone()) == other.params;
         if self.commutative == CommutativeKind::True || other.commutative == CommutativeKind::True {
             operators_eq || swapped_ops_eq
         } else {
@@ -202,18 +205,20 @@ impl PartialEq for ScopeBinopKey {
 impl std::hash::Hash for ScopeBinopKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         if self.commutative == CommutativeKind::True {
-            let mut sorted = vec![&self.operators.0, &self.operators.1];
+            let mut sorted = vec![&self.params.0, &self.params.1];
             sorted.sort();
             sorted.hash(state);
+            self.operator.hash(state);
         } else {
-            self.operators.hash(state);
+            self.params.hash(state);
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ScopeBinopDef {
-    pub operators: (TypeKind, TypeKind),
+    pub hands: (TypeKind, TypeKind),
+    pub operator: BinaryOperator,
     pub commutative: bool,
     pub return_ty: TypeKind,
 }
@@ -358,17 +363,22 @@ impl Module {
         }
 
         for binop in &self.binop_defs {
-            scope.binops.set(
-                ScopeBinopKey {
-                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
-                    commutative: CommutativeKind::True,
-                },
-                ScopeBinopDef {
-                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
-                    commutative: true,
-                    return_ty: binop.return_type.clone(),
-                },
-            );
+            scope
+                .binops
+                .set(
+                    ScopeBinopKey {
+                        params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                        commutative: CommutativeKind::True,
+                        operator: binop.op,
+                    },
+                    ScopeBinopDef {
+                        hands: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                        operator: binop.op,
+                        commutative: true,
+                        return_ty: binop.return_type.clone(),
+                    },
+                )
+                .ok();
         }
 
         for function in &self.functions {

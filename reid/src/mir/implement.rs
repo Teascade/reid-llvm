@@ -110,13 +110,13 @@ impl TypeKind {
         }
     }
 
-    pub fn binop_type<'o>(
+    pub fn binop_type(
         lhs: &TypeKind,
         rhs: &TypeKind,
         binop: &ScopeBinopDef,
     ) -> Option<(TypeKind, TypeKind, TypeKind)> {
-        let lhs_ty = lhs.collapse_into(&binop.operators.0);
-        let rhs_ty = rhs.collapse_into(&binop.operators.1);
+        let lhs_ty = lhs.collapse_into(&binop.hands.0);
+        let rhs_ty = rhs.collapse_into(&binop.hands.1);
         if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
             Some((lhs_ty, rhs_ty, binop.return_ty.clone()))
         } else {
@@ -126,7 +126,7 @@ impl TypeKind {
 
     /// Reverse of binop_type, where the given hint is the known required output
     /// type of the binop, and the output is the hint for the lhs/rhs type.
-    pub fn binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
+    pub fn simple_binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
         match op {
             BinaryOperator::Add
             | BinaryOperator::Minus
@@ -135,6 +135,22 @@ impl TypeKind {
             | BinaryOperator::Mod => Some(self.clone()),
             BinaryOperator::And => None,
             BinaryOperator::Cmp(_) => None,
+        }
+    }
+
+    pub fn binop_hint(
+        &self,
+        lhs: &TypeKind,
+        rhs: &TypeKind,
+        binop: &ScopeBinopDef,
+    ) -> Option<(TypeKind, TypeKind)> {
+        self.collapse_into(&binop.return_ty).ok()?;
+        let lhs_ty = lhs.collapse_into(&binop.hands.0);
+        let rhs_ty = rhs.collapse_into(&binop.hands.1);
+        if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
+            Some((lhs_ty, rhs_ty))
+        } else {
+            None
         }
     }
 

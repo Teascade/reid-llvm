@@ -400,8 +400,9 @@ impl mir::Module {
 
             binops.insert(
                 ScopeBinopKey {
-                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                    params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                     commutative: mir::pass::CommutativeKind::True,
+                    operator: binop.op,
                 },
                 StackBinopDefinition {
                     parameters: (binop.lhs.clone(), binop.rhs.clone()),

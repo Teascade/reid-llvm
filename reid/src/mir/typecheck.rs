@@ -513,7 +513,7 @@ impl Expression {
                 let lhs_res = lhs.typecheck(
                     state,
                     &typerefs,
-                    hint_t.and_then(|t| t.binop_hint(op)).as_ref(),
+                    hint_t.and_then(|t| t.simple_binop_hint(op)).as_ref(),
                 );
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
