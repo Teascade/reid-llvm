@@ -559,6 +559,9 @@ impl Expression {
                     let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                     let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
                     let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
+                    dbg!(&op, &hint_t);
+                    dbg!(&lhs_type);
+                    dbg!(&rhs_type);
 
                     let both_t = lhs_type.collapse_into(&rhs_type)?;
 

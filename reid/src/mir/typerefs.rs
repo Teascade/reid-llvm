@@ -238,9 +238,14 @@ impl<'outer> ScopeTypeRefs<'outer> {
         {
             return self.from_type(&TypeKind::Vague(VagueType::Unknown));
         }
-        for (_, binop) in binops.iter() {
+
+        let mut iter = binops.iter();
+        loop {
+            let Some((_, binop)) = iter.next() else {
+                break None;
+            };
             if let Some(ret) = try_binop(lhs, rhs, binop) {
-                return Some(ret);
+                break Some(ret);
             }
             if binop.operator.is_commutative() {
                 if let Some(ret) = try_binop(rhs, lhs, binop) {
@@ -248,8 +253,6 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 }
             }
         }
-        let ty = lhs.narrow(rhs)?;
-        self.from_type(&ty.as_type().simple_binop_type(op))
     }
 }
 

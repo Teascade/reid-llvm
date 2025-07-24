@@ -49,10 +49,24 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
 
     intrinsics.push(intrinsic_binop(
         BinaryOperator::Add,
+        TypeKind::U8,
+        TypeKind::U8,
+        TypeKind::U8,
+        IntrinsicIAdd(TypeKind::U8),
+    ));
+    intrinsics.push(intrinsic_binop(
+        BinaryOperator::Add,
         TypeKind::U32,
         TypeKind::U32,
         TypeKind::U32,
         IntrinsicIAdd(TypeKind::U32),
+    ));
+    intrinsics.push(intrinsic_binop(
+        BinaryOperator::Add,
+        TypeKind::U16,
+        TypeKind::U16,
+        TypeKind::U16,
+        IntrinsicIAdd(TypeKind::U16),
     ));
 
     intrinsics

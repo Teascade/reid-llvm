@@ -294,10 +294,10 @@ impl TypeKind {
         (lhs1, rhs1): (&TypeKind, &TypeKind),
         (lhs2, rhs2): (&TypeKind, &TypeKind),
     ) -> Option<(TypeKind, TypeKind)> {
-        if lhs1.collapse_into(&lhs2).is_ok() && rhs1.collapse_into(&rhs2).is_ok() {
-            Some((lhs1.clone(), rhs2.clone()))
-        } else if lhs1.collapse_into(&rhs2).is_ok() && rhs1.collapse_into(&lhs2).is_ok() {
-            Some((rhs1.clone(), lhs1.clone()))
+        if let (Ok(lhs), Ok(rhs)) = (lhs1.collapse_into(&lhs2), rhs1.collapse_into(&rhs2)) {
+            Some((lhs, rhs))
+        } else if let (Ok(lhs), Ok(rhs)) = (lhs1.collapse_into(&rhs2), rhs1.collapse_into(&lhs2)) {
+            Some((rhs, lhs))
         } else {
             None
         }

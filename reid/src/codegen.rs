@@ -900,13 +900,8 @@ impl mir::Expression {
 
                 if let Some(operation) = operation {
                     let a = operation.codegen(&lhs_val, &rhs_val, scope)?;
-                    dbg!(&scope.context);
-                    dbg!(&a);
                     Some(a)
                 } else {
-                    dbg!((lhs_val.1.clone(), rhs_val.1.clone()));
-                    dbg!(&operation.map(|b| &b.return_ty));
-
                     let lhs_type = lhs_exp
                         .return_type(&Default::default(), scope.module_id)
                         .unwrap()
@@ -972,6 +967,7 @@ impl mir::Expression {
                             Instr::Sub(lhs, mul)
                         }
                     };
+                    dbg!(&instr);
                     Some(StackValue(
                         StackValueKind::Immutable(
                             scope

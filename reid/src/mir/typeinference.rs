@@ -312,12 +312,20 @@ impl Expression {
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
 
-                type_refs
+                if let Ok(binop) = type_refs
                     .binop(op, &mut lhs_ref, &mut rhs_ref, &state.scope.binops)
                     .ok_or(ErrorKind::TypesIncompatible(
                         lhs_ref.resolve_deep().unwrap(),
                         rhs_ref.resolve_deep().unwrap(),
                     ))
+                {
+                    Ok(binop)
+                } else {
+                    let typeref = lhs_ref.narrow(&rhs_ref).unwrap();
+                    Ok(type_refs
+                        .from_type(&typeref.resolve_deep().unwrap().simple_binop_type(op))
+                        .unwrap())
+                }
             }
             ExprKind::FunctionCall(function_call) => {
                 // Get function definition and types
