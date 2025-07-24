@@ -44,15 +44,15 @@ Currently missing big features (TODOs) are:
 - ~~Type casting~~ (DONE)
 - ~~Built-in Int/Float division and modulo~~ (DONE)
 - ~~Loops~~ (DONE)
+- ~~Intrinsic functions~~ (DONE)
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions
-- Intrinsic functions
-- Not-Unary and NEQ-binary
+- Not-Unary
 
 Big features that I want later but are not necessary:
 - Associated functions
-- User-defined binary operations
-- Asymmetric binary operations (e.g. string + u32)
+- ~~User-defined binary operations~~ (DONE)
+- ~~Asymmetric binary operations (e.g. string + u32)~~ (DONE)
 - Error handling
 - Lexing & parsing of whitespace and comments as well
 - LSP implementation
