@@ -18,9 +18,12 @@ use crate::{
     allocator::{Allocator, AllocatorScope},
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind,
-        Metadata, NamedVariableRef, SourceModuleId, StructField, StructType, TypeDefinition,
-        TypeDefinitionKind, TypeKind, VagueLiteral, WhileStatement,
+        self,
+        implement::TypeCategory,
+        pass::{ScopeBinopDef, ScopeBinopKey},
+        CustomTypeKey, FunctionDefinitionKind, Metadata, NamedVariableRef, SourceModuleId,
+        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
+        WhileStatement,
     },
     util::try_all,
 };
@@ -77,12 +80,13 @@ pub struct Scope<'ctx, 'scope> {
     modules: &'scope HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
     tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
-    pub(super) module_id: SourceModuleId,
+    module_id: SourceModuleId,
     function: &'ctx Function<'ctx>,
     pub(super) block: Block<'ctx>,
-    pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
-    pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
+    types: &'scope HashMap<TypeValue, TypeDefinition>,
+    type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
     functions: &'scope HashMap<String, Function<'ctx>>,
+    binops: &'scope HashMap<ScopeBinopKey, StackBinopDefinition<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
     allocator: Rc<RefCell<Allocator>>,
@@ -104,6 +108,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             stack_values: self.stack_values.clone(),
             debug: self.debug.clone(),
             allocator: self.allocator.clone(),
+            binops: self.binops,
         }
     }
 
@@ -184,6 +189,29 @@ pub struct StackBinopDefinition<'ctx> {
     parameters: ((String, TypeKind), (String, TypeKind)),
     return_ty: TypeKind,
     ir: Function<'ctx>,
+}
+
+impl<'ctx> StackBinopDefinition<'ctx> {
+    fn codegen<'a>(
+        &self,
+        lhs: &StackValue,
+        rhs: &StackValue,
+        scope: &mut Scope<'ctx, 'a>,
+    ) -> StackValue {
+        let (lhs, rhs) = if lhs.1 == self.parameters.0 .1 && rhs.1 == self.parameters.1 .1 {
+            (lhs, rhs)
+        } else {
+            (rhs, lhs)
+        };
+        let instr = scope
+            .block
+            .build(Instr::FunctionCall(
+                self.ir.value(),
+                vec![lhs.instr(), rhs.instr()],
+            ))
+            .unwrap();
+        StackValue(StackValueKind::Immutable(instr), self.return_ty.clone())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -376,6 +404,7 @@ impl mir::Module {
                     scope: compile_unit,
                     types: &debug_types,
                 }),
+                binops: &binops,
                 allocator: Rc::new(RefCell::new(allocator)),
             };
 
@@ -442,6 +471,7 @@ impl mir::Module {
                     scope: compile_unit,
                     types: &debug_types,
                 }),
+                binops: &binops,
                 allocator: Rc::new(RefCell::new(allocator)),
             };
 
@@ -832,85 +862,102 @@ impl mir::Expression {
                 lit.as_type(),
             )),
             mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
-                let lhs = lhs_exp
+                let lhs_val = lhs_exp
                     .codegen(scope, state)?
-                    .expect("lhs has no return value")
-                    .instr();
-                let rhs = rhs_exp
+                    .expect("lhs has no return value");
+                let rhs_val = rhs_exp
                     .codegen(scope, state)?
-                    .expect("rhs has no return value")
-                    .instr();
-                let lhs_type = lhs_exp
-                    .return_type(&Default::default(), scope.module_id)
-                    .unwrap()
-                    .1;
-                let instr = match (
-                    binop,
-                    lhs_type.signed(),
-                    lhs_type.category() == TypeCategory::Real,
-                ) {
-                    (mir::BinaryOperator::Add, _, false) => Instr::Add(lhs, rhs),
-                    (mir::BinaryOperator::Add, _, true) => Instr::FAdd(lhs, rhs),
-                    (mir::BinaryOperator::Minus, _, false) => Instr::Sub(lhs, rhs),
-                    (mir::BinaryOperator::Minus, _, true) => Instr::FSub(lhs, rhs),
-                    (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
-                    (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
-                    (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
-                    (mir::BinaryOperator::Cmp(i), _, false) => Instr::ICmp(i.predicate(), lhs, rhs),
-                    (mir::BinaryOperator::Cmp(i), _, true) => Instr::FCmp(i.predicate(), lhs, rhs),
-                    (mir::BinaryOperator::Div, false, false) => Instr::UDiv(lhs, rhs),
-                    (mir::BinaryOperator::Div, true, false) => Instr::SDiv(lhs, rhs),
-                    (mir::BinaryOperator::Div, _, true) => Instr::FDiv(lhs, rhs),
-                    (mir::BinaryOperator::Mod, false, false) => {
-                        let div = scope
-                            .block
-                            .build(Instr::UDiv(lhs, rhs))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        let mul = scope
-                            .block
-                            .build(Instr::Mul(rhs, div))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        Instr::Sub(lhs, mul)
-                    }
-                    (mir::BinaryOperator::Mod, true, false) => {
-                        let div = scope
-                            .block
-                            .build(Instr::SDiv(lhs, rhs))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        let mul = scope
-                            .block
-                            .build(Instr::Mul(rhs, div))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        Instr::Sub(lhs, mul)
-                    }
-                    (mir::BinaryOperator::Mod, _, true) => {
-                        let div = scope
-                            .block
-                            .build(Instr::FDiv(lhs, rhs))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        let mul = scope
-                            .block
-                            .build(Instr::Mul(rhs, div))
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location);
-                        Instr::Sub(lhs, mul)
-                    }
-                };
-                Some(StackValue(
-                    StackValueKind::Immutable(
-                        scope
-                            .block
-                            .build(instr)
-                            .unwrap()
-                            .maybe_location(&mut scope.block, location),
-                    ),
-                    lhs_type,
-                ))
+                    .expect("rhs has no return value");
+                let lhs = lhs_val.instr();
+                let rhs = rhs_val.instr();
+
+                let operation = scope.binops.get(&ScopeBinopKey {
+                    params: (lhs_val.1.clone(), rhs_val.1.clone()),
+                    operator: *binop,
+                });
+
+                if let Some(operation) = operation {
+                    Some(operation.codegen(&lhs_val, &rhs_val, scope))
+                } else {
+                    dbg!((lhs_val.1.clone(), rhs_val.1.clone()));
+                    dbg!(&operation.map(|b| &b.return_ty));
+
+                    let lhs_type = lhs_exp
+                        .return_type(&Default::default(), scope.module_id)
+                        .unwrap()
+                        .1;
+                    let instr = match (
+                        binop,
+                        lhs_type.signed(),
+                        lhs_type.category() == TypeCategory::Real,
+                    ) {
+                        (mir::BinaryOperator::Add, _, false) => Instr::Add(lhs, rhs),
+                        (mir::BinaryOperator::Add, _, true) => Instr::FAdd(lhs, rhs),
+                        (mir::BinaryOperator::Minus, _, false) => Instr::Sub(lhs, rhs),
+                        (mir::BinaryOperator::Minus, _, true) => Instr::FSub(lhs, rhs),
+                        (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
+                        (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
+                        (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
+                        (mir::BinaryOperator::Cmp(i), _, false) => {
+                            Instr::ICmp(i.predicate(), lhs, rhs)
+                        }
+                        (mir::BinaryOperator::Cmp(i), _, true) => {
+                            Instr::FCmp(i.predicate(), lhs, rhs)
+                        }
+                        (mir::BinaryOperator::Div, false, false) => Instr::UDiv(lhs, rhs),
+                        (mir::BinaryOperator::Div, true, false) => Instr::SDiv(lhs, rhs),
+                        (mir::BinaryOperator::Div, _, true) => Instr::FDiv(lhs, rhs),
+                        (mir::BinaryOperator::Mod, false, false) => {
+                            let div = scope
+                                .block
+                                .build(Instr::UDiv(lhs, rhs))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            let mul = scope
+                                .block
+                                .build(Instr::Mul(rhs, div))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            Instr::Sub(lhs, mul)
+                        }
+                        (mir::BinaryOperator::Mod, true, false) => {
+                            let div = scope
+                                .block
+                                .build(Instr::SDiv(lhs, rhs))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            let mul = scope
+                                .block
+                                .build(Instr::Mul(rhs, div))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            Instr::Sub(lhs, mul)
+                        }
+                        (mir::BinaryOperator::Mod, _, true) => {
+                            let div = scope
+                                .block
+                                .build(Instr::FDiv(lhs, rhs))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            let mul = scope
+                                .block
+                                .build(Instr::Mul(rhs, div))
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location);
+                            Instr::Sub(lhs, mul)
+                        }
+                    };
+                    Some(StackValue(
+                        StackValueKind::Immutable(
+                            scope
+                                .block
+                                .build(instr)
+                                .unwrap()
+                                .maybe_location(&mut scope.block, location),
+                        ),
+                        lhs_type,
+                    ))
+                }
             }
             mir::ExprKind::FunctionCall(call) => {
                 let ret_type_kind = call
