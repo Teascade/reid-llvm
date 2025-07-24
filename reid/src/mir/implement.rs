@@ -95,11 +95,11 @@ impl TypeKind {
 
     /// Return the type that is the result of a binary operator between two
     /// values of this type
-    pub fn simple_binop_type(&self, op: &BinaryOperator) -> TypeKind {
-        // TODO make some type of mechanism that allows to binop two values of
-        // differing types..
-        // TODO Return None for arrays later
-        match op {
+    pub fn simple_binop_type(&self, op: &BinaryOperator) -> Option<TypeKind> {
+        if !self.category().is_simple_maths() {
+            return None;
+        }
+        Some(match op {
             BinaryOperator::Add => self.clone(),
             BinaryOperator::Minus => self.clone(),
             BinaryOperator::Mult => self.clone(),
@@ -107,7 +107,7 @@ impl TypeKind {
             BinaryOperator::Cmp(_) => TypeKind::Bool,
             BinaryOperator::Div => self.clone(),
             BinaryOperator::Mod => self.clone(),
-        }
+        })
     }
 
     pub fn binop_type(
@@ -127,6 +127,9 @@ impl TypeKind {
     /// Reverse of binop_type, where the given hint is the known required output
     /// type of the binop, and the output is the hint for the lhs/rhs type.
     pub fn simple_binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
+        if !self.category().is_simple_maths() {
+            return None;
+        }
         match op {
             BinaryOperator::Add
             | BinaryOperator::Minus
@@ -275,7 +278,7 @@ impl TypeKind {
             | TypeKind::F80
             | TypeKind::F128PPC => TypeCategory::Real,
             TypeKind::Void => TypeCategory::Other,
-            TypeKind::Bool => TypeCategory::Other,
+            TypeKind::Bool => TypeCategory::Bool,
             TypeKind::Array(_, _) => TypeCategory::Other,
             TypeKind::CustomType(..) => TypeCategory::Other,
             TypeKind::Borrow(_, _) => TypeCategory::Other,
@@ -329,8 +332,21 @@ impl BinaryOperator {
 pub enum TypeCategory {
     Integer,
     Real,
+    Bool,
     Other,
     TypeRef,
+}
+
+impl TypeCategory {
+    pub fn is_simple_maths(&self) -> bool {
+        match self {
+            TypeCategory::Integer => true,
+            TypeCategory::Real => true,
+            TypeCategory::Other => false,
+            TypeCategory::TypeRef => false,
+            TypeCategory::Bool => true,
+        }
+    }
 }
 
 impl StructType {

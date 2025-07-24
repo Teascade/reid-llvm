@@ -65,9 +65,12 @@ impl<'t> Pass for TypeInference<'t> {
                 params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                 operator: binop.op,
             };
-            if seen_binops.contains(&binop_key) {
+            if seen_binops.contains(&binop_key)
+                || (binop.lhs == binop.rhs && binop.lhs.1.category().is_simple_maths())
+            {
                 state.note_errors(
                     &vec![ErrorKind::BinaryOpAlreadyDefined(
+                        binop.op,
                         binop.lhs.1.clone(),
                         binop.rhs.1.clone(),
                     )],
@@ -323,7 +326,17 @@ impl Expression {
                 } else {
                     let typeref = lhs_ref.narrow(&rhs_ref).unwrap();
                     Ok(type_refs
-                        .from_type(&typeref.resolve_deep().unwrap().simple_binop_type(op))
+                        .from_type(
+                            &typeref
+                                .resolve_deep()
+                                .unwrap()
+                                .simple_binop_type(op)
+                                .ok_or(ErrorKind::InvalidBinop(
+                                    *op,
+                                    lhs_ref.resolve_deep().unwrap(),
+                                    rhs_ref.resolve_deep().unwrap(),
+                                ))?,
+                        )
                         .unwrap())
                 }
             }

@@ -64,14 +64,16 @@ pub enum ErrorKind {
     ImpossibleMutableBorrow(String),
     #[error("Cannot declare variable {0} as mutable, when it's type is immutable")]
     ImpossibleMutLet(String),
-    #[error("Cannot produce a negative unsigned value of type {0}!")]
+    #[error("Cannot produce a negative unsigned value of type {0}")]
     NegativeUnsignedValue(TypeKind),
-    #[error("Cannot cast type {0} into type {1}!")]
+    #[error("Cannot cast type {0} into type {1}")]
     NotCastableTo(TypeKind, TypeKind),
     #[error("Cannot divide by zero")]
     DivideZero,
-    #[error("Binary operation between {0} and {1} is already defined!")]
-    BinaryOpAlreadyDefined(TypeKind, TypeKind),
+    #[error("Binary operation {0} between {1} and {2} is already defined")]
+    BinaryOpAlreadyDefined(BinaryOperator, TypeKind, TypeKind),
+    #[error("Binary operation {0} between {1} and {2} is not defined")]
+    InvalidBinop(BinaryOperator, TypeKind, TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -580,7 +582,9 @@ impl Expression {
                         rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
                     }
 
-                    Ok(both_t.simple_binop_type(op))
+                    both_t
+                        .simple_binop_type(op)
+                        .ok_or(ErrorKind::InvalidBinop(*op, lhs_type, rhs_type))
                 }
             }
             ExprKind::FunctionCall(function_call) => {
