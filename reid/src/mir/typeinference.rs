@@ -4,12 +4,16 @@
 //! must then be passed through TypeCheck with the same [`TypeRefs`] in order to
 //! place the correct types from the IDs and check that there are no issues.
 
-use std::{collections::HashMap, convert::Infallible, iter};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::Infallible,
+    iter,
+};
 
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{Pass, PassResult, PassState},
+    pass::{self, Pass, PassResult, PassState, ScopeBinopDef, ScopeBinopKey},
     typecheck::{ErrorKind, ErrorTypedefKind},
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
@@ -52,6 +56,25 @@ impl<'t> Pass for TypeInference<'t> {
                         FunctionDefinitionKind::Intrinsic(..) => ErrorTypedefKind::Intrinsic,
                     },
                 );
+            }
+        }
+
+        let mut seen_binops = HashSet::new();
+        for binop in &module.binop_defs {
+            let binop_key = ScopeBinopKey {
+                operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                commutative: pass::CommutativeKind::True,
+            };
+            if seen_binops.contains(&binop_key) {
+                state.note_errors(
+                    &vec![ErrorKind::BinaryOpAlreadyDefined(
+                        binop.lhs.1.clone(),
+                        binop.rhs.1.clone(),
+                    )],
+                    binop.signature(),
+                );
+            } else {
+                seen_binops.insert(binop_key);
             }
         }
 

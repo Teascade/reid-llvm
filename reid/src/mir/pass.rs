@@ -1,7 +1,7 @@
 //! This module contains relevant code for [`Pass`] and shared code between
 //! passes. Passes can be performed on Reid MIR to e.g. typecheck the code.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::error::Error as STDError;
 
@@ -115,6 +115,7 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
 
 #[derive(Clone, Default, Debug)]
 pub struct Scope<Data: Clone + Default> {
+    pub binops: Storage<ScopeBinopKey, ScopeBinopDef>,
     pub function_returns: Storage<String, ScopeFunction>,
     pub variables: Storage<String, ScopeVariable>,
     pub types: Storage<CustomTypeKey, TypeDefinition>,
@@ -128,6 +129,7 @@ impl<Data: Clone + Default> Scope<Data> {
         Scope {
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
+            binops: self.binops.clone(),
             types: self.types.clone(),
             return_type_hint: self.return_type_hint.clone(),
             data: self.data.clone(),
@@ -160,6 +162,56 @@ pub struct ScopeFunction {
 pub struct ScopeVariable {
     pub ty: TypeKind,
     pub mutable: bool,
+}
+
+#[derive(Clone, Debug, Eq)]
+pub struct ScopeBinopKey {
+    pub operators: (TypeKind, TypeKind),
+    pub commutative: CommutativeKind,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CommutativeKind {
+    True,
+    False,
+    Any,
+}
+
+impl PartialEq for ScopeBinopKey {
+    fn eq(&self, other: &Self) -> bool {
+        if self.commutative != CommutativeKind::Any && other.commutative != CommutativeKind::Any {
+            if self.commutative != other.commutative {
+                return false;
+            }
+        }
+        let operators_eq = self.operators == other.operators;
+        let swapped_ops_eq =
+            (self.operators.1.clone(), self.operators.0.clone()) == other.operators;
+        if self.commutative == CommutativeKind::True || other.commutative == CommutativeKind::True {
+            operators_eq || swapped_ops_eq
+        } else {
+            operators_eq
+        }
+    }
+}
+
+impl std::hash::Hash for ScopeBinopKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        if self.commutative == CommutativeKind::True {
+            let mut sorted = vec![&self.operators.0, &self.operators.1];
+            sorted.sort();
+            sorted.hash(state);
+        } else {
+            self.operators.hash(state);
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ScopeBinopDef {
+    pub operators: (TypeKind, TypeKind),
+    pub commutative: bool,
+    pub return_ty: TypeKind,
 }
 
 pub struct PassState<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> {
@@ -299,6 +351,20 @@ impl Module {
                     typedef.clone(),
                 )
                 .ok();
+        }
+
+        for binop in &self.binop_defs {
+            scope.binops.set(
+                ScopeBinopKey {
+                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                    commutative: CommutativeKind::True,
+                },
+                ScopeBinopDef {
+                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                    commutative: true,
+                    return_ty: binop.return_ty.clone(),
+                },
+            );
         }
 
         for function in &self.functions {

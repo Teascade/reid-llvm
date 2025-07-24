@@ -70,6 +70,8 @@ pub enum ErrorKind {
     NotCastableTo(TypeKind, TypeKind),
     #[error("Cannot divide by zero")]
     DivideZero,
+    #[error("Binary operation between {0} and {1} is already defined!")]
+    BinaryOpAlreadyDefined(TypeKind, TypeKind),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
