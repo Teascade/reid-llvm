@@ -26,8 +26,8 @@ pub enum ErrorKind {
     FunctionNotDefined(String),
     #[error("Expected a return type of {0}, got {1} instead")]
     ReturnTypeMismatch(TypeKind, TypeKind),
-    #[error("Function already defined: {0}")]
-    FunctionAlreadyDefined(String),
+    #[error("Function {0} already defined {1}")]
+    FunctionAlreadyDefined(String, ErrorTypedefKind),
     #[error("Variable already defined: {0}")]
     VariableAlreadyDefined(String),
     #[error("Variable {0} is not declared as mutable")]
@@ -80,6 +80,16 @@ pub struct TypeCheck<'t> {
 
 type TypecheckPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
+#[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ErrorTypedefKind {
+    #[error("locally")]
+    Local,
+    #[error("as an extern")]
+    Extern,
+    #[error("as an intrinsic")]
+    Intrinsic,
+}
+
 impl<'t> Pass for TypeCheck<'t> {
     type Data = ();
     type TError = ErrorKind;
@@ -116,10 +126,9 @@ impl<'t> Pass for TypeCheck<'t> {
             }
         }
 
-        let seen = HashSet::new();
         for typedef in defmap.values() {
-            let mut curr = seen.clone();
-            curr.insert(typedef.name.clone());
+            let mut seen_types = HashSet::new();
+            seen_types.insert(typedef.name.clone());
             check_typedefs_for_recursion(&defmap, typedef, HashSet::new(), &mut state);
         }
 

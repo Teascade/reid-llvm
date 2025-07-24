@@ -4,13 +4,13 @@
 //! must then be passed through TypeCheck with the same [`TypeRefs`] in order to
 //! place the correct types from the IDs and check that there are no issues.
 
-use std::{convert::Infallible, iter};
+use std::{collections::HashMap, convert::Infallible, iter};
 
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
     pass::{Pass, PassResult, PassState},
-    typecheck::ErrorKind,
+    typecheck::{ErrorKind, ErrorTypedefKind},
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
     IfExpression, Module, ReturnKind, StmtKind,
@@ -33,6 +33,28 @@ impl<'t> Pass for TypeInference<'t> {
     type TError = ErrorKind;
 
     fn module(&mut self, module: &mut Module, mut state: TypeInferencePassState) -> PassResult {
+        let mut seen_functions = HashMap::new();
+        for function in &mut module.functions {
+            if let Some(kind) = seen_functions.get(&function.name) {
+                state.note_errors(
+                    &vec![ErrorKind::FunctionAlreadyDefined(
+                        function.name.clone(),
+                        *kind,
+                    )],
+                    function.signature(),
+                );
+            } else {
+                seen_functions.insert(
+                    function.name.clone(),
+                    match function.kind {
+                        FunctionDefinitionKind::Local(..) => ErrorTypedefKind::Local,
+                        FunctionDefinitionKind::Extern(..) => ErrorTypedefKind::Extern,
+                        FunctionDefinitionKind::Intrinsic(..) => ErrorTypedefKind::Intrinsic,
+                    },
+                );
+            }
+        }
+
         for function in &mut module.functions {
             let res = function.infer_types(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());

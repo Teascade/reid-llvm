@@ -129,7 +129,9 @@ pub fn perform_all_passes<'map>(
     dbg!(&context);
 
     for module in &mut context.modules {
-        module.1.functions.extend(form_intrinsics());
+        for intrinsic in form_intrinsics() {
+            module.1.functions.insert(0, intrinsic);
+        }
     }
 
     #[cfg(debug_assertions)]
