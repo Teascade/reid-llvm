@@ -25,7 +25,10 @@ fn main() -> Result<(), std::io::Error> {
 
         let text = fs::read_to_string(&path)?;
 
-        match compile_simple(&text, PathBuf::from(&path)) {
+        let cpu = std::env::var("CPU").unwrap_or("generic".to_owned());
+        let features = std::env::var("REIDFLAGS").unwrap_or("".to_owned());
+
+        match compile_simple(&text, PathBuf::from(&path), Some(cpu), vec![features]) {
             Ok((
                 CompileOutput {
                     triple,

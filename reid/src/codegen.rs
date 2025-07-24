@@ -19,12 +19,9 @@ use crate::{
     intrinsics::IntrinsicFunction,
     lexer::{FullToken, Position},
     mir::{
-        self,
-        implement::TypeCategory,
-        pass::{ScopeBinopDef, ScopeBinopKey},
-        CustomTypeKey, FunctionDefinitionKind, Metadata, NamedVariableRef, SourceModuleId,
-        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
-        WhileStatement,
+        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind,
+        Metadata, NamedVariableRef, SourceModuleId, StructField, StructType, TypeDefinition,
+        TypeDefinitionKind, TypeKind, VagueLiteral, WhileStatement,
     },
     util::try_all,
 };
@@ -45,8 +42,8 @@ pub struct CodegenContext<'ctx> {
 impl<'ctx> CodegenContext<'ctx> {
     /// Compile contained LLIR into LLVM IR and produce `hello.o` and
     /// `hello.asm`
-    pub fn compile(&self) -> CompiledModule {
-        self.context.compile()
+    pub fn compile(&self, cpu: Option<String>, features: Vec<String>) -> CompiledModule {
+        self.context.compile(cpu, features)
     }
 }
 

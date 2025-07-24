@@ -56,6 +56,8 @@ impl Drop for LLVMContext {
 pub struct CompiledModule {
     module_ref: LLVMModuleRef,
     _context: LLVMContext,
+    cpu: String,
+    features: String,
 }
 
 pub struct CompileOutput {
@@ -84,8 +86,8 @@ impl CompiledModule {
             let target_machine = LLVMCreateTargetMachine(
                 target,
                 triple,
-                c"generic".as_ptr(),
-                c"".as_ptr(),
+                into_cstring(self.cpu.clone()).as_ptr(),
+                into_cstring(self.features.clone()).as_ptr(),
                 llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
                 llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
                 llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
@@ -142,7 +144,7 @@ impl CompiledModule {
 }
 
 impl Context {
-    pub fn compile(&self) -> CompiledModule {
+    pub fn compile(&self, cpu: Option<String>, features: Vec<String>) -> CompiledModule {
         unsafe {
             let context_ref = LLVMContextCreate();
 
@@ -173,6 +175,8 @@ impl Context {
             CompiledModule {
                 module_ref: main_module_ref,
                 _context: context,
+                cpu: cpu.unwrap_or("generic".to_owned()),
+                features: features.join(","),
             }
         }
     }

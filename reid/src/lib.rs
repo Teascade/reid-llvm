@@ -216,6 +216,8 @@ pub fn compile_and_pass<'map>(
     source: &str,
     path: PathBuf,
     module_map: &'map mut ErrorModules,
+    cpu: Option<String>,
+    features: Vec<String>,
 ) -> Result<(CompileOutput, CustomIRs), ReidError> {
     let path = path.canonicalize().unwrap();
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
@@ -241,7 +243,7 @@ pub fn compile_and_pass<'map>(
     #[cfg(debug_assertions)]
     println!("{}", &codegen_modules.context);
 
-    let compiled = codegen_modules.compile();
+    let compiled = codegen_modules.compile(cpu, features);
     Ok((
         compiled.output(),
         CustomIRs {
@@ -259,7 +261,9 @@ pub struct CustomIRs {
 pub fn compile_simple(
     source: &str,
     path: PathBuf,
+    cpu: Option<String>,
+    features: Vec<String>,
 ) -> Result<(CompileOutput, CustomIRs), ReidError> {
     let mut map = ErrorModules::default();
-    compile_and_pass(source, path, &mut map)
+    compile_and_pass(source, path, &mut map, cpu, features)
 }

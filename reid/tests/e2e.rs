@@ -30,7 +30,7 @@ fn test(source: &str, name: &str, expected_exit_code: Option<i32>) {
 
         let codegen = assert_err(mir_context.codegen(&context));
 
-        let output = codegen.compile().output();
+        let output = codegen.compile(None, Vec::new()).output();
         let time = SystemTime::now();
         let in_path = PathBuf::from(format!(
             "/tmp/temp-{}.o",
