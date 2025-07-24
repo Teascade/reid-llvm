@@ -23,6 +23,7 @@ impl ast::Module {
         let mut imports = Vec::new();
         let mut functions = Vec::new();
         let mut typedefs = Vec::new();
+        let mut binops = Vec::new();
 
         use ast::TopLevelStatement::*;
         for stmt in &self.top_level_statements {
@@ -97,13 +98,28 @@ impl ast::Module {
                     };
                     typedefs.push(def);
                 }
-                BinopDefinition(binop_definition) => todo!(),
+                BinopDefinition(ast::BinopDefinition {
+                    lhs,
+                    op,
+                    rhs,
+                    return_ty,
+                    block,
+                }) => {
+                    binops.push(mir::BinopDefinition {
+                        lhs: (lhs.0.clone(), lhs.1 .0.into_mir(module_id)),
+                        op: op.mir(),
+                        rhs: (rhs.0.clone(), rhs.1 .0.into_mir(module_id)),
+                        return_ty: return_ty.0.into_mir(module_id),
+                        block: block.into_mir(module_id),
+                    });
+                }
             }
         }
 
         mir::Module {
             name: self.name.clone(),
             module_id: module_id,
+            binop_defs: binops,
             imports,
             functions,
             path: self.path.clone(),

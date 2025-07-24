@@ -366,12 +366,22 @@ pub enum TypeDefinitionKind {
 }
 
 #[derive(Debug)]
+pub struct BinopDefinition {
+    pub lhs: (String, TypeKind),
+    pub op: BinaryOperator,
+    pub rhs: (String, TypeKind),
+    pub return_ty: TypeKind,
+    pub block: Block,
+}
+
+#[derive(Debug)]
 pub struct Module {
     pub name: String,
     pub module_id: SourceModuleId,
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionDefinition>,
     pub typedefs: Vec<TypeDefinition>,
+    pub binop_defs: Vec<BinopDefinition>,
     pub path: Option<PathBuf>,
     pub tokens: Vec<FullToken>,
     pub is_main: bool,
