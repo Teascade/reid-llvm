@@ -378,6 +378,12 @@ impl ast::Expression {
                 Box::new(expression.process(module_id)),
                 ty.0.clone().into_mir(module_id),
             ),
+            ast::ExpressionKind::ArrayShort(expression, len) => mir::ExprKind::Array(
+                vec![*expression.clone(); *len as usize]
+                    .iter()
+                    .map(|e| e.process(module_id))
+                    .collect(),
+            ),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

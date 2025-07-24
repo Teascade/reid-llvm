@@ -57,6 +57,7 @@ pub enum ExpressionKind {
     Deref(String),
     Literal(Literal),
     Array(Vec<Expression>),
+    ArrayShort(Box<Expression>, u64),
     /// Array-indexed, e.g. <expr>[<expr>]
     Indexed(Box<Expression>, Box<Expression>),
     /// Struct-accessed, e.g. <expr>.<expr>

@@ -1,0 +1,7 @@
+// Arithmetic, function calls and imports!
+
+fn main() -> u16 {
+  let mut a = [5; 20];
+
+  return a[15];
+}

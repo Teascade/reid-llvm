@@ -250,16 +250,37 @@ impl Parse for PrimaryExpression {
                 }
                 Token::BracketOpen => {
                     stream.next(); // Consume
-                    let mut expressions = Vec::new();
                     if let Ok(exp) = stream.parse() {
-                        expressions.push(exp);
-                        while let Some(Token::Comma) = stream.peek() {
-                            stream.next(); // Consume comma
-                            expressions.push(stream.parse()?);
+                        if let Some(Token::Semi) = stream.peek() {
+                            stream.next(); // Consume colon
+                            let Some(Token::DecimalValue(val)) = stream.next() else {
+                                return Err(stream
+                                    .expecting_err("decimal value describing array length")?);
+                            };
+                            stream.expect(Token::BracketClose)?;
+                            Expression(
+                                Kind::ArrayShort(
+                                    Box::new(exp),
+                                    u64::from_str_radix(&val, 10).expect(
+                                        "Unable to parse array length to 64-bit decimal value",
+                                    ),
+                                ),
+                                stream.get_range().unwrap(),
+                            )
+                        } else {
+                            let mut expressions = Vec::new();
+                            expressions.push(exp);
+                            while let Some(Token::Comma) = stream.peek() {
+                                stream.next(); // Consume comma
+                                expressions.push(stream.parse()?);
+                            }
+                            stream.expect(Token::BracketClose)?;
+                            Expression(Kind::Array(expressions), stream.get_range().unwrap())
                         }
+                    } else {
+                        stream.expect(Token::BraceClose)?;
+                        Expression(Kind::Array(Vec::new()), stream.get_range().unwrap())
                     }
-                    stream.expect(Token::BracketClose)?;
-                    Expression(Kind::Array(expressions), stream.get_range().unwrap())
                 }
                 _ => Err(stream.expecting_err("expression")?)?,
             }
