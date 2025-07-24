@@ -45,12 +45,11 @@ Currently missing big features (TODOs) are:
 - ~~Built-in Int/Float division and modulo~~ (DONE)
 - ~~Loops~~ (DONE)
 - ~~Intrinsic functions~~ (DONE)
-- ~~Ability to specify types in literals~~ (DONE)
+- ~~Ability to specify types in literals and variable definitions~~ (DONE)
 - Debug Information (PARTIALLY DONE)
 - Not-Unary
 - Importing types from other modules
 - Importable binops?
-- Ability to specify types in variable definitions
 
 Big features that I want later but are not necessary:
 - Associated functions

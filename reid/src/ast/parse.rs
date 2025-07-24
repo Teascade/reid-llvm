@@ -531,6 +531,13 @@ impl Parse for LetStatement {
         let mutability = stream.expect(Token::MutKeyword).is_ok();
 
         if let Some(Token::Identifier(variable)) = stream.next() {
+            let ty = if let Some(Token::Colon) = stream.peek() {
+                stream.next(); // Consume colon
+                Some(stream.parse()?)
+            } else {
+                None
+            };
+
             let range = stream.get_range_prev().unwrap();
             stream.expect(Token::Equals)?;
 
@@ -538,7 +545,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Semi)?;
             Ok(LetStatement {
                 name: variable,
-                ty: None,
+                ty,
                 mutable: mutability,
                 value: expression,
                 name_range: range,

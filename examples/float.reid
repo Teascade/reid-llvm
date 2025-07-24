@@ -1,9 +1,6 @@
 // Arithmetic, function calls and imports!
 
-pub fn test() -> u8 {
-  return 5;
-}
 
 pub fn main() -> bool {
-  return 7.5 > (test() as f16);
+  return 7.5 > 5.001;
 }
