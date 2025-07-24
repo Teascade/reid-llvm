@@ -47,7 +47,7 @@ Currently missing big features (TODOs) are:
 - Debug Information (PARTIALLY DONE)
 - Ability to specify types in literals and variable definitions
 - Intrinsic functions
-- Not-Unary
+- Not-Unary and NEQ-binary
 
 Big features that I want later but are not necessary:
 - Associated functions
