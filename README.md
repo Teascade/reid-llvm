@@ -58,7 +58,7 @@ Big features that I want later but are not necessary:
 - LSP implementation
 
 Smaller features:
-- Hex-numbers
+- ~~Hex-numbers~~
 - Bitwise operations
 - Easier way to initialize arrays with a single value
 - Void-returns (`return;` for void-returning functions)
