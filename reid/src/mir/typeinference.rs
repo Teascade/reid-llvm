@@ -311,6 +311,7 @@ impl Expression {
                 // Infer LHS and RHS, and return binop type
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
+
                 type_refs
                     .binop(op, &mut lhs_ref, &mut rhs_ref, &state.scope.binops)
                     .ok_or(ErrorKind::TypesIncompatible(

@@ -514,14 +514,28 @@ impl Expression {
                 let rhs_res = rhs.typecheck(state, &typerefs, None);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                let operator = state
-                    .scope
-                    .binops
-                    .get(&pass::ScopeBinopKey {
-                        params: (lhs_type.clone(), rhs_type.clone()),
-                        operator: *op,
-                    })
-                    .cloned();
+                let cloned = state.scope.binops.clone();
+                let mut iter = cloned.iter();
+                let operator = loop {
+                    let Some((_, binop)) = iter.next() else {
+                        break None;
+                    };
+                    if binop.operator != *op {
+                        continue;
+                    }
+                    if let Some(hint_t) = hint_t {
+                        if binop.return_ty == *hint_t {
+                            if let Some(_) = TypeKind::binop_type(&lhs_type, &rhs_type, binop) {
+                                break Some(binop);
+                            }
+                        } else {
+                            continue;
+                        }
+                    }
+                    if let Some(_) = TypeKind::binop_type(&lhs_type, &rhs_type, binop) {
+                        break Some(binop);
+                    }
+                };
 
                 if let Some(operator) = operator {
                     // Re-typecheck with found operator hints
@@ -534,7 +548,7 @@ impl Expression {
                     let rhs_res = rhs.typecheck(state, &typerefs, Some(&rhs_ty));
                     state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                     state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
-                    Ok(operator.return_ty)
+                    Ok(operator.return_ty.clone())
                 } else {
                     // Re-typecheck with typical everyday binop
                     let lhs_res = lhs.typecheck(

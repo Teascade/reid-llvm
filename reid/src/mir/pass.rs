@@ -115,6 +115,10 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
     pub fn iter(&self) -> impl Iterator<Item = (&Key, &T)> {
         self.0.iter()
     }
+
+    pub fn find(&self, key: &Key) -> Option<(&Key, &T)> {
+        self.0.iter().find(|(k, _)| *k == key)
+    }
 }
 
 #[derive(Clone, Default, Debug)]
@@ -216,7 +220,6 @@ impl std::hash::Hash for ScopeBinopKey {
 pub struct ScopeBinopDef {
     pub hands: (TypeKind, TypeKind),
     pub operator: BinaryOperator,
-    pub commutative: bool,
     pub return_ty: TypeKind,
 }
 
@@ -370,7 +373,6 @@ impl Module {
                     ScopeBinopDef {
                         hands: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                         operator: binop.op,
-                        commutative: true,
                         return_ty: binop.return_type.clone(),
                     },
                 )

@@ -314,7 +314,7 @@ fn parse_binop_rhs(
 
         lhs = Expression(
             ExpressionKind::Binop(op, Box::new(lhs), Box::new(rhs)),
-            stream.get_range().unwrap(),
+            stream.get_range_prev().unwrap(),
         );
     }
 

@@ -233,11 +233,16 @@ impl<'outer> ScopeTypeRefs<'outer> {
         rhs: &mut TypeRef<'outer>,
         binops: &Storage<ScopeBinopKey, ScopeBinopDef>,
     ) -> Option<TypeRef<'outer>> {
+        if lhs.resolve_deep().unwrap().known().is_err()
+            && rhs.resolve_deep().unwrap().known().is_err()
+        {
+            return self.from_type(&TypeKind::Vague(VagueType::Unknown));
+        }
         for (_, binop) in binops.iter() {
             if let Some(ret) = try_binop(lhs, rhs, binop) {
                 return Some(ret);
             }
-            if binop.commutative {
+            if binop.operator.is_commutative() {
                 if let Some(ret) = try_binop(rhs, lhs, binop) {
                     return Some(ret);
                 }
