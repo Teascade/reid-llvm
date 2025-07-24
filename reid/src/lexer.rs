@@ -19,6 +19,10 @@ pub enum Token {
     DecimalValue(String),
     /// Integer number in the hexadecimal base
     HexadecimalValue(String),
+    /// Integer number in the octal base
+    OctalValue(String),
+    /// Integer number in the binary base
+    BinaryValue(String),
     /// Some character literal that was surrounded by 'single-quotes'.
     CharLit(String),
     /// Some string literal that was surrounded by "double-quotes".
@@ -141,7 +145,9 @@ impl ToString for Token {
         match &self {
             Token::Identifier(ident) => ident.clone(),
             Token::DecimalValue(val) => val.to_string(),
-            Token::HexadecimalValue(val) => val.to_string(),
+            Token::HexadecimalValue(val) => format!("0x{}", val),
+            Token::OctalValue(val) => format!("0o{}", val),
+            Token::BinaryValue(val) => format!("0b{}", val),
             Token::CharLit(lit) => format!("\'{}\'", lit),
             Token::StringLit(lit) => format!("\"{}\"", lit),
             Token::LetKeyword => String::from("let"),
@@ -370,6 +376,18 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                         cursor.next();
                         value = NumberType::Hexadecimal(String::new());
                         numerics = HEXADECIMAL_NUMERICS;
+                    } else if cursor.first() == Some('o')
+                        && OCTAL_NUMERICS.contains(&second.to_lowercase().next().unwrap_or('.'))
+                    {
+                        cursor.next();
+                        value = NumberType::Octal(String::new());
+                        numerics = OCTAL_NUMERICS;
+                    } else if cursor.first() == Some('b')
+                        && BINARY_NUMERICS.contains(&second.to_lowercase().next().unwrap_or('.'))
+                    {
+                        cursor.next();
+                        value = NumberType::Binary(String::new());
+                        numerics = BINARY_NUMERICS;
                     }
                 }
                 while let Some(c) = cursor.first() {
@@ -380,8 +398,10 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     cursor.next();
                 }
                 match value {
-                    NumberType::Decimal(value) => Token::DecimalValue(value),
+                    NumberType::Decimal(dec) => Token::DecimalValue(dec),
                     NumberType::Hexadecimal(hex) => Token::HexadecimalValue(hex),
+                    NumberType::Octal(oct) => Token::OctalValue(oct),
+                    NumberType::Binary(bin) => Token::BinaryValue(bin),
                 }
             }
             '-' if cursor.first() == Some('>') => {
@@ -440,6 +460,8 @@ fn escape_char(c: &char) -> char {
 enum NumberType {
     Decimal(String),
     Hexadecimal(String),
+    Octal(String),
+    Binary(String),
 }
 
 impl AddAssign<char> for NumberType {
@@ -449,6 +471,8 @@ impl AddAssign<char> for NumberType {
             NumberType::Hexadecimal(val) => {
                 NumberType::Hexadecimal(val.to_owned() + &rhs.to_string())
             }
+            NumberType::Octal(val) => NumberType::Octal(val.to_owned() + &rhs.to_string()),
+            NumberType::Binary(val) => NumberType::Binary(val.to_owned() + &rhs.to_string()),
         };
     }
 }

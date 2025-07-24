@@ -153,6 +153,24 @@ impl Parse for PrimaryExpression {
                         Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                     }
                 }
+                Token::BinaryValue(v) => {
+                    stream.next(); // Consume octal
+                    Expression(
+                        Kind::Literal(Literal::Integer(
+                            u128::from_str_radix(&v, 2).expect("Binary is not parseable as u128!"),
+                        )),
+                        stream.get_range().unwrap(),
+                    )
+                }
+                Token::OctalValue(v) => {
+                    stream.next(); // Consume octal
+                    Expression(
+                        Kind::Literal(Literal::Integer(
+                            u128::from_str_radix(&v, 8).expect("Octal is not parseable as u128!"),
+                        )),
+                        stream.get_range().unwrap(),
+                    )
+                }
                 Token::HexadecimalValue(v) => {
                     stream.next(); // Consume hexadecimal
                     Expression(
