@@ -61,5 +61,5 @@ fn main() {
 
     dbg!(&context);
 
-    context.compile();
+    context.compile(None, Vec::new());
 }

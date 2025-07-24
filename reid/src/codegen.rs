@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, hash::Hash, mem, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},

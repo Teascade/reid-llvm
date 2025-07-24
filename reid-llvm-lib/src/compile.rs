@@ -8,7 +8,7 @@ use std::{
 };
 
 use llvm_sys::{
-    LLVMAttributeIndex, LLVMIntPredicate, LLVMLinkage, LLVMRealPredicate, LLVMValueKind,
+    LLVMIntPredicate, LLVMLinkage, LLVMRealPredicate, LLVMValueKind,
     analysis::LLVMVerifyModule,
     core::*,
     debuginfo::*,

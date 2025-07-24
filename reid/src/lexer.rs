@@ -1,8 +1,4 @@
-use std::{
-    fmt::Debug,
-    ops::{Add, AddAssign},
-    str::Chars,
-};
+use std::{fmt::Debug, ops::AddAssign, str::Chars};
 
 static BINARY_NUMERICS: &[char] = &['0', '1'];
 static OCTAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7'];

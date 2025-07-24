@@ -2,41 +2,8 @@ use reid_lib::{builder::InstructionValue, Instr};
 
 use crate::{
     codegen::{ErrorKind, Scope, StackValue, StackValueKind},
-    mir::{BinaryOperator, BinopDefinition, FunctionDefinition, FunctionDefinitionKind, TypeKind},
+    mir::{BinopDefinition, FunctionDefinition, TypeKind},
 };
-
-fn intrinsic(
-    name: &str,
-    ret_ty: TypeKind,
-    params: Vec<(&str, TypeKind)>,
-    fun: impl IntrinsicFunction + 'static,
-) -> FunctionDefinition {
-    FunctionDefinition {
-        name: name.into(),
-        is_pub: false,
-        is_imported: false,
-        return_type: ret_ty,
-        parameters: params.into_iter().map(|(n, ty)| (n.into(), ty)).collect(),
-        kind: FunctionDefinitionKind::Intrinsic(Box::new(fun)),
-    }
-}
-
-fn intrinsic_binop(
-    op: BinaryOperator,
-    lhs: TypeKind,
-    rhs: TypeKind,
-    ret_ty: TypeKind,
-    fun: impl IntrinsicFunction + 'static,
-) -> BinopDefinition {
-    BinopDefinition {
-        lhs: ("lhs".to_string(), lhs),
-        op,
-        rhs: ("rhs".to_owned(), rhs),
-        return_type: ret_ty,
-        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(fun)),
-        meta: Default::default(),
-    }
-}
 
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     let intrinsics = Vec::new();

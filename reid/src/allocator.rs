@@ -6,8 +6,8 @@ use reid_lib::{
 };
 
 use crate::mir::{
-    self, CustomTypeKey, FunctionCall, FunctionDefinition, FunctionDefinitionKind, IfExpression,
-    SourceModuleId, TypeDefinition, TypeKind, WhileStatement,
+    self, CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId,
+    TypeKind, WhileStatement,
 };
 
 #[derive(Debug)]

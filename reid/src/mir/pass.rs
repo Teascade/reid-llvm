@@ -1,7 +1,7 @@
 //! This module contains relevant code for [`Pass`] and shared code between
 //! passes. Passes can be performed on Reid MIR to e.g. typecheck the code.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::error::Error as STDError;
 

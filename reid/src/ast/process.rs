@@ -8,8 +8,6 @@ use crate::{
     },
 };
 
-use super::TypeKind;
-
 impl mir::Context {
     pub fn from(modules: Vec<mir::Module>, base: PathBuf) -> mir::Context {
         let mut map = ModuleMap::new();

@@ -13,7 +13,7 @@ use std::{
 use crate::{mir::TypeKind, util::try_all};
 
 use super::{
-    pass::{self, Pass, PassResult, PassState, ScopeBinopDef, ScopeBinopKey},
+    pass::{Pass, PassResult, PassState, ScopeBinopKey},
     typecheck::{ErrorKind, ErrorTypedefKind},
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
     BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
