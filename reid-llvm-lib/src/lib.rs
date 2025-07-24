@@ -155,7 +155,7 @@ impl Default for FunctionFlags {
         FunctionFlags {
             is_extern: false,
             is_main: false,
-            is_pub: true,
+            is_pub: false,
             is_imported: false,
         }
     }

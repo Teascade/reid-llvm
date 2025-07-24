@@ -317,7 +317,14 @@ impl mir::Module {
                         ..FunctionFlags::default()
                     },
                 ),
-                mir::FunctionDefinitionKind::Intrinsic(instrinsic_kind) => todo!(),
+                mir::FunctionDefinitionKind::Intrinsic(instrinsic_kind) => module.function(
+                    &function.name,
+                    function.return_type.get_type(&type_values),
+                    param_types,
+                    FunctionFlags {
+                        ..FunctionFlags::default()
+                    },
+                ),
             };
 
             functions.insert(function.name.clone(), StackFunction { ir: func });
