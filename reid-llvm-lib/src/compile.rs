@@ -88,7 +88,7 @@ impl CompiledModule {
                 triple,
                 into_cstring(self.cpu.clone()).as_ptr(),
                 into_cstring(self.features.clone()).as_ptr(),
-                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
+                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
                 llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
                 llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
             );

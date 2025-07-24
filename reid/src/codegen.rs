@@ -741,7 +741,7 @@ impl mir::Statement {
                         InstructionDebugRecordData {
                             variable: var,
                             location,
-                            kind: DebugRecordKind::Declare(value.instr()),
+                            kind: DebugRecordKind::Declare(alloca),
                             scope: debug.scope,
                         },
                     );
