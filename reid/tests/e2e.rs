@@ -98,7 +98,7 @@ fn float_compiles_well() {
 }
 #[test]
 fn hello_world_compiles_well() {
-    test(include_str!("../../examples/hello_world.reid"), "test", 0);
+    test(include_str!("../../examples/hello_world.reid"), "test", 8);
 }
 #[test]
 fn mutable_compiles_well() {

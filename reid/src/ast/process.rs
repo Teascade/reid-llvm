@@ -50,7 +50,6 @@ impl ast::Module {
                             block.into_mir(module_id),
                             (*range).as_meta(module_id),
                         ),
-                        source: module_id,
                     };
                     functions.push(def);
                 }
@@ -71,7 +70,6 @@ impl ast::Module {
                             .map(|p| (p.0, p.1 .0.into_mir(module_id)))
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Extern(false),
-                        source: module_id,
                     };
                     functions.push(def);
                 }

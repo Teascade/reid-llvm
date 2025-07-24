@@ -44,6 +44,7 @@
 use std::path::PathBuf;
 
 use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
+use intrinsics::form_intrinsics;
 use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
@@ -126,6 +127,10 @@ pub fn perform_all_passes<'map>(
 ) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
     dbg!(&context);
+
+    for module in &mut context.modules {
+        module.1.functions.extend(form_intrinsics());
+    }
 
     #[cfg(debug_assertions)]
     println!("{}", &context);

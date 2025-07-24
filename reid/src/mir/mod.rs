@@ -294,7 +294,6 @@ pub struct FunctionDefinition {
     pub return_type: TypeKind,
     pub parameters: Vec<(String, TypeKind)>,
     pub kind: FunctionDefinitionKind,
-    pub source: SourceModuleId,
 }
 
 #[derive(Debug)]

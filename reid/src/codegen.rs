@@ -317,7 +317,7 @@ impl mir::Module {
                         ..FunctionFlags::default()
                     },
                 ),
-                mir::FunctionDefinitionKind::Intrinsic(instrinsic_kind) => module.function(
+                mir::FunctionDefinitionKind::Intrinsic(_) => module.function(
                     &function.name,
                     function.return_type.get_type(&type_values),
                     param_types,
@@ -478,7 +478,7 @@ impl mir::Module {
                 }
                 mir::FunctionDefinitionKind::Extern(_) => {}
                 mir::FunctionDefinitionKind::Intrinsic(kind) => {
-                    let mut entry = function.ir.block("entry");
+                    let entry = function.ir.block("entry");
                     let mut scope = Scope {
                         context,
                         modules: &modules,
