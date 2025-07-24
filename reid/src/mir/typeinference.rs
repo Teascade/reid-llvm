@@ -326,7 +326,15 @@ impl Expression {
                 {
                     Ok(binop)
                 } else {
-                    let typeref = lhs_ref.narrow(&rhs_ref).unwrap();
+                    let typeref = state.or_else(
+                        lhs_ref.narrow(&rhs_ref).ok_or(ErrorKind::InvalidBinop(
+                            *op,
+                            lhs_ref.resolve_deep().unwrap(),
+                            rhs_ref.resolve_deep().unwrap(),
+                        )),
+                        type_refs.from_type(&Vague(Unknown)).unwrap(),
+                        self.1,
+                    );
                     Ok(type_refs
                         .from_type(
                             &typeref

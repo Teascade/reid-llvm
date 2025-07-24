@@ -8,6 +8,8 @@ use crate::{
     },
 };
 
+use super::TypeKind;
+
 impl mir::Context {
     pub fn from(modules: Vec<mir::Module>, base: PathBuf) -> mir::Context {
         let mut map = ModuleMap::new();
@@ -417,6 +419,25 @@ impl ast::Literal {
             ast::Literal::String(val) => mir::Literal::String(val.clone()),
             ast::Literal::Decimal(v) => mir::Literal::Vague(mir::VagueLiteral::Decimal(*v)),
             ast::Literal::Char(inner) => mir::Literal::Char(*inner),
+            ast::Literal::Specific(specific_literal) => match specific_literal {
+                ast::SpecificLiteral::I8(val) => mir::Literal::I8(*val),
+                ast::SpecificLiteral::I16(val) => mir::Literal::I16(*val),
+                ast::SpecificLiteral::I32(val) => mir::Literal::I32(*val),
+                ast::SpecificLiteral::I64(val) => mir::Literal::I64(*val),
+                ast::SpecificLiteral::I128(val) => mir::Literal::I128(*val),
+                ast::SpecificLiteral::U8(val) => mir::Literal::U8(*val),
+                ast::SpecificLiteral::U16(val) => mir::Literal::U16(*val),
+                ast::SpecificLiteral::U32(val) => mir::Literal::U32(*val),
+                ast::SpecificLiteral::U64(val) => mir::Literal::U64(*val),
+                ast::SpecificLiteral::U128(val) => mir::Literal::U128(*val),
+                ast::SpecificLiteral::F16(val) => mir::Literal::F16(*val),
+                ast::SpecificLiteral::F32(val) => mir::Literal::F32(*val),
+                ast::SpecificLiteral::F32B(val) => mir::Literal::F32B(*val),
+                ast::SpecificLiteral::F64(val) => mir::Literal::F64(*val),
+                ast::SpecificLiteral::F80(val) => mir::Literal::F80(*val),
+                ast::SpecificLiteral::F128(val) => mir::Literal::F128(*val),
+                ast::SpecificLiteral::F128PPC(val) => mir::Literal::F128PPC(*val),
+            },
         }
     }
 }

@@ -96,6 +96,46 @@ impl Parse for UnaryOperator {
     }
 }
 
+fn specific_int_lit(value: u128, stream: &mut TokenStream) -> Result<Expression, Error> {
+    use ExpressionKind as Kind;
+
+    let specific_lit = if let Ok(ty) = stream.parse::<Type>() {
+        Some(match ty.0 {
+            TypeKind::I8 => SpecificLiteral::I8(value as i8),
+            TypeKind::I16 => SpecificLiteral::I16(value as i16),
+            TypeKind::I32 => SpecificLiteral::I32(value as i32),
+            TypeKind::I64 => SpecificLiteral::I64(value as i64),
+            TypeKind::I128 => SpecificLiteral::I128(value as i128),
+            TypeKind::U8 => SpecificLiteral::U8(value as u8),
+            TypeKind::U16 => SpecificLiteral::U16(value as u16),
+            TypeKind::U32 => SpecificLiteral::U32(value as u32),
+            TypeKind::U64 => SpecificLiteral::U64(value as u64),
+            TypeKind::U128 => SpecificLiteral::U128(value as u128),
+            TypeKind::F16 => SpecificLiteral::F16(value as f32),
+            TypeKind::F32 => SpecificLiteral::F32(value as f32),
+            TypeKind::F32B => SpecificLiteral::F32B(value as f32),
+            TypeKind::F64 => SpecificLiteral::F64(value as f64),
+            TypeKind::F128 => SpecificLiteral::F128(value as f64),
+            TypeKind::F80 => SpecificLiteral::F80(value as f64),
+            TypeKind::F128PPC => SpecificLiteral::F128PPC(value as f64),
+            _ => return Err(stream.expected_err("integer-compatible type")?),
+        })
+    } else {
+        None
+    };
+    Ok(if let Some(lit) = specific_lit {
+        Expression(
+            Kind::Literal(Literal::Specific(lit)),
+            stream.get_range().unwrap(),
+        )
+    } else {
+        Expression(
+            Kind::Literal(Literal::Integer(value)),
+            stream.get_range().unwrap(),
+        )
+    })
+}
+
 #[derive(Debug)]
 pub struct PrimaryExpression(Expression);
 
@@ -154,32 +194,26 @@ impl Parse for PrimaryExpression {
                     }
                 }
                 Token::BinaryValue(v) => {
-                    stream.next(); // Consume octal
-                    Expression(
-                        Kind::Literal(Literal::Integer(
-                            u128::from_str_radix(&v, 2).expect("Binary is not parseable as u128!"),
-                        )),
-                        stream.get_range().unwrap(),
-                    )
+                    stream.next(); // Consume binary
+                    specific_int_lit(
+                        u128::from_str_radix(&v, 2).expect("Binary is not parseable as u128!"),
+                        &mut stream,
+                    )?
                 }
                 Token::OctalValue(v) => {
                     stream.next(); // Consume octal
-                    Expression(
-                        Kind::Literal(Literal::Integer(
-                            u128::from_str_radix(&v, 8).expect("Octal is not parseable as u128!"),
-                        )),
-                        stream.get_range().unwrap(),
-                    )
+                    specific_int_lit(
+                        u128::from_str_radix(&v, 8).expect("Octal is not parseable as u128!"),
+                        &mut stream,
+                    )?
                 }
                 Token::HexadecimalValue(v) => {
                     stream.next(); // Consume hexadecimal
-                    Expression(
-                        Kind::Literal(Literal::Integer(
-                            u128::from_str_radix(&v, 16)
-                                .expect("Hexadecimal is not parseable as u128!"),
-                        )),
-                        stream.get_range().unwrap(),
-                    )
+                    specific_int_lit(
+                        u128::from_str_radix(&v, 16)
+                            .expect("Hexadecimal is not parseable as u128!"),
+                        &mut stream,
+                    )?
                 }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
@@ -189,22 +223,41 @@ impl Parse for PrimaryExpression {
                         stream.next(); // Consume dot
                         stream.next(); // Consume fractional
 
-                        Expression(
-                            Kind::Literal(Literal::Decimal(
-                                format!("{}.{}", v, fractional)
-                                    .parse()
-                                    .expect("Decimal is not parseable as f64!"),
-                            )),
-                            stream.get_range().unwrap(),
-                        )
+                        let value = format!("{}.{}", v, fractional)
+                            .parse()
+                            .expect("Decimal is not parseable as f64!");
+
+                        let specific_lit = if let Ok(ty) = stream.parse::<Type>() {
+                            Some(match ty.0 {
+                                TypeKind::F16 => SpecificLiteral::F16(value as f32),
+                                TypeKind::F32B => SpecificLiteral::F32B(value as f32),
+                                TypeKind::F32 => SpecificLiteral::F32(value as f32),
+                                TypeKind::F64 => SpecificLiteral::F64(value),
+                                TypeKind::F80 => SpecificLiteral::F80(value),
+                                TypeKind::F128 => SpecificLiteral::F128(value),
+                                TypeKind::F128PPC => SpecificLiteral::F128PPC(value),
+                                _ => return Err(stream.expected_err("float-compatible type")?),
+                            })
+                        } else {
+                            None
+                        };
+                        if let Some(lit) = specific_lit {
+                            Expression(
+                                Kind::Literal(Literal::Specific(lit)),
+                                stream.get_range().unwrap(),
+                            )
+                        } else {
+                            Expression(
+                                Kind::Literal(Literal::Decimal(value)),
+                                stream.get_range().unwrap(),
+                            )
+                        }
                     } else {
-                        Expression(
-                            Kind::Literal(Literal::Integer(
-                                u128::from_str_radix(&v, 10)
-                                    .expect("Integer is not parseable as u128!"),
-                            )),
-                            stream.get_range().unwrap(),
-                        )
+                        specific_int_lit(
+                            u128::from_str_radix(&v, 10)
+                                .expect("Integer is not parseable as u128!"),
+                            &mut stream,
+                        )?
                     }
                 }
                 Token::StringLit(v) => {
