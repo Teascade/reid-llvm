@@ -207,6 +207,15 @@ pub enum TopLevelStatement {
     ExternFunction(FunctionSignature),
     FunctionDefinition(FunctionDefinition),
     TypeDefinition(TypeDefinition),
+    BinopDefinition(BinopDefinition),
+}
+
+#[derive(Debug)]
+pub struct BinopDefinition {
+    lhs: (String, Type),
+    rhs: (String, Type),
+    return_ty: Type,
+    block: Block,
 }
 
 #[derive(Debug)]

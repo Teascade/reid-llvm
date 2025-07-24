@@ -97,6 +97,7 @@ impl ast::Module {
                     };
                     typedefs.push(def);
                 }
+                BinopDefinition(binop_definition) => todo!(),
             }
         }
 

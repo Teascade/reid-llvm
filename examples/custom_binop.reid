@@ -1,0 +1,12 @@
+// Arithmetic, function calls and imports!
+
+impl binop (lhs: u32) + (rhs: u32) -> u32 {
+
+}
+
+fn main() -> u32 {
+  let value = 6;
+  let other = 15;
+
+  return value * other + 7 * -value;
+}

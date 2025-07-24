@@ -46,8 +46,12 @@ pub enum Token {
     While,
     /// `for`
     For,
-    /// `In`
+    /// `in`
     In,
+    /// `impl`
+    Impl,
+    /// `binop`
+    Binop,
 
     // Symbols
     /// `;`
@@ -145,6 +149,8 @@ impl ToString for Token {
             Token::For => String::from("for"),
             Token::In => String::from("in"),
             Token::While => String::from("while"),
+            Token::Impl => String::from("impl"),
+            Token::Binop => String::from("binop"),
             Token::Semi => String::from(';'),
             Token::Equals => String::from('='),
             Token::Colon => String::from(':'),
@@ -334,6 +340,8 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                     "for" => Token::For,
                     "while" => Token::While,
                     "in" => Token::In,
+                    "impl" => Token::Impl,
+                    "binop" => Token::Binop,
                     _ => Token::Identifier(value),
                 };
                 variant
