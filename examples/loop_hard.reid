@@ -1,0 +1,27 @@
+import std::print;
+import std::new_string;
+import std::add_num_to_str;
+import std::add_char;
+
+fn main() -> u8 {
+    for i in 0..5 {
+        for j in 0..5 {
+            for k in 0..5 {
+                let mut test = new_string();
+                add_num_to_str(&mut test, i);
+                add_char(&mut test, ',');
+                add_num_to_str(&mut test, j);
+                add_char(&mut test, ',');
+                add_num_to_str(&mut test, k);
+                print(test);
+            }
+        }
+    }
+    for i in 0..1000 {
+        for j in 0..1000 {
+            for k in 0..1000 {
+            }
+        }
+    }
+    return 0;
+}

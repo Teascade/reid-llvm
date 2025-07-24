@@ -676,7 +676,7 @@ impl FunctionHolder {
 
                 let block_ref = LLVMCreateBasicBlockInContext(
                     module.context_ref,
-                    into_cstring(&self.data.name).as_ptr(),
+                    into_cstring(&block.data.name).as_ptr(),
                 );
                 LLVMAppendExistingBasicBlock(own_function.value_ref, block_ref);
                 module.blocks.insert(block.value, block_ref);

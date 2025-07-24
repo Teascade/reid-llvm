@@ -52,6 +52,7 @@ use reid_lib::{compile::CompileOutput, Context};
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
+mod allocator;
 mod ast;
 mod codegen;
 pub mod error_raporting;

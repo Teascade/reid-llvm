@@ -129,6 +129,6 @@ fn ptr_hard_compiles_well() {
     test(include_str!("../../examples/ptr_hard.reid"), "test", 0);
 }
 #[test]
-fn list_hard_compiles_well() {
-    test(include_str!("../../examples/list_hard.reid"), "test", 0);
+fn loop_hard_compiles_well() {
+    test(include_str!("../../examples/loop_hard.reid"), "test", 0);
 }
