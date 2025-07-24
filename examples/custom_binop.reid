@@ -1,7 +1,7 @@
 // Arithmetic, function calls and imports!
 
-impl binop (lhs: u32) + (rhs: u32) -> u32 {
-
+impl binop (lhs: u16) + (rhs: u32) -> u32 {
+  return (lhs as u32) + rhs;
 }
 
 fn main() -> u32 {

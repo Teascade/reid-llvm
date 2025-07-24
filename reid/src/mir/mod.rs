@@ -372,6 +372,17 @@ pub struct BinopDefinition {
     pub rhs: (String, TypeKind),
     pub return_ty: TypeKind,
     pub block: Block,
+    pub meta: Metadata,
+}
+
+impl BinopDefinition {
+    pub fn block_meta(&self) -> Metadata {
+        self.block.meta
+    }
+
+    pub fn signature(&self) -> Metadata {
+        self.meta
+    }
 }
 
 #[derive(Debug)]

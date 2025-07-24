@@ -554,7 +554,11 @@ impl Parse for Block {
             statements.push(statement);
         }
         stream.expect(Token::BraceClose)?;
-        Ok(Block(statements, return_stmt, stream.get_range().unwrap()))
+        Ok(Block(
+            statements,
+            return_stmt,
+            stream.get_range_prev().unwrap(),
+        ))
     }
 }
 
@@ -814,6 +818,8 @@ impl Parse for BinopDefinition {
         let rhs_type = stream.parse()?;
         stream.expect(Token::ParenClose)?;
 
+        let signature_range = stream.get_range().unwrap();
+
         stream.expect(Token::Arrow)?;
 
         Ok(BinopDefinition {
@@ -822,6 +828,7 @@ impl Parse for BinopDefinition {
             rhs: (rhs_name, rhs_type),
             return_ty: stream.parse()?,
             block: stream.parse()?,
+            signature_range,
         })
     }
 }

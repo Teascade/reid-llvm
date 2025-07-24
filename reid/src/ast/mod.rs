@@ -217,6 +217,7 @@ pub struct BinopDefinition {
     pub rhs: (String, Type),
     pub return_ty: Type,
     pub block: Block,
+    pub signature_range: TokenRange,
 }
 
 #[derive(Debug)]

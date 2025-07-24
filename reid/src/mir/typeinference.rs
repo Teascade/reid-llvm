@@ -12,8 +12,8 @@ use super::{
     pass::{Pass, PassResult, PassState},
     typecheck::{ErrorKind, ErrorTypedefKind},
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
-    Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
-    IfExpression, Module, ReturnKind, StmtKind,
+    BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
+    FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind,
     TypeKind::*,
     VagueType::*,
     WhileStatement,
@@ -55,10 +55,65 @@ impl<'t> Pass for TypeInference<'t> {
             }
         }
 
+        for binop in &mut module.binop_defs {
+            let res = binop.infer_types(&self.refs, &mut state.inner());
+            state.ok(res, binop.block_meta());
+        }
+
         for function in &mut module.functions {
             let res = function.infer_types(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
         }
+        Ok(())
+    }
+}
+
+impl BinopDefinition {
+    fn infer_types(
+        &mut self,
+        type_refs: &TypeRefs,
+        state: &mut TypeInferencePassState,
+    ) -> Result<(), ErrorKind> {
+        let scope_hints = ScopeTypeRefs::from(type_refs);
+
+        let lhs_ty = state.or_else(
+            self.lhs.1.assert_unvague(),
+            Vague(Unknown),
+            self.signature(),
+        );
+        state.ok(
+            scope_hints
+                .new_var(self.lhs.0.clone(), false, &lhs_ty)
+                .or(Err(ErrorKind::VariableAlreadyDefined(self.lhs.0.clone()))),
+            self.signature(),
+        );
+
+        let rhs_ty = state.or_else(
+            self.rhs.1.assert_unvague(),
+            Vague(Unknown),
+            self.signature(),
+        );
+
+        state.ok(
+            scope_hints
+                .new_var(self.rhs.0.clone(), false, &rhs_ty)
+                .or(Err(ErrorKind::VariableAlreadyDefined(self.rhs.0.clone()))),
+            self.signature(),
+        );
+
+        state.scope.return_type_hint = Some(self.return_ty.clone());
+        let ret_res = self.block.infer_types(state, &scope_hints);
+        let (_, mut ret_ty) = state.or_else(
+            ret_res,
+            (
+                ReturnKind::Soft,
+                scope_hints.from_type(&Vague(Unknown)).unwrap(),
+            ),
+            self.block_meta(),
+        );
+
+        ret_ty.narrow(&scope_hints.from_type(&self.return_ty).unwrap());
+
         Ok(())
     }
 }

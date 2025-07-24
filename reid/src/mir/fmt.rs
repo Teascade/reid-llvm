@@ -40,6 +40,9 @@ impl Display for Module {
         for import in &self.imports {
             writeln!(inner_f, "{}", import)?;
         }
+        for binop in &self.binop_defs {
+            writeln!(inner_f, "{}", binop)?;
+        }
         for typedef in &self.typedefs {
             writeln!(inner_f, "{}", typedef)?;
         }
@@ -53,6 +56,17 @@ impl Display for Module {
 impl Display for Import {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "import {}", self.0.join("::"))
+    }
+}
+
+impl Display for BinopDefinition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "impl binop ({}: {:#}) {} ({}: {:#}) -> {:#} ",
+            self.lhs.0, self.lhs.1, self.op, self.rhs.0, self.rhs.1, self.return_ty
+        )?;
+        Display::fmt(&self.block, f)
     }
 }
 

@@ -104,6 +104,7 @@ impl ast::Module {
                     rhs,
                     return_ty,
                     block,
+                    signature_range,
                 }) => {
                     binops.push(mir::BinopDefinition {
                         lhs: (lhs.0.clone(), lhs.1 .0.into_mir(module_id)),
@@ -111,6 +112,7 @@ impl ast::Module {
                         rhs: (rhs.0.clone(), rhs.1 .0.into_mir(module_id)),
                         return_ty: return_ty.0.into_mir(module_id),
                         block: block.into_mir(module_id),
+                        meta: signature_range.as_meta(module_id),
                     });
                 }
             }

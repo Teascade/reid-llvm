@@ -132,6 +132,11 @@ impl<'t> Pass for TypeCheck<'t> {
             check_typedefs_for_recursion(&defmap, typedef, HashSet::new(), &mut state);
         }
 
+        for binop in &mut module.binop_defs {
+            let res = binop.typecheck(&self.refs, &mut state.inner());
+            state.ok(res, binop.block_meta());
+        }
+
         for function in &mut module.functions {
             let res = function.typecheck(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
@@ -166,6 +171,48 @@ fn check_typedefs_for_recursion<'a, 'b>(
                     }
                 }
             }
+        }
+    }
+}
+
+impl BinopDefinition {
+    fn typecheck(
+        &mut self,
+        typerefs: &TypeRefs,
+        state: &mut TypecheckPassState,
+    ) -> Result<TypeKind, ErrorKind> {
+        for param in vec![&self.lhs, &self.rhs] {
+            let param_t = state.or_else(
+                param.1.assert_known(typerefs, state),
+                TypeKind::Vague(Vague::Unknown),
+                self.signature(),
+            );
+            let res = state
+                .scope
+                .variables
+                .set(
+                    param.0.clone(),
+                    ScopeVariable {
+                        ty: param_t.clone(),
+                        mutable: param_t.is_mutable(),
+                    },
+                )
+                .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
+            state.ok(res, self.signature());
+        }
+
+        let return_type = self.return_ty.clone().assert_known(typerefs, state)?;
+
+        state.scope.return_type_hint = Some(self.return_ty.clone());
+        let inferred = self
+            .block
+            .typecheck(&mut state.inner(), &typerefs, Some(&return_type));
+
+        match inferred {
+            Ok(t) => return_type
+                .collapse_into(&t.1)
+                .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
+            Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
         }
     }
 }
