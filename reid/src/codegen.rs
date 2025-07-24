@@ -1,4 +1,4 @@
-use std::{collections::HashMap, mem};
+use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
@@ -15,6 +15,7 @@ use reid_lib::{
 };
 
 use crate::{
+    allocator::{Allocator, AllocatorScope},
     lexer::{FullToken, Position},
     mir::{
         self, implement::TypeCategory, CustomTypeKey, Metadata, NamedVariableRef, SourceModuleId,
@@ -76,14 +77,15 @@ pub struct Scope<'ctx, 'scope> {
     modules: &'scope HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
     tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
-    module_id: SourceModuleId,
+    pub(super) module_id: SourceModuleId,
     function: &'ctx StackFunction<'ctx>,
-    block: Block<'ctx>,
-    types: &'scope HashMap<TypeValue, TypeDefinition>,
-    type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
+    pub(super) block: Block<'ctx>,
+    pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
+    pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
     functions: &'scope HashMap<String, StackFunction<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
+    allocator: Rc<RefCell<Allocator>>,
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +163,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             type_values: self.type_values,
             stack_values: self.stack_values.clone(),
             debug: self.debug.clone(),
+            allocator: self.allocator.clone(),
         }
     }
 
@@ -174,6 +177,10 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
     fn get_typedef(&self, key: &CustomTypeKey) -> Option<&TypeDefinition> {
         self.type_values.get(key).and_then(|v| self.types.get(v))
+    }
+
+    fn allocate(&self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
+        self.allocator.borrow_mut().allocate(name, ty)
     }
 }
 
@@ -321,6 +328,15 @@ impl mir::Module {
             match &mir_function.kind {
                 mir::FunctionDefinitionKind::Local(block, _) => {
                     let mut entry = function.ir.block("entry");
+                    let mut allocator = Allocator::from(
+                        mir_function,
+                        &mut AllocatorScope {
+                            block: &mut entry,
+                            module_id: self.module_id,
+                            types: &types,
+                            type_values: &type_values,
+                        },
+                    );
 
                     // Insert debug information
                     let debug_scope = if let Some(location) =
@@ -372,12 +388,9 @@ impl mir::Module {
                         let param = entry
                             .build_named(format!("{}.get", arg_name), Instr::Param(i))
                             .unwrap();
-                        let alloca = entry
-                            .build_named(
-                                &arg_name,
-                                Instr::Alloca(p_ty.get_type(&type_values, &types)),
-                            )
-                            .unwrap();
+
+                        let alloca = allocator.allocate(&p_name, &p_ty).unwrap();
+
                         entry
                             .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
                             .unwrap();
@@ -435,6 +448,7 @@ impl mir::Module {
                                 types: &debug_types,
                             })
                         }),
+                        allocator: Rc::new(RefCell::new(allocator)),
                     };
 
                     let state = State::default();
@@ -514,15 +528,11 @@ impl mir::Statement {
                 let value = expression.codegen(scope, &state)?.unwrap();
 
                 let alloca = scope
-                    .block
-                    .build_named(
-                        name,
-                        Instr::Alloca(value.1.get_type(scope.type_values, scope.types)),
-                    )
+                    .allocate(name, &value.1)
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                scope
+                let store = scope
                     .block
                     .build_named(
                         format!("{}.store", name),
@@ -551,7 +561,7 @@ impl mir::Statement {
                             flags: DwarfFlags,
                         }),
                     );
-                    alloca.add_record(
+                    store.add_record(
                         &mut scope.block,
                         InstructionDebugRecordData {
                             variable: var,
@@ -602,9 +612,9 @@ impl mir::Statement {
             mir::StmtKind::While(WhileStatement {
                 condition, block, ..
             }) => {
-                let condition_block = scope.function.ir.block("condition_block");
-                let condition_true_block = scope.function.ir.block("condition_true");
-                let condition_failed_block = scope.function.ir.block("condition_failed");
+                let condition_block = scope.function.ir.block("while.cond");
+                let condition_true_block = scope.function.ir.block("while.body");
+                let condition_failed_block = scope.function.ir.block("while.end");
 
                 scope
                     .block
@@ -1179,7 +1189,7 @@ impl mir::Expression {
 
                 Some({
                     if state.should_load {
-                        if let TypeKind::CodegenPtr(inner) = *ptr_inner.clone() {
+                        if let TypeKind::Borrow(inner, _) = *ptr_inner.clone() {
                             StackValue(
                                 v.0.derive(
                                     scope
@@ -1428,7 +1438,7 @@ impl mir::Literal {
 }
 
 impl TypeKind {
-    fn get_type(
+    pub(super) fn get_type(
         &self,
         type_vals: &HashMap<CustomTypeKey, TypeValue>,
         typedefs: &HashMap<TypeValue, TypeDefinition>,
