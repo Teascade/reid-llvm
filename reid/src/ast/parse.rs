@@ -785,7 +785,43 @@ impl Parse for TopLevelStatement {
                     range,
                 })
             }
+            Some(Token::Impl) => Stmt::BinopDefinition(stream.parse()?),
             _ => Err(stream.expecting_err("import or fn")?)?,
+        })
+    }
+}
+
+impl Parse for BinopDefinition {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::Impl)?;
+        stream.expect(Token::Binop)?;
+
+        stream.expect(Token::ParenOpen)?;
+        let Some(Token::Identifier(lhs_name)) = stream.next() else {
+            return Err(stream.expected_err("lhs name")?);
+        };
+        stream.expect(Token::Colon)?;
+        let lhs_type = stream.parse()?;
+        stream.expect(Token::ParenClose)?;
+
+        let operator = stream.parse()?;
+
+        stream.expect(Token::ParenOpen)?;
+        let Some(Token::Identifier(rhs_name)) = stream.next() else {
+            return Err(stream.expected_err("rhs name")?);
+        };
+        stream.expect(Token::Colon)?;
+        let rhs_type = stream.parse()?;
+        stream.expect(Token::ParenClose)?;
+
+        stream.expect(Token::Arrow)?;
+
+        Ok(BinopDefinition {
+            lhs: (lhs_name, lhs_type),
+            op: operator,
+            rhs: (rhs_name, rhs_type),
+            return_ty: stream.parse()?,
+            block: stream.parse()?,
         })
     }
 }

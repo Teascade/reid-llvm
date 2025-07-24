@@ -213,6 +213,7 @@ pub enum TopLevelStatement {
 #[derive(Debug)]
 pub struct BinopDefinition {
     lhs: (String, Type),
+    op: BinaryOperator,
     rhs: (String, Type),
     return_ty: Type,
     block: Block,
