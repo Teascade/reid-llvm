@@ -970,7 +970,7 @@ impl InstructionHolder {
                     ty.as_llvm(module.context_ref, &module.types),
                     name.as_ptr(),
                 ),
-                FPTrunc(instr_val, ty) => LLVMBuildTrunc(
+                FPTrunc(instr_val, ty) => LLVMBuildFPTrunc(
                     module.builder_ref,
                     module.values.get(instr_val).unwrap().value_ref,
                     ty.as_llvm(module.context_ref, &module.types),
