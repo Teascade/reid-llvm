@@ -6,8 +6,8 @@ use reid_lib::{
 };
 
 use crate::mir::{
-    self, CustomTypeKey, FunctionCall, FunctionDefinition, IfExpression, SourceModuleId,
-    TypeDefinition, TypeKind, WhileStatement,
+    self, CustomTypeKey, FunctionCall, FunctionDefinition, FunctionDefinitionKind, IfExpression,
+    SourceModuleId, TypeDefinition, TypeKind, WhileStatement,
 };
 
 #[derive(Debug)]
@@ -28,8 +28,12 @@ impl Allocator {
         }
     }
 
-    pub fn from(func: &FunctionDefinition, scope: &mut AllocatorScope) -> Allocator {
-        func.allocate(scope)
+    pub fn from(
+        func: &FunctionDefinitionKind,
+        params: &Vec<(String, TypeKind)>,
+        scope: &mut AllocatorScope,
+    ) -> Allocator {
+        func.allocate(scope, params)
     }
 
     pub fn allocate(&mut self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
@@ -45,12 +49,16 @@ impl Allocator {
 #[derive(Clone, Debug)]
 pub struct Allocation(String, TypeKind, InstructionValue);
 
-impl mir::FunctionDefinition {
-    fn allocate<'ctx, 'a>(&self, scope: &mut AllocatorScope<'ctx, 'a>) -> Allocator {
+impl mir::FunctionDefinitionKind {
+    fn allocate<'ctx, 'a>(
+        &self,
+        scope: &mut AllocatorScope<'ctx, 'a>,
+        parameters: &Vec<(String, TypeKind)>,
+    ) -> Allocator {
         let mut allocated = Vec::new();
-        match &self.kind {
+        match &self {
             mir::FunctionDefinitionKind::Local(block, _) => {
-                for param in &self.parameters {
+                for param in parameters {
                     let allocation = scope
                         .block
                         .build_named(

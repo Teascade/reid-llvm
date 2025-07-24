@@ -355,18 +355,15 @@ impl mir::Module {
             let function = functions.get(&mir_function.name).unwrap();
             let mut entry = function.ir.block("entry");
 
-            let allocator = match &mir_function.kind {
-                FunctionDefinitionKind::Local(..) => Allocator::from(
-                    mir_function,
-                    &mut AllocatorScope {
-                        block: &mut entry,
-                        module_id: self.module_id,
-                        type_values: &type_values,
-                    },
-                ),
-                FunctionDefinitionKind::Extern(_) => Allocator::empty(),
-                FunctionDefinitionKind::Intrinsic(_) => Allocator::empty(),
-            };
+            let allocator = Allocator::from(
+                &mir_function.kind,
+                &mir_function.parameters,
+                &mut AllocatorScope {
+                    block: &mut entry,
+                    module_id: self.module_id,
+                    type_values: &type_values,
+                },
+            );
 
             let mut scope = Scope {
                 context,
