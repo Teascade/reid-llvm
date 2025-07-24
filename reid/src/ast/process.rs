@@ -111,7 +111,10 @@ impl ast::Module {
                         op: op.mir(),
                         rhs: (rhs.0.clone(), rhs.1 .0.into_mir(module_id)),
                         return_ty: return_ty.0.into_mir(module_id),
-                        block: block.into_mir(module_id),
+                        fn_kind: mir::FunctionDefinitionKind::Local(
+                            block.into_mir(module_id),
+                            block.2.as_meta(module_id),
+                        ),
                         meta: signature_range.as_meta(module_id),
                     });
                 }

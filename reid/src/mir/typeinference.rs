@@ -80,7 +80,7 @@ impl<'t> Pass for TypeInference<'t> {
 
         for binop in &mut module.binop_defs {
             let res = binop.infer_types(&self.refs, &mut state.inner());
-            state.ok(res, binop.block_meta());
+            state.ok(res, binop.block_meta().unwrap_or(binop.signature()));
         }
 
         for function in &mut module.functions {
@@ -124,18 +124,12 @@ impl BinopDefinition {
             self.signature(),
         );
 
-        state.scope.return_type_hint = Some(self.return_ty.clone());
-        let ret_res = self.block.infer_types(state, &scope_hints);
-        let (_, mut ret_ty) = state.or_else(
-            ret_res,
-            (
-                ReturnKind::Soft,
-                scope_hints.from_type(&Vague(Unknown)).unwrap(),
-            ),
-            self.block_meta(),
-        );
-
-        ret_ty.narrow(&scope_hints.from_type(&self.return_ty).unwrap());
+        let ret_ty = self
+            .fn_kind
+            .infer_types(state, &scope_hints, Some(self.return_ty.clone()))?;
+        if let Some(mut ret_ty) = ret_ty {
+            ret_ty.narrow(&scope_hints.from_type(&self.return_ty).unwrap());
+        }
 
         Ok(())
     }
@@ -147,10 +141,10 @@ impl FunctionDefinition {
         type_refs: &TypeRefs,
         state: &mut TypeInferencePassState,
     ) -> Result<(), ErrorKind> {
-        let scope_hints = ScopeTypeRefs::from(type_refs);
+        let scope_refs = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
             let param_t = state.or_else(param.1.assert_unvague(), Vague(Unknown), self.signature());
-            let res = scope_hints
+            let res = scope_refs
                 .new_var(param.0.clone(), false, &param_t)
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
             state.ok(res, self.signature());
@@ -161,18 +155,48 @@ impl FunctionDefinition {
                 state.scope.return_type_hint = Some(self.return_type.clone());
 
                 // Infer block return type
-                let ret_res = block.infer_types(state, &scope_hints);
+                let ret_res = block.infer_types(state, &scope_refs);
 
                 // Narrow block type to declared function type
                 if let Some(mut ret_ty) = state.ok(ret_res.map(|(_, ty)| ty), self.block_meta()) {
-                    ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
+                    ret_ty.narrow(&scope_refs.from_type(&self.return_type).unwrap());
                 }
             }
             FunctionDefinitionKind::Extern(_) => {}
             FunctionDefinitionKind::Intrinsic(_) => {}
         };
+        let return_ty = self
+            .kind
+            .infer_types(state, &scope_refs, Some(self.return_type.clone()));
+
+        if let Some(Some(mut ret_ty)) = state.ok(return_ty, self.block_meta()) {
+            ret_ty.narrow(&scope_refs.from_type(&self.return_type).unwrap());
+        }
 
         Ok(())
+    }
+}
+
+impl FunctionDefinitionKind {
+    fn infer_types<'s>(
+        &mut self,
+        state: &mut TypeInferencePassState,
+        scope_refs: &'s ScopeTypeRefs,
+        hint: Option<TypeKind>,
+    ) -> Result<Option<TypeRef<'s>>, ErrorKind> {
+        Ok(match self {
+            FunctionDefinitionKind::Local(block, _) => {
+                state.scope.return_type_hint = hint;
+
+                // Infer block return type
+                let ret_res = block.infer_types(state, &scope_refs);
+
+                // Narrow block type to declared function type
+                Some(ret_res.map(|(_, ty)| ty)?)
+            }
+            FunctionDefinitionKind::Extern(_) => None,
+            FunctionDefinitionKind::Intrinsic(_) => None,
+        })
     }
 }
 

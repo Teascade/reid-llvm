@@ -371,13 +371,17 @@ pub struct BinopDefinition {
     pub op: BinaryOperator,
     pub rhs: (String, TypeKind),
     pub return_ty: TypeKind,
-    pub block: Block,
+    pub fn_kind: FunctionDefinitionKind,
     pub meta: Metadata,
 }
 
 impl BinopDefinition {
-    pub fn block_meta(&self) -> Metadata {
-        self.block.meta
+    pub fn block_meta(&self) -> Option<Metadata> {
+        match &self.fn_kind {
+            FunctionDefinitionKind::Local(block, _) => Some(block.meta),
+            FunctionDefinitionKind::Extern(_) => None,
+            FunctionDefinitionKind::Intrinsic(_) => None,
+        }
     }
 
     pub fn signature(&self) -> Metadata {

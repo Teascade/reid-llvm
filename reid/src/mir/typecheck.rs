@@ -136,7 +136,7 @@ impl<'t> Pass for TypeCheck<'t> {
 
         for binop in &mut module.binop_defs {
             let res = binop.typecheck(&self.refs, &mut state.inner());
-            state.ok(res, binop.block_meta());
+            state.ok(res, binop.block_meta().unwrap_or(binop.signature()));
         }
 
         for function in &mut module.functions {
@@ -206,15 +206,19 @@ impl BinopDefinition {
         let return_type = self.return_ty.clone().assert_known(typerefs, state)?;
 
         state.scope.return_type_hint = Some(self.return_ty.clone());
-        let inferred = self
-            .block
-            .typecheck(&mut state.inner(), &typerefs, Some(&return_type));
+        let inferred =
+            self.fn_kind
+                .typecheck(&typerefs, &mut state.inner(), Some(return_type.clone()));
 
         match inferred {
             Ok(t) => return_type
                 .collapse_into(&t.1)
                 .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
-            Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
+            Err(e) => Ok(state.or_else(
+                Err(e),
+                return_type,
+                self.block_meta().unwrap_or(self.signature()),
+            )),
         }
     }
 }
@@ -246,10 +250,30 @@ impl FunctionDefinition {
         }
 
         let return_type = self.return_type.clone().assert_known(typerefs, state)?;
-        let inferred = match &mut self.kind {
+        let inferred = self
+            .kind
+            .typecheck(typerefs, state, Some(self.return_type.clone()));
+
+        match inferred {
+            Ok(t) => return_type
+                .collapse_into(&t.1)
+                .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
+            Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
+        }
+    }
+}
+
+impl FunctionDefinitionKind {
+    fn typecheck(
+        &mut self,
+        typerefs: &TypeRefs,
+        state: &mut TypecheckPassState,
+        hint: Option<TypeKind>,
+    ) -> Result<(ReturnKind, TypeKind), ErrorKind> {
+        match self {
             FunctionDefinitionKind::Local(block, _) => {
-                state.scope.return_type_hint = Some(self.return_type.clone());
-                block.typecheck(&mut state.inner(), &typerefs, Some(&return_type))
+                state.scope.return_type_hint = hint.clone();
+                block.typecheck(&mut state.inner(), &typerefs, hint.as_ref())
             }
             FunctionDefinitionKind::Extern(_) => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
@@ -257,13 +281,6 @@ impl FunctionDefinition {
             FunctionDefinitionKind::Intrinsic(..) => {
                 Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown)))
             }
-        };
-
-        match inferred {
-            Ok(t) => return_type
-                .collapse_into(&t.1)
-                .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
-            Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
         }
     }
 }
