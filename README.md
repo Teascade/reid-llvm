@@ -61,7 +61,7 @@ Smaller features:
 - ~~Hex-numbers~~
 - Bitwise operations
 - Easier way to initialize arrays with a single value
-- Void-returns (`return;` for void-returning functions)
+- ~~Void-returns (`return;` for void-returning functions)~~
 - ~~Only include standard library at all if it is imported~~
 - Lexical scopes for Debug Information
 
