@@ -363,14 +363,17 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 let mut value = NumberType::Decimal(character.to_string());
                 let mut numerics = DECIMAL_NUMERICS;
                 if let Some(second) = cursor.second() {
-                    if cursor.first() == Some('x') && HEXADECIMAL_NUMERICS.contains(&second) {
+                    if cursor.first() == Some('x')
+                        && HEXADECIMAL_NUMERICS
+                            .contains(&second.to_lowercase().next().unwrap_or('.'))
+                    {
                         cursor.next();
                         value = NumberType::Hexadecimal(String::new());
                         numerics = HEXADECIMAL_NUMERICS;
                     }
                 }
                 while let Some(c) = cursor.first() {
-                    if !numerics.contains(&c) {
+                    if !numerics.contains(&c.to_lowercase().next().unwrap_or('.')) {
                         break;
                     }
                     value += c;

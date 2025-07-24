@@ -132,3 +132,7 @@ fn ptr_hard_compiles_well() {
 fn loop_hard_compiles_well() {
     test(include_str!("../../examples/loop_hard.reid"), "test", 0);
 }
+#[test]
+fn custom_binop_compiles_well() {
+    test(include_str!("../../examples/custom_binop.reid"), "test", 21);
+}
