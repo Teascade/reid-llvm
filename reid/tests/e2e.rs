@@ -182,3 +182,12 @@ fn custom_binop_compiles_well() {
         Some(21),
     );
 }
+
+#[test]
+fn array_short_compiles_well() {
+    test(
+        include_str!("../../examples/array_short.reid"),
+        "test",
+        Some(5),
+    );
+}
