@@ -2,7 +2,7 @@ use reid_lib::Instr;
 
 use crate::{
     codegen::{ErrorKind, Scope},
-    mir::{FunctionDefinition, FunctionDefinitionKind, TypeKind},
+    mir::{BinaryOperator, BinopDefinition, FunctionDefinition, FunctionDefinitionKind, TypeKind},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -26,13 +26,37 @@ fn intrinsic(
     }
 }
 
+fn intrinsic_binop(
+    op: BinaryOperator,
+    lhs: TypeKind,
+    rhs: TypeKind,
+    ret_ty: TypeKind,
+    kind: InstrinsicKind,
+) -> BinopDefinition {
+    BinopDefinition {
+        lhs: ("lhs".to_string(), lhs),
+        op,
+        rhs: ("rhs".to_owned(), rhs),
+        return_type: ret_ty,
+        fn_kind: FunctionDefinitionKind::Intrinsic(kind),
+        meta: Default::default(),
+    }
+}
+
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     let mut intrinsics = Vec::new();
 
-    intrinsics.push(intrinsic(
-        "addition",
-        TypeKind::U8,
-        vec![("lhs".into(), TypeKind::U8), ("rhs".into(), TypeKind::U8)],
+    intrinsics
+}
+
+pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
+    let mut intrinsics = Vec::new();
+
+    intrinsics.push(intrinsic_binop(
+        BinaryOperator::Add,
+        TypeKind::U32,
+        TypeKind::U32,
+        TypeKind::U32,
         InstrinsicKind::IAdd,
     ));
 

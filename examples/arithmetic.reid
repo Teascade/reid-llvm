@@ -5,5 +5,5 @@ fn main() -> u32 {
   let value = 6;
   let other = 15;
 
-  return value * other + 7 * -value;
+  return value + other;
 }
