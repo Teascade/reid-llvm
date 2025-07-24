@@ -153,6 +153,16 @@ impl Parse for PrimaryExpression {
                         Expression(Kind::VariableName(v.clone()), stream.get_range().unwrap())
                     }
                 }
+                Token::HexadecimalValue(v) => {
+                    stream.next(); // Consume hexadecimal
+                    Expression(
+                        Kind::Literal(Literal::Integer(
+                            u128::from_str_radix(&v, 16)
+                                .expect("Hexadecimal is not parseable as u128!"),
+                        )),
+                        stream.get_range().unwrap(),
+                    )
+                }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
                     if let (Some(Token::Dot), Some(Token::DecimalValue(fractional))) =
@@ -172,7 +182,8 @@ impl Parse for PrimaryExpression {
                     } else {
                         Expression(
                             Kind::Literal(Literal::Integer(
-                                v.parse().expect("Integer is not parseable as u128!"),
+                                u128::from_str_radix(&v, 10)
+                                    .expect("Integer is not parseable as u128!"),
                             )),
                             stream.get_range().unwrap(),
                         )

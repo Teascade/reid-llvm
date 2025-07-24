@@ -1,13 +1,24 @@
-use std::{fmt::Debug, str::Chars};
+use std::{
+    fmt::Debug,
+    ops::{Add, AddAssign},
+    str::Chars,
+};
 
+static BINARY_NUMERICS: &[char] = &['0', '1'];
+static OCTAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7'];
 static DECIMAL_NUMERICS: &[char] = &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+static HEXADECIMAL_NUMERICS: &[char] = &[
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+];
 
 #[derive(Eq, PartialEq, Clone, PartialOrd, Ord)]
 pub enum Token {
     /// Values
     Identifier(String),
-    /// Number with at most one decimal point
+    /// Number in the decimal base
     DecimalValue(String),
+    /// Integer number in the hexadecimal base
+    HexadecimalValue(String),
     /// Some character literal that was surrounded by 'single-quotes'.
     CharLit(String),
     /// Some string literal that was surrounded by "double-quotes".
@@ -130,6 +141,7 @@ impl ToString for Token {
         match &self {
             Token::Identifier(ident) => ident.clone(),
             Token::DecimalValue(val) => val.to_string(),
+            Token::HexadecimalValue(val) => val.to_string(),
             Token::CharLit(lit) => format!("\'{}\'", lit),
             Token::StringLit(lit) => format!("\"{}\"", lit),
             Token::LetKeyword => String::from("let"),
@@ -348,15 +360,26 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             }
             // Decimals
             c if DECIMAL_NUMERICS.contains(c) => {
-                let mut value = character.to_string();
+                let mut value = NumberType::Decimal(character.to_string());
+                let mut numerics = DECIMAL_NUMERICS;
+                if let Some(second) = cursor.second() {
+                    if cursor.first() == Some('x') && HEXADECIMAL_NUMERICS.contains(&second) {
+                        cursor.next();
+                        value = NumberType::Hexadecimal(String::new());
+                        numerics = HEXADECIMAL_NUMERICS;
+                    }
+                }
                 while let Some(c) = cursor.first() {
-                    if !DECIMAL_NUMERICS.contains(&c) {
+                    if !numerics.contains(&c) {
                         break;
                     }
-                    value += &c.to_string();
+                    value += c;
                     cursor.next();
                 }
-                Token::DecimalValue(value)
+                match value {
+                    NumberType::Decimal(value) => Token::DecimalValue(value),
+                    NumberType::Hexadecimal(hex) => Token::HexadecimalValue(hex),
+                }
             }
             '-' if cursor.first() == Some('>') => {
                 cursor.next(); // Eat `>`
@@ -408,6 +431,22 @@ fn escape_char(c: &char) -> char {
         'r' => '\r',
         '0' => '\0',
         _ => *c,
+    }
+}
+
+enum NumberType {
+    Decimal(String),
+    Hexadecimal(String),
+}
+
+impl AddAssign<char> for NumberType {
+    fn add_assign(&mut self, rhs: char) {
+        *self = match self {
+            NumberType::Decimal(val) => NumberType::Decimal(val.to_owned() + &rhs.to_string()),
+            NumberType::Hexadecimal(val) => {
+                NumberType::Hexadecimal(val.to_owned() + &rhs.to_string())
+            }
+        };
     }
 }
 

@@ -78,7 +78,7 @@ pub fn parse_module<'map, T: Into<String>>(
     map.set_tokens(id, tokens.clone());
 
     #[cfg(debug_assertions)]
-    dbg!(&tokens);
+    println!("{:#?}", &tokens);
 
     Ok((id, tokens))
 }

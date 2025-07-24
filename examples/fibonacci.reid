@@ -1,6 +1,6 @@
 // Main
 fn main() -> bool {
-    return 5 == fibonacci(5);
+    return 144 == fibonacci(0xc);
 }
 
 // Fibonacci
