@@ -68,6 +68,20 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
         TypeKind::U16,
         IntrinsicIAdd(TypeKind::U16),
     ));
+    intrinsics.push(intrinsic_binop(
+        BinaryOperator::Div,
+        TypeKind::U16,
+        TypeKind::U16,
+        TypeKind::U16,
+        IntrinsicUDiv(TypeKind::U16),
+    ));
+    intrinsics.push(intrinsic_binop(
+        BinaryOperator::Mod,
+        TypeKind::U16,
+        TypeKind::U16,
+        TypeKind::U16,
+        IntrinsicUMod(TypeKind::U16),
+    ));
 
     intrinsics
 }
@@ -93,5 +107,39 @@ impl IntrinsicFunction for IntrinsicIAdd {
         let rhs = params.get(1).unwrap();
         let add = scope.block.build(Instr::Add(*lhs, *rhs)).unwrap();
         Ok(StackValue(StackValueKind::Literal(add), self.0.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IntrinsicUDiv(TypeKind);
+
+impl IntrinsicFunction for IntrinsicUDiv {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        params: &[InstructionValue],
+    ) -> Result<StackValue, ErrorKind> {
+        let lhs = params.get(0).unwrap();
+        let rhs = params.get(1).unwrap();
+        let add = scope.block.build(Instr::UDiv(*lhs, *rhs)).unwrap();
+        Ok(StackValue(StackValueKind::Literal(add), self.0.clone()))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IntrinsicUMod(TypeKind);
+
+impl IntrinsicFunction for IntrinsicUMod {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        params: &[InstructionValue],
+    ) -> Result<StackValue, ErrorKind> {
+        let lhs = params.get(0).unwrap();
+        let rhs = params.get(1).unwrap();
+        let div = scope.block.build(Instr::UDiv(*lhs, *rhs)).unwrap();
+        let mul = scope.block.build(Instr::Mul(*rhs, div)).unwrap();
+        let sub = scope.block.build(Instr::Sub(*lhs, mul)).unwrap();
+        Ok(StackValue(StackValueKind::Literal(sub), self.0.clone()))
     }
 }
