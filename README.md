@@ -86,12 +86,12 @@ and not as representative of my skills as a programmer today as this one.
 
 ## What is currently being tested?
 
-Currently when testing the compiler I run `./libtest.sh reid_src/{file}.reid`,
+Currently when testing the compiler I run `./libtest.sh examples/{file}.reid`,
 where the `{file}` is one of the various examples I've written to help me test
 features of the compiler.
 
 What `./libtest.sh $1` does, is it compiles and runs the rust example found at
-path `$1`. Some pre-existing examples can be found in [`reid_src`](./reid_src)
+path `$1`. Some pre-existing examples can be found in [`examples`](./examples)
 
 All examples currently end up producing a `hello.o` and `hello.asm` file to the
 root directory, which is then linked with `ldd` to produce a `main`, which is
