@@ -289,6 +289,40 @@ impl TypeKind {
             },
         }
     }
+
+    pub fn try_collapse_two(
+        (lhs1, rhs1): (&TypeKind, &TypeKind),
+        (lhs2, rhs2): (&TypeKind, &TypeKind),
+    ) -> Option<(TypeKind, TypeKind)> {
+        if lhs1.collapse_into(&lhs2).is_ok() && rhs1.collapse_into(&rhs2).is_ok() {
+            Some((lhs1.clone(), rhs2.clone()))
+        } else if lhs1.collapse_into(&rhs2).is_ok() && rhs1.collapse_into(&lhs2).is_ok() {
+            Some((rhs1.clone(), lhs1.clone()))
+        } else {
+            None
+        }
+    }
+}
+
+impl BinaryOperator {
+    pub fn is_commutative(&self) -> bool {
+        match self {
+            BinaryOperator::Add => true,
+            BinaryOperator::Minus => false,
+            BinaryOperator::Mult => true,
+            BinaryOperator::Div => false,
+            BinaryOperator::Mod => false,
+            BinaryOperator::And => true,
+            BinaryOperator::Cmp(cmp_operator) => match cmp_operator {
+                CmpOperator::LT => false,
+                CmpOperator::LE => false,
+                CmpOperator::GT => false,
+                CmpOperator::GE => false,
+                CmpOperator::EQ => true,
+                CmpOperator::NE => true,
+            },
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]

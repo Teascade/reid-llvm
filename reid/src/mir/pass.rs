@@ -172,7 +172,6 @@ pub struct ScopeVariable {
 pub struct ScopeBinopKey {
     pub params: (TypeKind, TypeKind),
     pub operator: BinaryOperator,
-    pub commutative: CommutativeKind,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -187,14 +186,12 @@ impl PartialEq for ScopeBinopKey {
         if self.operator != other.operator {
             return false;
         }
-        if self.commutative != CommutativeKind::Any && other.commutative != CommutativeKind::Any {
-            if self.commutative != other.commutative {
-                return false;
-            }
+        if self.operator.is_commutative() != other.operator.is_commutative() {
+            return false;
         }
         let operators_eq = self.params == other.params;
         let swapped_ops_eq = (self.params.1.clone(), self.params.0.clone()) == other.params;
-        if self.commutative == CommutativeKind::True || other.commutative == CommutativeKind::True {
+        if self.operator.is_commutative() {
             operators_eq || swapped_ops_eq
         } else {
             operators_eq
@@ -204,7 +201,7 @@ impl PartialEq for ScopeBinopKey {
 
 impl std::hash::Hash for ScopeBinopKey {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        if self.commutative == CommutativeKind::True {
+        if self.operator.is_commutative() {
             let mut sorted = vec![&self.params.0, &self.params.1];
             sorted.sort();
             sorted.hash(state);
@@ -368,7 +365,6 @@ impl Module {
                 .set(
                     ScopeBinopKey {
                         params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
-                        commutative: CommutativeKind::True,
                         operator: binop.op,
                     },
                     ScopeBinopDef {

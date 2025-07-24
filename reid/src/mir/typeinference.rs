@@ -63,7 +63,6 @@ impl<'t> Pass for TypeInference<'t> {
         for binop in &module.binop_defs {
             let binop_key = ScopeBinopKey {
                 params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
-                commutative: pass::CommutativeKind::True,
                 operator: binop.op,
             };
             if seen_binops.contains(&binop_key) {

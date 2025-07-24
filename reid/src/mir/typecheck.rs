@@ -508,34 +508,63 @@ impl Expression {
                 Ok(literal.as_type())
             }
             ExprKind::BinOp(op, lhs, rhs) => {
-                // TODO make sure lhs and rhs can actually do this binary
-                // operation once relevant
-                let lhs_res = lhs.typecheck(
-                    state,
-                    &typerefs,
-                    hint_t.and_then(|t| t.simple_binop_hint(op)).as_ref(),
-                );
+                // First find unfiltered parameters to binop
+                let lhs_res = lhs.typecheck(state, &typerefs, None);
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
-                let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
+                let rhs_res = rhs.typecheck(state, &typerefs, None);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
-                    // Try to coerce both sides again with collapsed type
-                    lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
-                    rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
-                }
+                let operator = state
+                    .scope
+                    .binops
+                    .get(&pass::ScopeBinopKey {
+                        params: (lhs_type.clone(), rhs_type.clone()),
+                        operator: *op,
+                    })
+                    .cloned();
 
-                let both_t = lhs_type.collapse_into(&rhs_type)?;
+                if let Some(operator) = operator {
+                    // Re-typecheck with found operator hints
+                    let (lhs_ty, rhs_ty) = TypeKind::try_collapse_two(
+                        (&lhs_type, &rhs_type),
+                        (&operator.hands.0, &operator.hands.1),
+                    )
+                    .unwrap();
+                    let lhs_res = lhs.typecheck(state, &typerefs, Some(&lhs_ty));
+                    let rhs_res = rhs.typecheck(state, &typerefs, Some(&rhs_ty));
+                    state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
+                    state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
+                    Ok(operator.return_ty)
+                } else {
+                    // Re-typecheck with typical everyday binop
+                    let lhs_res = lhs.typecheck(
+                        state,
+                        &typerefs,
+                        hint_t.and_then(|t| t.simple_binop_hint(op)).as_ref(),
+                    );
+                    let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
+                    let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
+                    let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                if *op == BinaryOperator::Minus && !lhs_type.signed() {
-                    if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?) {
-                        if lhs_val < rhs_val {
-                            return Err(ErrorKind::NegativeUnsignedValue(lhs_type));
+                    let both_t = lhs_type.collapse_into(&rhs_type)?;
+
+                    if *op == BinaryOperator::Minus && !lhs_type.signed() {
+                        if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?)
+                        {
+                            if lhs_val < rhs_val {
+                                return Err(ErrorKind::NegativeUnsignedValue(lhs_type));
+                            }
                         }
                     }
-                }
 
-                Ok(both_t.simple_binop_type(op))
+                    if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
+                        // Try to coerce both sides again with collapsed type
+                        lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
+                        rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
+                    }
+
+                    Ok(both_t.simple_binop_type(op))
+                }
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = state
@@ -814,7 +843,7 @@ impl Expression {
                 Ok(*inner)
             }
             ExprKind::CastTo(expression, type_kind) => {
-                let expr = expression.typecheck(state, typerefs, None)?;
+                let expr = expression.typecheck(state, typerefs, Some(&type_kind))?;
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
         }
