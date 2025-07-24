@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, hash::Hash, mem, rc::Rc};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
@@ -18,9 +18,9 @@ use crate::{
     allocator::{Allocator, AllocatorScope},
     lexer::{FullToken, Position},
     mir::{
-        self, implement::TypeCategory, CustomTypeKey, Metadata, NamedVariableRef, SourceModuleId,
-        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral,
-        WhileStatement,
+        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind,
+        Metadata, NamedVariableRef, SourceModuleId, StructField, StructType, TypeDefinition,
+        TypeDefinitionKind, TypeKind, VagueLiteral, WhileStatement,
     },
     util::try_all,
 };
@@ -88,6 +88,42 @@ pub struct Scope<'ctx, 'scope> {
     allocator: Rc<RefCell<Allocator>>,
 }
 
+impl<'ctx, 'a> Scope<'ctx, 'a> {
+    fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
+        Scope {
+            block,
+            modules: self.modules,
+            tokens: self.tokens,
+            function: self.function,
+            context: self.context,
+            module: self.module,
+            module_id: self.module_id,
+            functions: self.functions,
+            types: self.types,
+            type_values: self.type_values,
+            stack_values: self.stack_values.clone(),
+            debug: self.debug.clone(),
+            allocator: self.allocator.clone(),
+        }
+    }
+
+    /// Takes the block out from this scope, swaps the given block in it's place
+    /// and returns the old block.
+    fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
+        let mut old_block = block;
+        mem::swap(&mut self.block, &mut old_block);
+        old_block
+    }
+
+    fn get_typedef(&self, key: &CustomTypeKey) -> Option<&TypeDefinition> {
+        self.type_values.get(key).and_then(|v| self.types.get(v))
+    }
+
+    fn allocate(&self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
+        self.allocator.borrow_mut().allocate(name, ty)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Debug<'ctx> {
     info: &'ctx DebugInformation,
@@ -148,40 +184,10 @@ impl StackValueKind {
     }
 }
 
-impl<'ctx, 'a> Scope<'ctx, 'a> {
-    fn with_block(&self, block: Block<'ctx>) -> Scope<'ctx, 'a> {
-        Scope {
-            block,
-            modules: self.modules,
-            tokens: self.tokens,
-            function: self.function,
-            context: self.context,
-            module: self.module,
-            module_id: self.module_id,
-            functions: self.functions,
-            types: self.types,
-            type_values: self.type_values,
-            stack_values: self.stack_values.clone(),
-            debug: self.debug.clone(),
-            allocator: self.allocator.clone(),
-        }
-    }
-
-    /// Takes the block out from this scope, swaps the given block in it's place
-    /// and returns the old block.
-    fn swap_block(&mut self, block: Block<'ctx>) -> Block<'ctx> {
-        let mut old_block = block;
-        mem::swap(&mut self.block, &mut old_block);
-        old_block
-    }
-
-    fn get_typedef(&self, key: &CustomTypeKey) -> Option<&TypeDefinition> {
-        self.type_values.get(key).and_then(|v| self.types.get(v))
-    }
-
-    fn allocate(&self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
-        self.allocator.borrow_mut().allocate(name, ty)
-    }
+pub struct StackBinopDefinition<'ctx> {
+    parameters: ((String, TypeKind), (String, TypeKind)),
+    return_ty: TypeKind,
+    ir: Function<'ctx>,
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
@@ -285,6 +291,21 @@ impl mir::Module {
             insert_debug!(&TypeKind::CustomType(type_key.clone()));
         }
 
+        // let mut binops = HashMap::new();
+        // for binop in &self.binop_defs {
+        //     binops.insert(
+        //         ScopeBinopKey {
+        //             operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+        //             commutative: mir::pass::CommutativeKind::True,
+        //         },
+        //         StackBinopDefinition {
+        //             parameters: (binop.lhs.clone(), binop.rhs.clone()),
+        //             return_ty: binop.return_ty.clone(),
+        //             ir: todo!(),
+        //         },
+        //     );
+        // }
+
         let mut functions = HashMap::new();
 
         for function in &self.functions {
@@ -332,175 +353,188 @@ impl mir::Module {
 
         for mir_function in &self.functions {
             let function = functions.get(&mir_function.name).unwrap();
+            let mut entry = function.ir.block("entry");
 
-            match &mir_function.kind {
-                mir::FunctionDefinitionKind::Local(block, _) => {
-                    let mut entry = function.ir.block("entry");
-                    let mut allocator = Allocator::from(
-                        mir_function,
-                        &mut AllocatorScope {
-                            block: &mut entry,
-                            module_id: self.module_id,
-                            type_values: &type_values,
-                        },
-                    );
+            let allocator = match &mir_function.kind {
+                FunctionDefinitionKind::Local(..) => Allocator::from(
+                    mir_function,
+                    &mut AllocatorScope {
+                        block: &mut entry,
+                        module_id: self.module_id,
+                        type_values: &type_values,
+                    },
+                ),
+                FunctionDefinitionKind::Extern(_) => Allocator::empty(),
+                FunctionDefinitionKind::Intrinsic(_) => Allocator::empty(),
+            };
 
-                    // Insert debug information
-                    let debug_scope = if let Some(location) =
-                        mir_function.signature().into_debug(tokens, compile_unit)
-                    {
+            let mut scope = Scope {
+                context,
+                modules: &modules,
+                tokens,
+                module: &module,
+                module_id: self.module_id,
+                function,
+                block: entry,
+                functions: &functions,
+                types: &types,
+                type_values: &type_values,
+                stack_values: HashMap::new(),
+                debug: Some(Debug {
+                    info: &debug,
+                    scope: compile_unit,
+                    types: &debug_types,
+                }),
+                allocator: Rc::new(RefCell::new(allocator)),
+            };
+
+            mir_function
+                .kind
+                .codegen(
+                    mir_function.name.clone(),
+                    mir_function.is_pub,
+                    &mut scope,
+                    &mir_function.parameters,
+                    &mir_function.return_type,
+                    &function.ir,
+                    match &mir_function.kind {
+                        FunctionDefinitionKind::Local(..) => {
+                            mir_function.signature().into_debug(tokens, compile_unit)
+                        }
+                        FunctionDefinitionKind::Extern(_) => None,
+                        FunctionDefinitionKind::Intrinsic(_) => None,
+                    },
+                )
+                .unwrap();
+        }
+
+        Ok(ModuleCodegen { module })
+    }
+}
+
+impl FunctionDefinitionKind {
+    fn codegen<'ctx, 'scope>(
+        &self,
+        name: String,
+        is_pub: bool,
+        scope: &mut Scope,
+        parameters: &Vec<(String, TypeKind)>,
+        return_type: &TypeKind,
+        ir_function: &Function,
+        debug_location: Option<DebugLocation>,
+    ) -> Result<(), ErrorKind> {
+        match &self {
+            mir::FunctionDefinitionKind::Local(block, _) => {
+                // Insert debug information
+                if let Some(debug) = &scope.debug {
+                    if let Some(location) = debug_location {
                         // let debug_scope = debug.inner_scope(&outer_scope, location);
 
-                        let fn_param_ty = &mir_function.return_type.get_debug_type_hard(
-                            compile_unit,
-                            &debug,
-                            &debug_types,
-                            &type_values,
-                            &types,
-                            self.module_id,
-                            &self.tokens,
-                            &modules,
-                        );
+                        let fn_param_ty = &return_type.get_debug_type(&debug, scope);
 
                         let debug_ty =
-                            debug.debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
-                                parameters: vec![*fn_param_ty],
-                                flags: DwarfFlags,
-                            }));
+                            debug
+                                .info
+                                .debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
+                                    parameters: vec![*fn_param_ty],
+                                    flags: DwarfFlags,
+                                }));
 
-                        let subprogram = debug.subprogram(DebugSubprogramData {
-                            name: mir_function.name.clone(),
-                            outer_scope: compile_unit.clone(),
+                        let subprogram = debug.info.subprogram(DebugSubprogramData {
+                            name: name.clone(),
+                            outer_scope: debug.scope.clone(),
                             location,
                             ty: debug_ty,
                             opts: DebugSubprogramOptionals {
-                                is_local: !mir_function.is_pub,
+                                is_local: !is_pub,
                                 is_definition: true,
                                 ..DebugSubprogramOptionals::default()
                             },
                         });
 
-                        function.ir.set_debug(subprogram);
-
-                        Some(subprogram)
-                    } else {
-                        None
-                    };
-
-                    // Compile actual IR part
-                    let mut stack_values = HashMap::new();
-                    for (i, (p_name, p_ty)) in mir_function.parameters.iter().enumerate() {
-                        // Codegen actual parameters
-                        let arg_name = format!("arg.{}", p_name);
-                        let param = entry
-                            .build_named(format!("{}.get", arg_name), Instr::Param(i))
-                            .unwrap();
-
-                        let alloca = allocator.allocate(&p_name, &p_ty).unwrap();
-
-                        entry
-                            .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
-                            .unwrap();
-                        stack_values.insert(
-                            p_name.clone(),
-                            StackValue(
-                                StackValueKind::mutable(p_ty.is_mutable(), alloca),
-                                TypeKind::CodegenPtr(Box::new(p_ty.clone())),
-                            ),
-                        );
-
-                        // Generate debug info
-                        if let (Some(debug_scope), Some(location)) = (
-                            &debug_scope,
-                            mir_function.signature().into_debug(tokens, compile_unit),
-                        ) {
-                            // debug.metadata(
-                            //     &location,
-                            //     DebugMetadata::ParamVar(DebugParamVariable {
-                            //         name: p_name.clone(),
-                            //         arg_idx: i as u32,
-                            //         ty: p_ty.get_debug_type_hard(
-                            //             *debug_scope,
-                            //             &debug,
-                            //             &debug_types,
-                            //             &type_values,
-                            //             &types,
-                            //             self.module_id,
-                            //             &self.tokens,
-                            //             &modules,
-                            //         ),
-                            //         always_preserve: true,
-                            //         flags: DwarfFlags,
-                            //     }),
-                            // );
-                        }
-                    }
-
-                    let mut scope = Scope {
-                        context,
-                        modules: &modules,
-                        tokens,
-                        module: &module,
-                        module_id: self.module_id,
-                        function,
-                        block: entry,
-                        functions: &functions,
-                        types: &types,
-                        type_values: &type_values,
-                        stack_values,
-                        debug: debug_scope.and_then(|scope| {
-                            Some(Debug {
-                                info: &debug,
-                                scope,
-                                types: &debug_types,
-                            })
-                        }),
-                        allocator: Rc::new(RefCell::new(allocator)),
-                    };
-
-                    let state = State::default();
-                    if let Some(ret) = block.codegen(&mut scope, &state)? {
-                        scope.block.terminate(Term::Ret(ret.instr())).unwrap();
-                    } else {
-                        if !scope.block.delete_if_unused().unwrap() {
-                            // Add a void return just in case if the block
-                            // wasn't unused but didn't have a terminator yet
-                            scope.block.terminate(Term::RetVoid).ok();
-                        }
-                    }
-
-                    if let Some(debug) = scope.debug {
-                        let location =
-                            &block.return_meta().into_debug(tokens, debug.scope).unwrap();
-                        let location = debug.info.location(&debug.scope, *location);
-                        scope.block.set_terminator_location(location).unwrap();
+                        ir_function.set_debug(subprogram);
+                        scope.debug = Some(Debug {
+                            info: debug.info,
+                            scope: subprogram,
+                            types: debug.types,
+                        });
                     }
                 }
-                mir::FunctionDefinitionKind::Extern(_) => {}
-                mir::FunctionDefinitionKind::Intrinsic(kind) => {
-                    let entry = function.ir.block("entry");
-                    let mut scope = Scope {
-                        context,
-                        modules: &modules,
-                        tokens,
-                        module: &module,
-                        module_id: self.module_id,
-                        function,
-                        block: entry,
-                        functions: &functions,
-                        types: &types,
-                        type_values: &type_values,
-                        stack_values: Default::default(),
-                        debug: None,
-                        allocator: Rc::new(RefCell::new(Allocator::empty())),
-                    };
 
-                    kind.codegen(&mut scope)?
+                // Compile actual IR part
+                for (i, (p_name, p_ty)) in parameters.iter().enumerate() {
+                    // Codegen actual parameters
+                    let arg_name = format!("arg.{}", p_name);
+                    let param = scope
+                        .block
+                        .build_named(format!("{}.get", arg_name), Instr::Param(i))
+                        .unwrap();
+
+                    let alloca = scope.allocate(&p_name, &p_ty).unwrap();
+
+                    scope
+                        .block
+                        .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
+                        .unwrap();
+                    scope.stack_values.insert(
+                        p_name.clone(),
+                        StackValue(
+                            StackValueKind::mutable(p_ty.is_mutable(), alloca),
+                            TypeKind::CodegenPtr(Box::new(p_ty.clone())),
+                        ),
+                    );
+
+                    // Generate debug info
+                    // if let (Some(debug_scope), Some(location)) = (
+                    //     &debug_scope,
+                    //     mir_function.signature().into_debug(tokens, compile_unit),
+                    // ) {
+                    //     debug.metadata(
+                    //         &location,
+                    //         DebugMetadata::ParamVar(DebugParamVariable {
+                    //             name: p_name.clone(),
+                    //             arg_idx: i as u32,
+                    //             ty: p_ty.get_debug_type_hard(
+                    //                 *debug_scope,
+                    //                 &debug,
+                    //                 &debug_types,
+                    //                 &type_values,
+                    //                 &types,
+                    //                 self.module_id,
+                    //                 &self.tokens,
+                    //                 &modules,
+                    //             ),
+                    //             always_preserve: true,
+                    //             flags: DwarfFlags,
+                    //         }),
+                    //     );
+                    // }
+                }
+
+                let state = State::default();
+                if let Some(ret) = block.codegen(scope, &state)? {
+                    scope.block.terminate(Term::Ret(ret.instr())).unwrap();
+                } else {
+                    if !scope.block.delete_if_unused().unwrap() {
+                        // Add a void return just in case if the block
+                        // wasn't unused but didn't have a terminator yet
+                        scope.block.terminate(Term::RetVoid).ok();
+                    }
+                }
+
+                if let Some(debug) = &scope.debug {
+                    let location = &block
+                        .return_meta()
+                        .into_debug(scope.tokens, debug.scope)
+                        .unwrap();
+                    let location = debug.info.location(&debug.scope, *location);
+                    scope.block.set_terminator_location(location).unwrap();
                 }
             }
-        }
-
-        Ok(ModuleCodegen { module })
+            mir::FunctionDefinitionKind::Extern(_) => {}
+            mir::FunctionDefinitionKind::Intrinsic(kind) => kind.codegen(scope)?,
+        };
+        Ok(())
     }
 }
 
