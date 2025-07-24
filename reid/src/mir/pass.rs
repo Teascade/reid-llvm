@@ -111,6 +111,10 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
     pub fn get(&self, key: &Key) -> Option<&T> {
         self.0.get(key)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Key, &T)> {
+        self.0.iter()
+    }
 }
 
 #[derive(Clone, Default, Debug)]
@@ -362,7 +366,7 @@ impl Module {
                 ScopeBinopDef {
                     operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                     commutative: true,
-                    return_ty: binop.return_ty.clone(),
+                    return_ty: binop.return_type.clone(),
                 },
             );
         }

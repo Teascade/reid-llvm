@@ -110,7 +110,7 @@ impl ast::Module {
                         lhs: (lhs.0.clone(), lhs.1 .0.into_mir(module_id)),
                         op: op.mir(),
                         rhs: (rhs.0.clone(), rhs.1 .0.into_mir(module_id)),
-                        return_ty: return_ty.0.into_mir(module_id),
+                        return_type: return_ty.0.into_mir(module_id),
                         fn_kind: mir::FunctionDefinitionKind::Local(
                             block.into_mir(module_id),
                             block.2.as_meta(module_id),

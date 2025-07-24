@@ -1,4 +1,4 @@
-use super::{typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
+use super::{pass::ScopeBinopDef, typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {
@@ -95,7 +95,7 @@ impl TypeKind {
 
     /// Return the type that is the result of a binary operator between two
     /// values of this type
-    pub fn binop_type(&self, op: &BinaryOperator) -> TypeKind {
+    pub fn simple_binop_type(&self, op: &BinaryOperator) -> TypeKind {
         // TODO make some type of mechanism that allows to binop two values of
         // differing types..
         // TODO Return None for arrays later
@@ -107,6 +107,20 @@ impl TypeKind {
             BinaryOperator::Cmp(_) => TypeKind::Bool,
             BinaryOperator::Div => self.clone(),
             BinaryOperator::Mod => self.clone(),
+        }
+    }
+
+    pub fn binop_type<'o>(
+        lhs: &TypeKind,
+        rhs: &TypeKind,
+        binop: &ScopeBinopDef,
+    ) -> Option<(TypeKind, TypeKind, TypeKind)> {
+        let lhs_ty = lhs.collapse_into(&binop.operators.0);
+        let rhs_ty = rhs.collapse_into(&binop.operators.1);
+        if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
+            Some((lhs_ty, rhs_ty, binop.return_ty.clone()))
+        } else {
+            None
         }
     }
 

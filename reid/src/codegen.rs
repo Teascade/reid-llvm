@@ -78,11 +78,11 @@ pub struct Scope<'ctx, 'scope> {
     tokens: &'ctx Vec<FullToken>,
     module: &'ctx Module<'ctx>,
     pub(super) module_id: SourceModuleId,
-    function: &'ctx StackFunction<'ctx>,
+    function: &'ctx Function<'ctx>,
     pub(super) block: Block<'ctx>,
     pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
     pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
-    functions: &'scope HashMap<String, StackFunction<'ctx>>,
+    functions: &'scope HashMap<String, Function<'ctx>>,
     stack_values: HashMap<String, StackValue>,
     debug: Option<Debug<'ctx>>,
     allocator: Rc<RefCell<Allocator>>,
@@ -129,10 +129,6 @@ pub struct Debug<'ctx> {
     info: &'ctx DebugInformation,
     scope: DebugProgramValue,
     types: &'ctx HashMap<TypeKind, DebugTypeValue>,
-}
-
-pub struct StackFunction<'ctx> {
-    ir: Function<'ctx>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -291,21 +287,6 @@ impl mir::Module {
             insert_debug!(&TypeKind::CustomType(type_key.clone()));
         }
 
-        // let mut binops = HashMap::new();
-        // for binop in &self.binop_defs {
-        //     binops.insert(
-        //         ScopeBinopKey {
-        //             operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
-        //             commutative: mir::pass::CommutativeKind::True,
-        //         },
-        //         StackBinopDefinition {
-        //             parameters: (binop.lhs.clone(), binop.rhs.clone()),
-        //             return_ty: binop.return_ty.clone(),
-        //             ir: todo!(),
-        //         },
-        //     );
-        // }
-
         let mut functions = HashMap::new();
 
         for function in &self.functions {
@@ -348,12 +329,91 @@ impl mir::Module {
                 ),
             };
 
-            functions.insert(function.name.clone(), StackFunction { ir: func });
+            functions.insert(function.name.clone(), func);
+        }
+
+        let mut binops = HashMap::new();
+        for binop in &self.binop_defs {
+            let binop_fn_name = format!(
+                "binop.{}.{:?}.{}.{}",
+                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
+            );
+            let ir_function = module.function(
+                &binop_fn_name,
+                binop.return_type.get_type(&type_values),
+                vec![
+                    binop.lhs.1.get_type(&type_values),
+                    binop.rhs.1.get_type(&type_values),
+                ],
+                FunctionFlags::default(),
+            );
+            let mut entry = ir_function.block("entry");
+
+            let allocator = Allocator::from(
+                &binop.fn_kind,
+                &vec![binop.lhs.clone(), binop.rhs.clone()],
+                &mut AllocatorScope {
+                    block: &mut entry,
+                    module_id: self.module_id,
+                    type_values: &type_values,
+                },
+            );
+
+            let mut scope = Scope {
+                context,
+                modules: &modules,
+                tokens,
+                module: &module,
+                module_id: self.module_id,
+                function: &ir_function,
+                block: entry,
+                functions: &functions,
+                types: &types,
+                type_values: &type_values,
+                stack_values: HashMap::new(),
+                debug: Some(Debug {
+                    info: &debug,
+                    scope: compile_unit,
+                    types: &debug_types,
+                }),
+                allocator: Rc::new(RefCell::new(allocator)),
+            };
+
+            binop
+                .fn_kind
+                .codegen(
+                    binop_fn_name.clone(),
+                    false,
+                    &mut scope,
+                    &vec![binop.lhs.clone(), binop.rhs.clone()],
+                    &binop.return_type,
+                    &ir_function,
+                    match &binop.fn_kind {
+                        FunctionDefinitionKind::Local(_, meta) => {
+                            meta.into_debug(tokens, compile_unit)
+                        }
+                        FunctionDefinitionKind::Extern(_) => None,
+                        FunctionDefinitionKind::Intrinsic(_) => None,
+                    },
+                )
+                .unwrap();
+
+            binops.insert(
+                ScopeBinopKey {
+                    operators: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                    commutative: mir::pass::CommutativeKind::True,
+                },
+                StackBinopDefinition {
+                    parameters: (binop.lhs.clone(), binop.rhs.clone()),
+                    return_ty: binop.return_type.clone(),
+                    ir: ir_function,
+                },
+            );
         }
 
         for mir_function in &self.functions {
             let function = functions.get(&mir_function.name).unwrap();
-            let mut entry = function.ir.block("entry");
+            let mut entry = function.block("entry");
 
             let allocator = Allocator::from(
                 &mir_function.kind,
@@ -393,7 +453,7 @@ impl mir::Module {
                     &mut scope,
                     &mir_function.parameters,
                     &mir_function.return_type,
-                    &function.ir,
+                    &function,
                     match &mir_function.kind {
                         FunctionDefinitionKind::Local(..) => {
                             mir_function.signature().into_debug(tokens, compile_unit)
@@ -670,9 +730,9 @@ impl mir::Statement {
             mir::StmtKind::While(WhileStatement {
                 condition, block, ..
             }) => {
-                let condition_block = scope.function.ir.block("while.cond");
-                let condition_true_block = scope.function.ir.block("while.body");
-                let condition_failed_block = scope.function.ir.block("while.end");
+                let condition_block = scope.function.block("while.cond");
+                let condition_true_block = scope.function.block("while.body");
+                let condition_failed_block = scope.function.block("while.end");
 
                 scope
                     .block
@@ -881,7 +941,7 @@ impl mir::Expression {
                     .block
                     .build_named(
                         call.name.clone(),
-                        Instr::FunctionCall(callee.ir.value(), param_instrs),
+                        Instr::FunctionCall(callee.value(), param_instrs),
                     )
                     .unwrap();
 
@@ -929,7 +989,7 @@ impl mir::Expression {
             }
             mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state)?,
             mir::ExprKind::Block(block) => {
-                let inner = scope.function.ir.block("inner");
+                let inner = scope.function.block("inner");
                 scope.block.terminate(Term::Br(inner.value())).unwrap();
 
                 let mut inner_scope = scope.with_block(inner);
@@ -938,7 +998,7 @@ impl mir::Expression {
                 } else {
                     None
                 };
-                let outer = scope.function.ir.block("outer");
+                let outer = scope.function.block("outer");
                 inner_scope.block.terminate(Term::Br(outer.value())).ok();
                 scope.swap_block(outer);
                 ret
@@ -1341,9 +1401,9 @@ impl mir::IfExpression {
         let condition = self.0.codegen(scope, state)?.unwrap();
 
         // Create blocks
-        let mut then_b = scope.function.ir.block("then");
-        let mut else_b = scope.function.ir.block("else");
-        let after_b = scope.function.ir.block("after");
+        let mut then_b = scope.function.block("then");
+        let mut else_b = scope.function.block("else");
+        let after_b = scope.function.block("after");
 
         if let Some(debug) = &scope.debug {
             let before_location = self.0 .1.into_debug(scope.tokens, debug.scope).unwrap();

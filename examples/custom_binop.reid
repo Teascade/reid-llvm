@@ -5,8 +5,8 @@ impl binop (lhs: u16) + (rhs: u32) -> u32 {
 }
 
 fn main() -> u32 {
-  let value = 6;
-  let other = 15;
+  let value = 6 as u16;
+  let other = 15 as u32;
 
-  return value * other + 7 * -value;
+  return value + other;
 }

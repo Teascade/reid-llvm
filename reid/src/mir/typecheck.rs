@@ -203,9 +203,9 @@ impl BinopDefinition {
             state.ok(res, self.signature());
         }
 
-        let return_type = self.return_ty.clone().assert_known(typerefs, state)?;
+        let return_type = self.return_type.clone().assert_known(typerefs, state)?;
 
-        state.scope.return_type_hint = Some(self.return_ty.clone());
+        state.scope.return_type_hint = Some(self.return_type.clone());
         let inferred =
             self.fn_kind
                 .typecheck(&typerefs, &mut state.inner(), Some(return_type.clone()));
@@ -535,7 +535,7 @@ impl Expression {
                     }
                 }
 
-                Ok(both_t.binop_type(op))
+                Ok(both_t.simple_binop_type(op))
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = state

@@ -124,11 +124,11 @@ impl BinopDefinition {
             self.signature(),
         );
 
-        let ret_ty = self
-            .fn_kind
-            .infer_types(state, &scope_hints, Some(self.return_ty.clone()))?;
+        let ret_ty =
+            self.fn_kind
+                .infer_types(state, &scope_hints, Some(self.return_type.clone()))?;
         if let Some(mut ret_ty) = ret_ty {
-            ret_ty.narrow(&scope_hints.from_type(&self.return_ty).unwrap());
+            ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
         }
 
         Ok(())
@@ -312,7 +312,7 @@ impl Expression {
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
                 type_refs
-                    .binop(op, &mut lhs_ref, &mut rhs_ref)
+                    .binop(op, &mut lhs_ref, &mut rhs_ref, &state.scope.binops)
                     .ok_or(ErrorKind::TypesIncompatible(
                         lhs_ref.resolve_deep().unwrap(),
                         rhs_ref.resolve_deep().unwrap(),

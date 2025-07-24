@@ -64,7 +64,7 @@ impl Display for BinopDefinition {
         write!(
             f,
             "impl binop ({}: {:#}) {} ({}: {:#}) -> {:#} ",
-            self.lhs.0, self.lhs.1, self.op, self.rhs.0, self.rhs.1, self.return_ty
+            self.lhs.0, self.lhs.1, self.op, self.rhs.0, self.rhs.1, self.return_type
         )?;
         Display::fmt(&self.fn_kind, f)
     }

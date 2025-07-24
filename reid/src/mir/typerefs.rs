@@ -6,7 +6,11 @@ use std::{
 
 use crate::mir::VagueType;
 
-use super::{typecheck::ErrorKind, BinaryOperator, TypeKind};
+use super::{
+    pass::{ScopeBinopDef, ScopeBinopKey, Storage},
+    typecheck::ErrorKind,
+    BinaryOperator, TypeKind,
+};
 
 #[derive(Clone)]
 pub struct TypeRef<'scope>(
@@ -227,8 +231,31 @@ impl<'outer> ScopeTypeRefs<'outer> {
         op: &BinaryOperator,
         lhs: &mut TypeRef<'outer>,
         rhs: &mut TypeRef<'outer>,
+        binops: &Storage<ScopeBinopKey, ScopeBinopDef>,
     ) -> Option<TypeRef<'outer>> {
+        for (_, binop) in binops.iter() {
+            if let Some(ret) = try_binop(lhs, rhs, binop) {
+                return Some(ret);
+            }
+            if binop.commutative {
+                if let Some(ret) = try_binop(rhs, lhs, binop) {
+                    return Some(ret);
+                }
+            }
+        }
         let ty = lhs.narrow(rhs)?;
-        self.from_type(&ty.as_type().binop_type(op))
+        self.from_type(&ty.as_type().simple_binop_type(op))
     }
+}
+
+fn try_binop<'o>(
+    lhs: &mut TypeRef<'o>,
+    rhs: &mut TypeRef<'o>,
+    binop: &ScopeBinopDef,
+) -> Option<TypeRef<'o>> {
+    let (lhs_ty, rhs_ty, ret_ty) =
+        TypeKind::binop_type(&lhs.resolve_deep()?, &rhs.resolve_deep()?, binop)?;
+    lhs.narrow(&lhs.1.from_type(&lhs_ty).unwrap()).unwrap();
+    rhs.narrow(&rhs.1.from_type(&rhs_ty).unwrap()).unwrap();
+    lhs.1.from_type(&ret_ty)
 }

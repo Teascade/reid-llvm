@@ -370,7 +370,7 @@ pub struct BinopDefinition {
     pub lhs: (String, TypeKind),
     pub op: BinaryOperator,
     pub rhs: (String, TypeKind),
-    pub return_ty: TypeKind,
+    pub return_type: TypeKind,
     pub fn_kind: FunctionDefinitionKind,
     pub meta: Metadata,
 }
