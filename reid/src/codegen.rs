@@ -16,6 +16,7 @@ use reid_lib::{
 
 use crate::{
     allocator::{Allocator, AllocatorScope},
+    intrinsics::IntrinsicFunction,
     lexer::{FullToken, Position},
     mir::{
         self,
@@ -137,7 +138,7 @@ pub struct Debug<'ctx> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StackValue(StackValueKind, TypeKind);
+pub struct StackValue(pub(super) StackValueKind, pub(super) TypeKind);
 
 impl StackValue {
     fn instr(&self) -> InstructionValue {
@@ -188,7 +189,12 @@ impl StackValueKind {
 pub struct StackBinopDefinition<'ctx> {
     parameters: ((String, TypeKind), (String, TypeKind)),
     return_ty: TypeKind,
-    ir: Function<'ctx>,
+    kind: StackBinopFunctionKind<'ctx>,
+}
+
+pub enum StackBinopFunctionKind<'ctx> {
+    UserGenerated(Function<'ctx>),
+    Intrinsic(&'ctx Box<dyn IntrinsicFunction>),
 }
 
 impl<'ctx> StackBinopDefinition<'ctx> {
@@ -197,20 +203,30 @@ impl<'ctx> StackBinopDefinition<'ctx> {
         lhs: &StackValue,
         rhs: &StackValue,
         scope: &mut Scope<'ctx, 'a>,
-    ) -> StackValue {
+    ) -> Result<StackValue, ErrorKind> {
         let (lhs, rhs) = if lhs.1 == self.parameters.0 .1 && rhs.1 == self.parameters.1 .1 {
             (lhs, rhs)
         } else {
             (rhs, lhs)
         };
-        let instr = scope
-            .block
-            .build(Instr::FunctionCall(
-                self.ir.value(),
-                vec![lhs.instr(), rhs.instr()],
-            ))
-            .unwrap();
-        StackValue(StackValueKind::Immutable(instr), self.return_ty.clone())
+        match &self.kind {
+            StackBinopFunctionKind::UserGenerated(ir) => {
+                let instr = scope
+                    .block
+                    .build(Instr::FunctionCall(
+                        ir.value(),
+                        vec![lhs.instr(), rhs.instr()],
+                    ))
+                    .unwrap();
+                Ok(StackValue(
+                    StackValueKind::Immutable(instr),
+                    self.return_ty.clone(),
+                ))
+            }
+            StackBinopFunctionKind::Intrinsic(fun) => {
+                fun.codegen(scope, &[lhs.instr(), rhs.instr()])
+            }
+        }
     }
 }
 
@@ -326,7 +342,7 @@ impl mir::Module {
 
             let is_main = self.is_main && function.name == "main";
             let func = match &function.kind {
-                mir::FunctionDefinitionKind::Local(_, _) => module.function(
+                mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
                     &function.name,
                     function.return_type.get_type(&type_values),
                     param_types,
@@ -336,8 +352,8 @@ impl mir::Module {
                         is_imported: function.is_imported,
                         ..FunctionFlags::default()
                     },
-                ),
-                mir::FunctionDefinitionKind::Extern(imported) => module.function(
+                )),
+                mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
                     &function.name,
                     function.return_type.get_type(&type_values),
                     param_types,
@@ -346,87 +362,17 @@ impl mir::Module {
                         is_imported: *imported,
                         ..FunctionFlags::default()
                     },
-                ),
-                mir::FunctionDefinitionKind::Intrinsic(_) => module.function(
-                    &function.name,
-                    function.return_type.get_type(&type_values),
-                    param_types,
-                    FunctionFlags {
-                        ..FunctionFlags::default()
-                    },
-                ),
+                )),
+                mir::FunctionDefinitionKind::Intrinsic(_) => None,
             };
 
-            functions.insert(function.name.clone(), func);
+            if let Some(func) = func {
+                functions.insert(function.name.clone(), func);
+            }
         }
 
         let mut binops = HashMap::new();
         for binop in &self.binop_defs {
-            let binop_fn_name = format!(
-                "binop.{}.{:?}.{}.{}",
-                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
-            );
-            let ir_function = module.function(
-                &binop_fn_name,
-                binop.return_type.get_type(&type_values),
-                vec![
-                    binop.lhs.1.get_type(&type_values),
-                    binop.rhs.1.get_type(&type_values),
-                ],
-                FunctionFlags::default(),
-            );
-            let mut entry = ir_function.block("entry");
-
-            let allocator = Allocator::from(
-                &binop.fn_kind,
-                &vec![binop.lhs.clone(), binop.rhs.clone()],
-                &mut AllocatorScope {
-                    block: &mut entry,
-                    module_id: self.module_id,
-                    type_values: &type_values,
-                },
-            );
-
-            let mut scope = Scope {
-                context,
-                modules: &modules,
-                tokens,
-                module: &module,
-                module_id: self.module_id,
-                function: &ir_function,
-                block: entry,
-                functions: &functions,
-                types: &types,
-                type_values: &type_values,
-                stack_values: HashMap::new(),
-                debug: Some(Debug {
-                    info: &debug,
-                    scope: compile_unit,
-                    types: &debug_types,
-                }),
-                binops: &binops,
-                allocator: Rc::new(RefCell::new(allocator)),
-            };
-
-            binop
-                .fn_kind
-                .codegen(
-                    binop_fn_name.clone(),
-                    false,
-                    &mut scope,
-                    &vec![binop.lhs.clone(), binop.rhs.clone()],
-                    &binop.return_type,
-                    &ir_function,
-                    match &binop.fn_kind {
-                        FunctionDefinitionKind::Local(_, meta) => {
-                            meta.into_debug(tokens, compile_unit)
-                        }
-                        FunctionDefinitionKind::Extern(_) => None,
-                        FunctionDefinitionKind::Intrinsic(_) => None,
-                    },
-                )
-                .unwrap();
-
             binops.insert(
                 ScopeBinopKey {
                     params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
@@ -435,7 +381,83 @@ impl mir::Module {
                 StackBinopDefinition {
                     parameters: (binop.lhs.clone(), binop.rhs.clone()),
                     return_ty: binop.return_type.clone(),
-                    ir: ir_function,
+                    kind: match &binop.fn_kind {
+                        FunctionDefinitionKind::Local(block, metadata) => {
+                            let binop_fn_name = format!(
+                                "binop.{}.{:?}.{}.{}",
+                                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
+                            );
+                            let ir_function = module.function(
+                                &binop_fn_name,
+                                binop.return_type.get_type(&type_values),
+                                vec![
+                                    binop.lhs.1.get_type(&type_values),
+                                    binop.rhs.1.get_type(&type_values),
+                                ],
+                                FunctionFlags {
+                                    inline: true,
+                                    ..Default::default()
+                                },
+                            );
+                            let mut entry = ir_function.block("entry");
+
+                            let allocator = Allocator::from(
+                                &binop.fn_kind,
+                                &vec![binop.lhs.clone(), binop.rhs.clone()],
+                                &mut AllocatorScope {
+                                    block: &mut entry,
+                                    module_id: self.module_id,
+                                    type_values: &type_values,
+                                },
+                            );
+
+                            let mut scope = Scope {
+                                context,
+                                modules: &modules,
+                                tokens,
+                                module: &module,
+                                module_id: self.module_id,
+                                function: &ir_function,
+                                block: entry,
+                                functions: &functions,
+                                types: &types,
+                                type_values: &type_values,
+                                stack_values: HashMap::new(),
+                                debug: Some(Debug {
+                                    info: &debug,
+                                    scope: compile_unit,
+                                    types: &debug_types,
+                                }),
+                                binops: &binops,
+                                allocator: Rc::new(RefCell::new(allocator)),
+                            };
+
+                            binop
+                                .fn_kind
+                                .codegen(
+                                    binop_fn_name.clone(),
+                                    false,
+                                    &mut scope,
+                                    &vec![binop.lhs.clone(), binop.rhs.clone()],
+                                    &binop.return_type,
+                                    &ir_function,
+                                    match &binop.fn_kind {
+                                        FunctionDefinitionKind::Local(_, meta) => {
+                                            meta.into_debug(tokens, compile_unit)
+                                        }
+                                        FunctionDefinitionKind::Extern(_) => None,
+                                        FunctionDefinitionKind::Intrinsic(_) => None,
+                                    },
+                                )
+                                .unwrap();
+
+                            StackBinopFunctionKind::UserGenerated(ir_function)
+                        }
+                        FunctionDefinitionKind::Extern(_) => todo!(),
+                        FunctionDefinitionKind::Intrinsic(intrinsic_function) => {
+                            StackBinopFunctionKind::Intrinsic(intrinsic_function)
+                        }
+                    },
                 },
             );
         }
@@ -619,7 +641,7 @@ impl FunctionDefinitionKind {
                 }
             }
             mir::FunctionDefinitionKind::Extern(_) => {}
-            mir::FunctionDefinitionKind::Intrinsic(kind) => kind.codegen(scope)?,
+            mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };
         Ok(())
     }
@@ -877,7 +899,10 @@ impl mir::Expression {
                 });
 
                 if let Some(operation) = operation {
-                    Some(operation.codegen(&lhs_val, &rhs_val, scope))
+                    let a = operation.codegen(&lhs_val, &rhs_val, scope)?;
+                    dbg!(&scope.context);
+                    dbg!(&a);
+                    Some(a)
                 } else {
                     dbg!((lhs_val.1.clone(), rhs_val.1.clone()));
                     dbg!(&operation.map(|b| &b.return_ty));

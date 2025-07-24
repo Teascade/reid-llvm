@@ -8,7 +8,7 @@ use std::{
 };
 
 use llvm_sys::{
-    LLVMIntPredicate, LLVMLinkage, LLVMRealPredicate, LLVMValueKind,
+    LLVMAttributeIndex, LLVMIntPredicate, LLVMLinkage, LLVMRealPredicate, LLVMValueKind,
     analysis::LLVMVerifyModule,
     core::*,
     debuginfo::*,
@@ -86,7 +86,7 @@ impl CompiledModule {
                 triple,
                 c"generic".as_ptr(),
                 c"".as_ptr(),
-                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+                llvm_sys::target_machine::LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
                 llvm_sys::target_machine::LLVMRelocMode::LLVMRelocDefault,
                 llvm_sys::target_machine::LLVMCodeModel::LLVMCodeModelDefault,
             );
@@ -600,6 +600,15 @@ impl FunctionHolder {
 
             let function_ref =
                 LLVMAddFunction(module_ref, into_cstring(&self.data.name).as_ptr(), fn_type);
+
+            if self.data.flags.inline {
+                let attribute = LLVMCreateEnumAttribute(
+                    context.context_ref,
+                    LLVMEnumAttribute::AlwaysInline as u32,
+                    0,
+                );
+                LLVMAddAttributeAtIndex(function_ref, 0, attribute);
+            }
 
             let metadata = if let Some(debug) = debug {
                 if let Some(value) = &self.data.debug {
@@ -1214,4 +1223,8 @@ impl Type {
             }
         }
     }
+}
+
+pub enum LLVMEnumAttribute {
+    AlwaysInline = 3,
 }

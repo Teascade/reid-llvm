@@ -148,6 +148,7 @@ pub struct FunctionFlags {
     pub is_main: bool,
     pub is_pub: bool,
     pub is_imported: bool,
+    pub inline: bool,
 }
 
 impl Default for FunctionFlags {
@@ -157,6 +158,7 @@ impl Default for FunctionFlags {
             is_main: false,
             is_pub: false,
             is_imported: false,
+            inline: false,
         }
     }
 }

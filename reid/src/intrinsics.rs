@@ -1,20 +1,15 @@
-use reid_lib::Instr;
+use reid_lib::{builder::InstructionValue, Instr};
 
 use crate::{
-    codegen::{ErrorKind, Scope},
+    codegen::{ErrorKind, Scope, StackValue, StackValueKind},
     mir::{BinaryOperator, BinopDefinition, FunctionDefinition, FunctionDefinitionKind, TypeKind},
 };
-
-#[derive(Debug, Clone, Copy)]
-pub enum InstrinsicKind {
-    IAdd,
-}
 
 fn intrinsic(
     name: &str,
     ret_ty: TypeKind,
     params: Vec<(&str, TypeKind)>,
-    kind: InstrinsicKind,
+    fun: impl IntrinsicFunction + 'static,
 ) -> FunctionDefinition {
     FunctionDefinition {
         name: name.into(),
@@ -22,7 +17,7 @@ fn intrinsic(
         is_imported: false,
         return_type: ret_ty,
         parameters: params.into_iter().map(|(n, ty)| (n.into(), ty)).collect(),
-        kind: FunctionDefinitionKind::Intrinsic(kind),
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(fun)),
     }
 }
 
@@ -31,20 +26,20 @@ fn intrinsic_binop(
     lhs: TypeKind,
     rhs: TypeKind,
     ret_ty: TypeKind,
-    kind: InstrinsicKind,
+    fun: impl IntrinsicFunction + 'static,
 ) -> BinopDefinition {
     BinopDefinition {
         lhs: ("lhs".to_string(), lhs),
         op,
         rhs: ("rhs".to_owned(), rhs),
         return_type: ret_ty,
-        fn_kind: FunctionDefinitionKind::Intrinsic(kind),
+        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(fun)),
         meta: Default::default(),
     }
 }
 
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
-    let mut intrinsics = Vec::new();
+    let intrinsics = Vec::new();
 
     intrinsics
 }
@@ -57,25 +52,32 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
         TypeKind::U32,
         TypeKind::U32,
         TypeKind::U32,
-        InstrinsicKind::IAdd,
+        IntrinsicIAdd(TypeKind::U32),
     ));
 
     intrinsics
 }
 
-impl InstrinsicKind {
-    pub fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>) -> Result<(), ErrorKind> {
-        match self {
-            InstrinsicKind::IAdd => {
-                let lhs = scope.block.build(Instr::Param(0)).unwrap();
-                let rhs = scope.block.build(Instr::Param(1)).unwrap();
-                let add = scope.block.build(Instr::Add(lhs, rhs)).unwrap();
-                scope
-                    .block
-                    .terminate(reid_lib::TerminatorKind::Ret(add))
-                    .unwrap()
-            }
-        }
-        Ok(())
+pub trait IntrinsicFunction: std::fmt::Debug {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        params: &[InstructionValue],
+    ) -> Result<StackValue, ErrorKind>;
+}
+
+#[derive(Debug, Clone)]
+pub struct IntrinsicIAdd(TypeKind);
+
+impl IntrinsicFunction for IntrinsicIAdd {
+    fn codegen<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        params: &[InstructionValue],
+    ) -> Result<StackValue, ErrorKind> {
+        let lhs = params.get(0).unwrap();
+        let rhs = params.get(1).unwrap();
+        let add = scope.block.build(Instr::Add(*lhs, *rhs)).unwrap();
+        Ok(StackValue(StackValueKind::Literal(add), self.0.clone()))
     }
 }

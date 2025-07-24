@@ -5,7 +5,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    intrinsics::InstrinsicKind,
+    intrinsics::IntrinsicFunction,
     lexer::{FullToken, Position},
     token_stream::TokenRange,
 };
@@ -303,7 +303,7 @@ pub enum FunctionDefinitionKind {
     /// True = imported from other module, False = Is user defined extern
     Extern(bool),
     /// Intrinsic definition, defined within the compiler
-    Intrinsic(InstrinsicKind),
+    Intrinsic(Box<dyn IntrinsicFunction>),
 }
 
 impl FunctionDefinition {
