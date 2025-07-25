@@ -5,9 +5,9 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
+    ast::token_stream::TokenRange,
     codegen::intrinsics::IntrinsicFunction,
     lexer::{FullToken, Position},
-    token_stream::TokenRange,
 };
 
 mod fmt;

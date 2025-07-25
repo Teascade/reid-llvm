@@ -3,10 +3,14 @@
 //! used for unwrapping syntax sugar, and then be transformed into Reid MIR.
 use std::path::PathBuf;
 
-use crate::{lexer::FullToken, token_stream::TokenRange};
+use token_stream::TokenRange;
 
+use crate::lexer::FullToken;
+
+pub mod lexer;
 pub mod parse;
 pub mod process;
+pub mod token_stream;
 
 #[derive(Debug, Clone)]
 pub struct Type(pub TypeKind, pub TokenRange);

@@ -43,24 +43,25 @@
 
 use std::path::PathBuf;
 
+use ast::{
+    lexer::{self, FullToken, Token},
+    token_stream::TokenStream,
+};
 use codegen::intrinsics::{form_intrinsic_binops, form_intrinsics};
 use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
-use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
 };
 use reid_lib::{compile::CompileOutput, Context};
 
-use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
+use crate::ast::TopLevelStatement;
 
 mod ast;
 mod codegen;
 pub mod error_raporting;
 pub mod ld;
-mod lexer;
 pub mod mir;
 mod pad_adapter;
-mod token_stream;
 mod util;
 
 pub fn parse_module<'map, T: Into<String>>(

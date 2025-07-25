@@ -4,10 +4,10 @@ use std::{
 };
 
 use crate::{
+    ast::token_stream::{self, TokenRange},
     codegen,
     lexer::{self, Cursor, FullToken, Position},
     mir::{self, pass, Metadata, SourceModuleId},
-    token_stream::{self, TokenRange},
 };
 
 fn label(text: &str) -> &str {
