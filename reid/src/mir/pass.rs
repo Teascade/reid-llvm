@@ -121,9 +121,11 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
     }
 }
 
+pub type BinopMap = Storage<ScopeBinopKey, ScopeBinopDef>;
+
 #[derive(Clone, Default, Debug)]
 pub struct Scope<Data: Clone + Default> {
-    pub binops: Storage<ScopeBinopKey, ScopeBinopDef>,
+    pub binops: BinopMap,
     pub function_returns: Storage<String, ScopeFunction>,
     pub variables: Storage<String, ScopeVariable>,
     pub types: Storage<CustomTypeKey, TypeDefinition>,
@@ -221,6 +223,34 @@ pub struct ScopeBinopDef {
     pub hands: (TypeKind, TypeKind),
     pub operator: BinaryOperator,
     pub return_ty: TypeKind,
+}
+
+impl ScopeBinopDef {
+    pub fn binop_hint_old(
+        &self,
+        lhs: &TypeKind,
+        rhs: &TypeKind,
+        ret_ty: &TypeKind,
+    ) -> Option<(TypeKind, TypeKind)> {
+        ret_ty.narrow_into(&self.return_ty).ok()?;
+        let lhs_ty = lhs.narrow_into(&self.hands.0);
+        let rhs_ty = rhs.narrow_into(&self.hands.1);
+        if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
+            Some((lhs_ty, rhs_ty))
+        } else {
+            None
+        }
+    }
+
+    pub fn binop_ret_ty(&self, lhs: &TypeKind, rhs: &TypeKind) -> Option<TypeKind> {
+        let lhs_ty = lhs.narrow_into(&self.hands.0);
+        let rhs_ty = rhs.narrow_into(&self.hands.1);
+        if let (Ok(_), Ok(_)) = (lhs_ty, rhs_ty) {
+            Some(self.return_ty.clone())
+        } else {
+            None
+        }
+    }
 }
 
 pub struct PassState<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> {

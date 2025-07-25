@@ -79,7 +79,7 @@ pub enum ErrorKind {
 }
 
 impl TypeKind {
-    pub(super) fn collapse_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
+    pub(super) fn narrow_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
         if self == other {
             return Ok(self.clone());
         }
@@ -121,7 +121,7 @@ impl TypeKind {
             }
             (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
                 // Extracted to give priority for other collapse-error
-                let collapsed = val1.collapse_into(val2)?;
+                let collapsed = val1.narrow_into(val2)?;
                 if mut1 == mut2 {
                     Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
                 } else {
@@ -132,14 +132,84 @@ impl TypeKind {
                 }
             }
             (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
-                Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
+                Ok(TypeKind::UserPtr(Box::new(val1.narrow_into(val2)?)))
             }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }
 
+    pub(super) fn widen_into(&self, other: &TypeKind) -> TypeKind {
+        if self == other {
+            return self.clone();
+        }
+        match (self, other) {
+            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
+                TypeKind::Vague(VagueType::Unknown)
+            }
+            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
+                match other {
+                    TypeKind::I8
+                    | TypeKind::I16
+                    | TypeKind::I32
+                    | TypeKind::I64
+                    | TypeKind::I128
+                    | TypeKind::U8
+                    | TypeKind::U16
+                    | TypeKind::U32
+                    | TypeKind::U64
+                    | TypeKind::U128 => TypeKind::Vague(VagueType::Integer),
+                    _ => TypeKind::Vague(VagueType::Unknown),
+                }
+            }
+            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
+                match other {
+                    TypeKind::F16
+                    | TypeKind::F32B
+                    | TypeKind::F32
+                    | TypeKind::F64
+                    | TypeKind::F80
+                    | TypeKind::F128
+                    | TypeKind::F128PPC => TypeKind::Vague(VagueType::Decimal),
+                    _ => TypeKind::Vague(VagueType::Unknown),
+                }
+            }
+            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
+                TypeKind::UserPtr(Box::new(val1.widen_into(val2)))
+            }
+            (TypeKind::CodegenPtr(val1), TypeKind::CodegenPtr(val2)) => {
+                TypeKind::CodegenPtr(Box::new(val1.widen_into(val2)))
+            }
+            (TypeKind::Array(val1, len1), TypeKind::Array(val2, len2)) => {
+                if len1 == len2 {
+                    TypeKind::Array(Box::new(val1.widen_into(val2)), *len1)
+                } else {
+                    TypeKind::Vague(VagueType::Unknown)
+                }
+            }
+            (TypeKind::Borrow(val1, mutable1), TypeKind::Borrow(val2, mutable2)) => {
+                if mutable1 == mutable2 {
+                    TypeKind::Borrow(Box::new(val1.widen_into(val2)), *mutable1)
+                } else {
+                    TypeKind::Vague(VagueType::Unknown)
+                }
+            }
+            _ => {
+                if self.category() == other.category() {
+                    match self.category() {
+                        TypeCategory::Integer => TypeKind::Vague(VagueType::Integer),
+                        TypeCategory::Real => TypeKind::Vague(VagueType::Decimal),
+                        TypeCategory::Bool => TypeKind::Bool,
+                        _ => TypeKind::Vague(VagueType::Unknown),
+                    }
+                } else {
+                    TypeKind::Vague(VagueType::Unknown)
+                }
+            }
+        }
+    }
+
     pub(super) fn cast_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        if let Ok(collapsed) = self.collapse_into(other) {
+        if let Ok(collapsed) = self.narrow_into(other) {
             Ok(collapsed)
         } else {
             let self_cat = self.category();
@@ -191,7 +261,7 @@ impl TypeKind {
 
     pub(super) fn resolve_weak(&self, refs: &TypeRefs) -> TypeKind {
         match self {
-            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_type(*idx).unwrap(),
+            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_wide_type(*idx).unwrap(),
             _ => self.clone(),
         }
     }

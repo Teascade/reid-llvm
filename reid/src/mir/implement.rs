@@ -48,8 +48,8 @@ impl TypeKind {
         rhs: &TypeKind,
         binop: &ScopeBinopDef,
     ) -> Option<(TypeKind, TypeKind, TypeKind)> {
-        let lhs_ty = lhs.collapse_into(&binop.hands.0);
-        let rhs_ty = rhs.collapse_into(&binop.hands.1);
+        let lhs_ty = lhs.narrow_into(&binop.hands.0);
+        let rhs_ty = rhs.narrow_into(&binop.hands.1);
         if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
             Some((lhs_ty, rhs_ty, binop.return_ty.clone()))
         } else {
@@ -71,22 +71,6 @@ impl TypeKind {
             | BinaryOperator::Mod => Some(self.clone()),
             BinaryOperator::And => None,
             BinaryOperator::Cmp(_) => None,
-        }
-    }
-
-    pub fn binop_hint(
-        &self,
-        lhs: &TypeKind,
-        rhs: &TypeKind,
-        binop: &ScopeBinopDef,
-    ) -> Option<(TypeKind, TypeKind)> {
-        self.collapse_into(&binop.return_ty).ok()?;
-        let lhs_ty = lhs.collapse_into(&binop.hands.0);
-        let rhs_ty = rhs.collapse_into(&binop.hands.1);
-        if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
-            Some((lhs_ty, rhs_ty))
-        } else {
-            None
         }
     }
 
@@ -230,9 +214,9 @@ impl TypeKind {
         (lhs1, rhs1): (&TypeKind, &TypeKind),
         (lhs2, rhs2): (&TypeKind, &TypeKind),
     ) -> Option<(TypeKind, TypeKind)> {
-        if let (Ok(lhs), Ok(rhs)) = (lhs1.collapse_into(&lhs2), rhs1.collapse_into(&rhs2)) {
+        if let (Ok(lhs), Ok(rhs)) = (lhs1.narrow_into(&lhs2), rhs1.narrow_into(&rhs2)) {
             Some((lhs, rhs))
-        } else if let (Ok(lhs), Ok(rhs)) = (lhs1.collapse_into(&rhs2), rhs1.collapse_into(&lhs2)) {
+        } else if let (Ok(lhs), Ok(rhs)) = (lhs1.narrow_into(&rhs2), rhs1.narrow_into(&lhs2)) {
             Some((rhs, lhs))
         } else {
             None

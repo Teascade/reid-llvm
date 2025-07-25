@@ -147,7 +147,7 @@ impl BinopDefinition {
 
         match inferred {
             Ok(t) => return_type
-                .collapse_into(&t.1)
+                .narrow_into(&t.1)
                 .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
             Err(e) => Ok(state.or_else(
                 Err(e),
@@ -191,7 +191,7 @@ impl FunctionDefinition {
 
         match inferred {
             Ok(t) => return_type
-                .collapse_into(&t.1)
+                .narrow_into(&t.1)
                 .or(Err(ErrorKind::ReturnTypeMismatch(return_type, t.1))),
             Err(e) => Ok(state.or_else(Err(e), return_type, self.block_meta())),
         }
@@ -250,7 +250,7 @@ impl Block {
 
                     // Make sure the expression and variable type really is the same
                     let res_t = state.or_else(
-                        res.collapse_into(&var_t_resolved),
+                        res.narrow_into(&var_t_resolved),
                         TypeKind::Vague(Vague::Unknown),
                         variable_reference.2 + expression.1,
                     );
@@ -315,7 +315,7 @@ impl Block {
 
                     // Make sure the expression and variable type to really
                     // be the same
-                    state.ok(lhs_ty.collapse_into(&rhs_ty), lhs.1 + rhs.1);
+                    state.ok(lhs_ty.narrow_into(&rhs_ty), lhs.1 + rhs.1);
 
                     if let Some(named_var) = lhs.backing_var() {
                         if let Some(scope_var) = state.scope.variables.get(&named_var.1) {
@@ -435,7 +435,7 @@ impl Expression {
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
-                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
+                    var_ref.0.resolve_ref(typerefs).narrow_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
                 );
@@ -499,7 +499,7 @@ impl Expression {
                     let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
                     let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                    let both_t = lhs_type.collapse_into(&rhs_type)?;
+                    let both_t = lhs_type.narrow_into(&rhs_type)?;
 
                     if *op == BinaryOperator::Minus && !lhs_type.signed() {
                         if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?)
@@ -510,7 +510,7 @@ impl Expression {
                         }
                     }
 
-                    if let Some(collapsed) = state.ok(rhs_type.collapse_into(&rhs_type), self.1) {
+                    if let Some(collapsed) = state.ok(rhs_type.narrow_into(&rhs_type), self.1) {
                         // Try to coerce both sides again with collapsed type
                         lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
                         rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
@@ -558,14 +558,14 @@ impl Expression {
                         let param_res = param.typecheck(state, &typerefs, Some(&true_param_t));
                         let param_t =
                             state.or_else(param_res, TypeKind::Vague(Vague::Unknown), param.1);
-                        state.ok(param_t.collapse_into(&true_param_t), param.1);
+                        state.ok(param_t.narrow_into(&true_param_t), param.1);
                     }
 
                     // Make sure function return type is the same as the claimed
                     // return type
                     let ret_t = f
                         .ret
-                        .collapse_into(&function_call.return_type.resolve_ref(typerefs))?;
+                        .narrow_into(&function_call.return_type.resolve_ref(typerefs))?;
                     // Update typing to be more accurate
                     function_call.return_type = ret_t.clone();
                     Ok(ret_t.resolve_ref(typerefs))
@@ -576,7 +576,7 @@ impl Expression {
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
                 let cond_res = cond.typecheck(state, &typerefs, Some(&TypeKind::Bool));
                 let cond_t = state.or_else(cond_res, TypeKind::Vague(Vague::Unknown), cond.1);
-                state.ok(cond_t.collapse_into(&TypeKind::Bool), cond.1);
+                state.ok(cond_t.narrow_into(&TypeKind::Bool), cond.1);
 
                 // Typecheck then/else return types and make sure they are the
                 // same, if else exists.
@@ -596,7 +596,7 @@ impl Expression {
 
                 // Make sure then and else -blocks have the same return type
                 let collapsed = then_ret_t
-                    .collapse_into(&else_ret_t)
+                    .narrow_into(&else_ret_t)
                     .or(Err(ErrorKind::BranchTypesDiffer(then_ret_t, else_ret_t)))?;
 
                 if let Some(rhs) = rhs.as_mut() {
@@ -632,7 +632,7 @@ impl Expression {
                 match expr_t {
                     TypeKind::Array(inferred_ty, _) | TypeKind::UserPtr(inferred_ty) => {
                         let ty = state.or_else(
-                            elem_ty.resolve_ref(typerefs).collapse_into(&inferred_ty),
+                            elem_ty.resolve_ref(typerefs).narrow_into(&inferred_ty),
                             TypeKind::Vague(Vague::Unknown),
                             self.1,
                         );
@@ -660,7 +660,7 @@ impl Expression {
                         let mut iter = expr_types.iter_mut();
                         if let Some(first) = iter.next() {
                             for other in iter {
-                                state.ok(first.collapse_into(other), self.1);
+                                state.ok(first.narrow_into(other), self.1);
                             }
                             Ok(TypeKind::Array(
                                 Box::new(first.clone()),
@@ -696,7 +696,7 @@ impl Expression {
                     if let Some(expr_field_ty) = struct_type.get_field_ty(&field_name) {
                         // Make sure they are the same
                         let true_ty = state.or_else(
-                            expr_field_ty.collapse_into(&expected_ty),
+                            expr_field_ty.narrow_into(&expected_ty),
                             TypeKind::Vague(Vague::Unknown),
                             self.1,
                         );
@@ -736,7 +736,7 @@ impl Expression {
                         state.or_else(expr_res, TypeKind::Vague(Vague::Unknown), field_expr.1);
 
                     // Make sure both are the same type, report error if not
-                    state.ok(expr_ty.collapse_into(&expr_ty), field_expr.1);
+                    state.ok(expr_ty.narrow_into(&expr_ty), field_expr.1);
                 }
                 Ok(TypeKind::CustomType(type_key))
             }
@@ -762,7 +762,7 @@ impl Expression {
 
                 // Update typing to be more accurate
                 var_ref.0 = state.or_else(
-                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
+                    var_ref.0.resolve_ref(typerefs).narrow_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
                 );
@@ -786,7 +786,7 @@ impl Expression {
 
                 // Update typing to be more accurate
                 let TypeKind::Borrow(inner, mutable) = state.or_else(
-                    var_ref.0.resolve_ref(typerefs).collapse_into(&existing),
+                    var_ref.0.resolve_ref(typerefs).narrow_into(&existing),
                     TypeKind::Vague(Vague::Unknown),
                     var_ref.2,
                 ) else {

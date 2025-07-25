@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::mir::{BinaryOperator, TypeKind, VagueType};
+use crate::mir::{pass::BinopMap, BinaryOperator, TypeKind, VagueType};
 
 use super::{
     super::pass::{ScopeBinopDef, ScopeBinopKey, Storage},
@@ -21,7 +21,7 @@ impl<'scope> TypeRef<'scope> {
     /// Resolve current type in a weak manner, not resolving any Arrays or
     /// further inner types
     pub fn resolve_weak(&self) -> Option<TypeKind> {
-        Some(self.1.types.retrieve_type(*self.0.borrow())?)
+        Some(self.1.types.retrieve_wide_type(*self.0.borrow())?)
     }
 
     /// Resolve type deeply, trying to resolve any inner types as well.
@@ -57,12 +57,46 @@ impl<'scope> std::fmt::Debug for TypeRef<'scope> {
 
 type TypeIdRef = Rc<RefCell<usize>>;
 
+#[derive(Clone, Debug, PartialEq, PartialOrd, Ord, Eq)]
+pub enum TypeRefKind {
+    Direct(TypeKind),
+    BinOp(BinaryOperator, TypeKind, TypeKind),
+}
+
+impl TypeRefKind {
+    pub fn widen(&self, types: &TypeRefs) -> Option<TypeKind> {
+        match self {
+            TypeRefKind::BinOp(op, lhs, rhs) => {
+                let mut binops = types
+                    .binop_types
+                    .iter()
+                    .filter(|b| b.1.operator == *op)
+                    .map(|b| b.1.binop_ret_ty(&lhs, &rhs))
+                    .filter_map(|s| s);
+                if let Some(mut ty) = binops.next() {
+                    while let Some(other) = binops.next() {
+                        ty = ty.widen_into(&other);
+                    }
+                    Some(ty)
+                } else {
+                    None
+                }
+            }
+            TypeRefKind::Direct(ty) => match ty {
+                TypeKind::Vague(VagueType::TypeRef(id)) => types.retrieve_wide_type(*id),
+                _ => Some(ty.clone()),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct TypeRefs {
     /// Simple list of types that variables can refrence
-    pub(super) hints: RefCell<Vec<TypeKind>>,
+    pub(super) hints: RefCell<Vec<TypeRefKind>>,
     /// Indirect ID-references, referring to hints-vec
     pub(super) type_refs: RefCell<Vec<TypeIdRef>>,
+    binop_types: BinopMap,
 }
 
 impl std::fmt::Display for TypeRefs {
@@ -74,7 +108,7 @@ impl std::fmt::Display for TypeRefs {
                 "{:<3} = {:<3} = {:?} = {}",
                 i,
                 unsafe { *self.recurse_type_ref(idx).borrow() },
-                self.retrieve_type(idx),
+                self.retrieve_wide_type(idx),
                 TypeKind::Vague(VagueType::TypeRef(idx)).resolve_ref(self)
             )?;
         }
@@ -87,7 +121,9 @@ impl TypeRefs {
         let idx = self.hints.borrow().len();
         let typecell = Rc::new(RefCell::new(idx));
         self.type_refs.borrow_mut().push(typecell.clone());
-        self.hints.borrow_mut().push(ty.clone());
+        self.hints
+            .borrow_mut()
+            .push(TypeRefKind::Direct(ty.clone()));
         typecell
     }
 
@@ -103,7 +139,7 @@ impl TypeRefs {
             .borrow_mut()
             .iter()
             .enumerate()
-            .find(|(_, t)| *t == ty)
+            .find(|(_, t)| t == &&TypeRefKind::Direct(ty.clone()))
             .map(|(i, _)| i)
         {
             Some(Rc::new(RefCell::new(idx)))
@@ -124,16 +160,13 @@ impl TypeRefs {
         return refs.get_unchecked(idx).clone();
     }
 
-    pub fn retrieve_type(&self, idx: usize) -> Option<TypeKind> {
+    pub fn retrieve_wide_type(&self, idx: usize) -> Option<TypeKind> {
         let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
         self.hints
             .borrow()
             .get(inner_idx)
             .cloned()
-            .map(|t| match t {
-                TypeKind::Vague(VagueType::TypeRef(id)) => self.retrieve_type(id),
-                _ => Some(t),
-            })
+            .map(|t| t.widen(self))
             .flatten()
     }
 }
@@ -203,7 +236,27 @@ impl<'outer> ScopeTypeRefs<'outer> {
         unsafe {
             let mut hints = self.types.hints.borrow_mut();
             let existing = hints.get_unchecked_mut(*hint.0.borrow());
-            *existing = existing.collapse_into(&ty).ok()?;
+            match existing {
+                TypeRefKind::Direct(type_kind) => {
+                    *type_kind = type_kind.narrow_into(&ty).ok()?;
+                }
+                TypeRefKind::BinOp(op, lhs, rhs) => {
+                    let binops = self
+                        .types
+                        .binop_types
+                        .iter()
+                        .filter(|b| b.1.operator == *op && b.1.return_ty == *ty);
+                    for binop in binops {
+                        if let (Ok(lhs_narrow), Ok(rhs_narrow)) = (
+                            lhs.narrow_into(&binop.1.hands.0),
+                            rhs.narrow_into(&binop.1.hands.1),
+                        ) {
+                            *lhs = lhs_narrow;
+                            *rhs = rhs_narrow
+                        }
+                    }
+                }
+            }
             Some(TypeRef(hint.0.clone(), self))
         }
     }
@@ -215,7 +268,9 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 .hints
                 .borrow()
                 .get_unchecked(*hint2.0.borrow())
-                .clone();
+                .clone()
+                .widen(self.types)
+                .unwrap();
             self.narrow_to_type(&hint1, &ty)?;
             for idx in self.types.type_refs.borrow_mut().iter_mut() {
                 if *idx == hint2.0 && idx != &hint1.0 {

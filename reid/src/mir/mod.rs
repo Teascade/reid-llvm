@@ -112,7 +112,9 @@ pub enum TypeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VagueType {
     Unknown,
+    /// Some integer value (e.g. 5)
     Integer,
+    /// Some decimal fractional value (e.g. 1.5)
     Decimal,
     TypeRef(usize),
 }
