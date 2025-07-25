@@ -1,4 +1,6 @@
-use super::{pass::ScopeBinopDef, typecheck::ErrorKind, typerefs::TypeRefs, VagueType as Vague, *};
+use crate::util::maybe;
+
+use super::{pass::ScopeBinopDef, typecheck::typerefs::TypeRefs, *};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {
@@ -12,87 +14,18 @@ pub enum ReturnTypeOther {
     Loop,
 }
 
+#[derive(thiserror::Error, Debug, Clone, PartialEq, PartialOrd)]
+pub enum NumValueError {
+    #[error("Cannot divide by zero")]
+    DivideZero,
+}
+
+enum BlockReturn<'b> {
+    Early(&'b Statement),
+    Normal(ReturnKind, &'b Option<Box<Expression>>),
+}
+
 impl TypeKind {
-    pub fn collapse_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        if self == other {
-            return Ok(self.clone());
-        }
-
-        match (self, other) {
-            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::I8
-                    | TypeKind::I16
-                    | TypeKind::I32
-                    | TypeKind::I64
-                    | TypeKind::I128
-                    | TypeKind::U8
-                    | TypeKind::U16
-                    | TypeKind::U32
-                    | TypeKind::U64
-                    | TypeKind::U128 => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::F16
-                    | TypeKind::F32B
-                    | TypeKind::F32
-                    | TypeKind::F64
-                    | TypeKind::F80
-                    | TypeKind::F128
-                    | TypeKind::F128PPC => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
-                Ok(other.clone())
-            }
-            (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
-                // Extracted to give priority for other collapse-error
-                let collapsed = val1.collapse_into(val2)?;
-                if mut1 == mut2 {
-                    Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
-                } else {
-                    Err(ErrorKind::TypesDifferMutability(
-                        self.clone(),
-                        other.clone(),
-                    ))
-                }
-            }
-            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
-                Ok(TypeKind::UserPtr(Box::new(val1.collapse_into(val2)?)))
-            }
-            _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-        }
-    }
-
-    pub fn cast_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
-        if let Ok(collapsed) = self.collapse_into(other) {
-            Ok(collapsed)
-        } else {
-            let self_cat = self.category();
-            let other_cat = other.category();
-            match (self, other) {
-                (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Ok(other.clone()),
-                (TypeKind::Char, TypeKind::U8) => Ok(other.clone()),
-                (TypeKind::U8, TypeKind::Char) => Ok(other.clone()),
-                _ => match (&self_cat, &other_cat) {
-                    (TypeCategory::Integer, TypeCategory::Integer) => Ok(other.clone()),
-                    (TypeCategory::Integer, TypeCategory::Real) => Ok(other.clone()),
-                    (TypeCategory::Real, TypeCategory::Integer) => Ok(other.clone()),
-                    (TypeCategory::Real, TypeCategory::Real) => Ok(other.clone()),
-                    _ => Err(ErrorKind::NotCastableTo(self.clone(), other.clone())),
-                },
-            }
-        }
-    }
-
     /// Return the type that is the result of a binary operator between two
     /// values of this type
     pub fn simple_binop_type(&self, op: &BinaryOperator) -> Option<TypeKind> {
@@ -365,11 +298,6 @@ impl StructType {
     }
 }
 
-enum BlockReturn<'b> {
-    Early(&'b Statement),
-    Normal(ReturnKind, &'b Option<Box<Expression>>),
-}
-
 impl Block {
     fn return_expr(&self) -> Result<BlockReturn, ReturnTypeOther> {
         let mut early_return = None;
@@ -566,15 +494,7 @@ impl Expression {
         }
     }
 
-    pub fn is_zero(&self) -> Result<Option<bool>, ErrorKind> {
-        if let Some(val) = self.num_value()? {
-            Ok(Some(val == 0))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn num_value(&self) -> Result<Option<i128>, ErrorKind> {
+    pub fn num_value(&self) -> Result<Option<i128>, NumValueError> {
         Ok(match &self.0 {
             ExprKind::Variable(_) => None,
             ExprKind::Indexed(..) => None,
@@ -591,14 +511,14 @@ impl Expression {
                 BinaryOperator::Div => {
                     let rhs_value = rhs.num_value()?;
                     if rhs_value == Some(0) {
-                        Err(ErrorKind::DivideZero)?
+                        Err(NumValueError::DivideZero)?
                     }
                     maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a / b)
                 }
                 BinaryOperator::Mod => {
                     let rhs_value = rhs.num_value()?;
                     if rhs_value == Some(0) {
-                        Err(ErrorKind::DivideZero)?
+                        Err(NumValueError::DivideZero)?
                     }
                     maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a % b)
                 }
@@ -613,16 +533,6 @@ impl Expression {
     }
 }
 
-fn maybe<T>(lhs: Option<i128>, rhs: Option<i128>, fun: T) -> Option<i128>
-where
-    T: FnOnce(i128, i128) -> i128,
-{
-    if let (Some(lhs), Some(rhs)) = (lhs, rhs) {
-        Some(fun(lhs, rhs))
-    } else {
-        None
-    }
-}
 impl IfExpression {
     pub fn return_type(
         &self,
@@ -675,56 +585,6 @@ pub fn pick_return<T>(lhs: (ReturnKind, T), rhs: (ReturnKind, T)) -> (ReturnKind
         (Hard, Soft) => (Soft, rhs.1),
         (Soft, Hard) => (Soft, lhs.1),
         (_, _) => (Soft, lhs.1),
-    }
-}
-
-impl TypeKind {
-    /// Assert that a type is already known and not vague. Return said type or
-    /// error.
-    pub fn assert_unvague(&self) -> Result<TypeKind, ErrorKind> {
-        self.known().map_err(ErrorKind::TypeIsVague)
-    }
-
-    /// Try to collapse a type on itself producing a default type if one exists,
-    /// Error if not.
-    pub fn or_default(&self) -> Result<TypeKind, ErrorKind> {
-        Ok(match self {
-            TypeKind::Vague(vague_type) => match &vague_type {
-                Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type))?,
-                Vague::Integer => TypeKind::I32,
-                Vague::TypeRef(_) => panic!("Hinted default!"),
-                VagueType::Decimal => TypeKind::F32,
-            },
-            TypeKind::Array(type_kind, len) => {
-                TypeKind::Array(Box::new(type_kind.or_default()?), *len)
-            }
-            TypeKind::Borrow(type_kind, mutable) => {
-                TypeKind::Borrow(Box::new(type_kind.or_default()?), *mutable)
-            }
-            TypeKind::UserPtr(type_kind) => TypeKind::UserPtr(Box::new(type_kind.or_default()?)),
-            TypeKind::CodegenPtr(type_kind) => {
-                TypeKind::CodegenPtr(Box::new(type_kind.or_default()?))
-            }
-            _ => self.clone(),
-        })
-    }
-
-    pub fn resolve_weak(&self, refs: &TypeRefs) -> TypeKind {
-        match self {
-            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_type(*idx).unwrap(),
-            _ => self.clone(),
-        }
-    }
-
-    pub fn resolve_ref(&self, refs: &TypeRefs) -> TypeKind {
-        let resolved = self.resolve_weak(refs);
-        match resolved {
-            TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
-            TypeKind::Borrow(inner, mutable) => {
-                TypeKind::Borrow(Box::new(inner.resolve_ref(refs)), mutable)
-            }
-            _ => resolved,
-        }
     }
 }
 

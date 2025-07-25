@@ -50,7 +50,8 @@ use ast::{
 use codegen::intrinsics::{form_intrinsic_binops, form_intrinsics};
 use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
 use mir::{
-    linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
+    linker::LinkerPass,
+    typecheck::{typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs},
 };
 use reid_lib::{compile::CompileOutput, Context};
 

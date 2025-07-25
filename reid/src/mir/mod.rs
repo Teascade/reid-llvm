@@ -15,8 +15,6 @@ pub mod implement;
 pub mod linker;
 pub mod pass;
 pub mod typecheck;
-pub mod typeinference;
-pub mod typerefs;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Default, Hash)]
 pub struct SourceModuleId(pub u32);

@@ -6,83 +6,16 @@ use crate::{mir::*, util::try_all};
 use VagueType as Vague;
 
 use super::{
-    pass::{Pass, PassResult, PassState, ScopeVariable},
+    super::pass::{Pass, PassResult, ScopeVariable},
     typerefs::TypeRefs,
+    ErrorKind, TypecheckPassState,
 };
-
-#[derive(thiserror::Error, Debug, Clone, PartialEq, PartialOrd)]
-pub enum ErrorKind {
-    #[error("NULL error, should never occur!")]
-    Null,
-    #[error("Type is vague: {0}")]
-    TypeIsVague(VagueType),
-    #[error("Literal {0} can not be coerced to type {1}")]
-    LiteralIncompatible(Literal, TypeKind),
-    #[error("Types {0} and {1} are incompatible")]
-    TypesIncompatible(TypeKind, TypeKind),
-    #[error("Variable not defined: {0}")]
-    VariableNotDefined(String),
-    #[error("Function not defined: {0}")]
-    FunctionNotDefined(String),
-    #[error("Expected a return type of {0}, got {1} instead")]
-    ReturnTypeMismatch(TypeKind, TypeKind),
-    #[error("Function {0} already defined {1}")]
-    FunctionAlreadyDefined(String, ErrorTypedefKind),
-    #[error("Variable already defined: {0}")]
-    VariableAlreadyDefined(String),
-    #[error("Variable {0} is not declared as mutable")]
-    VariableNotMutable(String),
-    #[error("Function {0} was given {1} parameters, but {2} were expected")]
-    InvalidAmountParameters(String, usize, usize),
-    #[error("Unable to infer type {0}")]
-    TypeNotInferrable(TypeKind),
-    #[error("Expected branch type to be {0}, found {1} instead")]
-    BranchTypesDiffer(TypeKind, TypeKind),
-    #[error("Attempted to index a non-indexable type of {0}")]
-    TriedIndexingNonIndexable(TypeKind),
-    #[error("Index {0} out of bounds ({1})")]
-    IndexOutOfBounds(u64, u64),
-    #[error("No such type {0} could be found in module {1}")]
-    NoSuchType(String, SourceModuleId),
-    #[error("Attempted to access field of non-struct type of {0}")]
-    TriedAccessingNonStruct(TypeKind),
-    #[error("No such struct-field on type {0}")]
-    NoSuchField(String),
-    #[error("Struct field declared twice {0}")]
-    DuplicateStructField(String),
-    #[error("Type declared twice {0}")]
-    DuplicateTypeName(String),
-    #[error("Recursive type definition: {0}.{1}")]
-    RecursiveTypeDefinition(String, String),
-    #[error("This type of expression can not be used for assignment")]
-    InvalidSetExpression,
-    #[error("Can not deref {0}, as it is not a borrow")]
-    AttemptedDerefNonBorrow(String),
-    #[error("Types {0} and {1} differ in mutability")]
-    TypesDifferMutability(TypeKind, TypeKind),
-    #[error("Cannot mutably borrow variable {0}, which is not declared as mutable")]
-    ImpossibleMutableBorrow(String),
-    #[error("Cannot declare variable {0} as mutable, when it's type is immutable")]
-    ImpossibleMutLet(String),
-    #[error("Cannot produce a negative unsigned value of type {0}")]
-    NegativeUnsignedValue(TypeKind),
-    #[error("Cannot cast type {0} into type {1}")]
-    NotCastableTo(TypeKind, TypeKind),
-    #[error("Cannot divide by zero")]
-    DivideZero,
-    #[error("Binary operation {0} between {1} and {2} is already defined")]
-    BinaryOpAlreadyDefined(BinaryOperator, TypeKind, TypeKind),
-    #[error("Binary operation {0} between {1} and {2} is not defined")]
-    InvalidBinop(BinaryOperator, TypeKind, TypeKind),
-}
 
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct TypeCheck<'t> {
     pub refs: &'t TypeRefs,
 }
-
-type TypecheckPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
 #[derive(thiserror::Error, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ErrorTypedefKind {
@@ -920,32 +853,4 @@ impl Literal {
     }
 }
 
-impl TypeKind {
-    fn assert_known(
-        &self,
-        refs: &TypeRefs,
-        state: &TypecheckPassState,
-    ) -> Result<TypeKind, ErrorKind> {
-        self.is_known(refs, state).map(|_| self.clone())
-    }
-
-    fn is_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<(), ErrorKind> {
-        match &self {
-            TypeKind::Array(type_kind, _) => type_kind.as_ref().is_known(refs, state),
-            TypeKind::CustomType(custom_type_key) => state
-                .scope
-                .types
-                .get(custom_type_key)
-                .map(|_| ())
-                .ok_or(ErrorKind::NoSuchType(
-                    custom_type_key.0.clone(),
-                    state.module_id.unwrap(),
-                )),
-            TypeKind::Borrow(type_kind, _) => type_kind.is_known(refs, state),
-            TypeKind::UserPtr(type_kind) => type_kind.is_known(refs, state),
-            TypeKind::CodegenPtr(type_kind) => type_kind.is_known(refs, state),
-            TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(*vague_type)),
-            _ => Ok(()),
-        }
-    }
-}
+impl TypeKind {}

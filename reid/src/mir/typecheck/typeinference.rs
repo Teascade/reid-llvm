@@ -10,17 +10,24 @@ use std::{
     iter,
 };
 
-use crate::{mir::TypeKind, util::try_all};
+use crate::{
+    mir::{
+        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
+        FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind, TypeKind,
+        WhileStatement,
+    },
+    util::try_all,
+};
 
 use super::{
-    pass::{Pass, PassResult, PassState, ScopeBinopKey},
-    typecheck::{ErrorKind, ErrorTypedefKind},
+    super::{
+        pass::{Pass, PassResult, PassState, ScopeBinopKey},
+        TypeKind::*,
+        VagueType::*,
+    },
+    typecheck::ErrorTypedefKind,
     typerefs::{ScopeTypeRefs, TypeRef, TypeRefs},
-    BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
-    FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind,
-    TypeKind::*,
-    VagueType::*,
-    WhileStatement,
+    ErrorKind, TypecheckPassState,
 };
 
 /// Struct used to implement Type Inference, where an intermediary
@@ -30,13 +37,11 @@ pub struct TypeInference<'t> {
     pub refs: &'t TypeRefs,
 }
 
-type TypeInferencePassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
-
 impl<'t> Pass for TypeInference<'t> {
     type Data = ();
     type TError = ErrorKind;
 
-    fn module(&mut self, module: &mut Module, mut state: TypeInferencePassState) -> PassResult {
+    fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) -> PassResult {
         let mut seen_functions = HashMap::new();
         for function in &mut module.functions {
             if let Some(kind) = seen_functions.get(&function.name) {
@@ -98,7 +103,7 @@ impl BinopDefinition {
     fn infer_types(
         &mut self,
         type_refs: &TypeRefs,
-        state: &mut TypeInferencePassState,
+        state: &mut TypecheckPassState,
     ) -> Result<(), ErrorKind> {
         let scope_hints = ScopeTypeRefs::from(type_refs);
 
@@ -142,7 +147,7 @@ impl FunctionDefinition {
     fn infer_types(
         &mut self,
         type_refs: &TypeRefs,
-        state: &mut TypeInferencePassState,
+        state: &mut TypecheckPassState,
     ) -> Result<(), ErrorKind> {
         let scope_refs = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
@@ -183,7 +188,7 @@ impl FunctionDefinition {
 impl FunctionDefinitionKind {
     fn infer_types<'s>(
         &mut self,
-        state: &mut TypeInferencePassState,
+        state: &mut TypecheckPassState,
         scope_refs: &'s ScopeTypeRefs,
         hint: Option<TypeKind>,
     ) -> Result<Option<TypeRef<'s>>, ErrorKind> {
@@ -206,7 +211,7 @@ impl FunctionDefinitionKind {
 impl Block {
     fn infer_types<'s>(
         &mut self,
-        state: &mut TypeInferencePassState,
+        state: &mut TypecheckPassState,
         outer_refs: &'s ScopeTypeRefs,
     ) -> Result<(ReturnKind, TypeRef<'s>), ErrorKind> {
         let mut state = state.inner();
@@ -293,7 +298,7 @@ impl Block {
 impl Expression {
     fn infer_types<'s>(
         &mut self,
-        state: &mut TypeInferencePassState,
+        state: &mut TypecheckPassState,
         type_refs: &'s ScopeTypeRefs<'s>,
     ) -> Result<TypeRef<'s>, ErrorKind> {
         match &mut self.0 {

@@ -2,24 +2,7 @@ use std::fmt::{Debug, Display, Write};
 
 use crate::pad_adapter::PadAdapter;
 
-use super::{typerefs::TypeRefs, *};
-
-impl Display for TypeRefs {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, typeref) in self.type_refs.borrow().iter().enumerate() {
-            let idx = *typeref.borrow();
-            writeln!(
-                f,
-                "{:<3} = {:<3} = {:?} = {}",
-                i,
-                unsafe { *self.recurse_type_ref(idx).borrow() },
-                self.retrieve_type(idx),
-                TypeKind::Vague(VagueType::TypeRef(idx)).resolve_ref(self)
-            )?;
-        }
-        Ok(())
-    }
-}
+use super::{typecheck::typerefs::TypeRefs, *};
 
 impl Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

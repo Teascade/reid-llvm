@@ -4,12 +4,11 @@ use std::{
     rc::Rc,
 };
 
-use crate::mir::VagueType;
+use crate::mir::{BinaryOperator, TypeKind, VagueType};
 
 use super::{
-    pass::{ScopeBinopDef, ScopeBinopKey, Storage},
-    typecheck::ErrorKind,
-    BinaryOperator, TypeKind,
+    super::pass::{ScopeBinopDef, ScopeBinopKey, Storage},
+    ErrorKind,
 };
 
 #[derive(Clone)]
@@ -43,7 +42,7 @@ impl<'scope> TypeRef<'scope> {
     }
 
     pub fn as_type(&self) -> TypeKind {
-        TypeKind::Vague(super::VagueType::TypeRef(*self.0.borrow()))
+        TypeKind::Vague(VagueType::TypeRef(*self.0.borrow()))
     }
 }
 
@@ -64,6 +63,23 @@ pub struct TypeRefs {
     pub(super) hints: RefCell<Vec<TypeKind>>,
     /// Indirect ID-references, referring to hints-vec
     pub(super) type_refs: RefCell<Vec<TypeIdRef>>,
+}
+
+impl std::fmt::Display for TypeRefs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, typeref) in self.type_refs.borrow().iter().enumerate() {
+            let idx = *typeref.borrow();
+            writeln!(
+                f,
+                "{:<3} = {:<3} = {:?} = {}",
+                i,
+                unsafe { *self.recurse_type_ref(idx).borrow() },
+                self.retrieve_type(idx),
+                TypeKind::Vague(VagueType::TypeRef(idx)).resolve_ref(self)
+            )?;
+        }
+        Ok(())
+    }
 }
 
 impl TypeRefs {
@@ -157,7 +173,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
 
     pub fn from_type(&'outer self, ty: &TypeKind) -> Option<TypeRef<'outer>> {
         let idx = match ty {
-            TypeKind::Vague(super::VagueType::TypeRef(idx)) => {
+            TypeKind::Vague(VagueType::TypeRef(idx)) => {
                 let inner_idx = unsafe { *self.types.recurse_type_ref(*idx).borrow() };
                 self.types.type_refs.borrow().get(inner_idx).cloned()?
             }

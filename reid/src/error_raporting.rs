@@ -7,8 +7,10 @@ use crate::{
     ast::token_stream::{self, TokenRange},
     codegen,
     lexer::{self, Cursor, FullToken, Position},
-    mir::{self, pass, Metadata, SourceModuleId},
+    mir::{self, pass, typecheck, Metadata, SourceModuleId},
 };
+
+use crate::mir::typecheck::ErrorKind as TypecheckError;
 
 fn label(text: &str) -> &str {
     #[cfg(debug_assertions)]
@@ -26,9 +28,9 @@ pub enum ErrorKind {
     #[error("{}{}", label("(Parsing) "), .0.kind)]
     ParserError(#[from] mir::pass::Error<token_stream::Error>),
     #[error("{}{}", label("(TypeCheck) "), .0.kind)]
-    TypeCheckError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
+    TypeCheckError(#[source] mir::pass::Error<typecheck::ErrorKind>),
     #[error("{}{}", label("(TypeInference) "), .0.kind)]
-    TypeInferenceError(#[source] mir::pass::Error<mir::typecheck::ErrorKind>),
+    TypeInferenceError(#[source] mir::pass::Error<TypecheckError>),
     #[error("{}{}", label("(Linker) "), .0.kind)]
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
     #[error("{}{}", label("(Codegen) "), .0)]
@@ -36,11 +38,11 @@ pub enum ErrorKind {
 }
 
 impl ErrorKind {
-    pub fn from_typecheck(err: mir::pass::Error<mir::typecheck::ErrorKind>) -> ErrorKind {
+    pub fn from_typecheck(err: mir::pass::Error<typecheck::ErrorKind>) -> ErrorKind {
         ErrorKind::TypeCheckError(err)
     }
 
-    pub fn from_typeinference(err: mir::pass::Error<mir::typecheck::ErrorKind>) -> ErrorKind {
+    pub fn from_typeinference(err: mir::pass::Error<typecheck::ErrorKind>) -> ErrorKind {
         ErrorKind::TypeInferenceError(err)
     }
 }
