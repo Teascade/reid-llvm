@@ -283,14 +283,14 @@ impl<'outer> ScopeTypeRefs<'outer> {
                             match &lhs {
                                 TypeKind::Vague(VagueType::TypeRef(idx)) => {
                                     let mut lhs_ref = TypeRef(Rc::new(RefCell::new(*idx)), self);
-                                    let narrowed = self.narrow_to_type(&mut lhs_ref, &lhs_narrow).unwrap_or(lhs_ref);
+                                    self.narrow_to_type(&mut lhs_ref, &lhs_narrow).unwrap_or(lhs_ref);
                                 }
                                 _ => {}
                             };
                             match &rhs {
                                 TypeKind::Vague(VagueType::TypeRef(idx)) => {
                                     let mut rhs_ref = TypeRef(Rc::new(RefCell::new(*idx)), self);
-                                    let narrowed = self.narrow_to_type(&mut rhs_ref, &rhs_narrow).unwrap_or(rhs_ref);
+                                    self.narrow_to_type(&mut rhs_ref, &rhs_narrow).unwrap_or(rhs_ref);
                                 }
                                 _ => {}
                             }
@@ -312,9 +312,20 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 .clone()
                 .widen(self.types);
             self.narrow_to_type(&hint1, &ty)?;
+            let hint1_typeref = self.types.retrieve_typeref(*hint1.0.borrow()).unwrap();
             for idx in self.types.type_refs.borrow_mut().iter_mut() {
-                if *idx == hint2.0 && idx != &hint1.0 {
-                    *idx.borrow_mut() = *hint1.0.borrow();
+                match hint1_typeref {
+                    TypeRefKind::Direct(_) => {
+                        if *idx == hint2.0 && idx != &hint1.0 {
+                            *idx.borrow_mut() = *hint1.0.borrow();
+                        }
+                    }
+                    TypeRefKind::BinOp(_, _, _) => {
+                        // TODO may not be good ?
+                        // if *idx == hint2.0 && idx != &hint1.0 {
+                        //     *idx.borrow_mut() = *hint1.0.borrow();
+                        // }
+                    }
                 }
             }
             Some(TypeRef(hint1.0.clone(), self))

@@ -119,6 +119,7 @@ impl BinopDefinition {
             .fn_kind
             .infer_types(state, &scope_hints, Some(self.return_type.clone()))?;
         if let Some(mut ret_ty) = ret_ty {
+            dbg!(&ret_ty, &self.return_type);
             ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
         }
 
@@ -296,7 +297,27 @@ impl Expression {
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
 
-                let binops = type_refs.available_binops(op, &mut lhs_ref, &mut rhs_ref);
+                let binops = if let (Some(lhs_ty), Some(rhs_ty)) = (lhs_ref.resolve_deep(), rhs_ref.resolve_deep()) {
+                    let mut applying_binops = Vec::new();
+                    for (_, binop) in state.scope.binops.iter() {
+                        if binop.operator != *op {
+                            continue;
+                        }
+                        if let Some(_) = binop.narrow(&lhs_ty, &rhs_ty) {
+                            applying_binops.push(binop.clone());
+                            continue;
+                        }
+                        if binop.operator.is_commutative() {
+                            if let Some(_) = binop.narrow(&lhs_ty, &rhs_ty) {
+                                applying_binops.push(binop.clone());
+                                continue;
+                            }
+                        }
+                    }
+                    applying_binops
+                } else {
+                    Vec::new()
+                };
 
                 if binops.len() > 0 {
                     let binop = unsafe { binops.get_unchecked(0) };
@@ -307,9 +328,15 @@ impl Expression {
                         widened_rhs = widened_rhs.widen_into(&binop.hands.1);
                     }
                     let binop_res = type_refs.from_binop(*op, &lhs_ref, &rhs_ref);
+                    dbg!(&type_refs.types.type_refs);
+                    dbg!(&type_refs.types.hints);
                     lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
+                    dbg!(&lhs_ref, &rhs_ref);
                     *return_ty = binop_res.as_type();
+                    dbg!(&type_refs.types.hints, &type_refs.types.type_refs);
+                    dbg!(&return_ty);
+                    dbg!(&type_refs.from_type(&return_ty));
                     Ok(binop_res)
                 } else {
                     Err(ErrorKind::InvalidBinop(

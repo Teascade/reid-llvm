@@ -418,13 +418,13 @@ impl Expression {
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
                 let expected_return_ty = ret_ty.resolve_ref(typerefs);
 
-                let binops = typerefs.binop_types.filter(&pass::ScopeBinopKey {
+                let binops = state.scope.binops.filter(&pass::ScopeBinopKey {
                     params: (lhs_type.clone(), rhs_type.clone()),
                     operator: *op,
                 });
                 if let Some(binop) = binops
                     .iter()
-                    .filter(|f| f.1.return_ty == expected_return_ty)
+                    .filter(|f| f.1.return_ty.narrow_into(&expected_return_ty).is_ok())
                     .map(|v| (v.1.clone()))
                     .next()
                 {

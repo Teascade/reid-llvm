@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::error::Error as STDError;
 
+use crate::codegen::intrinsics::form_intrinsic_binops;
 use crate::error_raporting::ReidError;
 
 use super::*;
@@ -53,12 +54,7 @@ impl<TErr: STDError> State<TErr> {
         }
     }
 
-    fn or_else<U, T: Into<Metadata> + Clone + Copy>(
-        &mut self,
-        result: Result<U, TErr>,
-        default: U,
-        meta: T,
-    ) -> U {
+    fn or_else<U, T: Into<Metadata> + Clone + Copy>(&mut self, result: Result<U, TErr>, default: U, meta: T) -> U {
         match result {
             Ok(t) => t,
             Err(e) => {
@@ -71,11 +67,7 @@ impl<TErr: STDError> State<TErr> {
         }
     }
 
-    fn ok<T: Into<Metadata> + Clone + Copy, U>(
-        &mut self,
-        result: Result<U, TErr>,
-        meta: T,
-    ) -> Option<U> {
+    fn ok<T: Into<Metadata> + Clone + Copy, U>(&mut self, result: Result<U, TErr>, meta: T) -> Option<U> {
         match result {
             Ok(v) => Some(v),
             Err(e) => {
@@ -200,10 +192,10 @@ impl PartialEq for ScopeBinopKey {
             return false;
         }
 
-        let operators_eq = self.params.0.narrow_into(&other.params.0).is_ok()
-            && self.params.1.narrow_into(&other.params.1).is_ok();
-        let swapped_ops_eq = self.params.0.narrow_into(&other.params.1).is_ok()
-            && self.params.1.narrow_into(&other.params.0).is_ok();
+        let operators_eq =
+            self.params.0.narrow_into(&other.params.0).is_ok() && self.params.1.narrow_into(&other.params.1).is_ok();
+        let swapped_ops_eq =
+            self.params.0.narrow_into(&other.params.1).is_ok() && self.params.1.narrow_into(&other.params.0).is_ok();
 
         if self.operator.is_commutative() {
             operators_eq || swapped_ops_eq
@@ -253,11 +245,7 @@ pub struct PassState<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> 
 }
 
 impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, 'sc, Data, TError> {
-    fn from(
-        state: &'st mut State<TError>,
-        scope: &'sc mut Scope<Data>,
-        module_id: Option<SourceModuleId>,
-    ) -> Self {
+    fn from(state: &'st mut State<TError>, scope: &'sc mut Scope<Data>, module_id: Option<SourceModuleId>) -> Self {
         PassState {
             state,
             scope,
@@ -275,19 +263,11 @@ impl<'st, 'sc, Data: Clone + Default, TError: STDError + Clone> PassState<'st, '
         self.state.or_else(result, default, meta)
     }
 
-    pub fn ok<TMeta: Into<Metadata> + Clone + Copy, U>(
-        &mut self,
-        result: Result<U, TError>,
-        meta: TMeta,
-    ) -> Option<U> {
+    pub fn ok<TMeta: Into<Metadata> + Clone + Copy, U>(&mut self, result: Result<U, TError>, meta: TMeta) -> Option<U> {
         self.state.ok(result, meta)
     }
 
-    pub fn note_errors<TMeta: Into<Metadata> + Clone>(
-        &mut self,
-        errors: &Vec<TError>,
-        meta: TMeta,
-    ) {
+    pub fn note_errors<TMeta: Into<Metadata> + Clone>(&mut self, errors: &Vec<TError>, meta: TMeta) {
         for error in errors {
             self.ok::<_, Infallible>(Err(error.clone()), meta.clone().into());
         }
@@ -311,18 +291,10 @@ pub trait Pass {
     type Data: Clone + Default;
     type TError: STDError + Clone;
 
-    fn context(
-        &mut self,
-        _context: &mut Context,
-        mut _state: PassState<Self::Data, Self::TError>,
-    ) -> PassResult {
+    fn context(&mut self, _context: &mut Context, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
         Ok(())
     }
-    fn module(
-        &mut self,
-        _module: &mut Module,
-        mut _state: PassState<Self::Data, Self::TError>,
-    ) -> PassResult {
+    fn module(&mut self, _module: &mut Module, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
         Ok(())
     }
     fn function(
@@ -332,25 +304,13 @@ pub trait Pass {
     ) -> PassResult {
         Ok(())
     }
-    fn block(
-        &mut self,
-        _block: &mut Block,
-        mut _state: PassState<Self::Data, Self::TError>,
-    ) -> PassResult {
+    fn block(&mut self, _block: &mut Block, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
         Ok(())
     }
-    fn stmt(
-        &mut self,
-        _stmt: &mut Statement,
-        mut _state: PassState<Self::Data, Self::TError>,
-    ) -> PassResult {
+    fn stmt(&mut self, _stmt: &mut Statement, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
         Ok(())
     }
-    fn expr(
-        &mut self,
-        _expr: &mut Expression,
-        mut _state: PassState<Self::Data, Self::TError>,
-    ) -> PassResult {
+    fn expr(&mut self, _expr: &mut Expression, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
         Ok(())
     }
 }
@@ -360,6 +320,24 @@ impl Context {
         let mut state = State::new();
         let mut scope = Scope::default();
         pass.context(self, PassState::from(&mut state, &mut scope, None))?;
+
+        for intrinsic in form_intrinsic_binops() {
+            scope
+                .binops
+                .set(
+                    ScopeBinopKey {
+                        params: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        operator: intrinsic.op,
+                    },
+                    ScopeBinopDef {
+                        hands: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        operator: intrinsic.op,
+                        return_ty: intrinsic.return_type.clone(),
+                    },
+                )
+                .ok();
+        }
+
         for (_, module) in &mut self.modules {
             module.pass(pass, &mut state, &mut scope.inner())?;
         }
@@ -368,12 +346,7 @@ impl Context {
 }
 
 impl Module {
-    fn pass<T: Pass>(
-        &mut self,
-        pass: &mut T,
-        state: &mut State<T::TError>,
-        scope: &mut Scope<T::Data>,
-    ) -> PassResult {
+    fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope<T::Data>) -> PassResult {
         for typedef in &self.typedefs {
             scope
                 .types
