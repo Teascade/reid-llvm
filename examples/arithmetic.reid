@@ -5,7 +5,5 @@ fn main() -> u32 {
   let value = 0b110;
   let other = 0o17;
 
-  let b = [5.0, 0.0 -5.0];
-
-  return value -1;
+  return value * other + 7 * -value;
 }

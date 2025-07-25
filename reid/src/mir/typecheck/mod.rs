@@ -78,6 +78,34 @@ pub enum ErrorKind {
     InvalidBinop(BinaryOperator, TypeKind, TypeKind),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HintKind {
+    Coerce(TypeKind),
+    Default,
+    None,
+}
+
+impl HintKind {
+    pub fn map<T>(&self, fun: T) -> HintKind
+    where
+        T: FnOnce(&TypeKind) -> TypeKind,
+    {
+        match self {
+            HintKind::Coerce(type_kind) => HintKind::Coerce(fun(type_kind)),
+            _ => self.clone(),
+        }
+    }
+}
+
+impl From<Option<TypeKind>> for HintKind {
+    fn from(value: Option<TypeKind>) -> Self {
+        match value {
+            Some(ty) => HintKind::Coerce(ty),
+            None => HintKind::None,
+        }
+    }
+}
+
 impl TypeKind {
     pub(super) fn narrow_into(&self, other: &TypeKind) -> Result<TypeKind, ErrorKind> {
         if self == other {
