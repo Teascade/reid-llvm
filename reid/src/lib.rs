@@ -152,7 +152,7 @@ pub fn perform_all_passes<'map>(
     }
 
     #[cfg(debug_assertions)]
-    println!("{}", &context);
+    println!("{:#}", &context);
 
     let state = context.pass(&mut LinkerPass {
         module_map,
@@ -162,7 +162,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{:-^100}", "LINKER OUTPUT");
     #[cfg(debug_assertions)]
-    println!("{}", &context);
+    println!("{:#}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
 
@@ -202,7 +202,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{:-^100}", "TYPECHECKER OUTPUT");
     #[cfg(debug_assertions)]
-    println!("{}", &context);
+    println!("{:#}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
 
@@ -243,7 +243,7 @@ pub fn compile_and_pass<'map>(
     #[cfg(debug_assertions)]
     println!("{:-^100}", "FINAL OUTPUT");
     #[cfg(debug_assertions)]
-    println!("{}", &mir_context);
+    println!("{:#}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
     let codegen_modules = match mir_context.codegen(&mut context) {

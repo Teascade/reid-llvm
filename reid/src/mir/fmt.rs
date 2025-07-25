@@ -15,6 +15,8 @@ impl Display for Context {
 
 impl Display for Module {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let is_alternate = f.alternate();
+
         writeln!(f, "Module({}) ({}) {{", self.name, self.module_id)?;
 
         let mut state = Default::default();
@@ -23,8 +25,26 @@ impl Display for Module {
         for import in &self.imports {
             writeln!(inner_f, "{}", import)?;
         }
-        for binop in &self.binop_defs {
+
+        let intrinsic_binops = self
+            .binop_defs
+            .iter()
+            .filter(|b| matches!(b.fn_kind, FunctionDefinitionKind::Intrinsic(_)));
+
+        for binop in self
+            .binop_defs
+            .iter()
+            .filter(|b| !matches!(b.fn_kind, FunctionDefinitionKind::Intrinsic(_)))
+        {
             writeln!(inner_f, "{}", binop)?;
+        }
+
+        if is_alternate {
+            writeln!(inner_f, "... <{}> intrinsic binary operators", intrinsic_binops.count())?;
+        } else {
+            for binop in intrinsic_binops {
+                writeln!(inner_f, "{}", binop)?;
+            }
         }
         for typedef in &self.typedefs {
             writeln!(inner_f, "{}", typedef)?;
