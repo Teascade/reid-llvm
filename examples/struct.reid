@@ -7,8 +7,8 @@ struct Test {
 
 fn main() -> u32 {
     let mut value = Test {
-        second: 3,
         field: 5,
+        second: 3,
     };
 
 

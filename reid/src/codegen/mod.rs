@@ -16,7 +16,7 @@ use scope::*;
 use crate::{
     mir::{
         self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind, NamedVariableRef,
-        SourceModuleId, StructField, StructType, TypeDefinitionKind, TypeKind, WhileStatement,
+        SourceModuleId, StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -1042,24 +1042,32 @@ impl mir::Expression {
             }
             mir::ExprKind::Struct(name, items) => {
                 let type_key = CustomTypeKey(name.clone(), scope.module_id);
-                let struct_ty = Type::CustomType({
+                let ty = Type::CustomType({
                     let Some(a) = scope.type_values.get(&type_key) else {
                         return Ok(None);
                     };
                     *a
                 });
 
+                let TypeDefinition {
+                    kind: TypeDefinitionKind::Struct(struct_ty),
+                    ..
+                } = scope.types.get(scope.type_values.get(&type_key).unwrap()).unwrap();
+
+                let indices = struct_ty.0.iter().enumerate();
+
                 let load_n = format!("{}.load", name);
 
                 let struct_ptr = scope
                     .block
-                    .build_named(name, Instr::Alloca(struct_ty.clone()))
+                    .build_named(name, Instr::Alloca(ty.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
-                for (i, (field_n, exp)) in items.iter().enumerate() {
+                for (field_n, exp) in items {
                     let gep_n = format!("{}.{}.gep", name, field_n);
                     let store_n = format!("{}.{}.store", name, field_n);
+                    let i = indices.clone().find(|(_, f)| f.0 == *field_n).unwrap().0;
 
                     let elem_ptr = scope
                         .block
@@ -1075,10 +1083,7 @@ impl mir::Expression {
                     }
                 }
 
-                let struct_val = scope
-                    .block
-                    .build_named(load_n, Instr::Load(struct_ptr, struct_ty))
-                    .unwrap();
+                let struct_val = scope.block.build_named(load_n, Instr::Load(struct_ptr, ty)).unwrap();
 
                 Some(StackValue(
                     StackValueKind::Literal(struct_val),
