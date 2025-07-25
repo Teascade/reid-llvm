@@ -1,9 +1,11 @@
 use reid_lib::{builder::InstructionValue, Instr};
 
 use crate::{
-    codegen::{ErrorKind, Scope, StackValue, StackValueKind},
+    codegen::{ErrorKind, StackValueKind},
     mir::{BinopDefinition, FunctionDefinition, TypeKind},
 };
+
+use super::scope::{Scope, StackValue};
 
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     let intrinsics = Vec::new();

@@ -43,8 +43,8 @@
 
 use std::path::PathBuf;
 
+use codegen::intrinsics::{form_intrinsic_binops, form_intrinsics};
 use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
-use intrinsics::{form_intrinsic_binops, form_intrinsics};
 use lexer::FullToken;
 use mir::{
     linker::LinkerPass, typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs,
@@ -53,11 +53,9 @@ use reid_lib::{compile::CompileOutput, Context};
 
 use crate::{ast::TopLevelStatement, lexer::Token, token_stream::TokenStream};
 
-mod allocator;
 mod ast;
 mod codegen;
 pub mod error_raporting;
-pub mod intrinsics;
 pub mod ld;
 mod lexer;
 pub mod mir;

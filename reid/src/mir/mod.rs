@@ -5,7 +5,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    intrinsics::IntrinsicFunction,
+    codegen::intrinsics::IntrinsicFunction,
     lexer::{FullToken, Position},
     token_stream::TokenRange,
 };
