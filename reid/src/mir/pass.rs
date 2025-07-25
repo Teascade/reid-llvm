@@ -156,6 +156,15 @@ impl<Data: Clone + Default> Scope<Data> {
             .find(|(CustomTypeKey(n, _), _)| n == name)
             .map(|(key, _)| key)
     }
+
+    pub fn get_type(&self, typekey: &CustomTypeKey) -> Option<&TypeDefinition> {
+        self.types.get(&typekey).or(self
+            .types
+            .0
+            .iter()
+            .find(|(key, def)| key.0 == typekey.0 && def.importer == Some(typekey.1))
+            .map(|(_, v)| v))
+    }
 }
 
 #[derive(Clone, Debug)]

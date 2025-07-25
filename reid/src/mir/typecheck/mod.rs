@@ -300,8 +300,7 @@ impl TypeKind {
             TypeKind::CustomType(custom_type_key) => {
                 state
                     .scope
-                    .types
-                    .get(custom_type_key)
+                    .get_type(custom_type_key)
                     .map(|_| ())
                     .ok_or(ErrorKind::NoSuchType(
                         custom_type_key.0.clone(),
