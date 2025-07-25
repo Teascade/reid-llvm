@@ -34,12 +34,7 @@ impl<'t> Pass for TypeCheck<'t> {
     fn module(&mut self, module: &mut Module, mut state: TypecheckPassState) -> PassResult {
         let mut defmap = HashMap::new();
         for typedef in &module.typedefs {
-            let TypeDefinition {
-                name,
-                kind,
-                meta,
-                source_module: _,
-            } = &typedef;
+            let TypeDefinition { name, kind, meta, .. } = &typedef;
 
             match kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
@@ -216,8 +211,6 @@ impl Block {
                         TypeKind::Vague(VagueType::Unknown),
                         variable_reference.2,
                     );
-
-                    dbg!(&var_t_resolved);
 
                     // Typecheck (and coerce) expression with said type
                     let res = expression.typecheck(&mut state, &typerefs, HintKind::Coerce(var_t_resolved.clone()));

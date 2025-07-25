@@ -95,6 +95,7 @@ impl ast::Module {
                         },
                         meta: (*range).as_meta(module_id),
                         source_module: module_id,
+                        importer: None,
                     };
                     typedefs.push(def);
                 }

@@ -31,8 +31,8 @@ pub enum ErrorKind {
     ModuleNotFound(String),
     #[error("Error while compiling module {0}: {1}")]
     ModuleCompilationError(String, String),
-    #[error("No such function {0} found in module {1}")]
-    NoSuchFunctionInModule(String, String),
+    #[error("No such value {0} found in module {1}")]
+    ImportDoesNotExist(String, String),
     #[error("Importing function {0}::{1} not possible: {2}")]
     FunctionImportIssue(String, String, EqualsIssue),
     #[error("Tried linking another main module: {0}")]
@@ -111,10 +111,7 @@ impl<'map> Pass for LinkerPass<'map> {
             for import in importer_module.imports.clone() {
                 let Import(path, _) = &import;
                 if path.len() != 2 {
-                    state.ok::<_, Infallible>(
-                        Err(ErrorKind::InnerModulesNotYetSupported(import.clone())),
-                        import.1,
-                    );
+                    state.ok::<_, Infallible>(Err(ErrorKind::InnerModulesNotYetSupported(import.clone())), import.1);
                 }
 
                 let module_name = unsafe { path.get_unchecked(0) };
@@ -123,38 +120,30 @@ impl<'map> Pass for LinkerPass<'map> {
                     modules.get(mod_id).unwrap()
                 } else if module_name == STD_NAME {
                     let std = compile_std(&mut self.module_map)?;
-                    modules.insert(
-                        std.module_id,
-                        Rc::new(RefCell::new(compile_std(&mut self.module_map)?)),
-                    );
+                    modules.insert(std.module_id, Rc::new(RefCell::new(compile_std(&mut self.module_map)?)));
                     module_ids.insert(std.name, std.module_id);
                     modules.get(&std.module_id).unwrap()
                 } else {
-                    let file_path =
-                        PathBuf::from(&context.base.clone()).join(module_name.to_owned() + ".reid");
+                    let file_path = PathBuf::from(&context.base.clone()).join(module_name.to_owned() + ".reid");
 
                     let Ok(source) = fs::read_to_string(&file_path) else {
-                        state.ok::<_, Infallible>(
-                            Err(ErrorKind::ModuleNotFound(module_name.clone())),
-                            import.1,
-                        );
+                        state.ok::<_, Infallible>(Err(ErrorKind::ModuleNotFound(module_name.clone())), import.1);
                         continue;
                     };
 
-                    let (id, tokens) =
-                        match parse_module(&source, module_name.clone(), &mut self.module_map) {
-                            Ok(val) => val,
-                            Err(err) => {
-                                state.ok::<_, Infallible>(
-                                    Err(ErrorKind::ModuleCompilationError(
-                                        module_name.clone(),
-                                        format!("{}", err),
-                                    )),
-                                    import.1,
-                                );
-                                continue;
-                            }
-                        };
+                    let (id, tokens) = match parse_module(&source, module_name.clone(), &mut self.module_map) {
+                        Ok(val) => val,
+                        Err(err) => {
+                            state.ok::<_, Infallible>(
+                                Err(ErrorKind::ModuleCompilationError(
+                                    module_name.clone(),
+                                    format!("{}", err),
+                                )),
+                                import.1,
+                            );
+                            continue;
+                        }
+                    };
 
                     match compile_module(id, tokens, &mut self.module_map, Some(file_path), false) {
                         Ok(imported_module) => {
@@ -166,8 +155,7 @@ impl<'map> Pass for LinkerPass<'map> {
                                 continue;
                             }
                             let module_id = imported_module.module_id;
-                            module_ids
-                                .insert(imported_module.name.clone(), imported_module.module_id);
+                            module_ids.insert(imported_module.name.clone(), imported_module.module_id);
                             modules.insert(module_id, Rc::new(RefCell::new(imported_module)));
                             let imported = modules.get_mut(&module_id).unwrap();
                             modules_to_process.push(imported.clone());
@@ -187,112 +175,74 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
                 .borrow_mut();
 
-                let func_name = unsafe { path.get_unchecked(1) };
-
-                let Some(func) = imported.functions.iter_mut().find(|f| f.name == *func_name)
-                else {
-                    state.ok::<_, Infallible>(
-                        Err(ErrorKind::NoSuchFunctionInModule(
-                            module_name.clone(),
-                            func_name.clone(),
-                        )),
-                        import.1,
-                    );
-                    continue;
-                };
-
-                let func_name = func.name.clone();
-
-                if !func.is_pub {
-                    state.ok::<_, Infallible>(
-                        Err(ErrorKind::FunctionIsPrivate(
-                            module_name.clone(),
-                            func_name.clone(),
-                        )),
-                        import.1,
-                    );
-                    continue;
-                }
-
-                func.is_imported = true;
-
-                if let Some(existing) = importer_module
-                    .functions
-                    .iter()
-                    .find(|f| f.name == *func_name)
-                {
-                    if let Err(e) = existing.equals_as_imported(func) {
-                        state.ok::<_, Infallible>(
-                            Err(ErrorKind::FunctionImportIssue(
-                                module_name.clone(),
-                                func_name.clone(),
-                                e,
-                            )),
-                            import.1,
-                        );
-                    }
-                }
-
-                fn import_type(ty: &TypeKind) -> Vec<CustomTypeKey> {
-                    let mut imported_types = Vec::new();
-                    match &ty {
-                        TypeKind::CustomType(key) => imported_types.push(key.clone()),
-                        TypeKind::Borrow(ty, _) => imported_types.extend(import_type(ty)),
-                        TypeKind::Array(ty, _) => imported_types.extend(import_type(ty)),
-                        TypeKind::UserPtr(ty) => imported_types.extend(import_type(ty)),
-                        TypeKind::CodegenPtr(ty) => imported_types.extend(import_type(ty)),
-                        _ => {}
-                    };
-                    imported_types
-                }
+                let import_name = unsafe { path.get_unchecked(1) };
 
                 let mut imported_types = Vec::new();
 
-                let types = import_type(&func.return_type);
-                let return_type = func.return_type.clone();
-                imported_types.extend(types);
+                if let Some(func) = imported.functions.iter_mut().find(|f| f.name == *import_name) {
+                    let func_name = func.name.clone();
 
-                let mut param_tys = Vec::new();
-                for (param_name, param_ty) in &func.parameters {
-                    let types = import_type(&param_ty);
-                    imported_types.extend(types);
-                    param_tys.push((param_name.clone(), param_ty.clone()));
-                }
+                    if !func.is_pub {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::FunctionIsPrivate(module_name.clone(), func_name.clone())),
+                            import.1,
+                        );
+                        continue;
+                    }
 
-                fn find_inner_types(
-                    typedef: &TypeDefinition,
-                    mut seen: HashSet<CustomTypeKey>,
-                    mod_id: SourceModuleId,
-                ) -> Vec<CustomTypeKey> {
-                    match &typedef.kind {
-                        crate::mir::TypeDefinitionKind::Struct(struct_type) => {
-                            let typenames = struct_type
-                                .0
-                                .iter()
-                                .filter(|t| matches!(t.1, TypeKind::CustomType(..)))
-                                .map(|t| match &t.1 {
-                                    TypeKind::CustomType(CustomTypeKey(t, _)) => t,
-                                    _ => panic!(),
-                                })
-                                .cloned()
-                                .collect::<Vec<_>>();
+                    func.is_imported = true;
 
-                            for typename in typenames {
-                                if seen.contains(&CustomTypeKey(typename.clone(), mod_id)) {
-                                    continue;
-                                }
-                                let inner = find_inner_types(typedef, seen.clone(), mod_id);
-                                seen.insert(CustomTypeKey(typename, mod_id));
-                                seen.extend(inner);
-                            }
-
-                            seen.into_iter().collect()
+                    if let Some(existing) = importer_module.functions.iter().find(|f| f.name == *func_name) {
+                        if let Err(e) = existing.equals_as_imported(func) {
+                            state.ok::<_, Infallible>(
+                                Err(ErrorKind::FunctionImportIssue(
+                                    module_name.clone(),
+                                    func_name.clone(),
+                                    e,
+                                )),
+                                import.1,
+                            );
                         }
                     }
+
+                    let types = import_type(&func.return_type, false);
+                    let return_type = func.return_type.clone();
+                    imported_types.extend(types);
+
+                    let mut param_tys = Vec::new();
+                    for (param_name, param_ty) in &func.parameters {
+                        let types = import_type(&param_ty, false);
+                        imported_types.extend(types);
+                        param_tys.push((param_name.clone(), param_ty.clone()));
+                    }
+
+                    importer_module.functions.push(FunctionDefinition {
+                        name: func_name,
+                        is_pub: false,
+                        is_imported: false,
+                        return_type,
+                        parameters: param_tys,
+                        kind: super::FunctionDefinitionKind::Extern(true),
+                    });
+                } else if let Some(ty) = imported.typedefs.iter_mut().find(|f| f.name == *import_name) {
+                    dbg!("hello??");
+                    let external_key = CustomTypeKey(ty.name.clone(), ty.source_module);
+                    imported_types.push((external_key, true));
+                    dbg!(&imported_types);
+                } else {
+                    state.ok::<_, Infallible>(
+                        Err(ErrorKind::ImportDoesNotExist(module_name.clone(), import_name.clone())),
+                        import.1,
+                    );
+                    continue;
                 }
 
                 let mut seen = HashSet::new();
-                seen.extend(imported_types.clone());
+                let mut extern_types = HashSet::new();
+                seen.extend(imported_types.clone().iter().map(|t| t.0.clone()));
+                extern_types.extend(imported_types.clone().iter().filter(|t| t.1).map(|t| t.0.clone()));
+                dbg!(&imported_types);
+                dbg!(&extern_types);
 
                 let imported_mod_id = imported.module_id;
                 let imported_mod_typedefs = &mut imported.typedefs;
@@ -300,10 +250,10 @@ impl<'map> Pass for LinkerPass<'map> {
                 for typekey in imported_types.clone() {
                     let typedef = imported_mod_typedefs
                         .iter()
-                        .find(|ty| CustomTypeKey(ty.name.clone(), imported_mod_id) == typekey)
+                        .find(|ty| CustomTypeKey(ty.name.clone(), imported_mod_id) == typekey.0)
                         .unwrap();
                     let inner = find_inner_types(typedef, seen.clone(), imported_mod_id);
-                    seen.extend(inner);
+                    seen.extend(inner.iter().cloned());
                 }
 
                 // TODO: Unable to import same-named type from multiple places..
@@ -314,24 +264,37 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 already_imported_types.extend(seen.clone());
 
+                for typekey in &already_imported_types {
+                    if extern_types.contains(typekey) {
+                        let module_id = importer_module.module_id;
+                        let typedef = importer_module
+                            .typedefs
+                            .iter_mut()
+                            .find(|t| t.name == typekey.0 && t.source_module == typekey.1);
+                        if let Some(typedef) = typedef {
+                            typedef.importer = Some(module_id);
+                        }
+                    }
+                }
+
                 for typekey in seen.into_iter() {
-                    let typedef = imported_mod_typedefs
+                    dbg!(&typekey);
+                    let mut typedef = imported_mod_typedefs
                         .iter()
                         .find(|ty| CustomTypeKey(ty.name.clone(), imported_mod_id) == typekey)
                         .unwrap()
                         .clone();
 
-                    importer_module.typedefs.push(typedef.clone());
-                }
+                    if extern_types.contains(&typekey) {
+                        typedef = TypeDefinition {
+                            importer: Some(importer_module.module_id),
+                            ..typedef
+                        };
+                    }
 
-                importer_module.functions.push(FunctionDefinition {
-                    name: func_name,
-                    is_pub: false,
-                    is_imported: false,
-                    return_type,
-                    parameters: param_tys,
-                    kind: super::FunctionDefinitionKind::Extern(true),
-                });
+                    importer_module.typedefs.push(typedef);
+                }
+                dbg!(&importer_module.typedefs);
             }
         }
 
@@ -345,5 +308,50 @@ impl<'map> Pass for LinkerPass<'map> {
         }
 
         Ok(())
+    }
+}
+
+fn import_type(ty: &TypeKind, usable_import: bool) -> Vec<(CustomTypeKey, bool)> {
+    let mut imported_types = Vec::new();
+    match &ty {
+        TypeKind::CustomType(key) => imported_types.push((key.clone(), usable_import)),
+        TypeKind::Borrow(ty, _) => imported_types.extend(import_type(ty, usable_import)),
+        TypeKind::Array(ty, _) => imported_types.extend(import_type(ty, usable_import)),
+        TypeKind::UserPtr(ty) => imported_types.extend(import_type(ty, usable_import)),
+        TypeKind::CodegenPtr(ty) => imported_types.extend(import_type(ty, usable_import)),
+        _ => {}
+    };
+    imported_types
+}
+
+fn find_inner_types(
+    typedef: &TypeDefinition,
+    mut seen: HashSet<CustomTypeKey>,
+    mod_id: SourceModuleId,
+) -> Vec<CustomTypeKey> {
+    match &typedef.kind {
+        crate::mir::TypeDefinitionKind::Struct(struct_type) => {
+            let typenames = struct_type
+                .0
+                .iter()
+                .filter(|t| matches!(t.1, TypeKind::CustomType(..)))
+                .map(|t| match &t.1 {
+                    TypeKind::CustomType(CustomTypeKey(t, _)) => t,
+                    _ => panic!(),
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            for typename in typenames {
+                if seen.contains(&CustomTypeKey(typename.clone(), mod_id)) {
+                    continue;
+                }
+                let inner = find_inner_types(typedef, seen.clone(), mod_id);
+                seen.insert(CustomTypeKey(typename, mod_id));
+                seen.extend(inner);
+            }
+
+            seen.into_iter().collect()
+        }
     }
 }

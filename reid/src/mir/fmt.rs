@@ -75,7 +75,17 @@ impl Display for BinopDefinition {
 
 impl Display for TypeDefinition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "type {} = ", self.name)?;
+        write!(
+            f,
+            "type {} (mod {}{}) = ",
+            self.name,
+            self.source_module,
+            if let Some(mod_id) = self.importer {
+                format!("; imported to {}", mod_id)
+            } else {
+                String::new()
+            }
+        )?;
         Display::fmt(&self.kind, f)
     }
 }

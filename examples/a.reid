@@ -1,6 +1,12 @@
-pub fn abs(f: f32) -> f32 {
-    if f < 0.0 {
-        return f * (0.0 - 1.0);
-    }
-    return f;
+
+import std::print;
+import std::new_string;
+import std::String;
+
+fn otus() -> String {
+    return new_string();
+}
+
+fn main() -> u8 {
+    return 0;
 }

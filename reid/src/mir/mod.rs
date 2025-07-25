@@ -354,6 +354,7 @@ pub struct TypeDefinition {
     pub kind: TypeDefinitionKind,
     pub meta: Metadata,
     pub source_module: SourceModuleId,
+    pub importer: Option<SourceModuleId>,
 }
 
 #[derive(Debug, Clone)]
