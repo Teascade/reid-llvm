@@ -302,6 +302,27 @@ impl<'outer> ScopeTypeRefs<'outer> {
         }
     }
 
+    pub fn try_default_deep(&self, ty: &TypeKind) -> Option<TypeKind> {
+        Some(match &ty {
+            TypeKind::Array(type_kind, _) => self.try_default_deep(type_kind)?,
+            TypeKind::CustomType(_) => ty.clone(),
+            TypeKind::Borrow(type_kind, _) => self.try_default_deep(type_kind)?,
+            TypeKind::UserPtr(type_kind) => self.try_default_deep(type_kind)?,
+            TypeKind::CodegenPtr(type_kind) => self.try_default_deep(type_kind)?,
+            TypeKind::Vague(vague_type) => match vague_type {
+                VagueType::Unknown => ty.clone(),
+                VagueType::Integer => ty.or_default().unwrap(),
+                VagueType::Decimal => ty.or_default().unwrap(),
+                VagueType::TypeRef(idx) => {
+                    let typeref = TypeRef(Rc::new(RefCell::new(*idx)), self);
+                    self.narrow_to_type(&typeref, &self.try_default_deep(&typeref.resolve_deep()?)?)?
+                        .resolve_deep()?
+                }
+            },
+            _ => ty.clone(),
+        })
+    }
+
     fn combine_vars(&'outer self, hint1: &TypeRef, hint2: &TypeRef) -> Option<TypeRef<'outer>> {
         unsafe {
             let ty = self

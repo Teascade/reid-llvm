@@ -197,6 +197,9 @@ impl Block {
         let mut state = state.inner();
         let inner_refs = outer_refs.inner();
 
+        // Keep track of variables created in this scope
+        let mut scope_variables = Vec::new();
+
         for statement in &mut self.statements {
             match &mut statement.0 {
                 StmtKind::Let(var, mutable, expr) => {
@@ -217,6 +220,9 @@ impl Block {
                     if let (Some(var_ref), Some(expr_ty_ref)) = (var_ref.as_mut(), expr_ty_ref.as_mut()) {
                         var_ref.narrow(&expr_ty_ref);
                     }
+
+                    // Add variable to list of tracked variables
+                    scope_variables.push(var.clone());
                 }
                 StmtKind::Set(lhs, rhs) => {
                     // Infer hints for the expression itself
@@ -264,6 +270,12 @@ impl Block {
             if let Some(hint) = &state.scope.return_type_hint {
                 ret_type_ref.narrow(&mut outer_refs.from_type(&hint).unwrap());
             }
+        }
+
+        // if variables aren't known at this time, they will never be. Default
+        // their types.
+        for variable in scope_variables {
+            inner_refs.try_default_deep(&variable.0);
         }
 
         Ok((kind, ret_type_ref))
@@ -328,15 +340,9 @@ impl Expression {
                         widened_rhs = widened_rhs.widen_into(&binop.hands.1);
                     }
                     let binop_res = type_refs.from_binop(*op, &lhs_ref, &rhs_ref);
-                    dbg!(&type_refs.types.type_refs);
-                    dbg!(&type_refs.types.hints);
                     lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
-                    dbg!(&lhs_ref, &rhs_ref);
                     *return_ty = binop_res.as_type();
-                    dbg!(&type_refs.types.hints, &type_refs.types.type_refs);
-                    dbg!(&return_ty);
-                    dbg!(&type_refs.from_type(&return_ty));
                     Ok(binop_res)
                 } else {
                     Err(ErrorKind::InvalidBinop(

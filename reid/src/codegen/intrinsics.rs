@@ -131,6 +131,14 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
         intrinsics.push(simple_binop_def(BinaryOperator::Minus, &ty, |scope, lhs, rhs| {
             scope.block.build(Instr::FSub(lhs, rhs)).unwrap()
         }));
+        intrinsics.push(simple_binop_def(Div, &ty, |scope, lhs, rhs| {
+            scope.block.build(Instr::FDiv(lhs, rhs)).unwrap()
+        }));
+        intrinsics.push(simple_binop_def(Mod, &ty, |scope, lhs, rhs| {
+            let div = scope.block.build(Instr::FDiv(lhs, rhs)).unwrap();
+            let mul = scope.block.build(Instr::Mul(rhs, div)).unwrap();
+            scope.block.build(Instr::Sub(lhs, mul)).unwrap()
+        }));
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::EQ), &ty, |scope, lhs, rhs| {
             scope.block.build(Instr::FCmp(CmpPredicate::EQ, lhs, rhs)).unwrap()
         }));
@@ -150,6 +158,10 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
             scope.block.build(Instr::FCmp(CmpPredicate::LE, lhs, rhs)).unwrap()
         }));
     }
+
+    intrinsics.push(boolean_binop_def(And, &TypeKind::Bool, |scope, lhs, rhs| {
+        scope.block.build(Instr::And(lhs, rhs)).unwrap()
+    }));
 
     intrinsics
 }

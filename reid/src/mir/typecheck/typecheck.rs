@@ -217,9 +217,10 @@ impl Block {
                         variable_reference.2,
                     );
 
+                    dbg!(&var_t_resolved);
+
                     // Typecheck (and coerce) expression with said type
                     let res = expression.typecheck(&mut state, &typerefs, Some(&var_t_resolved));
-
                     // If expression resolution itself was erronous, resolve as
                     // Unknown and note error.
                     let res = state.or_else(res, TypeKind::Vague(Vague::Unknown), expression.1);
@@ -413,10 +414,18 @@ impl Expression {
             ExprKind::BinOp(op, lhs, rhs, ret_ty) => {
                 // First find unfiltered parameters to binop
                 let lhs_res = lhs.typecheck(state, &typerefs, None);
-                let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_res = rhs.typecheck(state, &typerefs, None);
+                let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
-                let expected_return_ty = ret_ty.resolve_ref(typerefs);
+
+                let mut expected_return_ty = ret_ty.resolve_ref(typerefs);
+                if let Some(hint_t) = hint_t {
+                    expected_return_ty = state.or_else(
+                        expected_return_ty.narrow_into(hint_t),
+                        TypeKind::Vague(VagueType::Unknown),
+                        self.1,
+                    );
+                };
 
                 let binops = state.scope.binops.filter(&pass::ScopeBinopKey {
                     params: (lhs_type.clone(), rhs_type.clone()),
@@ -433,11 +442,6 @@ impl Expression {
                     *ret_ty = binop.narrow(&lhs_type, &rhs_type).unwrap().2;
                     Ok(ret_ty.clone())
                 } else {
-                    dbg!(&binops);
-                    dbg!(&op, &lhs, &rhs);
-                    dbg!(&lhs_type);
-                    dbg!(&rhs_type);
-                    dbg!(&expected_return_ty);
                     panic!()
                 }
             }
@@ -537,7 +541,7 @@ impl Expression {
                 });
 
                 // Typecheck and narrow index-expression
-                let idx_expr_res = idx_expr.typecheck(state, typerefs, Some(&TypeKind::U32));
+                let idx_expr_res = idx_expr.typecheck(state, typerefs, Some(&TypeKind::Vague(VagueType::Integer)));
                 state.ok(idx_expr_res, idx_expr.1);
 
                 // TODO it could be possible to check length against constants..
@@ -559,7 +563,7 @@ impl Expression {
             ExprKind::Array(expressions) => {
                 // Try to unwrap hint type from array if possible
                 let hint_t = hint_t.map(|t| match t {
-                    TypeKind::Array(type_kind, _) => &type_kind,
+                    TypeKind::Array(type_kind, _) => type_kind,
                     _ => t,
                 });
 
@@ -704,7 +708,7 @@ impl Expression {
                 Ok(*inner)
             }
             ExprKind::CastTo(expression, type_kind) => {
-                let expr = expression.typecheck(state, typerefs, Some(&type_kind))?;
+                let expr = expression.typecheck(state, typerefs, None)?;
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
         }
