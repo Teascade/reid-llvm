@@ -125,6 +125,12 @@ impl TypeKind {
             (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
                 Ok(TypeKind::UserPtr(Box::new(val1.narrow_into(val2)?)))
             }
+            (TypeKind::Array(val1, len1), TypeKind::Array(val2, len2)) => {
+                if len1 != len2 {
+                    return Err(ErrorKind::TypesIncompatible(self.clone(), other.clone()));
+                }
+                Ok(TypeKind::Array(Box::new(val1.narrow_into(val2)?), *len1))
+            }
             _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
         }
     }
