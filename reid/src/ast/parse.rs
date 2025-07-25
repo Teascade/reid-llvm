@@ -99,80 +99,72 @@ impl Parse for UnaryOperator {
 fn specific_float_lit(value: f64, stream: &mut TokenStream) -> Result<Expression, Error> {
     use ExpressionKind as Kind;
 
-    let specific_lit = if let Ok(ty) = stream.parse::<Type>() {
-        dbg!(&ty);
-        match ty.0 {
-            TypeKind::F16 => Some(SpecificLiteral::F16(value as f32)),
-            TypeKind::F32 => Some(SpecificLiteral::F32(value as f32)),
-            TypeKind::F32B => Some(SpecificLiteral::F32B(value as f32)),
-            TypeKind::F64 => Some(SpecificLiteral::F64(value as f64)),
-            TypeKind::F128 => Some(SpecificLiteral::F128(value as f64)),
-            TypeKind::F80 => Some(SpecificLiteral::F80(value as f64)),
-            TypeKind::F128PPC => Some(SpecificLiteral::F128PPC(value as f64)),
-            TypeKind::Array(..) => None,
-            TypeKind::Ptr(..) => None,
-            TypeKind::Custom(..) => None,
-            TypeKind::Borrow(..) => None,
-            _ => return Err(stream.expected_err("integer-compatible type")?),
-        }
-    } else {
-        None
+    let lit = match stream
+        .parse_if::<Type, _>(|t| match t.0 {
+            TypeKind::F16 => true,
+            TypeKind::F32B => true,
+            TypeKind::F32 => true,
+            TypeKind::F64 => true,
+            TypeKind::F128 => true,
+            TypeKind::F80 => true,
+            TypeKind::F128PPC => true,
+            _ => false,
+        })?
+        .0
+    {
+        TypeKind::F16 => SpecificLiteral::F16(value as f32),
+        TypeKind::F32 => SpecificLiteral::F32(value as f32),
+        TypeKind::F32B => SpecificLiteral::F32B(value as f32),
+        TypeKind::F64 => SpecificLiteral::F64(value as f64),
+        TypeKind::F128 => SpecificLiteral::F128(value as f64),
+        TypeKind::F80 => SpecificLiteral::F80(value as f64),
+        TypeKind::F128PPC => SpecificLiteral::F128PPC(value as f64),
+        _ => Err(stream.expected_err("float-compatible type")?)?,
     };
-    Ok(if let Some(lit) = specific_lit {
-        Expression(
-            Kind::Literal(Literal::Specific(lit)),
-            stream.get_range().unwrap(),
-        )
-    } else {
-        Expression(
-            Kind::Literal(Literal::Decimal(value)),
-            stream.get_range().unwrap(),
-        )
-    })
+    Ok(Expression(
+        Kind::Literal(Literal::Specific(lit)),
+        stream.get_range().unwrap(),
+    ))
 }
 
 fn specific_int_lit(value: u128, stream: &mut TokenStream) -> Result<Expression, Error> {
     use ExpressionKind as Kind;
 
-    let specific_lit = if let Ok(ty) = stream.parse::<Type>() {
-        match ty.0 {
-            TypeKind::I8 => Some(SpecificLiteral::I8(value as i8)),
-            TypeKind::I16 => Some(SpecificLiteral::I16(value as i16)),
-            TypeKind::I32 => Some(SpecificLiteral::I32(value as i32)),
-            TypeKind::I64 => Some(SpecificLiteral::I64(value as i64)),
-            TypeKind::I128 => Some(SpecificLiteral::I128(value as i128)),
-            TypeKind::U8 => Some(SpecificLiteral::U8(value as u8)),
-            TypeKind::U16 => Some(SpecificLiteral::U16(value as u16)),
-            TypeKind::U32 => Some(SpecificLiteral::U32(value as u32)),
-            TypeKind::U64 => Some(SpecificLiteral::U64(value as u64)),
-            TypeKind::U128 => Some(SpecificLiteral::U128(value as u128)),
-            TypeKind::F16 => Some(SpecificLiteral::F16(value as f32)),
-            TypeKind::F32 => Some(SpecificLiteral::F32(value as f32)),
-            TypeKind::F32B => Some(SpecificLiteral::F32B(value as f32)),
-            TypeKind::F64 => Some(SpecificLiteral::F64(value as f64)),
-            TypeKind::F128 => Some(SpecificLiteral::F128(value as f64)),
-            TypeKind::F80 => Some(SpecificLiteral::F80(value as f64)),
-            TypeKind::F128PPC => Some(SpecificLiteral::F128PPC(value as f64)),
-            TypeKind::Array(..) => None,
-            TypeKind::Ptr(..) => None,
-            TypeKind::Custom(..) => None,
-            TypeKind::Borrow(..) => None,
-            _ => return Err(stream.expected_err("integer-compatible type")?),
-        }
-    } else {
-        None
+    let lit = match stream
+        .parse_if::<Type, _>(|t| match t.0 {
+            TypeKind::Char => false,
+            TypeKind::Array(_, _) => false,
+            TypeKind::Custom(_) => false,
+            TypeKind::Borrow(_, _) => false,
+            TypeKind::Ptr(_) => false,
+            TypeKind::Bool => false,
+            _ => true,
+        })?
+        .0
+    {
+        TypeKind::I8 => SpecificLiteral::I8(value as i8),
+        TypeKind::I16 => SpecificLiteral::I16(value as i16),
+        TypeKind::I32 => SpecificLiteral::I32(value as i32),
+        TypeKind::I64 => SpecificLiteral::I64(value as i64),
+        TypeKind::I128 => SpecificLiteral::I128(value as i128),
+        TypeKind::U8 => SpecificLiteral::U8(value as u8),
+        TypeKind::U16 => SpecificLiteral::U16(value as u16),
+        TypeKind::U32 => SpecificLiteral::U32(value as u32),
+        TypeKind::U64 => SpecificLiteral::U64(value as u64),
+        TypeKind::U128 => SpecificLiteral::U128(value as u128),
+        TypeKind::F16 => SpecificLiteral::F16(value as f32),
+        TypeKind::F32 => SpecificLiteral::F32(value as f32),
+        TypeKind::F32B => SpecificLiteral::F32B(value as f32),
+        TypeKind::F64 => SpecificLiteral::F64(value as f64),
+        TypeKind::F128 => SpecificLiteral::F128(value as f64),
+        TypeKind::F80 => SpecificLiteral::F80(value as f64),
+        TypeKind::F128PPC => SpecificLiteral::F128PPC(value as f64),
+        _ => return Err(stream.expected_err("integer-compatible type")?),
     };
-    Ok(if let Some(lit) = specific_lit {
-        Expression(
-            Kind::Literal(Literal::Specific(lit)),
-            stream.get_range().unwrap(),
-        )
-    } else {
-        Expression(
-            Kind::Literal(Literal::Integer(value)),
-            stream.get_range().unwrap(),
-        )
-    })
+    Ok(Expression(
+        Kind::Literal(Literal::Specific(lit)),
+        stream.get_range().unwrap(),
+    ))
 }
 
 #[derive(Debug)]
@@ -234,25 +226,43 @@ impl Parse for PrimaryExpression {
                 }
                 Token::BinaryValue(v) => {
                     stream.next(); // Consume binary
-                    specific_int_lit(
-                        u128::from_str_radix(&v, 2).expect("Binary is not parseable as u128!"),
-                        &mut stream,
-                    )?
+                    let value =
+                        u128::from_str_radix(&v, 2).expect("Value is not parseable as u128!");
+                    if let Ok(expr) = specific_int_lit(value, &mut stream) {
+                        expr
+                    } else {
+                        Expression(
+                            Kind::Literal(Literal::Integer(value)),
+                            stream.get_range().unwrap(),
+                        )
+                    }
                 }
                 Token::OctalValue(v) => {
                     stream.next(); // Consume octal
-                    specific_int_lit(
-                        u128::from_str_radix(&v, 8).expect("Octal is not parseable as u128!"),
-                        &mut stream,
-                    )?
+                    let value =
+                        u128::from_str_radix(&v, 8).expect("Value is not parseable as u128!");
+                    if let Ok(expr) = specific_int_lit(value, &mut stream) {
+                        expr
+                    } else {
+                        Expression(
+                            Kind::Literal(Literal::Integer(value)),
+                            stream.get_range().unwrap(),
+                        )
+                    }
                 }
                 Token::HexadecimalValue(v) => {
                     stream.next(); // Consume hexadecimal
-                    specific_int_lit(
-                        u128::from_str_radix(&v, 16)
-                            .expect("Hexadecimal is not parseable as u128!"),
-                        &mut stream,
-                    )?
+
+                    let value =
+                        u128::from_str_radix(&v, 16).expect("Value is not parseable as u128!");
+                    if let Ok(expr) = specific_int_lit(value, &mut stream) {
+                        expr
+                    } else {
+                        Expression(
+                            Kind::Literal(Literal::Integer(value)),
+                            stream.get_range().unwrap(),
+                        )
+                    }
                 }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
@@ -266,15 +276,25 @@ impl Parse for PrimaryExpression {
                             .parse()
                             .expect("Decimal is not parseable as f64!");
 
-                        let a = specific_float_lit(value, &mut stream)?;
-                        dbg!(&a);
-                        a
+                        if let Ok(expr) = specific_float_lit(value, &mut stream) {
+                            expr
+                        } else {
+                            Expression(
+                                Kind::Literal(Literal::Decimal(value)),
+                                stream.get_range().unwrap(),
+                            )
+                        }
                     } else {
-                        specific_int_lit(
-                            u128::from_str_radix(&v, 10)
-                                .expect("Integer is not parseable as u128!"),
-                            &mut stream,
-                        )?
+                        let value =
+                            u128::from_str_radix(&v, 10).expect("Value is not parseable as u128!");
+                        if let Ok(expr) = specific_int_lit(value, &mut stream) {
+                            expr
+                        } else {
+                            Expression(
+                                Kind::Literal(Literal::Integer(value)),
+                                stream.get_range().unwrap(),
+                            )
+                        }
                     }
                 }
                 Token::StringLit(v) => {

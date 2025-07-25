@@ -972,7 +972,6 @@ impl mir::Expression {
                             Instr::Sub(lhs, mul)
                         }
                     };
-                    dbg!(&instr);
                     Some(StackValue(
                         StackValueKind::Immutable(
                             scope

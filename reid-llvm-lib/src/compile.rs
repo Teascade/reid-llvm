@@ -728,7 +728,6 @@ impl BlockHolder {
                 ))
                 .compile(module, function, block_ref);
 
-            dbg!(&self.value, &self.data.terminator_location);
             if let Some(location) = &self.data.terminator_location {
                 LLVMInstructionSetDebugLoc(
                     term_instr.value_ref,
@@ -839,7 +838,6 @@ impl InstructionHolder {
                 FCmp(pred, lhs, rhs) => {
                     let lhs = module.values.get(&lhs).unwrap();
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
-                    dbg!(pred.as_llvm_unsorted_float());
                     LLVMBuildFCmp(
                         module.builder_ref,
                         pred.as_llvm_unsorted_float(),
