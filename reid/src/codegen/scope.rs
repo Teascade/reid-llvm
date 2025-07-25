@@ -160,9 +160,7 @@ impl<'ctx> StackBinopDefinition<'ctx> {
                     self.return_ty.clone(),
                 ))
             }
-            StackBinopFunctionKind::Intrinsic(fun) => {
-                fun.codegen(scope, &[lhs.instr(), rhs.instr()])
-            }
+            StackBinopFunctionKind::Intrinsic(fun) => fun.codegen(scope, &[&lhs, &rhs]),
         }
     }
 }

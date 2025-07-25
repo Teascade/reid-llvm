@@ -41,7 +41,7 @@
 //! - Debug Symbols
 //! ```
 
-use std::path::PathBuf;
+use std::{path::PathBuf, thread, time::Duration};
 
 use ast::{
     lexer::{self, FullToken, Token},
@@ -51,6 +51,7 @@ use codegen::intrinsics::{form_intrinsic_binops, form_intrinsics};
 use error_raporting::{ErrorKind as ErrorRapKind, ErrorModules, ReidError};
 use mir::{
     linker::LinkerPass,
+    pass::BinopMap,
     typecheck::{typecheck::TypeCheck, typeinference::TypeInference, typerefs::TypeRefs},
 };
 use reid_lib::{compile::CompileOutput, Context};
@@ -128,8 +129,22 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&context);
 
+    let mut binops = BinopMap::default();
     for module in &mut context.modules {
         for intrinsic in form_intrinsic_binops() {
+            binops
+                .set(
+                    mir::pass::ScopeBinopKey {
+                        params: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        operator: intrinsic.op,
+                    },
+                    mir::pass::ScopeBinopDef {
+                        hands: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        operator: intrinsic.op,
+                        return_ty: intrinsic.return_type.clone(),
+                    },
+                )
+                .ok();
             module.1.binop_defs.insert(0, intrinsic);
         }
     }
@@ -162,7 +177,7 @@ pub fn perform_all_passes<'map>(
         ));
     }
 
-    let refs = TypeRefs::default();
+    let refs = TypeRefs::with_binops(binops);
 
     let state = context.pass(&mut TypeInference { refs: &refs })?;
 
@@ -174,6 +189,8 @@ pub fn perform_all_passes<'map>(
     println!("{}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
+    dbg!("asd!");
+    thread::sleep(Duration::from_millis(100));
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(

@@ -43,20 +43,6 @@ impl TypeKind {
         })
     }
 
-    pub fn binop_type(
-        lhs: &TypeKind,
-        rhs: &TypeKind,
-        binop: &ScopeBinopDef,
-    ) -> Option<(TypeKind, TypeKind, TypeKind)> {
-        let lhs_ty = lhs.narrow_into(&binop.hands.0);
-        let rhs_ty = rhs.narrow_into(&binop.hands.1);
-        if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
-            Some((lhs_ty, rhs_ty, binop.return_ty.clone()))
-        } else {
-            None
-        }
-    }
-
     /// Reverse of binop_type, where the given hint is the known required output
     /// type of the binop, and the output is the hint for the lhs/rhs type.
     pub fn simple_binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {

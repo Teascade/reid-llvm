@@ -322,37 +322,25 @@ impl Expression {
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
 
-                if let Ok(binop) = type_refs
-                    .binop(op, &mut lhs_ref, &mut rhs_ref, &state.scope.binops)
-                    .ok_or(ErrorKind::TypesIncompatible(
+                let binops = type_refs.available_binops(op, &mut lhs_ref, &mut rhs_ref);
+
+                if binops.len() > 0 {
+                    let binop = unsafe { binops.get_unchecked(0) };
+                    let mut widened_lhs = binop.hands.0.clone();
+                    let mut widened_rhs = binop.hands.1.clone();
+                    for binop in binops.iter().skip(1) {
+                        widened_lhs = widened_lhs.widen_into(&binop.hands.0);
+                        widened_rhs = widened_rhs.widen_into(&binop.hands.1);
+                    }
+                    lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
+                    rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
+                    Ok(type_refs.from_binop(*op, &lhs_ref, &rhs_ref))
+                } else {
+                    Err(ErrorKind::InvalidBinop(
+                        *op,
                         lhs_ref.resolve_deep().unwrap(),
                         rhs_ref.resolve_deep().unwrap(),
                     ))
-                {
-                    Ok(binop)
-                } else {
-                    let typeref = state.or_else(
-                        lhs_ref.narrow(&rhs_ref).ok_or(ErrorKind::InvalidBinop(
-                            *op,
-                            lhs_ref.resolve_deep().unwrap(),
-                            rhs_ref.resolve_deep().unwrap(),
-                        )),
-                        type_refs.from_type(&Vague(Unknown)).unwrap(),
-                        self.1,
-                    );
-                    Ok(type_refs
-                        .from_type(
-                            &typeref
-                                .resolve_deep()
-                                .unwrap()
-                                .simple_binop_type(op)
-                                .ok_or(ErrorKind::InvalidBinop(
-                                    *op,
-                                    lhs_ref.resolve_deep().unwrap(),
-                                    rhs_ref.resolve_deep().unwrap(),
-                                ))?,
-                        )
-                        .unwrap())
                 }
             }
             ExprKind::FunctionCall(function_call) => {

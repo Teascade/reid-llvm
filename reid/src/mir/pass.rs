@@ -119,6 +119,10 @@ impl<Key: std::hash::Hash + Eq, T: Clone + std::fmt::Debug> Storage<Key, T> {
     pub fn find(&self, key: &Key) -> Option<(&Key, &T)> {
         self.0.iter().find(|(k, _)| *k == key)
     }
+
+    pub fn filter(&self, key: &Key) -> Vec<(&Key, &T)> {
+        self.0.iter().filter(|(k, _)| *k == key).collect()
+    }
 }
 
 pub type BinopMap = Storage<ScopeBinopKey, ScopeBinopDef>;
@@ -195,8 +199,12 @@ impl PartialEq for ScopeBinopKey {
         if self.operator.is_commutative() != other.operator.is_commutative() {
             return false;
         }
-        let operators_eq = self.params == other.params;
-        let swapped_ops_eq = (self.params.1.clone(), self.params.0.clone()) == other.params;
+
+        let operators_eq = self.params.0.narrow_into(&other.params.0).is_ok()
+            && self.params.1.narrow_into(&other.params.1).is_ok();
+        let swapped_ops_eq = self.params.0.narrow_into(&other.params.1).is_ok()
+            && self.params.1.narrow_into(&other.params.0).is_ok();
+
         if self.operator.is_commutative() {
             operators_eq || swapped_ops_eq
         } else {
@@ -226,27 +234,11 @@ pub struct ScopeBinopDef {
 }
 
 impl ScopeBinopDef {
-    pub fn binop_hint_old(
-        &self,
-        lhs: &TypeKind,
-        rhs: &TypeKind,
-        ret_ty: &TypeKind,
-    ) -> Option<(TypeKind, TypeKind)> {
-        ret_ty.narrow_into(&self.return_ty).ok()?;
+    pub fn narrow(&self, lhs: &TypeKind, rhs: &TypeKind) -> Option<(TypeKind, TypeKind, TypeKind)> {
         let lhs_ty = lhs.narrow_into(&self.hands.0);
         let rhs_ty = rhs.narrow_into(&self.hands.1);
         if let (Ok(lhs_ty), Ok(rhs_ty)) = (lhs_ty, rhs_ty) {
-            Some((lhs_ty, rhs_ty))
-        } else {
-            None
-        }
-    }
-
-    pub fn binop_ret_ty(&self, lhs: &TypeKind, rhs: &TypeKind) -> Option<TypeKind> {
-        let lhs_ty = lhs.narrow_into(&self.hands.0);
-        let rhs_ty = rhs.narrow_into(&self.hands.1);
-        if let (Ok(_), Ok(_)) = (lhs_ty, rhs_ty) {
-            Some(self.return_ty.clone())
+            Some((lhs_ty, rhs_ty, self.return_ty.clone()))
         } else {
             None
         }

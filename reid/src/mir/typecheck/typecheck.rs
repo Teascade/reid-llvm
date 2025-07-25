@@ -453,73 +453,93 @@ impl Expression {
                 let rhs_res = rhs.typecheck(state, &typerefs, None);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
-                let cloned = state.scope.binops.clone();
-                let mut iter = cloned.iter();
-                let operator = loop {
-                    let Some((_, binop)) = iter.next() else {
-                        break None;
-                    };
-                    if binop.operator != *op {
-                        continue;
-                    }
-                    if let Some(hint_t) = hint_t {
-                        if binop.return_ty == *hint_t {
-                            if let Some(_) = TypeKind::binop_type(&lhs_type, &rhs_type, binop) {
-                                break Some(binop);
-                            }
-                        } else {
-                            continue;
-                        }
-                    }
-                    if let Some(_) = TypeKind::binop_type(&lhs_type, &rhs_type, binop) {
-                        break Some(binop);
-                    }
-                };
-
-                if let Some(operator) = operator {
-                    // Re-typecheck with found operator hints
-                    let (lhs_ty, rhs_ty) = TypeKind::try_collapse_two(
-                        (&lhs_type, &rhs_type),
-                        (&operator.hands.0, &operator.hands.1),
-                    )
-                    .unwrap();
-                    let lhs_res = lhs.typecheck(state, &typerefs, Some(&lhs_ty));
-                    let rhs_res = rhs.typecheck(state, &typerefs, Some(&rhs_ty));
-                    state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
-                    state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
-                    Ok(operator.return_ty.clone())
+                if let Some(binop) = state
+                    .scope
+                    .binops
+                    .find(&pass::ScopeBinopKey {
+                        params: (lhs_type.clone(), rhs_type.clone()),
+                        operator: *op,
+                    })
+                    .map(|v| (v.1.clone()))
+                {
+                    dbg!(&lhs, &rhs);
+                    dbg!(&lhs_type.resolve_ref(typerefs));
+                    dbg!(&rhs_type.resolve_ref(typerefs));
+                    lhs.typecheck(state, &typerefs, Some(&binop.hands.0))?;
+                    rhs.typecheck(state, &typerefs, Some(&binop.hands.1))?;
+                    Ok(binop.narrow(&lhs_type, &rhs_type).unwrap().2)
                 } else {
-                    // Re-typecheck with typical everyday binop
-                    let lhs_res = lhs.typecheck(
-                        state,
-                        &typerefs,
-                        hint_t.and_then(|t| t.simple_binop_hint(op)).as_ref(),
-                    );
-                    let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
-                    let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
-                    let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
-
-                    let both_t = lhs_type.narrow_into(&rhs_type)?;
-
-                    if *op == BinaryOperator::Minus && !lhs_type.signed() {
-                        if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?)
-                        {
-                            if lhs_val < rhs_val {
-                                return Err(ErrorKind::NegativeUnsignedValue(lhs_type));
-                            }
-                        }
-                    }
-
-                    if let Some(collapsed) = state.ok(rhs_type.narrow_into(&rhs_type), self.1) {
-                        // Try to coerce both sides again with collapsed type
-                        lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
-                        rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
-                    }
-
-                    both_t
-                        .simple_binop_type(op)
-                        .ok_or(ErrorKind::InvalidBinop(*op, lhs_type, rhs_type))
+                    Err(ErrorKind::InvalidBinop(*op, lhs_type, rhs_type))
                 }
+
+                // let cloned = state.scope.binops.clone();
+                // let mut iter = cloned.iter();
+                // let operator = loop {
+                //     let Some((_, binop)) = iter.next() else {
+                //         break None;
+                //     };
+                //     if binop.operator != *op {
+                //         continue;
+                //     }
+                //     if let Some(hint_t) = hint_t {
+                //         if binop.return_ty == *hint_t {
+                //             if let Some(_) = TypeKind::narrow_to_binop(&lhs_type, &rhs_type, binop)
+                //             {
+                //                 break Some(binop);
+                //             }
+                //         } else {
+                //             continue;
+                //         }
+                //     }
+                //     if let Some(_) = TypeKind::narrow_to_binop(&lhs_type, &rhs_type, binop) {
+                //         break Some(binop);
+                //     }
+                // };
+
+                // if let Some(operator) = operator {
+                //     // Re-typecheck with found operator hints
+                //     let (lhs_ty, rhs_ty) = TypeKind::try_collapse_two(
+                //         (&lhs_type, &rhs_type),
+                //         (&operator.hands.0, &operator.hands.1),
+                //     )
+                //     .unwrap();
+                //     let lhs_res = lhs.typecheck(state, &typerefs, Some(&lhs_ty));
+                //     let rhs_res = rhs.typecheck(state, &typerefs, Some(&rhs_ty));
+                //     state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
+                //     state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
+                //     Ok(operator.return_ty.clone())
+                // } else {
+                //     // Re-typecheck with typical everyday binop
+                //     let lhs_res = lhs.typecheck(
+                //         state,
+                //         &typerefs,
+                //         hint_t.and_then(|t| t.simple_binop_hint(op)).as_ref(),
+                //     );
+                //     let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
+                //     let rhs_res = rhs.typecheck(state, &typerefs, Some(&lhs_type));
+                //     let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
+
+                //     let both_t = lhs_type.narrow_into(&rhs_type)?;
+
+                //     if *op == BinaryOperator::Minus && !lhs_type.signed() {
+                //         if let (Some(lhs_val), Some(rhs_val)) = (lhs.num_value()?, rhs.num_value()?)
+                //         {
+                //             if lhs_val < rhs_val {
+                //                 return Err(ErrorKind::NegativeUnsignedValue(lhs_type));
+                //             }
+                //         }
+                //     }
+
+                //     if let Some(collapsed) = state.ok(rhs_type.narrow_into(&rhs_type), self.1) {
+                //         // Try to coerce both sides again with collapsed type
+                //         lhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
+                //         rhs.typecheck(state, &typerefs, Some(&collapsed)).ok();
+                //     }
+
+                //     both_t
+                //         .simple_binop_type(op)
+                //         .ok_or(ErrorKind::InvalidBinop(*op, lhs_type, rhs_type))
+                // }
             }
             ExprKind::FunctionCall(function_call) => {
                 let true_function = state
@@ -809,6 +829,7 @@ impl Literal {
     /// Try to coerce this literal, ie. convert it to a more specific type in
     /// regards to the given hint if any.
     fn try_coerce(self, hint: Option<TypeKind>) -> Result<Self, ErrorKind> {
+        dbg!(&self, &hint);
         if let Some(hint) = &hint {
             use Literal as L;
             use VagueLiteral as VagueL;
