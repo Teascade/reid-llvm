@@ -8,9 +8,10 @@ use std::{
 };
 
 use crate::{
+    codegen::scope,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
-    mir::{CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind},
+    mir::{CustomTypeKey, FunctionDefinitionKind, SourceModuleId, TypeDefinition, TypeKind},
     parse_module,
 };
 
@@ -65,10 +66,15 @@ pub struct LinkerPass<'map> {
     pub is_lib: bool,
 }
 
-type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+#[derive(Default, Clone)]
+pub struct LinkerState {
+    extern_imported_types: HashMap<SourceModuleId, HashMap<String, SourceModuleId>>,
+}
+
+type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, LinkerState, ErrorKind>;
 
 impl<'map> Pass for LinkerPass<'map> {
-    type Data = ();
+    type Data = LinkerState;
     type TError = ErrorKind;
     fn context(&mut self, context: &mut Context, mut state: LinkerPassState) -> PassResult {
         let mains = context
@@ -106,6 +112,7 @@ impl<'map> Pass for LinkerPass<'map> {
         let mut already_imported_types = HashSet::<CustomTypeKey>::new();
 
         while let Some(module) = modules_to_process.pop() {
+            let mut extern_types = HashMap::new();
             let mut importer_module = module.borrow_mut();
 
             for import in importer_module.imports.clone() {
@@ -238,11 +245,12 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
 
                 let mut seen = HashSet::new();
-                let mut extern_types = HashSet::new();
+                let mut current_extern_types = HashSet::new();
                 seen.extend(imported_types.clone().iter().map(|t| t.0.clone()));
-                extern_types.extend(imported_types.clone().iter().filter(|t| t.1).map(|t| t.0.clone()));
-                dbg!(&imported_types);
-                dbg!(&extern_types);
+                current_extern_types.extend(imported_types.clone().iter().filter(|t| t.1).map(|t| t.0.clone()));
+                for extern_type in &current_extern_types {
+                    extern_types.insert(extern_type.0.clone(), extern_type.1);
+                }
 
                 let imported_mod_id = imported.module_id;
                 let imported_mod_typedefs = &mut imported.typedefs;
@@ -265,7 +273,7 @@ impl<'map> Pass for LinkerPass<'map> {
                 already_imported_types.extend(seen.clone());
 
                 for typekey in &already_imported_types {
-                    if extern_types.contains(typekey) {
+                    if current_extern_types.contains(typekey) {
                         let module_id = importer_module.module_id;
                         let typedef = importer_module
                             .typedefs
@@ -285,7 +293,7 @@ impl<'map> Pass for LinkerPass<'map> {
                         .unwrap()
                         .clone();
 
-                    if extern_types.contains(&typekey) {
+                    if current_extern_types.contains(&typekey) {
                         typedef = TypeDefinition {
                             importer: Some(importer_module.module_id),
                             ..typedef
@@ -296,6 +304,11 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
                 dbg!(&importer_module.typedefs);
             }
+            state
+                .scope
+                .data
+                .extern_imported_types
+                .insert(importer_module.module_id, extern_types);
         }
 
         let mut modules: Vec<Module> = modules
@@ -308,6 +321,54 @@ impl<'map> Pass for LinkerPass<'map> {
         }
 
         Ok(())
+    }
+
+    fn function(
+        &mut self,
+        function: &mut FunctionDefinition,
+        mut state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        if matches!(function.kind, FunctionDefinitionKind::Local(_, _)) {
+            let mod_id = state.scope.module_id.unwrap();
+            let extern_types = &state.scope.data.extern_imported_types.get(&mod_id);
+            if let Some(extern_types) = extern_types {
+                function.return_type = function.return_type.update_imported(*extern_types, mod_id);
+                dbg!(&function.return_type);
+            }
+        }
+        Ok(())
+    }
+}
+
+impl TypeKind {
+    fn update_imported(
+        &self,
+        extern_types: &HashMap<String, SourceModuleId>,
+        importer_mod_id: SourceModuleId,
+    ) -> TypeKind {
+        match &self {
+            TypeKind::Array(type_kind, len) => {
+                TypeKind::Array(Box::new(type_kind.update_imported(extern_types, importer_mod_id)), *len)
+            }
+            TypeKind::CustomType(custom_type_key) => {
+                if let Some(mod_id) = extern_types.get(&custom_type_key.0) {
+                    TypeKind::CustomType(CustomTypeKey(custom_type_key.0.clone(), *mod_id))
+                } else {
+                    self.clone()
+                }
+            }
+            TypeKind::Borrow(type_kind, mutable) => TypeKind::Borrow(
+                Box::new(type_kind.update_imported(extern_types, importer_mod_id)),
+                *mutable,
+            ),
+            TypeKind::UserPtr(type_kind) => {
+                TypeKind::UserPtr(Box::new(type_kind.update_imported(extern_types, importer_mod_id)))
+            }
+            TypeKind::CodegenPtr(type_kind) => {
+                TypeKind::CodegenPtr(Box::new(type_kind.update_imported(extern_types, importer_mod_id)))
+            }
+            _ => self.clone(),
+        }
     }
 }
 

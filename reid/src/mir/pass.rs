@@ -121,6 +121,7 @@ pub type BinopMap = Storage<ScopeBinopKey, ScopeBinopDef>;
 
 #[derive(Clone, Default, Debug)]
 pub struct Scope<Data: Clone + Default> {
+    pub module_id: Option<SourceModuleId>,
     pub binops: BinopMap,
     pub function_returns: Storage<String, ScopeFunction>,
     pub variables: Storage<String, ScopeVariable>,
@@ -133,6 +134,7 @@ pub struct Scope<Data: Clone + Default> {
 impl<Data: Clone + Default> Scope<Data> {
     pub fn inner(&self) -> Scope<Data> {
         Scope {
+            module_id: self.module_id,
             function_returns: self.function_returns.clone(),
             variables: self.variables.clone(),
             binops: self.binops.clone(),
@@ -356,6 +358,8 @@ impl Context {
 
 impl Module {
     fn pass<T: Pass>(&mut self, pass: &mut T, state: &mut State<T::TError>, scope: &mut Scope<T::Data>) -> PassResult {
+        scope.module_id = Some(self.module_id);
+
         for typedef in &self.typedefs {
             scope
                 .types
