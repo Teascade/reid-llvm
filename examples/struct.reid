@@ -11,6 +11,8 @@ fn main() -> u32 {
         second: 3,
     };
 
+    value.second = 17;
+
 
     return value.second;
 }

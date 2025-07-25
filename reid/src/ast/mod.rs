@@ -101,6 +101,7 @@ pub enum ExpressionKind {
 pub enum UnaryOperator {
     Plus,
     Minus,
+    Not,
 }
 
 #[derive(Debug, Clone, Copy)]

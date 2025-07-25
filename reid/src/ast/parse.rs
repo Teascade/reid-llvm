@@ -87,6 +87,7 @@ impl Parse for UnaryOperator {
             match token {
                 Token::Plus => Ok(UnaryOperator::Plus),
                 Token::Minus => Ok(UnaryOperator::Minus),
+                Token::Exclamation => Ok(UnaryOperator::Not),
                 _ => Err(stream.expected_err("unary operator")?),
             }
         } else {
@@ -174,20 +175,11 @@ impl Parse for PrimaryExpression {
         use ExpressionKind as Kind;
 
         let mut expr = if let Ok(exp) = stream.parse() {
-            Expression(
-                Kind::FunctionCall(Box::new(exp)),
-                stream.get_range().unwrap(),
-            )
+            Expression(Kind::FunctionCall(Box::new(exp)), stream.get_range().unwrap())
         } else if let Ok(block) = stream.parse() {
-            Expression(
-                Kind::BlockExpr(Box::new(block)),
-                stream.get_range().unwrap(),
-            )
+            Expression(Kind::BlockExpr(Box::new(block)), stream.get_range().unwrap())
         } else if let Some(Token::If) = stream.peek() {
-            Expression(
-                Kind::IfExpr(Box::new(stream.parse()?)),
-                stream.get_range().unwrap(),
-            )
+            Expression(Kind::IfExpr(Box::new(stream.parse()?)), stream.get_range().unwrap())
         } else if let (Some(Token::Et), Some(Token::MutKeyword)) = (stream.peek(), stream.peek2()) {
             stream.next(); // Consume Et
             stream.next(); // Consume mut
@@ -195,15 +187,11 @@ impl Parse for PrimaryExpression {
                 return Err(stream.expected_err("identifier")?);
             };
             Expression(Kind::Borrow(name, true), stream.get_range().unwrap())
-        } else if let (Some(Token::Et), Some(Token::Identifier(name))) =
-            (stream.peek(), stream.peek2())
-        {
+        } else if let (Some(Token::Et), Some(Token::Identifier(name))) = (stream.peek(), stream.peek2()) {
             stream.next(); // Consume Et
             stream.next(); // Consume identifier
             Expression(Kind::Borrow(name, false), stream.get_range().unwrap())
-        } else if let (Some(Token::Star), Some(Token::Identifier(name))) =
-            (stream.peek(), stream.peek2())
-        {
+        } else if let (Some(Token::Star), Some(Token::Identifier(name))) = (stream.peek(), stream.peek2()) {
             stream.next(); // Consume Et
             stream.next(); // Consume identifier
             Expression(Kind::Deref(name), stream.get_range().unwrap())
@@ -225,49 +213,35 @@ impl Parse for PrimaryExpression {
                 }
                 Token::BinaryValue(v) => {
                     stream.next(); // Consume binary
-                    let value =
-                        u128::from_str_radix(&v, 2).expect("Value is not parseable as u128!");
+                    let value = u128::from_str_radix(&v, 2).expect("Value is not parseable as u128!");
                     if let Ok(expr) = specific_int_lit(value, &mut stream) {
                         expr
                     } else {
-                        Expression(
-                            Kind::Literal(Literal::Integer(value)),
-                            stream.get_range().unwrap(),
-                        )
+                        Expression(Kind::Literal(Literal::Integer(value)), stream.get_range().unwrap())
                     }
                 }
                 Token::OctalValue(v) => {
                     stream.next(); // Consume octal
-                    let value =
-                        u128::from_str_radix(&v, 8).expect("Value is not parseable as u128!");
+                    let value = u128::from_str_radix(&v, 8).expect("Value is not parseable as u128!");
                     if let Ok(expr) = specific_int_lit(value, &mut stream) {
                         expr
                     } else {
-                        Expression(
-                            Kind::Literal(Literal::Integer(value)),
-                            stream.get_range().unwrap(),
-                        )
+                        Expression(Kind::Literal(Literal::Integer(value)), stream.get_range().unwrap())
                     }
                 }
                 Token::HexadecimalValue(v) => {
                     stream.next(); // Consume hexadecimal
 
-                    let value =
-                        u128::from_str_radix(&v, 16).expect("Value is not parseable as u128!");
+                    let value = u128::from_str_radix(&v, 16).expect("Value is not parseable as u128!");
                     if let Ok(expr) = specific_int_lit(value, &mut stream) {
                         expr
                     } else {
-                        Expression(
-                            Kind::Literal(Literal::Integer(value)),
-                            stream.get_range().unwrap(),
-                        )
+                        Expression(Kind::Literal(Literal::Integer(value)), stream.get_range().unwrap())
                     }
                 }
                 Token::DecimalValue(v) => {
                     stream.next(); // Consume decimal
-                    if let (Some(Token::Dot), Some(Token::DecimalValue(fractional))) =
-                        (stream.peek(), stream.peek2())
-                    {
+                    if let (Some(Token::Dot), Some(Token::DecimalValue(fractional))) = (stream.peek(), stream.peek2()) {
                         stream.next(); // Consume dot
                         stream.next(); // Consume fractional
 
@@ -278,30 +252,20 @@ impl Parse for PrimaryExpression {
                         if let Ok(expr) = specific_float_lit(value, &mut stream) {
                             expr
                         } else {
-                            Expression(
-                                Kind::Literal(Literal::Decimal(value)),
-                                stream.get_range().unwrap(),
-                            )
+                            Expression(Kind::Literal(Literal::Decimal(value)), stream.get_range().unwrap())
                         }
                     } else {
-                        let value =
-                            u128::from_str_radix(&v, 10).expect("Value is not parseable as u128!");
+                        let value = u128::from_str_radix(&v, 10).expect("Value is not parseable as u128!");
                         if let Ok(expr) = specific_int_lit(value, &mut stream) {
                             expr
                         } else {
-                            Expression(
-                                Kind::Literal(Literal::Integer(value)),
-                                stream.get_range().unwrap(),
-                            )
+                            Expression(Kind::Literal(Literal::Integer(value)), stream.get_range().unwrap())
                         }
                     }
                 }
                 Token::StringLit(v) => {
                     stream.next(); // Consume
-                    Expression(
-                        Kind::Literal(Literal::String(v.clone())),
-                        stream.get_range().unwrap(),
-                    )
+                    Expression(Kind::Literal(Literal::String(v.clone())), stream.get_range().unwrap())
                 }
                 Token::CharLit(v) => {
                     stream.next(); // Consume
@@ -319,17 +283,11 @@ impl Parse for PrimaryExpression {
                 }
                 Token::True => {
                     stream.next(); // Consume
-                    Expression(
-                        Kind::Literal(Literal::Bool(true)),
-                        stream.get_range().unwrap(),
-                    )
+                    Expression(Kind::Literal(Literal::Bool(true)), stream.get_range().unwrap())
                 }
                 Token::False => {
                     stream.next(); // Consume
-                    Expression(
-                        Kind::Literal(Literal::Bool(false)),
-                        stream.get_range().unwrap(),
-                    )
+                    Expression(Kind::Literal(Literal::Bool(false)), stream.get_range().unwrap())
                 }
                 Token::ParenOpen => {
                     stream.next(); // Consume
@@ -343,16 +301,14 @@ impl Parse for PrimaryExpression {
                         if let Some(Token::Semi) = stream.peek() {
                             stream.next(); // Consume colon
                             let Some(Token::DecimalValue(val)) = stream.next() else {
-                                return Err(stream
-                                    .expecting_err("decimal value describing array length")?);
+                                return Err(stream.expecting_err("decimal value describing array length")?);
                             };
                             stream.expect(Token::BracketClose)?;
                             Expression(
                                 Kind::ArrayShort(
                                     Box::new(exp),
-                                    u64::from_str_radix(&val, 10).expect(
-                                        "Unable to parse array length to 64-bit decimal value",
-                                    ),
+                                    u64::from_str_radix(&val, 10)
+                                        .expect("Unable to parse array length to 64-bit decimal value"),
                                 ),
                                 stream.get_range().unwrap(),
                             )
@@ -514,11 +470,7 @@ impl Parse for FunctionCallExpression {
 
             stream.expect(Token::ParenClose)?;
 
-            Ok(FunctionCallExpression(
-                name,
-                args,
-                stream.get_range().unwrap(),
-            ))
+            Ok(FunctionCallExpression(name, args, stream.get_range().unwrap()))
         } else {
             Err(stream.expected_err("identifier")?)
         }
@@ -535,12 +487,7 @@ impl Parse for IfExpression {
         } else {
             None
         };
-        Ok(IfExpression(
-            cond,
-            then_b,
-            else_b,
-            stream.get_range().unwrap(),
-        ))
+        Ok(IfExpression(cond, then_b, else_b, stream.get_range().unwrap()))
     }
 }
 
@@ -700,11 +647,7 @@ impl Parse for Block {
             statements.push(statement);
         }
         stream.expect(Token::BraceClose)?;
-        Ok(Block(
-            statements,
-            return_stmt,
-            stream.get_range_prev().unwrap(),
-        ))
+        Ok(Block(statements, return_stmt, stream.get_range_prev().unwrap()))
     }
 }
 
@@ -809,9 +752,7 @@ impl Parse for BlockLevelStatement {
         use BlockLevelStatement as Stmt;
         Ok(match stream.peek() {
             Some(Token::LetKeyword) => Stmt::Let(stream.parse()?),
-            Some(Token::ImportKeyword) => Stmt::Import {
-                _i: stream.parse()?,
-            },
+            Some(Token::ImportKeyword) => Stmt::Import { _i: stream.parse()? },
             Some(Token::ReturnKeyword) => {
                 stream.next();
                 let exp = stream.parse().ok();
@@ -924,9 +865,7 @@ impl Parse for TopLevelStatement {
                 stream.expect(Token::Semi)?;
                 extern_fn
             }
-            Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
-                Stmt::FunctionDefinition(stream.parse()?)
-            }
+            Some(Token::FnKeyword) | Some(Token::PubKeyword) => Stmt::FunctionDefinition(stream.parse()?),
             Some(Token::Struct) => {
                 let StructDefinition(name, fields, range) = stream.parse::<StructDefinition>()?;
                 Stmt::TypeDefinition(TypeDefinition {

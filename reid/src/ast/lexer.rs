@@ -298,9 +298,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '\"' | '\'' => {
                 let mut value = String::new();
                 let mut escape_next = false;
-                while cursor.first().is_some()
-                    && (cursor.first() != Some(*character) || escape_next)
-                {
+                while cursor.first().is_some() && (cursor.first() != Some(*character) || escape_next) {
                     if cursor.first() == Some('\\') && !escape_next {
                         cursor.next(); // Consume backslash and always add next character
                         escape_next = true;
@@ -366,8 +364,7 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
                 let mut numerics = DECIMAL_NUMERICS;
                 if let Some(second) = cursor.second() {
                     if cursor.first() == Some('x')
-                        && HEXADECIMAL_NUMERICS
-                            .contains(&second.to_lowercase().next().unwrap_or('.'))
+                        && HEXADECIMAL_NUMERICS.contains(&second.to_lowercase().next().unwrap_or('.'))
                     {
                         cursor.next();
                         value = NumberType::Hexadecimal(String::new());
@@ -464,9 +461,7 @@ impl AddAssign<char> for NumberType {
     fn add_assign(&mut self, rhs: char) {
         *self = match self {
             NumberType::Decimal(val) => NumberType::Decimal(val.to_owned() + &rhs.to_string()),
-            NumberType::Hexadecimal(val) => {
-                NumberType::Hexadecimal(val.to_owned() + &rhs.to_string())
-            }
+            NumberType::Hexadecimal(val) => NumberType::Hexadecimal(val.to_owned() + &rhs.to_string()),
             NumberType::Octal(val) => NumberType::Octal(val.to_owned() + &rhs.to_string()),
             NumberType::Binary(val) => NumberType::Binary(val.to_owned() + &rhs.to_string()),
         };

@@ -366,6 +366,15 @@ impl ast::Expression {
                     Box::new(expr.process(module_id)),
                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                 ),
+                ast::UnaryOperator::Not => mir::ExprKind::BinOp(
+                    mir::BinaryOperator::Cmp(mir::CmpOperator::EQ),
+                    Box::new(expr.process(module_id)),
+                    Box::new(mir::Expression(
+                        mir::ExprKind::Literal(mir::Literal::Bool(false)),
+                        expr.1.as_meta(module_id),
+                    )),
+                    mir::TypeKind::Bool,
+                ),
             },
             ast::ExpressionKind::CastTo(expression, ty) => mir::ExprKind::CastTo(
                 Box::new(expression.process(module_id)),
