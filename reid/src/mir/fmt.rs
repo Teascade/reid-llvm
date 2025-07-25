@@ -152,24 +152,14 @@ impl Display for StmtKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             StmtKind::Let(var, mutable, block) => {
-                write!(
-                    f,
-                    "let{} {} = {}",
-                    if *mutable { " mut" } else { "" },
-                    var,
-                    block
-                )
+                write!(f, "let{} {} = {}", if *mutable { " mut" } else { "" }, var, block)
             }
             StmtKind::Set(var, expr) => write!(f, "{} = {}", var, expr),
             StmtKind::Import(n) => write!(f, "import {}", n),
             StmtKind::Expression(exp) => Display::fmt(exp, f),
 
             StmtKind::While(while_statement) => {
-                write!(
-                    f,
-                    "while {} {}",
-                    while_statement.condition, while_statement.block,
-                )
+                write!(f, "while {} {}", while_statement.condition, while_statement.block,)
             }
         }
     }
@@ -189,7 +179,12 @@ impl Display for ExprKind {
         match self {
             ExprKind::Variable(var) => Display::fmt(var, f),
             ExprKind::Literal(lit) => Display::fmt(lit, f),
-            ExprKind::BinOp(op, lhs, rhs) => write!(f, "{} {} {}", lhs, op, rhs),
+            ExprKind::BinOp(op, lhs, rhs, ty) => {
+                write!(f, "{} {} {} (= ", lhs, op, rhs)?;
+                Debug::fmt(ty, f)?;
+                f.write_char(')')?;
+                Ok(())
+            }
             ExprKind::FunctionCall(fc) => Display::fmt(fc, f),
             ExprKind::If(if_exp) => Display::fmt(&if_exp, f),
             ExprKind::Block(block) => Display::fmt(block, f),

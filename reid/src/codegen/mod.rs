@@ -5,20 +5,18 @@ use intrinsics::*;
 use reid_lib::{
     compile::CompiledModule,
     debug_information::{
-        DebugFileData, DebugLocalVariable, DebugLocation, DebugMetadata, DebugRecordKind,
-        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData,
-        DwarfFlags, InstructionDebugRecordData,
+        DebugFileData, DebugLocalVariable, DebugLocation, DebugMetadata, DebugRecordKind, DebugSubprogramData,
+        DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DwarfFlags, InstructionDebugRecordData,
     },
-    CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr, Module,
-    NamedStruct, TerminatorKind as Term, Type,
+    CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr, Module, NamedStruct,
+    TerminatorKind as Term, Type,
 };
 use scope::*;
 
 use crate::{
     mir::{
-        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind,
-        NamedVariableRef, SourceModuleId, StructField, StructType, TypeDefinitionKind, TypeKind,
-        WhileStatement,
+        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind, NamedVariableRef,
+        SourceModuleId, StructField, StructType, TypeDefinitionKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -83,9 +81,7 @@ struct State {
 impl State {
     /// Sets should load, returning a new state
     fn load(self, should: bool) -> State {
-        State {
-            should_load: should,
-        }
+        State { should_load: should }
     }
 }
 
@@ -235,10 +231,7 @@ impl mir::Module {
                             let ir_function = module.function(
                                 &binop_fn_name,
                                 binop.return_type.get_type(&type_values),
-                                vec![
-                                    binop.lhs.1.get_type(&type_values),
-                                    binop.rhs.1.get_type(&type_values),
-                                ],
+                                vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
                                 FunctionFlags {
                                     inline: true,
                                     ..Default::default()
@@ -287,9 +280,7 @@ impl mir::Module {
                                     &binop.return_type,
                                     &ir_function,
                                     match &binop.fn_kind {
-                                        FunctionDefinitionKind::Local(_, meta) => {
-                                            meta.into_debug(tokens, compile_unit)
-                                        }
+                                        FunctionDefinitionKind::Local(_, meta) => meta.into_debug(tokens, compile_unit),
                                         FunctionDefinitionKind::Extern(_) => None,
                                         FunctionDefinitionKind::Intrinsic(_) => None,
                                     },
@@ -352,9 +343,7 @@ impl mir::Module {
                     &mir_function.return_type,
                     &function,
                     match &mir_function.kind {
-                        FunctionDefinitionKind::Local(..) => {
-                            mir_function.signature().into_debug(tokens, compile_unit)
-                        }
+                        FunctionDefinitionKind::Local(..) => mir_function.signature().into_debug(tokens, compile_unit),
                         FunctionDefinitionKind::Extern(_) => None,
                         FunctionDefinitionKind::Intrinsic(_) => None,
                     },
@@ -386,13 +375,10 @@ impl FunctionDefinitionKind {
 
                         let fn_param_ty = &return_type.get_debug_type(&debug, scope);
 
-                        let debug_ty =
-                            debug
-                                .info
-                                .debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
-                                    parameters: vec![*fn_param_ty],
-                                    flags: DwarfFlags,
-                                }));
+                        let debug_ty = debug.info.debug_type(DebugTypeData::Subprogram(DebugSubprogramType {
+                            parameters: vec![*fn_param_ty],
+                            flags: DwarfFlags,
+                        }));
 
                         let subprogram = debug.info.subprogram(DebugSubprogramData {
                             name: name.clone(),
@@ -477,9 +463,7 @@ impl FunctionDefinitionKind {
                 }
 
                 if let Some(debug) = &scope.debug {
-                    if let Some(location) =
-                        &block.return_meta().into_debug(scope.tokens, debug.scope)
-                    {
+                    if let Some(location) = &block.return_meta().into_debug(scope.tokens, debug.scope) {
                         let location = debug.info.location(&debug.scope, *location);
                         scope.block.set_terminator_location(location).unwrap();
                     }
@@ -536,11 +520,7 @@ impl mir::Block {
 }
 
 impl mir::Statement {
-    fn codegen<'ctx, 'a>(
-        &self,
-        scope: &mut Scope<'ctx, 'a>,
-        state: &State,
-    ) -> Result<Option<StackValue>, ErrorKind> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Result<Option<StackValue>, ErrorKind> {
         let location = scope.debug.clone().map(|d| {
             let location = self.1.into_debug(scope.tokens, d.scope).unwrap();
             d.info.location(&d.scope, location)
@@ -557,10 +537,7 @@ impl mir::Statement {
 
                 let store = scope
                     .block
-                    .build_named(
-                        format!("{}.store", name),
-                        Instr::Store(alloca, value.instr()),
-                    )
+                    .build_named(format!("{}.store", name), Instr::Store(alloca, value.instr()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location);
 
@@ -632,17 +609,12 @@ impl mir::Statement {
             }
             mir::StmtKind::Import(_) => todo!(),
             mir::StmtKind::Expression(expression) => expression.codegen(scope, state),
-            mir::StmtKind::While(WhileStatement {
-                condition, block, ..
-            }) => {
+            mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
                 let condition_block = scope.function.block("while.cond");
                 let condition_true_block = scope.function.block("while.body");
                 let condition_failed_block = scope.function.block("while.end");
 
-                scope
-                    .block
-                    .terminate(Term::Br(condition_block.value()))
-                    .unwrap();
+                scope.block.terminate(Term::Br(condition_block.value())).unwrap();
                 let mut condition_scope = scope.with_block(condition_block);
                 let condition_res = condition.codegen(&mut condition_scope, state)?.unwrap();
                 let true_instr = condition_scope
@@ -651,11 +623,7 @@ impl mir::Statement {
                     .unwrap();
                 let check = condition_scope
                     .block
-                    .build(Instr::ICmp(
-                        CmpPredicate::EQ,
-                        condition_res.instr(),
-                        true_instr,
-                    ))
+                    .build(Instr::ICmp(CmpPredicate::EQ, condition_res.instr(), true_instr))
                     .unwrap();
 
                 condition_scope
@@ -685,16 +653,13 @@ impl mir::Statement {
 }
 
 impl mir::Expression {
-    fn codegen<'ctx, 'a>(
-        &self,
-        scope: &mut Scope<'ctx, 'a>,
-        state: &State,
-    ) -> Result<Option<StackValue>, ErrorKind> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Result<Option<StackValue>, ErrorKind> {
         let location = if let Some(debug) = &scope.debug {
-            Some(debug.info.location(
-                &debug.scope,
-                self.1.into_debug(scope.tokens, debug.scope).unwrap(),
-            ))
+            Some(
+                debug
+                    .info
+                    .location(&debug.scope, self.1.into_debug(scope.tokens, debug.scope).unwrap()),
+            )
         } else {
             None
         };
@@ -715,10 +680,7 @@ impl mir::Expression {
                                         .block
                                         .build_named(
                                             format!("{}", varref.1),
-                                            Instr::Load(
-                                                v.0.instr(),
-                                                inner.get_type(scope.type_values),
-                                            ),
+                                            Instr::Load(v.0.instr(), inner.get_type(scope.type_values)),
                                         )
                                         .unwrap(),
                                 ),
@@ -736,13 +698,9 @@ impl mir::Expression {
                 StackValueKind::Literal(lit.as_const(&mut scope.block)),
                 lit.as_type(),
             )),
-            mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp) => {
-                let lhs_val = lhs_exp
-                    .codegen(scope, state)?
-                    .expect("lhs has no return value");
-                let rhs_val = rhs_exp
-                    .codegen(scope, state)?
-                    .expect("rhs has no return value");
+            mir::ExprKind::BinOp(binop, lhs_exp, rhs_exp, return_ty) => {
+                let lhs_val = lhs_exp.codegen(scope, state)?.expect("lhs has no return value");
+                let rhs_val = rhs_exp.codegen(scope, state)?.expect("rhs has no return value");
                 let lhs = lhs_val.instr();
                 let rhs = rhs_val.instr();
 
@@ -755,15 +713,8 @@ impl mir::Expression {
                     let a = operation.codegen(&lhs_val, &rhs_val, scope)?;
                     Some(a)
                 } else {
-                    let lhs_type = lhs_exp
-                        .return_type(&Default::default(), scope.module_id)
-                        .unwrap()
-                        .1;
-                    let instr = match (
-                        binop,
-                        lhs_type.signed(),
-                        lhs_type.category() == TypeCategory::Real,
-                    ) {
+                    let lhs_type = lhs_exp.return_type(&Default::default(), scope.module_id).unwrap().1;
+                    let instr = match (binop, lhs_type.signed(), lhs_type.category() == TypeCategory::Real) {
                         (mir::BinaryOperator::Add, _, false) => Instr::Add(lhs, rhs),
                         (mir::BinaryOperator::Add, _, true) => Instr::FAdd(lhs, rhs),
                         (mir::BinaryOperator::Minus, _, false) => Instr::Sub(lhs, rhs),
@@ -771,12 +722,8 @@ impl mir::Expression {
                         (mir::BinaryOperator::Mult, _, false) => Instr::Mul(lhs, rhs),
                         (mir::BinaryOperator::Mult, _, true) => Instr::FMul(lhs, rhs),
                         (mir::BinaryOperator::And, _, _) => Instr::And(lhs, rhs),
-                        (mir::BinaryOperator::Cmp(i), _, false) => {
-                            Instr::ICmp(i.predicate(), lhs, rhs)
-                        }
-                        (mir::BinaryOperator::Cmp(i), _, true) => {
-                            Instr::FCmp(i.predicate(), lhs, rhs)
-                        }
+                        (mir::BinaryOperator::Cmp(i), _, false) => Instr::ICmp(i.predicate(), lhs, rhs),
+                        (mir::BinaryOperator::Cmp(i), _, true) => Instr::FCmp(i.predicate(), lhs, rhs),
                         (mir::BinaryOperator::Div, false, false) => Instr::UDiv(lhs, rhs),
                         (mir::BinaryOperator::Div, true, false) => Instr::SDiv(lhs, rhs),
                         (mir::BinaryOperator::Div, _, true) => Instr::FDiv(lhs, rhs),
@@ -828,15 +775,12 @@ impl mir::Expression {
                                 .unwrap()
                                 .maybe_location(&mut scope.block, location),
                         ),
-                        lhs_type,
+                        return_ty.clone(),
                     ))
                 }
             }
             mir::ExprKind::FunctionCall(call) => {
-                let ret_type_kind = call
-                    .return_type
-                    .known()
-                    .expect("function return type unknown");
+                let ret_type_kind = call.return_type.known().expect("function return type unknown");
 
                 let ret_type = ret_type_kind.get_type(scope.type_values);
 
@@ -852,17 +796,11 @@ impl mir::Expression {
                 .collect::<Vec<_>>();
 
                 let param_instrs = params.iter().map(|e| e.instr()).collect();
-                let callee = scope
-                    .functions
-                    .get(&call.name)
-                    .expect("function not found!");
+                let callee = scope.functions.get(&call.name).expect("function not found!");
 
                 let val = scope
                     .block
-                    .build_named(
-                        call.name.clone(),
-                        Instr::FunctionCall(callee.value(), param_instrs),
-                    )
+                    .build_named(call.name.clone(), Instr::FunctionCall(callee.value(), param_instrs))
                     .unwrap();
 
                 if let Some(debug) = &scope.debug {
@@ -939,10 +877,7 @@ impl mir::Expression {
                 let (ptr, contained_ty) = if let TypeKind::UserPtr(further_inner) = *inner.clone() {
                     let loaded = scope
                         .block
-                        .build_named(
-                            "load",
-                            Instr::Load(kind.instr(), inner.get_type(scope.type_values)),
-                        )
+                        .build_named("load", Instr::Load(kind.instr(), inner.get_type(scope.type_values)))
                         .unwrap();
                     (
                         scope
@@ -960,10 +895,7 @@ impl mir::Expression {
                     (
                         scope
                             .block
-                            .build_named(
-                                format!("array.gep"),
-                                Instr::GetElemPtr(kind.instr(), vec![idx]),
-                            )
+                            .build_named(format!("array.gep"), Instr::GetElemPtr(kind.instr(), vec![idx]))
                             .unwrap()
                             .maybe_location(&mut scope.block, location),
                         val_t.clone(),
@@ -980,10 +912,7 @@ impl mir::Expression {
                     (
                         scope
                             .block
-                            .build_named(
-                                format!("array.gep"),
-                                Instr::GetElemPtr(kind.instr(), vec![first, idx]),
-                            )
+                            .build_named(format!("array.gep"), Instr::GetElemPtr(kind.instr(), vec![first, idx]))
                             .unwrap()
                             .maybe_location(&mut scope.block, location),
                         val_t.clone(),
@@ -995,10 +924,7 @@ impl mir::Expression {
                         kind.derive(
                             scope
                                 .block
-                                .build_named(
-                                    "array.load",
-                                    Instr::Load(ptr, contained_ty.get_type(scope.type_values)),
-                                )
+                                .build_named("array.load", Instr::Load(ptr, contained_ty.get_type(scope.type_values)))
                                 .unwrap()
                                 .maybe_location(&mut scope.block, location),
                         ),
@@ -1012,21 +938,14 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::Array(expressions) => {
-                let stack_value_list: Vec<_> = try_all(
-                    expressions
-                        .iter()
-                        .map(|e| e.codegen(scope, state))
-                        .collect::<Vec<_>>(),
-                )
-                .map_err(|e| e.first().cloned().unwrap())?
-                .into_iter()
-                .map(|v| v.unwrap())
-                .collect();
+                let stack_value_list: Vec<_> =
+                    try_all(expressions.iter().map(|e| e.codegen(scope, state)).collect::<Vec<_>>())
+                        .map_err(|e| e.first().cloned().unwrap())?
+                        .into_iter()
+                        .map(|v| v.unwrap())
+                        .collect();
 
-                let instr_list = stack_value_list
-                    .iter()
-                    .map(|s| s.instr())
-                    .collect::<Vec<_>>();
+                let instr_list = stack_value_list.iter().map(|s| s.instr()).collect::<Vec<_>>();
 
                 let elem_ty_kind = stack_value_list
                     .iter()
@@ -1053,10 +972,7 @@ impl mir::Expression {
 
                     let index_expr = scope
                         .block
-                        .build_named(
-                            index.to_string(),
-                            Instr::Constant(ConstValue::U32(index as u32)),
-                        )
+                        .build_named(index.to_string(), Instr::Constant(ConstValue::U32(index as u32)))
                         .unwrap();
                     let first = scope
                         .block
@@ -1094,8 +1010,7 @@ impl mir::Expression {
                 let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };
-                let TypeDefinitionKind::Struct(struct_ty) =
-                    scope.get_typedef(&key).unwrap().kind.clone();
+                let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&key).unwrap().kind.clone();
                 let idx = struct_ty.find_index(field).unwrap();
 
                 let gep_n = format!("{}.{}.gep", key.0, field);
@@ -1103,10 +1018,7 @@ impl mir::Expression {
 
                 let value = scope
                     .block
-                    .build_named(
-                        gep_n,
-                        Instr::GetStructElemPtr(struct_val.instr(), idx as u32),
-                    )
+                    .build_named(gep_n, Instr::GetStructElemPtr(struct_val.instr(), idx as u32))
                     .unwrap();
 
                 // value.maybe_location(&mut scope.block, location);
@@ -1116,10 +1028,7 @@ impl mir::Expression {
                         struct_val.0.derive(
                             scope
                                 .block
-                                .build_named(
-                                    load_n,
-                                    Instr::Load(value, type_kind.get_type(scope.type_values)),
-                                )
+                                .build_named(load_n, Instr::Load(value, type_kind.get_type(scope.type_values)))
                                 .unwrap(),
                         ),
                         struct_ty.get_field_ty(&field).unwrap().clone(),
@@ -1127,9 +1036,7 @@ impl mir::Expression {
                 } else {
                     Some(StackValue(
                         struct_val.0.derive(value),
-                        TypeKind::CodegenPtr(Box::new(
-                            struct_ty.get_field_ty(&field).unwrap().clone(),
-                        )),
+                        TypeKind::CodegenPtr(Box::new(struct_ty.get_field_ty(&field).unwrap().clone())),
                     ))
                 }
             }
@@ -1222,10 +1129,7 @@ impl mir::Expression {
                                         .block
                                         .build_named(
                                             format!("{}.deref.inner", varref.1),
-                                            Instr::Load(
-                                                var_ptr_instr,
-                                                inner.get_type(scope.type_values),
-                                            ),
+                                            Instr::Load(var_ptr_instr, inner.get_type(scope.type_values)),
                                         )
                                         .unwrap(),
                                 ),
@@ -1253,17 +1157,14 @@ impl mir::Expression {
                     Some(val)
                 } else {
                     match (&val.1, type_kind) {
-                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(_)) => match *inner.clone()
-                        {
+                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(_)) => match *inner.clone() {
                             TypeKind::UserPtr(_) => Some(StackValue(
                                 val.0.derive(
                                     scope
                                         .block
                                         .build(Instr::BitCast(
                                             val.instr(),
-                                            Type::Ptr(Box::new(
-                                                type_kind.get_type(scope.type_values),
-                                            )),
+                                            Type::Ptr(Box::new(type_kind.get_type(scope.type_values))),
                                         ))
                                         .unwrap(),
                                 ),
@@ -1278,10 +1179,7 @@ impl mir::Expression {
                             val.0.derive(
                                 scope
                                     .block
-                                    .build(Instr::BitCast(
-                                        val.instr(),
-                                        type_kind.get_type(scope.type_values),
-                                    ))
+                                    .build(Instr::BitCast(val.instr(), type_kind.get_type(scope.type_values)))
                                     .unwrap(),
                             ),
                             type_kind.clone(),
@@ -1290,10 +1188,7 @@ impl mir::Expression {
                             let cast_instr = val
                                 .1
                                 .get_type(scope.type_values)
-                                .cast_instruction(
-                                    val.instr(),
-                                    &type_kind.get_type(scope.type_values),
-                                )
+                                .cast_instruction(val.instr(), &type_kind.get_type(scope.type_values))
                                 .unwrap();
 
                             Some(StackValue(
@@ -1313,11 +1208,7 @@ impl mir::Expression {
 }
 
 impl mir::IfExpression {
-    fn codegen<'ctx, 'a>(
-        &self,
-        scope: &mut Scope<'ctx, 'a>,
-        state: &State,
-    ) -> Result<Option<StackValue>, ErrorKind> {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Result<Option<StackValue>, ErrorKind> {
         let condition = self.0.codegen(scope, state)?.unwrap();
 
         // Create blocks
@@ -1389,10 +1280,7 @@ impl mir::IfExpression {
             incoming.extend(else_res.clone());
             let instr = scope
                 .block
-                .build_named(
-                    "phi",
-                    Instr::Phi(incoming.iter().map(|i| i.instr()).collect()),
-                )
+                .build_named("phi", Instr::Phi(incoming.iter().map(|i| i.instr()).collect()))
                 .unwrap();
 
             use StackValueKind::*;

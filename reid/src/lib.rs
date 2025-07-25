@@ -182,7 +182,7 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     println!("{}", &refs);
     #[cfg(debug_assertions)]
-    println!("{}", &context);
+    println!("{:#}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
 

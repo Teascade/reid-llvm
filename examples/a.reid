@@ -1,0 +1,6 @@
+pub fn abs(f: f32) -> f32 {
+    if f < 0.0 {
+        return f * (0.0 - 1.0);
+    }
+    return f;
+}

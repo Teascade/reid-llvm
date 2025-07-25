@@ -85,50 +85,41 @@ impl TypeKind {
         }
 
         match (self, other) {
-            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
-                    TypeKind::I8
-                    | TypeKind::I16
-                    | TypeKind::I32
-                    | TypeKind::I64
-                    | TypeKind::I128
-                    | TypeKind::U8
-                    | TypeKind::U16
-                    | TypeKind::U32
-                    | TypeKind::U64
-                    | TypeKind::U128 => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
-                match other {
-                    TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
-                    TypeKind::F16
-                    | TypeKind::F32B
-                    | TypeKind::F32
-                    | TypeKind::F64
-                    | TypeKind::F80
-                    | TypeKind::F128
-                    | TypeKind::F128PPC => Ok(other.clone()),
-                    _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
-                }
-            }
-            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
-                Ok(other.clone())
-            }
+            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => match other {
+                TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Integer)),
+                TypeKind::Vague(Vague::Integer) => Ok(TypeKind::Vague(Vague::Integer)),
+                TypeKind::I8
+                | TypeKind::I16
+                | TypeKind::I32
+                | TypeKind::I64
+                | TypeKind::I128
+                | TypeKind::U8
+                | TypeKind::U16
+                | TypeKind::U32
+                | TypeKind::U64
+                | TypeKind::U128 => Ok(other.clone()),
+                _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+            },
+            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => match other {
+                TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
+                TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
+                TypeKind::F16
+                | TypeKind::F32B
+                | TypeKind::F32
+                | TypeKind::F64
+                | TypeKind::F80
+                | TypeKind::F128
+                | TypeKind::F128PPC => Ok(other.clone()),
+                _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
+            },
+            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => Ok(other.clone()),
             (TypeKind::Borrow(val1, mut1), TypeKind::Borrow(val2, mut2)) => {
                 // Extracted to give priority for other collapse-error
                 let collapsed = val1.narrow_into(val2)?;
                 if mut1 == mut2 {
                     Ok(TypeKind::Borrow(Box::new(collapsed), *mut1 && *mut2))
                 } else {
-                    Err(ErrorKind::TypesDifferMutability(
-                        self.clone(),
-                        other.clone(),
-                    ))
+                    Err(ErrorKind::TypesDifferMutability(self.clone(), other.clone()))
                 }
             }
             (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
@@ -146,36 +137,30 @@ impl TypeKind {
             (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
                 TypeKind::Vague(VagueType::Unknown)
             }
-            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => {
-                match other {
-                    TypeKind::I8
-                    | TypeKind::I16
-                    | TypeKind::I32
-                    | TypeKind::I64
-                    | TypeKind::I128
-                    | TypeKind::U8
-                    | TypeKind::U16
-                    | TypeKind::U32
-                    | TypeKind::U64
-                    | TypeKind::U128 => TypeKind::Vague(VagueType::Integer),
-                    _ => TypeKind::Vague(VagueType::Unknown),
-                }
-            }
-            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => {
-                match other {
-                    TypeKind::F16
-                    | TypeKind::F32B
-                    | TypeKind::F32
-                    | TypeKind::F64
-                    | TypeKind::F80
-                    | TypeKind::F128
-                    | TypeKind::F128PPC => TypeKind::Vague(VagueType::Decimal),
-                    _ => TypeKind::Vague(VagueType::Unknown),
-                }
-            }
-            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => {
-                TypeKind::UserPtr(Box::new(val1.widen_into(val2)))
-            }
+            (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => match other {
+                TypeKind::I8
+                | TypeKind::I16
+                | TypeKind::I32
+                | TypeKind::I64
+                | TypeKind::I128
+                | TypeKind::U8
+                | TypeKind::U16
+                | TypeKind::U32
+                | TypeKind::U64
+                | TypeKind::U128 => TypeKind::Vague(VagueType::Integer),
+                _ => TypeKind::Vague(VagueType::Unknown),
+            },
+            (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => match other {
+                TypeKind::F16
+                | TypeKind::F32B
+                | TypeKind::F32
+                | TypeKind::F64
+                | TypeKind::F80
+                | TypeKind::F128
+                | TypeKind::F128PPC => TypeKind::Vague(VagueType::Decimal),
+                _ => TypeKind::Vague(VagueType::Unknown),
+            },
+            (TypeKind::UserPtr(val1), TypeKind::UserPtr(val2)) => TypeKind::UserPtr(Box::new(val1.widen_into(val2))),
             (TypeKind::CodegenPtr(val1), TypeKind::CodegenPtr(val2)) => {
                 TypeKind::CodegenPtr(Box::new(val1.widen_into(val2)))
             }
@@ -245,16 +230,10 @@ impl TypeKind {
                 Vague::TypeRef(_) => panic!("Hinted default!"),
                 VagueType::Decimal => TypeKind::F32,
             },
-            TypeKind::Array(type_kind, len) => {
-                TypeKind::Array(Box::new(type_kind.or_default()?), *len)
-            }
-            TypeKind::Borrow(type_kind, mutable) => {
-                TypeKind::Borrow(Box::new(type_kind.or_default()?), *mutable)
-            }
+            TypeKind::Array(type_kind, len) => TypeKind::Array(Box::new(type_kind.or_default()?), *len),
+            TypeKind::Borrow(type_kind, mutable) => TypeKind::Borrow(Box::new(type_kind.or_default()?), *mutable),
             TypeKind::UserPtr(type_kind) => TypeKind::UserPtr(Box::new(type_kind.or_default()?)),
-            TypeKind::CodegenPtr(type_kind) => {
-                TypeKind::CodegenPtr(Box::new(type_kind.or_default()?))
-            }
+            TypeKind::CodegenPtr(type_kind) => TypeKind::CodegenPtr(Box::new(type_kind.or_default()?)),
             _ => self.clone(),
         })
     }
@@ -270,37 +249,29 @@ impl TypeKind {
         let resolved = self.resolve_weak(refs);
         match resolved {
             TypeKind::Array(t, len) => TypeKind::Array(Box::new(t.resolve_ref(refs)), len),
-            TypeKind::Borrow(inner, mutable) => {
-                TypeKind::Borrow(Box::new(inner.resolve_ref(refs)), mutable)
-            }
+            TypeKind::Borrow(inner, mutable) => TypeKind::Borrow(Box::new(inner.resolve_ref(refs)), mutable),
             _ => resolved,
         }
     }
 
-    pub(super) fn assert_known(
-        &self,
-        refs: &TypeRefs,
-        state: &TypecheckPassState,
-    ) -> Result<TypeKind, ErrorKind> {
+    pub(super) fn assert_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<TypeKind, ErrorKind> {
         self.is_known(refs, state).map(|_| self.clone())
     }
 
-    pub(super) fn is_known(
-        &self,
-        refs: &TypeRefs,
-        state: &TypecheckPassState,
-    ) -> Result<(), ErrorKind> {
+    pub(super) fn is_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<(), ErrorKind> {
         match &self {
             TypeKind::Array(type_kind, _) => type_kind.as_ref().is_known(refs, state),
-            TypeKind::CustomType(custom_type_key) => state
-                .scope
-                .types
-                .get(custom_type_key)
-                .map(|_| ())
-                .ok_or(ErrorKind::NoSuchType(
-                    custom_type_key.0.clone(),
-                    state.module_id.unwrap(),
-                )),
+            TypeKind::CustomType(custom_type_key) => {
+                state
+                    .scope
+                    .types
+                    .get(custom_type_key)
+                    .map(|_| ())
+                    .ok_or(ErrorKind::NoSuchType(
+                        custom_type_key.0.clone(),
+                        state.module_id.unwrap(),
+                    ))
+            }
             TypeKind::Borrow(type_kind, _) => type_kind.is_known(refs, state),
             TypeKind::UserPtr(type_kind) => type_kind.is_known(refs, state),
             TypeKind::CodegenPtr(type_kind) => type_kind.is_known(refs, state),

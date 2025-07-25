@@ -410,28 +410,34 @@ impl Expression {
                 *literal = literal.clone().try_coerce(hint_t.cloned())?;
                 Ok(literal.as_type())
             }
-            ExprKind::BinOp(op, lhs, rhs) => {
+            ExprKind::BinOp(op, lhs, rhs, ret_ty) => {
                 // First find unfiltered parameters to binop
                 let lhs_res = lhs.typecheck(state, &typerefs, None);
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_res = rhs.typecheck(state, &typerefs, None);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
+                let expected_return_ty = ret_ty.resolve_ref(typerefs);
 
-                if let Some(binop) = typerefs
-                    .binop_types
-                    .find(&pass::ScopeBinopKey {
-                        params: (lhs_type.clone(), rhs_type.clone()),
-                        operator: *op,
-                    })
+                let binops = typerefs.binop_types.filter(&pass::ScopeBinopKey {
+                    params: (lhs_type.clone(), rhs_type.clone()),
+                    operator: *op,
+                });
+                if let Some(binop) = binops
+                    .iter()
+                    .filter(|f| f.1.return_ty == expected_return_ty)
                     .map(|v| (v.1.clone()))
+                    .next()
                 {
                     lhs.typecheck(state, &typerefs, Some(&binop.hands.0))?;
                     rhs.typecheck(state, &typerefs, Some(&binop.hands.1))?;
-                    Ok(binop.narrow(&lhs_type, &rhs_type).unwrap().2)
+                    *ret_ty = binop.narrow(&lhs_type, &rhs_type).unwrap().2;
+                    Ok(ret_ty.clone())
                 } else {
+                    dbg!(&binops);
                     dbg!(&op, &lhs, &rhs);
                     dbg!(&lhs_type);
                     dbg!(&rhs_type);
+                    dbg!(&expected_return_ty);
                     panic!()
                 }
             }

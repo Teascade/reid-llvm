@@ -291,7 +291,7 @@ impl Expression {
                 type_ref
             }
             ExprKind::Literal(literal) => Ok(type_refs.from_type(&literal.as_type()).unwrap()),
-            ExprKind::BinOp(op, lhs, rhs) => {
+            ExprKind::BinOp(op, lhs, rhs, return_ty) => {
                 // Infer LHS and RHS, and return binop type
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
@@ -306,11 +306,17 @@ impl Expression {
                         widened_lhs = widened_lhs.widen_into(&binop.hands.0);
                         widened_rhs = widened_rhs.widen_into(&binop.hands.1);
                     }
+                    let binop_res = type_refs.from_binop(*op, &lhs_ref, &rhs_ref);
                     lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
-                    Ok(type_refs.from_binop(*op, &lhs_ref, &rhs_ref))
+                    *return_ty = binop_res.as_type();
+                    Ok(binop_res)
                 } else {
-                    panic!();
+                    Err(ErrorKind::InvalidBinop(
+                        *op,
+                        lhs_ref.resolve_deep().unwrap(),
+                        rhs_ref.resolve_deep().unwrap(),
+                    ))
                 }
             }
             ExprKind::FunctionCall(function_call) => {

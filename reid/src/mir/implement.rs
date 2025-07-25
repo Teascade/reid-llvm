@@ -359,10 +359,7 @@ impl Statement {
                 expr.return_type(refs, mod_id)?,
                 Err(ReturnTypeOther::Let(var.2 + expr.1)),
             ),
-            Set(lhs, rhs) => if_hard(
-                rhs.return_type(refs, mod_id)?,
-                Err(ReturnTypeOther::Set(lhs.1 + rhs.1)),
-            ),
+            Set(lhs, rhs) => if_hard(rhs.return_type(refs, mod_id)?, Err(ReturnTypeOther::Set(lhs.1 + rhs.1))),
             Import(_) => todo!(),
             Expression(expression) => expression.return_type(refs, mod_id),
             While(_) => Err(ReturnTypeOther::Loop),
@@ -390,11 +387,14 @@ impl Expression {
         match &self.0 {
             Literal(lit) => Ok((ReturnKind::Soft, lit.as_type())),
             Variable(var) => var.return_type(),
-            BinOp(_, then_e, else_e) => {
+            BinOp(_, then_e, else_e, return_ty) => {
                 let then_r = then_e.return_type(refs, mod_id)?;
                 let else_r = else_e.return_type(refs, mod_id)?;
 
-                Ok(pick_return(then_r, else_r))
+                Ok(match (then_r.0, else_r.0) {
+                    (ReturnKind::Hard, ReturnKind::Hard) => (ReturnKind::Hard, return_ty.clone()),
+                    _ => (ReturnKind::Soft, return_ty.clone()),
+                })
             }
             Block(block) => block.return_type(refs, mod_id),
             FunctionCall(fcall) => fcall.return_type(),
@@ -457,7 +457,7 @@ impl Expression {
             ExprKind::Array(_) => None,
             ExprKind::Struct(_, _) => None,
             ExprKind::Literal(_) => None,
-            ExprKind::BinOp(_, _, _) => None,
+            ExprKind::BinOp(_, _, _, _) => None,
             ExprKind::FunctionCall(_) => None,
             ExprKind::If(_) => None,
             ExprKind::CastTo(expression, _) => expression.backing_var(),
@@ -472,7 +472,7 @@ impl Expression {
             ExprKind::Array(_) => None,
             ExprKind::Struct(..) => None,
             ExprKind::Literal(literal) => literal.num_value(),
-            ExprKind::BinOp(op, lhs, rhs) => match op {
+            ExprKind::BinOp(op, lhs, rhs, _) => match op {
                 BinaryOperator::Add => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a + b),
                 BinaryOperator::Minus => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a - b),
                 BinaryOperator::Mult => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a * b),
@@ -604,9 +604,7 @@ pub enum EqualsIssue {
 impl FunctionDefinition {
     pub fn equals_as_imported(&self, other: &FunctionDefinition) -> Result<(), EqualsIssue> {
         match &self.kind {
-            FunctionDefinitionKind::Local(_, metadata) => {
-                Err(EqualsIssue::ExistsLocally(*metadata))
-            }
+            FunctionDefinitionKind::Local(_, metadata) => Err(EqualsIssue::ExistsLocally(*metadata)),
             FunctionDefinitionKind::Extern(imported) => {
                 if *imported {
                     Err(EqualsIssue::ConflictWithImport(self.name.clone()))
@@ -618,10 +616,7 @@ impl FunctionDefinition {
                     {
                         Ok(())
                     } else {
-                        Err(EqualsIssue::AlreadyExtern(
-                            self.name.clone(),
-                            self.signature(),
-                        ))
+                        Err(EqualsIssue::AlreadyExtern(self.name.clone(), self.signature()))
                     }
                 }
             }

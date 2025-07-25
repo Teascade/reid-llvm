@@ -71,7 +71,10 @@ impl TypeRefKind {
                     .binop_types
                     .iter()
                     .filter(|b| b.1.operator == *op)
-                    .map(|b| b.1.narrow(&lhs, &rhs).map(|b| b.2))
+                    .map(|b| {
+                        b.1.narrow(&lhs.resolve_ref(types), &rhs.resolve_ref(types))
+                            .map(|b| b.2)
+                    })
                     .filter_map(|s| s);
                 if let Some(mut ty) = binops.next() {
                     while let Some(other) = binops.next() {
@@ -105,11 +108,11 @@ impl std::fmt::Display for TypeRefs {
             let idx = *typeref.borrow();
             writeln!(
                 f,
-                "{:<3} = {:<3} = {:?} = {}",
+                "{:<3} = {:<3} = {:?} = {:?}",
                 i,
                 unsafe { *self.recurse_type_ref(idx).borrow() },
+                self.retrieve_typeref(idx),
                 self.retrieve_wide_type(idx),
-                TypeKind::Vague(VagueType::TypeRef(idx)).resolve_ref(self)
             )?;
         }
         Ok(())
@@ -176,9 +179,13 @@ impl TypeRefs {
         return refs.get_unchecked(idx).clone();
     }
 
-    pub fn retrieve_wide_type(&self, idx: usize) -> Option<TypeKind> {
+    pub fn retrieve_typeref(&self, idx: usize) -> Option<TypeRefKind> {
         let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
-        self.hints.borrow().get(inner_idx).cloned().map(|t| t.widen(self))
+        self.hints.borrow().get(inner_idx).cloned()
+    }
+
+    pub fn retrieve_wide_type(&self, idx: usize) -> Option<TypeKind> {
+        self.retrieve_typeref(idx).map(|t| t.widen(self))
     }
 }
 
@@ -248,22 +255,45 @@ impl<'outer> ScopeTypeRefs<'outer> {
         unsafe {
             let mut hints = self.types.hints.borrow_mut();
             let existing = hints.get_unchecked_mut(*hint.0.borrow());
+
             match existing {
                 TypeRefKind::Direct(type_kind) => {
                     *type_kind = type_kind.narrow_into(&ty).ok()?;
                 }
                 TypeRefKind::BinOp(op, lhs, rhs) => {
+                    let op = op.clone();
+                    let lhs = lhs.clone();
+                    let rhs = rhs.clone();
+                    drop(hints);
+
+                    let lhs_resolved = lhs.resolve_ref(self.types);
+                    let rhs_resolved = rhs.resolve_ref(self.types);
+
                     let binops = self
                         .types
                         .binop_types
                         .iter()
-                        .filter(|b| b.1.operator == *op && b.1.return_ty == *ty);
+                        .filter(|b| b.1.operator == op && b.1.return_ty == *ty)
+                        .collect::<Vec<_>>();
                     for binop in binops {
-                        if let (Ok(lhs_narrow), Ok(rhs_narrow)) =
-                            (lhs.narrow_into(&binop.1.hands.0), rhs.narrow_into(&binop.1.hands.1))
-                        {
-                            *lhs = lhs_narrow;
-                            *rhs = rhs_narrow
+                        if let (Ok(lhs_narrow), Ok(rhs_narrow)) = (
+                            lhs_resolved.narrow_into(&binop.1.hands.0),
+                            rhs_resolved.narrow_into(&binop.1.hands.1),
+                        ) {
+                            match &lhs {
+                                TypeKind::Vague(VagueType::TypeRef(idx)) => {
+                                    let mut lhs_ref = TypeRef(Rc::new(RefCell::new(*idx)), self);
+                                    let narrowed = self.narrow_to_type(&mut lhs_ref, &lhs_narrow).unwrap_or(lhs_ref);
+                                }
+                                _ => {}
+                            };
+                            match &rhs {
+                                TypeKind::Vague(VagueType::TypeRef(idx)) => {
+                                    let mut rhs_ref = TypeRef(Rc::new(RefCell::new(*idx)), self);
+                                    let narrowed = self.narrow_to_type(&mut rhs_ref, &rhs_narrow).unwrap_or(rhs_ref);
+                                }
+                                _ => {}
+                            }
                         }
                     }
                 }

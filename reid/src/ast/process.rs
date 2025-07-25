@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crate::{
     ast::{self},
     mir::{
-        self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind,
-        StructField, StructType, WhileStatement,
+        self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind, StructField,
+        StructType, WhileStatement,
     },
 };
 
@@ -162,9 +162,7 @@ impl ast::Block {
                     *range,
                 ),
                 ast::BlockLevelStatement::Import { _i } => todo!(),
-                ast::BlockLevelStatement::Expression(e) => {
-                    (StmtKind::Expression(e.process(module_id)), e.1)
-                }
+                ast::BlockLevelStatement::Expression(e) => (StmtKind::Expression(e.process(module_id)), e.1),
                 ast::BlockLevelStatement::Return(_, e) => {
                     if let Some(e) = e {
                         (StmtKind::Expression(e.process(module_id)), e.1)
@@ -197,11 +195,10 @@ impl ast::Block {
                                         counter_range.as_meta(module_id),
                                     )),
                                     Box::new(mir::Expression(
-                                        mir::ExprKind::Literal(mir::Literal::Vague(
-                                            mir::VagueLiteral::Number(1),
-                                        )),
+                                        mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(1))),
                                         counter_range.as_meta(module_id),
                                     )),
+                                    mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
                                 counter_range.as_meta(module_id),
                             ),
@@ -220,6 +217,7 @@ impl ast::Block {
                                         counter_range.as_meta(module_id),
                                     )),
                                     Box::new(end.process(module_id)),
+                                    mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
                                 counter_range.as_meta(module_id),
                             ),
@@ -292,22 +290,15 @@ impl ast::Expression {
                 binary_operator.mir(),
                 Box::new(lhs.process(module_id)),
                 Box::new(rhs.process(module_id)),
+                mir::TypeKind::Vague(mir::VagueType::Unknown),
             ),
-            ast::ExpressionKind::FunctionCall(fn_call_expr) => {
-                mir::ExprKind::FunctionCall(mir::FunctionCall {
-                    name: fn_call_expr.0.clone(),
-                    return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
-                    parameters: fn_call_expr
-                        .1
-                        .iter()
-                        .map(|e| e.process(module_id))
-                        .collect(),
-                    meta: fn_call_expr.2.as_meta(module_id),
-                })
-            }
-            ast::ExpressionKind::BlockExpr(block) => {
-                mir::ExprKind::Block(block.into_mir(module_id))
-            }
+            ast::ExpressionKind::FunctionCall(fn_call_expr) => mir::ExprKind::FunctionCall(mir::FunctionCall {
+                name: fn_call_expr.0.clone(),
+                return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
+                parameters: fn_call_expr.1.iter().map(|e| e.process(module_id)).collect(),
+                meta: fn_call_expr.2.as_meta(module_id),
+            }),
+            ast::ExpressionKind::BlockExpr(block) => mir::ExprKind::Block(block.into_mir(module_id)),
             ast::ExpressionKind::IfExpr(if_expression) => {
                 let cond = if_expression.0.process(module_id);
                 let then_block = if_expression.1.process(module_id);
@@ -364,6 +355,7 @@ impl ast::Expression {
                         expr.1.as_meta(module_id),
                     )),
                     Box::new(expr.process(module_id)),
+                    mir::TypeKind::Vague(mir::VagueType::Unknown),
                 ),
                 ast::UnaryOperator::Minus => mir::ExprKind::BinOp(
                     mir::BinaryOperator::Minus,
@@ -372,6 +364,7 @@ impl ast::Expression {
                         expr.1.as_meta(module_id),
                     )),
                     Box::new(expr.process(module_id)),
+                    mir::TypeKind::Vague(mir::VagueType::Unknown),
                 ),
             },
             ast::ExpressionKind::CastTo(expression, ty) => mir::ExprKind::CastTo(
@@ -457,15 +450,11 @@ impl ast::TypeKind {
             ast::TypeKind::Array(type_kind, length) => {
                 mir::TypeKind::Array(Box::new(type_kind.clone().into_mir(source_mod)), *length)
             }
-            ast::TypeKind::Custom(name) => {
-                mir::TypeKind::CustomType(CustomTypeKey(name.clone(), source_mod))
-            }
+            ast::TypeKind::Custom(name) => mir::TypeKind::CustomType(CustomTypeKey(name.clone(), source_mod)),
             ast::TypeKind::Borrow(type_kind, mutable) => {
                 mir::TypeKind::Borrow(Box::new(type_kind.clone().into_mir(source_mod)), *mutable)
             }
-            ast::TypeKind::Ptr(type_kind) => {
-                mir::TypeKind::UserPtr(Box::new(type_kind.clone().into_mir(source_mod)))
-            }
+            ast::TypeKind::Ptr(type_kind) => mir::TypeKind::UserPtr(Box::new(type_kind.clone().into_mir(source_mod))),
             ast::TypeKind::F16 => mir::TypeKind::F16,
             ast::TypeKind::F32B => mir::TypeKind::F32B,
             ast::TypeKind::F32 => mir::TypeKind::F32,

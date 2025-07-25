@@ -6,8 +6,7 @@ use reid_lib::{
 };
 
 use crate::mir::{
-    self, CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId,
-    TypeKind, WhileStatement,
+    self, CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId, TypeKind, WhileStatement,
 };
 
 #[derive(Debug)]
@@ -74,9 +73,7 @@ impl mir::FunctionDefinitionKind {
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         }
 
-        Allocator {
-            allocations: allocated,
-        }
+        Allocator { allocations: allocated }
     }
 }
 
@@ -126,9 +123,7 @@ impl mir::Statement {
             crate::mir::StmtKind::Expression(expression) => {
                 allocated.extend(expression.allocate(scope));
             }
-            crate::mir::StmtKind::While(WhileStatement {
-                condition, block, ..
-            }) => {
+            crate::mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
                 allocated.extend(condition.allocate(scope));
                 allocated.extend(block.allocate(scope));
             }
@@ -162,7 +157,7 @@ impl mir::Expression {
                 }
             }
             crate::mir::ExprKind::Literal(_) => {}
-            crate::mir::ExprKind::BinOp(_, lhs, rhs) => {
+            crate::mir::ExprKind::BinOp(_, lhs, rhs, _) => {
                 allocated.extend(lhs.allocate(scope));
                 allocated.extend(rhs.allocate(scope));
             }

@@ -256,7 +256,7 @@ pub enum ExprKind {
     Array(Vec<Expression>),
     Struct(String, Vec<(String, Expression)>),
     Literal(Literal),
-    BinOp(BinaryOperator, Box<Expression>, Box<Expression>),
+    BinOp(BinaryOperator, Box<Expression>, Box<Expression>, TypeKind),
     FunctionCall(FunctionCall),
     If(IfExpression),
     Block(Block),
@@ -270,11 +270,7 @@ pub struct Expression(pub ExprKind, pub Metadata);
 
 /// Condition, Then, Else
 #[derive(Debug)]
-pub struct IfExpression(
-    pub Box<Expression>,
-    pub Box<Expression>,
-    pub Box<Option<Expression>>,
-);
+pub struct IfExpression(pub Box<Expression>, pub Box<Expression>, pub Box<Option<Expression>>);
 
 #[derive(Debug)]
 pub struct FunctionCall {
