@@ -315,6 +315,9 @@ impl<'outer> ScopeTypeRefs<'outer> {
             let Some((_, binop)) = iter.next() else {
                 break None;
             };
+            if binop.operator != *op {
+                continue;
+            }
             if let Some(ret) = try_binop(lhs, rhs, binop) {
                 break Some(ret);
             }
