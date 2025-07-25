@@ -53,7 +53,7 @@ Currently missing big features (TODOs) are:
 - Importable binops?
 
 Big features that I want later but are not necessary:
-- Associated functions
+- Associated functions (for e.g. sizeof)
 - ~~User-defined binary operations~~ (DONE)
 - ~~Asymmetric binary operations (e.g. string + u32)~~ (DONE)
 - Error handling

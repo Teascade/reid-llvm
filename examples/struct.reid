@@ -7,11 +7,10 @@ struct Test {
 
 fn main() -> u32 {
     let mut value = Test {
-        field: 5,
         second: 3,
+        field: 5,
     };
 
-    value.second = 17;
 
     return value.second;
 }

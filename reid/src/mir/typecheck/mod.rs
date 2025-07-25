@@ -50,6 +50,8 @@ pub enum ErrorKind {
     TriedAccessingNonStruct(TypeKind),
     #[error("No such struct-field on type {0}")]
     NoSuchField(String),
+    #[error("Missing definition for field \"{0}\"")]
+    MissingStructField(String),
     #[error("Struct field declared twice {0}")]
     DuplicateStructField(String),
     #[error("Type declared twice {0}")]

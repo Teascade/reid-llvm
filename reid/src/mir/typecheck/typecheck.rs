@@ -632,6 +632,13 @@ impl Expression {
                     .get_struct_type(&type_key)
                     .ok_or(ErrorKind::NoSuchType(struct_name.clone(), type_key.1))?
                     .clone();
+
+                let mut expected_fields = if let Some(struct_ty) = state.scope.get_struct_type(&type_key) {
+                    struct_ty.0.iter().map(|f| f.0.clone()).collect()
+                } else {
+                    HashSet::new()
+                };
+
                 for (field_name, field_expr) in items {
                     // Get expected type, or error if field does not exist
                     let expected_ty = state.or_else(
@@ -641,6 +648,7 @@ impl Expression {
                         &TypeKind::Vague(VagueType::Unknown),
                         field_expr.1,
                     );
+                    expected_fields.remove(field_name);
 
                     // Typecheck the actual expression
                     let expr_res = field_expr.typecheck(state, typerefs, HintKind::Coerce(expected_ty.clone()));
@@ -649,6 +657,15 @@ impl Expression {
                     // Make sure both are the same type, report error if not
                     state.ok(expr_ty.narrow_into(&expr_ty), field_expr.1);
                 }
+
+                state.note_errors(
+                    &expected_fields
+                        .into_iter()
+                        .map(|v| ErrorKind::MissingStructField(v))
+                        .collect(),
+                    self.1,
+                );
+
                 Ok(TypeKind::CustomType(type_key))
             }
             ExprKind::Borrow(var_ref, mutable) => {
