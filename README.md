@@ -46,7 +46,7 @@ Currently missing big features (TODOs) are:
 - ~~Loops~~ (DONE)
 - ~~Intrinsic functions~~ (DONE)
 - ~~Ability to specify types in literals and variable definitions~~ (DONE)
-- Debug Information (PARTIALLY DONE)
+- ~~Debug Information~~ (DONE)
 - Not-Unary
 - Importing types from other modules
 - Importable binops?
