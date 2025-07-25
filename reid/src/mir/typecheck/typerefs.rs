@@ -15,10 +15,7 @@ use super::{
 };
 
 #[derive(Clone)]
-pub struct TypeRef<'scope>(
-    pub(super) TypeIdRef,
-    pub(super) &'scope ScopeTypeRefs<'scope>,
-);
+pub struct TypeRef<'scope>(pub(super) TypeIdRef, pub(super) &'scope ScopeTypeRefs<'scope>);
 
 impl<'scope> TypeRef<'scope> {
     /// Resolve current type in a weak manner, not resolving any Arrays or
@@ -99,7 +96,7 @@ pub struct TypeRefs {
     pub(super) hints: RefCell<Vec<TypeRefKind>>,
     /// Indirect ID-references, referring to hints-vec
     pub(super) type_refs: RefCell<Vec<TypeIdRef>>,
-    binop_types: BinopMap,
+    pub(super) binop_types: BinopMap,
 }
 
 impl std::fmt::Display for TypeRefs {
@@ -132,9 +129,7 @@ impl TypeRefs {
         let idx = self.hints.borrow().len();
         let typecell = Rc::new(RefCell::new(idx));
         self.type_refs.borrow_mut().push(typecell.clone());
-        self.hints
-            .borrow_mut()
-            .push(TypeRefKind::Direct(ty.clone()));
+        self.hints.borrow_mut().push(TypeRefKind::Direct(ty.clone()));
         typecell
     }
 
@@ -183,11 +178,7 @@ impl TypeRefs {
 
     pub fn retrieve_wide_type(&self, idx: usize) -> Option<TypeKind> {
         let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
-        self.hints
-            .borrow()
-            .get(inner_idx)
-            .cloned()
-            .map(|t| t.widen(self))
+        self.hints.borrow().get(inner_idx).cloned().map(|t| t.widen(self))
     }
 }
 
@@ -218,9 +209,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
             return Err(ErrorKind::VariableAlreadyDefined(name));
         }
         let type_ref = self.from_type(&initial_ty).unwrap();
-        self.variables
-            .borrow_mut()
-            .insert(name, (mutable, type_ref.0.clone()));
+        self.variables.borrow_mut().insert(name, (mutable, type_ref.0.clone()));
         Ok(type_ref)
     }
 
@@ -233,8 +222,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
             TypeKind::Vague(_) => self.types.new(ty),
             TypeKind::Array(elem_ty, length) => {
                 let elem_ty = self.from_type(elem_ty)?;
-                self.types
-                    .new(&TypeKind::Array(Box::new(elem_ty.as_type()), *length))
+                self.types.new(&TypeKind::Array(Box::new(elem_ty.as_type()), *length))
             }
             TypeKind::Borrow(ty, mutable) => {
                 let inner_ty = self.from_type(ty)?;
@@ -252,12 +240,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
         Some(TypeRef(idx, self))
     }
 
-    pub fn from_binop(
-        &'outer self,
-        op: BinaryOperator,
-        lhs: &TypeRef,
-        rhs: &TypeRef,
-    ) -> TypeRef<'outer> {
+    pub fn from_binop(&'outer self, op: BinaryOperator, lhs: &TypeRef, rhs: &TypeRef) -> TypeRef<'outer> {
         TypeRef(self.types.binop(op, lhs, rhs), self)
     }
 
@@ -276,10 +259,9 @@ impl<'outer> ScopeTypeRefs<'outer> {
                         .iter()
                         .filter(|b| b.1.operator == *op && b.1.return_ty == *ty);
                     for binop in binops {
-                        if let (Ok(lhs_narrow), Ok(rhs_narrow)) = (
-                            lhs.narrow_into(&binop.1.hands.0),
-                            rhs.narrow_into(&binop.1.hands.1),
-                        ) {
+                        if let (Ok(lhs_narrow), Ok(rhs_narrow)) =
+                            (lhs.narrow_into(&binop.1.hands.0), rhs.narrow_into(&binop.1.hands.1))
+                        {
                             *lhs = lhs_narrow;
                             *rhs = rhs_narrow
                         }

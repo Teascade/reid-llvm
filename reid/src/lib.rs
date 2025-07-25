@@ -98,11 +98,7 @@ pub fn compile_module<'map>(
     let mut statements = Vec::new();
 
     while !matches!(token_stream.peek().unwrap_or(Token::Eof), Token::Eof) {
-        let statement = ReidError::from_parser(
-            token_stream.parse::<TopLevelStatement>(),
-            map.clone(),
-            module_id,
-        )?;
+        let statement = ReidError::from_parser(token_stream.parse::<TopLevelStatement>(), map.clone(), module_id)?;
         statements.push(statement);
     }
 
@@ -189,8 +185,6 @@ pub fn perform_all_passes<'map>(
     println!("{}", &context);
     #[cfg(debug_assertions)]
     dbg!(&state);
-    dbg!("asd!");
-    thread::sleep(Duration::from_millis(100));
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(

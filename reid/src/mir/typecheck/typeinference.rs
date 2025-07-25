@@ -12,9 +12,8 @@ use std::{
 
 use crate::{
     mir::{
-        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
-        FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind, TypeKind,
-        WhileStatement,
+        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
+        IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -46,10 +45,7 @@ impl<'t> Pass for TypeInference<'t> {
         for function in &mut module.functions {
             if let Some(kind) = seen_functions.get(&function.name) {
                 state.note_errors(
-                    &vec![ErrorKind::FunctionAlreadyDefined(
-                        function.name.clone(),
-                        *kind,
-                    )],
+                    &vec![ErrorKind::FunctionAlreadyDefined(function.name.clone(), *kind)],
                     function.signature(),
                 );
             } else {
@@ -70,8 +66,7 @@ impl<'t> Pass for TypeInference<'t> {
                 params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                 operator: binop.op,
             };
-            if seen_binops.contains(&binop_key)
-                || (binop.lhs == binop.rhs && binop.lhs.1.category().is_simple_maths())
+            if seen_binops.contains(&binop_key) || (binop.lhs == binop.rhs && binop.lhs.1.category().is_simple_maths())
             {
                 state.note_errors(
                     &vec![ErrorKind::BinaryOpAlreadyDefined(
@@ -100,18 +95,10 @@ impl<'t> Pass for TypeInference<'t> {
 }
 
 impl BinopDefinition {
-    fn infer_types(
-        &mut self,
-        type_refs: &TypeRefs,
-        state: &mut TypecheckPassState,
-    ) -> Result<(), ErrorKind> {
+    fn infer_types(&mut self, type_refs: &TypeRefs, state: &mut TypecheckPassState) -> Result<(), ErrorKind> {
         let scope_hints = ScopeTypeRefs::from(type_refs);
 
-        let lhs_ty = state.or_else(
-            self.lhs.1.assert_unvague(),
-            Vague(Unknown),
-            self.signature(),
-        );
+        let lhs_ty = state.or_else(self.lhs.1.assert_unvague(), Vague(Unknown), self.signature());
         state.ok(
             scope_hints
                 .new_var(self.lhs.0.clone(), false, &lhs_ty)
@@ -119,11 +106,7 @@ impl BinopDefinition {
             self.signature(),
         );
 
-        let rhs_ty = state.or_else(
-            self.rhs.1.assert_unvague(),
-            Vague(Unknown),
-            self.signature(),
-        );
+        let rhs_ty = state.or_else(self.rhs.1.assert_unvague(), Vague(Unknown), self.signature());
 
         state.ok(
             scope_hints
@@ -132,9 +115,9 @@ impl BinopDefinition {
             self.signature(),
         );
 
-        let ret_ty =
-            self.fn_kind
-                .infer_types(state, &scope_hints, Some(self.return_type.clone()))?;
+        let ret_ty = self
+            .fn_kind
+            .infer_types(state, &scope_hints, Some(self.return_type.clone()))?;
         if let Some(mut ret_ty) = ret_ty {
             ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
         }
@@ -144,11 +127,7 @@ impl BinopDefinition {
 }
 
 impl FunctionDefinition {
-    fn infer_types(
-        &mut self,
-        type_refs: &TypeRefs,
-        state: &mut TypecheckPassState,
-    ) -> Result<(), ErrorKind> {
+    fn infer_types(&mut self, type_refs: &TypeRefs, state: &mut TypecheckPassState) -> Result<(), ErrorKind> {
         let scope_refs = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
             let param_t = state.or_else(param.1.assert_unvague(), Vague(Unknown), self.signature());
@@ -221,8 +200,7 @@ impl Block {
             match &mut statement.0 {
                 StmtKind::Let(var, mutable, expr) => {
                     // Get the TypeRef for this variable declaration
-                    let mut var_ref =
-                        state.ok(inner_refs.new_var(var.1.clone(), *mutable, &var.0), var.2);
+                    let mut var_ref = state.ok(inner_refs.new_var(var.1.clone(), *mutable, &var.0), var.2);
 
                     // If ok, update the MIR type to this TypeRef
                     if let Some(var_ref) = &var_ref {
@@ -235,9 +213,7 @@ impl Block {
 
                     // Try to narrow the variable type declaration with the
                     // expression
-                    if let (Some(var_ref), Some(expr_ty_ref)) =
-                        (var_ref.as_mut(), expr_ty_ref.as_mut())
-                    {
+                    if let (Some(var_ref), Some(expr_ty_ref)) = (var_ref.as_mut(), expr_ty_ref.as_mut()) {
                         var_ref.narrow(&expr_ty_ref);
                     }
                 }
@@ -260,9 +236,7 @@ impl Block {
                     let expr_res = expr.infer_types(&mut state, &inner_refs);
                     state.ok(expr_res, expr.1);
                 }
-                StmtKind::While(WhileStatement {
-                    condition, block, ..
-                }) => {
+                StmtKind::While(WhileStatement { condition, block, .. }) => {
                     condition.infer_types(&mut state, &inner_refs)?;
                     block.infer_types(&mut state, &inner_refs)?;
                 }
@@ -336,11 +310,7 @@ impl Expression {
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
                     Ok(type_refs.from_binop(*op, &lhs_ref, &rhs_ref))
                 } else {
-                    Err(ErrorKind::InvalidBinop(
-                        *op,
-                        lhs_ref.resolve_deep().unwrap(),
-                        rhs_ref.resolve_deep().unwrap(),
-                    ))
+                    panic!();
                 }
             }
             ExprKind::FunctionCall(function_call) => {
@@ -357,9 +327,7 @@ impl Expression {
                 // many were provided)
                 let true_params_iter = fn_call.params.iter().chain(iter::repeat(&Vague(Unknown)));
 
-                for (param_expr, param_t) in
-                    function_call.parameters.iter_mut().zip(true_params_iter)
-                {
+                for (param_expr, param_t) in function_call.parameters.iter_mut().zip(true_params_iter) {
                     let expr_res = param_expr.infer_types(state, type_refs);
                     if let Some(mut param_ref) = state.ok(expr_res, param_expr.1) {
                         param_ref.narrow(&mut type_refs.from_type(param_t).unwrap());
@@ -390,12 +358,10 @@ impl Expression {
 
                     // Narrow LHS to the same type as RHS and return it's return type
                     if let (Some(mut lhs_hints), Some(mut rhs_hints)) = (lhs_hints, rhs_hints) {
-                        lhs_hints
-                            .narrow(&mut rhs_hints)
-                            .ok_or(ErrorKind::TypesIncompatible(
-                                lhs_hints.resolve_deep().unwrap(),
-                                rhs_hints.resolve_deep().unwrap(),
-                            ))
+                        lhs_hints.narrow(&mut rhs_hints).ok_or(ErrorKind::TypesIncompatible(
+                            lhs_hints.resolve_deep().unwrap(),
+                            rhs_hints.resolve_deep().unwrap(),
+                        ))
                     } else {
                         // Failed to retrieve types from either
                         Ok(type_refs.from_type(&Vague(Unknown)).unwrap())
@@ -451,15 +417,10 @@ impl Expression {
                             }
 
                             Ok(type_refs
-                                .from_type(&Array(
-                                    Box::new(first.as_type()),
-                                    expressions.len() as u64,
-                                ))
+                                .from_type(&Array(Box::new(first.as_type()), expressions.len() as u64))
                                 .unwrap())
                         } else {
-                            Ok(type_refs
-                                .from_type(&Array(Box::new(TypeKind::Void), 0))
-                                .unwrap())
+                            Ok(type_refs.from_type(&Array(Box::new(TypeKind::Void), 0)).unwrap())
                         }
                     }
                     Err(errors) => {
@@ -503,10 +464,7 @@ impl Expression {
                 let expected_struct_ty = state
                     .scope
                     .get_struct_type(&type_key)
-                    .ok_or(ErrorKind::NoSuchType(
-                        struct_name.clone(),
-                        state.module_id.unwrap(),
-                    ))?
+                    .ok_or(ErrorKind::NoSuchType(struct_name.clone(), state.module_id.unwrap()))?
                     .clone();
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
@@ -516,17 +474,12 @@ impl Expression {
                         }
                     } else {
                         state.ok::<_, Infallible>(
-                            Err(ErrorKind::NoSuchField(format!(
-                                "{}.{}",
-                                struct_name, field.0
-                            ))),
+                            Err(ErrorKind::NoSuchField(format!("{}.{}", struct_name, field.0))),
                             field.1 .1,
                         );
                     }
                 }
-                Ok(type_refs
-                    .from_type(&TypeKind::CustomType(type_key.clone()))
-                    .unwrap())
+                Ok(type_refs.from_type(&TypeKind::CustomType(type_key.clone())).unwrap())
             }
             ExprKind::Borrow(var, mutable) => {
                 // Find variable type
