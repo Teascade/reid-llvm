@@ -59,10 +59,10 @@ Currently missing big features (TODOs) are:
 - ~~Intrinsic functions~~ (DONE)
 - ~~Ability to specify types in literals and variable definitions~~ (DONE)
 - ~~Debug Information~~ (DONE)
-- ~~Fix struct initialization (wrong order and missing fields allowed now)~~
-- ~~Not-Unary~~
-- ~~Importing types from other modules~~
-- ~~Importable binops?~~
+- ~~Fix struct initialization (wrong order and missing fields allowed now)~~ (DONE)
+- ~~Not-Unary~~ (DONE)
+- ~~Importing types from other modules~~ (DONE)
+- ~~Importable binops?~~ (DONE)
 - Associated functions (for e.g. sizeof)
 
 Big features that I want later but are not necessary:
