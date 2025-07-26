@@ -1,0 +1,14 @@
+struct Otus {
+    field: u32,
+}
+
+impl Otus {
+    fn test(&self) -> u32 {
+        *self.field
+    }
+}
+
+fn main() -> u32 {
+    let otus = Otus {};
+    return Otus::test(&otus);
+}
