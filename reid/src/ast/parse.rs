@@ -168,6 +168,18 @@ fn specific_int_lit(value: u128, stream: &mut TokenStream) -> Result<Expression,
 }
 
 #[derive(Debug)]
+pub struct AssociatedFunctionCall(Type, FunctionCallExpression);
+
+impl Parse for AssociatedFunctionCall {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let ty = stream.parse()?;
+        stream.expect(Token::Colon)?;
+        stream.expect(Token::Colon)?;
+        Ok(AssociatedFunctionCall(ty, stream.parse()?))
+    }
+}
+
+#[derive(Debug)]
 pub struct PrimaryExpression(Expression);
 
 impl Parse for PrimaryExpression {
@@ -198,6 +210,11 @@ impl Parse for PrimaryExpression {
         } else if let Ok(unary) = stream.parse() {
             Expression(
                 Kind::UnaryOperation(unary, Box::new(stream.parse()?)),
+                stream.get_range().unwrap(),
+            )
+        } else if let Ok(assoc_function) = stream.parse::<AssociatedFunctionCall>() {
+            Expression(
+                Kind::AssociatedFunctionCall(assoc_function.0, Box::new(assoc_function.1)),
                 stream.get_range().unwrap(),
             )
         } else if let Some(token) = stream.peek() {

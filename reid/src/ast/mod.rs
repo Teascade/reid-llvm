@@ -91,6 +91,7 @@ pub enum ExpressionKind {
     Accessed(Box<Expression>, String),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
+    AssociatedFunctionCall(Type, Box<FunctionCallExpression>),
     BlockExpr(Box<Block>),
     IfExpr(Box<IfExpression>),
     StructExpression(StructExpression),

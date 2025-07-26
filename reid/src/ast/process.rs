@@ -404,6 +404,7 @@ impl ast::Expression {
                     .map(|e| e.process(module_id))
                     .collect(),
             ),
+            ast::ExpressionKind::AssociatedFunctionCall(_, function_call_expression) => todo!(),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))
