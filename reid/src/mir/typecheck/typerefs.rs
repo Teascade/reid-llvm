@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    super::pass::{ScopeBinopDef, ScopeBinopKey, Storage},
+    super::pass::{BinopKey, ScopeBinopDef, Storage},
     ErrorKind,
 };
 

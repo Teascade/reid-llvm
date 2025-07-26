@@ -66,8 +66,14 @@ impl Display for BinopDefinition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "impl binop ({}: {:#}) {} ({}: {:#}) -> {:#} ",
-            self.lhs.0, self.lhs.1, self.op, self.rhs.0, self.rhs.1, self.return_type
+            "{}impl binop ({}: {:#}) {} ({}: {:#}) -> {:#} ",
+            if self.exported { "exported " } else { "" },
+            self.lhs.0,
+            self.lhs.1,
+            self.op,
+            self.rhs.0,
+            self.rhs.1,
+            self.return_type
         )?;
         Display::fmt(&self.fn_kind, f)
     }

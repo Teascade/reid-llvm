@@ -370,6 +370,8 @@ pub struct BinopDefinition {
     pub return_type: TypeKind,
     pub fn_kind: FunctionDefinitionKind,
     pub meta: Metadata,
+    // Wether this binop definition has been imported into another module.
+    pub exported: bool,
 }
 
 impl BinopDefinition {

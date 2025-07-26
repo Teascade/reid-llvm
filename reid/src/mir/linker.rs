@@ -11,7 +11,10 @@ use crate::{
     codegen::scope,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
-    mir::{CustomTypeKey, FunctionDefinitionKind, SourceModuleId, TypeDefinition, TypeKind},
+    mir::{
+        pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, SourceModuleId, TypeDefinition,
+        TypeKind,
+    },
     parse_module,
 };
 
@@ -110,6 +113,7 @@ impl<'map> Pass for LinkerPass<'map> {
         let mut modules_to_process: Vec<Rc<RefCell<_>>> = modules.values().cloned().collect();
 
         let mut already_imported_types = HashSet::<CustomTypeKey>::new();
+        let mut already_imported_binops = HashSet::<BinopKey>::new();
 
         while let Some(module) = modules_to_process.pop() {
             let mut extern_types = HashMap::new();
@@ -232,10 +236,39 @@ impl<'map> Pass for LinkerPass<'map> {
                         kind: super::FunctionDefinitionKind::Extern(true),
                     });
                 } else if let Some(ty) = imported.typedefs.iter_mut().find(|f| f.name == *import_name) {
-                    dbg!("hello??");
                     let external_key = CustomTypeKey(ty.name.clone(), ty.source_module);
+                    let imported_ty = TypeKind::CustomType(external_key.clone());
                     imported_types.push((external_key, true));
-                    dbg!(&imported_types);
+
+                    for binop in &mut imported.binop_defs {
+                        if binop.lhs.1 != imported_ty && binop.rhs.1 != imported_ty {
+                            continue;
+                        }
+                        let binop_key = BinopKey {
+                            params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                            operator: binop.op,
+                        };
+                        if already_imported_binops.contains(&binop_key) {
+                            continue;
+                        }
+                        binop.exported = true;
+                        already_imported_binops.insert(binop_key);
+                        match &binop.fn_kind {
+                            FunctionDefinitionKind::Local(block, metadata) => {
+                                importer_module.binop_defs.push(BinopDefinition {
+                                    lhs: binop.lhs.clone(),
+                                    op: binop.op,
+                                    rhs: binop.rhs.clone(),
+                                    return_type: binop.return_type.clone(),
+                                    fn_kind: FunctionDefinitionKind::Extern(true),
+                                    meta: binop.meta.clone(),
+                                    exported: false,
+                                });
+                            }
+                            FunctionDefinitionKind::Extern(_) => {}
+                            FunctionDefinitionKind::Intrinsic(_) => {}
+                        }
+                    }
                 } else {
                     state.ok::<_, Infallible>(
                         Err(ErrorKind::ImportDoesNotExist(module_name.clone(), import_name.clone())),

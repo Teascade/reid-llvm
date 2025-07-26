@@ -5,9 +5,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
-use debug_information::{
-    DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
-};
+use debug_information::{DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue};
 use fmt::PrintableModule;
 
 pub mod builder;
@@ -66,13 +64,7 @@ pub struct Module<'ctx> {
 }
 
 impl<'ctx> Module<'ctx> {
-    pub fn function(
-        &self,
-        name: &str,
-        ret: Type,
-        params: Vec<Type>,
-        flags: FunctionFlags,
-    ) -> Function<'ctx> {
+    pub fn function(&self, name: &str, ret: Type, params: Vec<Type>, flags: FunctionFlags) -> Function<'ctx> {
         unsafe {
             Function {
                 phantom: PhantomData,
@@ -111,10 +103,7 @@ impl<'ctx> Module<'ctx> {
         }
     }
 
-    pub fn create_debug_info(
-        &mut self,
-        file: DebugFileData,
-    ) -> (DebugInformation, DebugProgramValue) {
+    pub fn create_debug_info(&mut self, file: DebugFileData) -> (DebugInformation, DebugProgramValue) {
         let (debug_info, program_value) = DebugInformation::from_file(file);
         self.debug_info = Some(debug_info.clone());
         (debug_info, program_value)
@@ -144,10 +133,17 @@ pub struct FunctionData {
 
 #[derive(Debug, Clone, Copy, Hash)]
 pub struct FunctionFlags {
+    /// True in the destination module of the import, false in the source module.
     pub is_extern: bool,
+    /// Whether this function is the main function of the module, that should be
+    /// executed (and linked externally also).
     pub is_main: bool,
+    /// Whether this function should be available externally always.
     pub is_pub: bool,
+    /// If this function is an imported function (either in the source or
+    /// destination module)
     pub is_imported: bool,
+    /// Whether this function should add "alwaysinline"-attribute.
     pub inline: bool,
 }
 
@@ -260,11 +256,7 @@ impl Instr {
 }
 
 impl<'builder> Block<'builder> {
-    pub fn build_named<T: Into<String>>(
-        &mut self,
-        name: T,
-        instruction: Instr,
-    ) -> CompileResult<InstructionValue> {
+    pub fn build_named<T: Into<String>>(&mut self, name: T, instruction: Instr) -> CompileResult<InstructionValue> {
         unsafe {
             self.builder.add_instruction(
                 &self.value,
@@ -295,15 +287,13 @@ impl<'builder> Block<'builder> {
 
     pub fn set_instr_location(&self, instruction: InstructionValue, location: DebugLocationValue) {
         unsafe {
-            self.builder
-                .add_instruction_location(&instruction, location);
+            self.builder.add_instruction_location(&instruction, location);
         }
     }
 
     pub fn set_instr_metadata(&self, instruction: InstructionValue, location: DebugMetadataValue) {
         unsafe {
-            self.builder
-                .add_instruction_metadata(&instruction, location);
+            self.builder.add_instruction_metadata(&instruction, location);
         }
     }
 
@@ -610,16 +600,10 @@ impl Type {
             | Type::U32
             | Type::U64
             | Type::U128 => TypeCategory::Integer,
-            Type::F16
-            | Type::F32B
-            | Type::F32
-            | Type::F64
-            | Type::F80
-            | Type::F128
-            | Type::F128PPC => TypeCategory::Real,
-            Type::Bool | Type::Void | Type::CustomType(_) | Type::Array(_, _) | Type::Ptr(_) => {
-                TypeCategory::Other
+            Type::F16 | Type::F32B | Type::F32 | Type::F64 | Type::F80 | Type::F128 | Type::F128PPC => {
+                TypeCategory::Real
             }
+            Type::Bool | Type::Void | Type::CustomType(_) | Type::Array(_, _) | Type::Ptr(_) => TypeCategory::Other,
         }
     }
 
@@ -630,23 +614,15 @@ impl Type {
             (I16, I32 | I64 | I128) => Some(Instr::SExt(value, other.clone())),
             (I32, I64 | I128) => Some(Instr::SExt(value, other.clone())),
             (I64, I128) => Some(Instr::SExt(value, other.clone())),
-            (I128 | U128, I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8) => {
-                Some(Instr::Trunc(value, other.clone()))
-            }
-            (I64 | U64, I32 | U32 | I16 | U16 | I8 | U8) => {
-                Some(Instr::Trunc(value, other.clone()))
-            }
+            (I128 | U128, I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8) => Some(Instr::Trunc(value, other.clone())),
+            (I64 | U64, I32 | U32 | I16 | U16 | I8 | U8) => Some(Instr::Trunc(value, other.clone())),
             (I32 | U32, I16 | U16 | I8 | U8) => Some(Instr::Trunc(value, other.clone())),
             (I16 | U16, I8 | U8) => Some(Instr::Trunc(value, other.clone())),
             (U8 | I8, U8 | I8 | U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
                 Some(Instr::ZExt(value, other.clone()))
             }
-            (U16 | I16, U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => {
-                Some(Instr::ZExt(value, other.clone()))
-            }
-            (U32 | I32, U32 | I32 | U64 | I64 | U128 | I128) => {
-                Some(Instr::ZExt(value, other.clone()))
-            }
+            (U16 | I16, U16 | I16 | U32 | I32 | U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
+            (U32 | I32, U32 | I32 | U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
             (U64 | I64, U64 | I64 | U128 | I128) => Some(Instr::ZExt(value, other.clone())),
             (U128 | I128, U128 | I128) => Some(Instr::ZExt(value, other.clone())),
             (U8 | U16 | U32 | U64 | U128, F16 | F32 | F32B | F64 | F80 | F128 | F128PPC) => {
@@ -667,15 +643,11 @@ impl Type {
             (Ptr(_), I128 | U128 | I64 | U64 | I32 | U32 | I16 | U16 | I8 | U8) => {
                 Some(Instr::PtrToInt(value, other.clone()))
             }
-            (F16, F32 | F32B | F64 | F80 | F128 | F128PPC) => {
-                Some(Instr::FPExt(value, other.clone()))
-            }
+            (F16, F32 | F32B | F64 | F80 | F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
             (F32 | F32B, F64 | F80 | F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
             (F64, F80 | F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
             (F80, F128 | F128PPC) => Some(Instr::FPExt(value, other.clone())),
-            (F128PPC | F128, F80 | F64 | F32B | F32 | F16) => {
-                Some(Instr::FPTrunc(value, other.clone()))
-            }
+            (F128PPC | F128, F80 | F64 | F32B | F32 | F16) => Some(Instr::FPTrunc(value, other.clone())),
             (F80, F64 | F32B | F32 | F16) => Some(Instr::FPTrunc(value, other.clone())),
             (F64, F32B | F32 | F16) => Some(Instr::FPTrunc(value, other.clone())),
             (F32B | F32, F16) => Some(Instr::FPTrunc(value, other.clone())),

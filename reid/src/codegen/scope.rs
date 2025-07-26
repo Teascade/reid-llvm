@@ -8,7 +8,7 @@ use reid_lib::{
 
 use crate::{
     lexer::FullToken,
-    mir::{pass::ScopeBinopKey, CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind},
+    mir::{pass::BinopKey, CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind},
 };
 
 use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
@@ -24,7 +24,7 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
     pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
     pub(super) functions: &'scope HashMap<String, Function<'ctx>>,
-    pub(super) binops: &'scope HashMap<ScopeBinopKey, StackBinopDefinition<'ctx>>,
+    pub(super) binops: &'scope HashMap<BinopKey, StackBinopDefinition<'ctx>>,
     pub(super) stack_values: HashMap<String, StackValue>,
     pub(super) debug: Option<Debug<'ctx>>,
     pub(super) allocator: Rc<RefCell<Allocator>>,
@@ -150,15 +150,9 @@ impl<'ctx> StackBinopDefinition<'ctx> {
             StackBinopFunctionKind::UserGenerated(ir) => {
                 let instr = scope
                     .block
-                    .build(Instr::FunctionCall(
-                        ir.value(),
-                        vec![lhs.instr(), rhs.instr()],
-                    ))
+                    .build(Instr::FunctionCall(ir.value(), vec![lhs.instr(), rhs.instr()]))
                     .unwrap();
-                Ok(StackValue(
-                    StackValueKind::Immutable(instr),
-                    self.return_ty.clone(),
-                ))
+                Ok(StackValue(StackValueKind::Immutable(instr), self.return_ty.clone()))
             }
             StackBinopFunctionKind::Intrinsic(fun) => fun.codegen(scope, &[&lhs, &rhs]),
         }

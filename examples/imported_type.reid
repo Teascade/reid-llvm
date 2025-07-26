@@ -14,6 +14,6 @@ fn otus(param: &mut String) {
 fn main() -> u8 {
     let mut otus = from_str("hello");
     otus(&mut otus);
-    print(otus);
+    print(otus + " beep");
     return 0;
 }

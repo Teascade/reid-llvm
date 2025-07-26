@@ -20,7 +20,7 @@ use crate::{
 
 use super::{
     super::{
-        pass::{Pass, PassResult, PassState, ScopeBinopKey},
+        pass::{BinopKey, Pass, PassResult, PassState},
         TypeKind::*,
         VagueType::*,
     },
@@ -62,7 +62,7 @@ impl<'t> Pass for TypeInference<'t> {
 
         let mut seen_binops = HashSet::new();
         for binop in &module.binop_defs {
-            let binop_key = ScopeBinopKey {
+            let binop_key = BinopKey {
                 params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                 operator: binop.op,
             };

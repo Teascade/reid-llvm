@@ -15,7 +15,7 @@ use scope::*;
 
 use crate::{
     mir::{
-        self, implement::TypeCategory, pass::ScopeBinopKey, CustomTypeKey, FunctionDefinitionKind, NamedVariableRef,
+        self, implement::TypeCategory, pass::BinopKey, CustomTypeKey, FunctionDefinitionKind, NamedVariableRef,
         SourceModuleId, StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, WhileStatement,
     },
     util::try_all,
@@ -214,8 +214,12 @@ impl mir::Module {
 
         let mut binops = HashMap::new();
         for binop in &self.binop_defs {
+            let binop_fn_name = format!(
+                "binop.{}.{:?}.{}.{}",
+                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
+            );
             binops.insert(
-                ScopeBinopKey {
+                BinopKey {
                     params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
                     operator: binop.op,
                 },
@@ -224,16 +228,14 @@ impl mir::Module {
                     return_ty: binop.return_type.clone(),
                     kind: match &binop.fn_kind {
                         FunctionDefinitionKind::Local(block, metadata) => {
-                            let binop_fn_name = format!(
-                                "binop.{}.{:?}.{}.{}",
-                                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
-                            );
                             let ir_function = module.function(
                                 &binop_fn_name,
                                 binop.return_type.get_type(&type_values),
                                 vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
                                 FunctionFlags {
                                     inline: true,
+                                    is_pub: binop.exported,
+                                    is_imported: binop.exported,
                                     ..Default::default()
                                 },
                             );
@@ -289,7 +291,18 @@ impl mir::Module {
 
                             StackBinopFunctionKind::UserGenerated(ir_function)
                         }
-                        FunctionDefinitionKind::Extern(_) => todo!(),
+                        FunctionDefinitionKind::Extern(imported) => {
+                            StackBinopFunctionKind::UserGenerated(module.function(
+                                &binop_fn_name,
+                                binop.return_type.get_type(&type_values),
+                                vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
+                                FunctionFlags {
+                                    is_extern: true,
+                                    is_imported: *imported,
+                                    ..FunctionFlags::default()
+                                },
+                            ))
+                        }
                         FunctionDefinitionKind::Intrinsic(intrinsic_function) => {
                             StackBinopFunctionKind::Intrinsic(intrinsic_function)
                         }
@@ -704,7 +717,7 @@ impl mir::Expression {
                 let lhs = lhs_val.instr();
                 let rhs = rhs_val.instr();
 
-                let operation = scope.binops.get(&ScopeBinopKey {
+                let operation = scope.binops.get(&BinopKey {
                     params: (lhs_val.1.clone(), rhs_val.1.clone()),
                     operator: *binop,
                 });

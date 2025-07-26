@@ -422,7 +422,7 @@ impl Expression {
                     );
                 };
 
-                let binops = state.scope.binops.filter(&pass::ScopeBinopKey {
+                let binops = state.scope.binops.filter(&pass::BinopKey {
                     params: (lhs_type.clone(), rhs_type.clone()),
                     operator: *op,
                 });

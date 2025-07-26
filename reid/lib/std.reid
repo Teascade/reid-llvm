@@ -4,6 +4,21 @@ extern fn malloc(size: u64) -> *u8;
 extern fn free(ptr: *u8);
 extern fn div(numerator: i32, denominator: i32) -> div_t;
 
+struct String {
+    inner: *char,
+    length: u64,
+    max_length: u64,
+    must_be_freed: bool,
+}
+
+impl binop (lhs: String) + (rhs: *char) -> String {
+    let mut new = lhs;
+    let added = from_str(rhs);
+    concat_strings(&mut new, added);
+    free_string(&added);
+    return lhs;
+}
+
 struct div_t {
     quotient: i32,
     remainder: i32,
@@ -19,13 +34,6 @@ pub fn int_div(numerator: i32, denominator: i32) -> div_t {
 
 pub fn allocate(size: u64) -> *u8 {
     malloc(size)
-}
-
-struct String {
-    inner: *char,
-    length: u64,
-    max_length: u64,
-    must_be_freed: bool,
 }
 
 pub fn new_string() -> String {

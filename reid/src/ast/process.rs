@@ -117,6 +117,7 @@ impl ast::Module {
                             block.2.as_meta(module_id),
                         ),
                         meta: signature_range.as_meta(module_id),
+                        exported: false,
                     });
                 }
             }

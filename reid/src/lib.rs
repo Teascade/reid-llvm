@@ -130,7 +130,7 @@ pub fn perform_all_passes<'map>(
         for intrinsic in form_intrinsic_binops() {
             binops
                 .set(
-                    mir::pass::ScopeBinopKey {
+                    mir::pass::BinopKey {
                         params: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
                         operator: intrinsic.op,
                     },

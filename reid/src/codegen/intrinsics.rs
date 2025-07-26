@@ -49,6 +49,7 @@ where
         return_type: ty.clone(),
         fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
         meta: Default::default(),
+        exported: false,
     }
 }
 
@@ -63,6 +64,7 @@ where
         return_type: TypeKind::Bool,
         fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicBooleanInstr(fun))),
         meta: Default::default(),
+        exported: false,
     }
 }
 
