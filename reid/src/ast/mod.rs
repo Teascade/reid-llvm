@@ -236,6 +236,7 @@ pub enum TopLevelStatement {
     FunctionDefinition(FunctionDefinition),
     TypeDefinition(TypeDefinition),
     BinopDefinition(BinopDefinition),
+    AssociatedFunction(Type, Vec<FunctionDefinition>),
 }
 
 #[derive(Debug)]

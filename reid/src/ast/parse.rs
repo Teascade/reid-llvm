@@ -874,7 +874,14 @@ impl Parse for TopLevelStatement {
                     range,
                 })
             }
-            Some(Token::Impl) => Stmt::BinopDefinition(stream.parse()?),
+            Some(Token::Impl) => match stream.peek2() {
+                Some(Token::Binop) => Stmt::BinopDefinition(stream.parse()?),
+                Some(_) => {
+                    let AssociatedFunctionBlock(ty, functions) = stream.parse::<AssociatedFunctionBlock>()?;
+                    Stmt::AssociatedFunction(ty, functions)
+                }
+                _ => Err(stream.expecting_err("binop or associated function block")?)?,
+            },
             _ => Err(stream.expecting_err("import or fn")?)?,
         })
     }
@@ -915,5 +922,23 @@ impl Parse for BinopDefinition {
             block: stream.parse()?,
             signature_range,
         })
+    }
+}
+
+#[derive(Debug)]
+pub struct AssociatedFunctionBlock(Type, Vec<FunctionDefinition>);
+
+impl Parse for AssociatedFunctionBlock {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::Impl)?;
+        let ty = stream.parse::<Type>()?;
+        stream.expect(Token::BraceOpen)?;
+        let mut functions = Vec::new();
+        while let Some(Token::FnKeyword) = stream.peek() {
+            functions.push(stream.parse()?);
+        }
+
+        stream.expect(Token::BraceClose)?;
+        Ok(AssociatedFunctionBlock(ty, functions))
     }
 }

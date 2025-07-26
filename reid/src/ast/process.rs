@@ -120,6 +120,7 @@ impl ast::Module {
                         exported: false,
                     });
                 }
+                AssociatedFunction(_, function_definition) => todo!(),
             }
         }
 
