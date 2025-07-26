@@ -7,7 +7,12 @@ motivation to write.
 Documentation is presented in a formal grammar and an example,
 syntax-highlighted with Rust, because it's close enough.
 
-## Syntax
+## Standard Library
+
+Reid has a standard library that is referred to as `std` in code. Documentation
+about importable types and functions can be found [here](./standard_library.md).
+
+## Syntax and general information
 
 Syntax for Reid is very much inspired by rust, and examples of the language can
 be found in the [examples](../examples/)-folder.
@@ -76,7 +81,7 @@ grammar the syntax for imports is
 <import> :: "import" <ident> "::" <ident> ";"
 ```
 
-An example importing the `print`-function from `std` would be
+An example importing the `print`-function from [`std`](./standard_library.md) would be
 ``` rust
 import std::print;
 ```
