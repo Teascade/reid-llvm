@@ -982,7 +982,13 @@ impl Parse for AssociatedFunctionBlock {
         stream.expect(Token::BraceOpen)?;
         let mut functions = Vec::new();
         while let Some(Token::FnKeyword) = stream.peek() {
-            functions.push(stream.parse()?);
+            let mut fun: FunctionDefinition = stream.parse()?;
+            fun.0.self_kind = match fun.0.self_kind {
+                SelfKind::Borrow(_) => SelfKind::Borrow(ty.0.clone()),
+                SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.0.clone()),
+                SelfKind::None => SelfKind::None,
+            };
+            functions.push(fun);
         }
 
         stream.expect(Token::BraceClose)?;
