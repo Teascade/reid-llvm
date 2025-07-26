@@ -292,6 +292,12 @@ pub struct FunctionDefinition {
     pub kind: FunctionDefinitionKind,
 }
 
+pub enum SelfKind {
+    Borrow,
+    MutBorrow,
+    None,
+}
+
 #[derive(Debug)]
 pub enum FunctionDefinitionKind {
     /// Actual definition block and surrounding signature range

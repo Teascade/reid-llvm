@@ -32,6 +32,26 @@ impl ast::Module {
                     imports.push(mir::Import(import.0.clone(), import.1.as_meta(module_id)));
                 }
                 FunctionDefinition(ast::FunctionDefinition(signature, is_pub, block, range)) => {
+                    let mut params = Vec::new();
+                    match &signature.self_kind {
+                        ast::SelfKind::Borrow(type_kind) => params.push((
+                            "self".to_owned(),
+                            mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), false),
+                        )),
+                        ast::SelfKind::MutBorrow(type_kind) => params.push((
+                            "self".to_owned(),
+                            mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), true),
+                        )),
+                        ast::SelfKind::None => {}
+                    }
+
+                    params.extend(
+                        signature
+                            .params
+                            .iter()
+                            .cloned()
+                            .map(|p| (p.0, p.1 .0.into_mir(module_id))),
+                    );
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         is_pub: *is_pub,
@@ -41,12 +61,7 @@ impl ast::Module {
                             .clone()
                             .map(|r| r.0.into_mir(module_id))
                             .unwrap_or(mir::TypeKind::Void),
-                        parameters: signature
-                            .args
-                            .iter()
-                            .cloned()
-                            .map(|p| (p.0, p.1 .0.into_mir(module_id)))
-                            .collect(),
+                        parameters: params,
                         kind: mir::FunctionDefinitionKind::Local(
                             block.into_mir(module_id),
                             (*range).as_meta(module_id),
@@ -65,7 +80,7 @@ impl ast::Module {
                             .map(|r| r.0.into_mir(module_id))
                             .unwrap_or(mir::TypeKind::Void),
                         parameters: signature
-                            .args
+                            .params
                             .iter()
                             .cloned()
                             .map(|p| (p.0, p.1 .0.into_mir(module_id)))
@@ -475,6 +490,7 @@ impl ast::TypeKind {
             ast::TypeKind::F128 => mir::TypeKind::F128,
             ast::TypeKind::F128PPC => mir::TypeKind::F128PPC,
             ast::TypeKind::Char => mir::TypeKind::Char,
+            ast::TypeKind::Unknown => mir::TypeKind::Vague(mir::VagueType::Unknown),
         }
     }
 }

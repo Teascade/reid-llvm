@@ -579,18 +579,47 @@ impl Parse for FunctionParam {
     }
 }
 
+#[derive(Debug)]
+pub struct SelfParam(SelfKind);
+
+impl Parse for SelfParam {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::Et)?;
+        let mutable = if let Some(Token::MutKeyword) = stream.peek() {
+            stream.next();
+            true
+        } else {
+            false
+        };
+
+        let Some(Token::Identifier(name)) = stream.next() else {
+            return Err(stream.expected_err("parameter name")?);
+        };
+        if name == "self" {
+            match mutable {
+                true => Ok(SelfParam(SelfKind::MutBorrow(TypeKind::Unknown))),
+                false => Ok(SelfParam(SelfKind::Borrow(TypeKind::Unknown))),
+            }
+        } else {
+            Err(stream.expected_err("self parameter")?)
+        }
+    }
+}
+
 impl Parse for FunctionSignature {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
             stream.expect(Token::ParenOpen)?;
-            let mut args = Vec::new();
+            let mut params = Vec::new();
+
+            let self_kind = stream.parse::<SelfParam>().map(|s| s.0).unwrap_or(SelfKind::None);
 
             if let Ok(param) = stream.parse::<FunctionParam>() {
-                args.push((param.0, param.1));
+                params.push((param.0, param.1));
                 while let Some(Token::Comma) = stream.peek() {
                     stream.next();
                     let param = stream.parse::<FunctionParam>()?;
-                    args.push((param.0, param.1));
+                    params.push((param.0, param.1));
                 }
             }
 
@@ -603,7 +632,8 @@ impl Parse for FunctionSignature {
 
             Ok(FunctionSignature {
                 name,
-                args,
+                params,
+                self_kind,
                 return_type,
                 range: stream.get_range().unwrap(),
             })

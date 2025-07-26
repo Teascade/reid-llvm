@@ -40,6 +40,7 @@ pub enum TypeKind {
     Custom(String),
     Borrow(Box<TypeKind>, bool),
     Ptr(Box<TypeKind>),
+    Unknown,
 }
 
 #[derive(Debug, Clone)]
@@ -170,10 +171,18 @@ pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub To
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: String,
-    pub args: Vec<(String, Type)>,
+    pub self_kind: SelfKind,
+    pub params: Vec<(String, Type)>,
     pub return_type: Option<Type>,
     #[allow(dead_code)]
     pub range: TokenRange,
+}
+
+#[derive(Debug, Clone)]
+pub enum SelfKind {
+    Borrow(TypeKind),
+    MutBorrow(TypeKind),
+    None,
 }
 
 #[derive(Debug, Clone, Copy)]
