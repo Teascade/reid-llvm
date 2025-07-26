@@ -326,14 +326,59 @@ impl<'map> Pass for LinkerPass<'map> {
     fn function(
         &mut self,
         function: &mut FunctionDefinition,
-        mut state: PassState<Self::Data, Self::TError>,
+        state: PassState<Self::Data, Self::TError>,
     ) -> PassResult {
         if matches!(function.kind, FunctionDefinitionKind::Local(_, _)) {
             let mod_id = state.scope.module_id.unwrap();
             let extern_types = &state.scope.data.extern_imported_types.get(&mod_id);
             if let Some(extern_types) = extern_types {
                 function.return_type = function.return_type.update_imported(*extern_types, mod_id);
-                dbg!(&function.return_type);
+                for param in function.parameters.iter_mut() {
+                    param.1 = param.1.update_imported(extern_types, mod_id);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn stmt(&mut self, stmt: &mut super::Statement, state: PassState<Self::Data, Self::TError>) -> PassResult {
+        let mod_id = state.scope.module_id.unwrap();
+        let extern_types = &state.scope.data.extern_imported_types.get(&mod_id);
+        if let Some(extern_types) = extern_types {
+            match &mut stmt.0 {
+                super::StmtKind::Let(var_ref, _, _) => {
+                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn expr(&mut self, expr: &mut super::Expression, state: PassState<Self::Data, Self::TError>) -> PassResult {
+        let mod_id = state.scope.module_id.unwrap();
+        let extern_types = &state.scope.data.extern_imported_types.get(&mod_id);
+        if let Some(extern_types) = extern_types {
+            match &mut expr.0 {
+                super::ExprKind::Variable(var_ref) => {
+                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
+                }
+                super::ExprKind::Indexed(.., type_kind, _) => {
+                    *type_kind = type_kind.update_imported(extern_types, mod_id)
+                }
+                super::ExprKind::Accessed(.., type_kind, _) => {
+                    *type_kind = type_kind.update_imported(extern_types, mod_id)
+                }
+                super::ExprKind::BinOp(.., type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
+
+                super::ExprKind::Borrow(var_ref, _) => {
+                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
+                }
+                super::ExprKind::Deref(var_ref) => {
+                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
+                }
+                super::ExprKind::CastTo(_, type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
+                _ => {}
             }
         }
         Ok(())

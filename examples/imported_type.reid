@@ -1,0 +1,19 @@
+
+import std::print;
+import std::from_str;
+import std::concat_strings;
+import std::free_string;
+import std::String;
+
+fn otus(param: &mut String) {
+    let b: String = from_str(" bello");
+    concat_strings(param, b);
+    free_string(&b);
+}
+
+fn main() -> u8 {
+    let mut otus = from_str("hello");
+    otus(&mut otus);
+    print(otus);
+    return 0;
+}

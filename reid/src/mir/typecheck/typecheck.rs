@@ -50,8 +50,10 @@ impl<'t> Pass for TypeCheck<'t> {
                 }
             }
 
-            if let Some(_) = defmap.insert(&typedef.name, typedef) {
-                state.ok::<_, Infallible>(Err(ErrorKind::DuplicateTypeName(name.clone())), meta.clone());
+            if typedef.source_module == module.module_id || typedef.importer == Some(module.module_id) {
+                if let Some(_) = defmap.insert(&typedef.name, typedef) {
+                    state.ok::<_, Infallible>(Err(ErrorKind::DuplicateTypeName(name.clone())), meta.clone());
+                }
             }
         }
 
