@@ -9,14 +9,26 @@ contains the relevant abstraction to produce a more Rust'y API from that.
 Much of the syntax in Reid is directly inspired by rust, but mostly it is driven
 by simplicity.
 
+Specifications and documentation for the language can be found
+[here](./documentation/).
+
 Reid is currently able to (non-exhaustively):
-- Do basic algebra (e.g. Add, Sub, Mult)
+- Do basic algebra binary and unary-operations (e.g. Add, Sub, Div, Mult, And,
+  Not)
 - Resolve complex one-liners correctly using PEDMAS (e.g. `5 + 2 * 5 - 5 *
   5` is calculated correctly)
+- Handle borrows/derefs, pointers.
 - Declare and call functions with varying parameters and return types
 - Perform type-checking and type-inference such that return-types and
   parameter types must always match.
 - Do simple logic-operations (e.g. If/And/Or)
+- Handle, access, define and initialize structs and arrays.
+- Define and execute For/While loops
+- Output detailed debug information
+- Define extern functions that can be linked to outside modules such as `libc`.
+- Define custom binary operations for any two types that hasn't been defined
+  previously (such as `u16 + u32`).
+
 
 An example program of Reid, that calculates the 5th fibonacci number (and uses
 Rust for highlighting) is:
