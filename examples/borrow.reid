@@ -1,11 +1,15 @@
-// Arithmetic, function calls and imports!
-
-
 fn main() -> u32 {
-  let mut value = [4, 3, 2];
+    // Create a value to be mutated
+    let mut value = [4, 3, 2];
 
-  let mut borrow = &mut value;
-  (*borrow)[1] = 17;
+    // Pass a mutable borrow of the value
+    mutate(&mut value);
 
-  return value[1];
+    // Retrieve the now-mutated value
+    return value[1];
+}
+
+fn mutate(value: &mut [u32; 3]) {
+    // Dereference the borrow to mutate it
+    *value[1] = 17;
 }

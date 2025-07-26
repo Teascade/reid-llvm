@@ -101,6 +101,10 @@ fn hello_world_compiles_well() {
     test(include_str!("../../examples/hello_world.reid"), "test", None);
 }
 #[test]
+fn hello_world_harder_compiles_well() {
+    test(include_str!("../../examples/hello_world_harder.reid"), "test", None);
+}
+#[test]
 fn mutable_compiles_well() {
     test(include_str!("../../examples/mutable.reid"), "test", Some(21));
 }

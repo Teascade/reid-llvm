@@ -1,0 +1,25 @@
+import std::print;
+import std::from_str;
+import std::add_char;
+import std::set_char;
+import std::free_string;
+import std::new_string;
+import std::add_num_to_str;
+import std::concat_strings;
+
+fn main() {
+    let mut test = from_str("hello");
+
+    concat_strings(&mut test, from_str(" world"));
+
+    add_char(&mut test, '!');
+    add_char(&mut test, '\n');
+
+    add_num_to_str(&mut test, 175);
+    
+    print(test);
+
+    free_string(&test);
+
+    return;
+}

@@ -12,6 +12,12 @@ syntax-highlighted with Rust, because it's close enough.
 Reid has a standard library that is referred to as `std` in code. Documentation
 about importable types and functions can be found [here](./standard_library.md).
 
+## Book
+
+A collection of documentation and examples to get you going can be found at [the
+Book of Reid](./book.md). It is recommended you read through the chapter about
+Syntax first though to familiarize yourself with the basic concepts of Reid.
+
 ## Syntax and general information
 
 Syntax for Reid is very much inspired by rust, and examples of the language can
