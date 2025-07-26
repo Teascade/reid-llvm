@@ -4,6 +4,6 @@ import std::from_str;
 import std::String;
 
 fn main() -> u8 {
-    print((from_str("hello") + " beep: ") + 1234u64);
+    print(from_str("hello") + " beep: " + 1234u64);
     return 0;
 }

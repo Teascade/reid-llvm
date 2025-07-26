@@ -319,7 +319,6 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
 
                 for typekey in seen.into_iter() {
-                    dbg!(&typekey);
                     let mut typedef = imported_mod_typedefs
                         .iter()
                         .find(|ty| CustomTypeKey(ty.name.clone(), imported_mod_id) == typekey)
@@ -335,7 +334,6 @@ impl<'map> Pass for LinkerPass<'map> {
 
                     importer_module.typedefs.push(typedef);
                 }
-                dbg!(&importer_module.typedefs);
             }
             state
                 .scope

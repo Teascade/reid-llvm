@@ -49,8 +49,8 @@ Currently missing big features (TODOs) are:
 - ~~Debug Information~~ (DONE)
 - ~~Fix struct initialization (wrong order and missing fields allowed now)~~
 - ~~Not-Unary~~
-- Importing types from other modules
-- Importable binops?
+- ~~Importing types from other modules~~
+- ~~Importable binops?~~
 - Associated functions (for e.g. sizeof)
 
 Big features that I want later but are not necessary:
