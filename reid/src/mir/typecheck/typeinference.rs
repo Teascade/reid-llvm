@@ -33,7 +33,7 @@ use super::{
 /// TypeRefs-struct is used as a helper to go through the modules and change
 /// types while inferring.
 pub struct TypeInference<'t> {
-    pub refs: &'t TypeRefs,
+    pub refs: &'t mut TypeRefs,
 }
 
 impl<'t> Pass for TypeInference<'t> {
@@ -77,7 +77,18 @@ impl<'t> Pass for TypeInference<'t> {
                     binop.signature(),
                 );
             } else {
-                seen_binops.insert(binop_key);
+                seen_binops.insert(binop_key.clone());
+                self.refs
+                    .binop_types
+                    .set(
+                        binop_key,
+                        crate::mir::pass::ScopeBinopDef {
+                            hands: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                            operator: binop.op,
+                            return_ty: binop.return_type.clone(),
+                        },
+                    )
+                    .ok();
             }
         }
 
@@ -119,7 +130,6 @@ impl BinopDefinition {
             .fn_kind
             .infer_types(state, &scope_hints, Some(self.return_type.clone()))?;
         if let Some(mut ret_ty) = ret_ty {
-            dbg!(&ret_ty, &self.return_type);
             ret_ty.narrow(&scope_hints.from_type(&self.return_type).unwrap());
         }
 
@@ -320,7 +330,7 @@ impl Expression {
                             continue;
                         }
                         if binop.operator.is_commutative() {
-                            if let Some(_) = binop.narrow(&lhs_ty, &rhs_ty) {
+                            if let Some(_) = binop.narrow(&rhs_ty, &lhs_ty) {
                                 applying_binops.push(binop.clone());
                                 continue;
                             }
@@ -330,7 +340,6 @@ impl Expression {
                 } else {
                     Vec::new()
                 };
-
                 if binops.len() > 0 {
                     let binop = unsafe { binops.get_unchecked(0) };
                     let mut widened_lhs = binop.hands.0.clone();

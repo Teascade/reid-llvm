@@ -173,9 +173,9 @@ pub fn perform_all_passes<'map>(
         ));
     }
 
-    let refs = TypeRefs::with_binops(binops);
+    let mut refs = TypeRefs::with_binops(binops);
 
-    let state = context.pass(&mut TypeInference { refs: &refs })?;
+    let state = context.pass(&mut TypeInference { refs: &mut refs })?;
 
     #[cfg(debug_assertions)]
     println!("{:-^100}", "TYPE INFERRER OUTPUT");

@@ -1,0 +1,10 @@
+
+struct Otus {}
+
+impl binop (lhs: Otus) + (rhs: u64) -> Otus {
+    return lhs;
+}
+
+pub fn make_otus() -> Otus {
+    return Otus {};
+}

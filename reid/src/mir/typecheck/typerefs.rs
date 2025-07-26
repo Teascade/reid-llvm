@@ -80,7 +80,7 @@ impl TypeRefKind {
                     while let Some(other) = binops.next() {
                         ty = ty.widen_into(&other);
                     }
-                    ty
+                    ty.clone()
                 } else {
                     TypeKind::Vague(VagueType::Unknown)
                 }

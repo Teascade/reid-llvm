@@ -16,7 +16,13 @@ impl binop (lhs: String) + (rhs: *char) -> String {
     let added = from_str(rhs);
     concat_strings(&mut new, added);
     free_string(&added);
-    return lhs;
+    return new;
+}
+
+impl binop (lhs: String) + (rhs: u64) -> String {
+    let mut new = lhs;
+    add_num_to_str(&mut new, rhs);
+    return new;
 }
 
 struct div_t {
