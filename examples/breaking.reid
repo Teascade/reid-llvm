@@ -1,0 +1,6 @@
+import std::String;
+import std::print;
+
+fn main() {
+    print(String::new() + "hello")
+}

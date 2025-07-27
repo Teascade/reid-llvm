@@ -569,48 +569,48 @@ impl Expression {
         match &mut self.0 {
             ExprKind::Variable(_) => {}
             ExprKind::Indexed(value_expr, _, index_expr) => {
-                pass.expr(value_expr.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
-                pass.expr(index_expr.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
+                value_expr.pass(pass, state, scope, mod_id)?;
+                index_expr.pass(pass, state, scope, mod_id)?;
             }
             ExprKind::Accessed(value_expr, ..) => {
-                pass.expr(value_expr.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
+                value_expr.pass(pass, state, scope, mod_id)?;
             }
             ExprKind::Array(expressions) => {
                 for expr in expressions {
-                    pass.expr(expr, PassState::from(state, scope, Some(mod_id)))?;
+                    expr.pass(pass, state, scope, mod_id)?;
                 }
             }
             ExprKind::Struct(_, items) => {
                 for (_, expr) in items {
-                    pass.expr(expr, PassState::from(state, scope, Some(mod_id)))?;
+                    expr.pass(pass, state, scope, mod_id)?;
                 }
             }
             ExprKind::Literal(_) => {}
             ExprKind::BinOp(_, lhs, rhs, _) => {
-                pass.expr(lhs.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
-                pass.expr(rhs.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
+                lhs.pass(pass, state, scope, mod_id)?;
+                rhs.pass(pass, state, scope, mod_id)?;
             }
             ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
                 for expr in parameters {
-                    pass.expr(expr, PassState::from(state, scope, Some(mod_id)))?;
+                    expr.pass(pass, state, scope, mod_id)?;
                 }
             }
             ExprKind::AssociatedFunctionCall(_, FunctionCall { parameters, .. }) => {
                 for expr in parameters {
-                    pass.expr(expr, PassState::from(state, scope, Some(mod_id)))?;
+                    expr.pass(pass, state, scope, mod_id)?;
                 }
             }
             ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                pass.expr(cond.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
-                pass.expr(lhs.as_mut(), PassState::from(state, scope, Some(mod_id)))?;
+                cond.pass(pass, state, scope, mod_id)?;
+                lhs.pass(pass, state, scope, mod_id)?;
                 if let Some(rhs) = rhs.as_mut() {
-                    pass.expr(rhs, PassState::from(state, scope, Some(mod_id)))?;
+                    rhs.pass(pass, state, scope, mod_id)?;
                 }
             }
-            ExprKind::Block(block) => pass.block(block, PassState::from(state, scope, Some(mod_id)))?,
-            ExprKind::Borrow(expression, _) => pass.expr(expression, PassState::from(state, scope, Some(mod_id)))?,
-            ExprKind::Deref(expression) => pass.expr(expression, PassState::from(state, scope, Some(mod_id)))?,
-            ExprKind::CastTo(expression, _) => pass.expr(expression, PassState::from(state, scope, Some(mod_id)))?,
+            ExprKind::Block(block) => block.pass(pass, state, scope, mod_id)?,
+            ExprKind::Borrow(expression, _) => expression.pass(pass, state, scope, mod_id)?,
+            ExprKind::Deref(expression) => expression.pass(pass, state, scope, mod_id)?,
+            ExprKind::CastTo(expression, _) => expression.pass(pass, state, scope, mod_id)?,
         }
         Ok(())
     }

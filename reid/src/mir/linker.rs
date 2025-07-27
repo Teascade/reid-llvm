@@ -276,7 +276,6 @@ impl<'map> Pass for LinkerPass<'map> {
                         }
 
                         let func_name = func.name.clone();
-                        dbg!(&func_name);
 
                         if !func.is_pub {
                             state.ok::<_, Infallible>(
