@@ -40,6 +40,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
     match name {
         "sizeof" => Some(FunctionDefinition {
             name: "sizeof".to_owned(),
+            linkage_name: None,
             is_pub: true,
             is_imported: false,
             return_type: TypeKind::U64,
@@ -48,6 +49,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
         }),
         "alloca" => Some(FunctionDefinition {
             name: "alloca".to_owned(),
+            linkage_name: None,
             is_pub: true,
             is_imported: false,
             return_type: TypeKind::UserPtr(Box::new(ty.clone())),
@@ -56,6 +58,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
         }),
         "null" => Some(FunctionDefinition {
             name: "null".to_owned(),
+            linkage_name: None,
             is_pub: true,
             is_imported: false,
             return_type: TypeKind::UserPtr(Box::new(ty.clone())),

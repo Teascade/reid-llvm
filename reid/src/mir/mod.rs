@@ -284,6 +284,7 @@ pub struct FunctionCall {
 #[derive(Debug)]
 pub struct FunctionDefinition {
     pub name: String,
+    pub linkage_name: Option<String>,
     /// Whether this function is visible to outside modules
     pub is_pub: bool,
     /// Whether this module is from an external module, and has been imported

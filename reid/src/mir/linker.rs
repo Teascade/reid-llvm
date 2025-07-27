@@ -227,7 +227,8 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
 
                     importer_module.functions.push(FunctionDefinition {
-                        name: func_name,
+                        name: func_name.clone(),
+                        linkage_name: None,
                         is_pub: false,
                         is_imported: false,
                         return_type,
@@ -267,6 +268,66 @@ impl<'map> Pass for LinkerPass<'map> {
                             FunctionDefinitionKind::Extern(_) => {}
                             FunctionDefinitionKind::Intrinsic(_) => {}
                         }
+                    }
+
+                    for (ty, func) in &mut imported.associated_functions {
+                        if *ty != imported_ty {
+                            continue;
+                        }
+
+                        let func_name = func.name.clone();
+                        dbg!(&func_name);
+
+                        if !func.is_pub {
+                            state.ok::<_, Infallible>(
+                                Err(ErrorKind::FunctionIsPrivate(module_name.clone(), func_name.clone())),
+                                import.1,
+                            );
+                            continue;
+                        }
+
+                        func.is_imported = true;
+
+                        if let Some((_, existing)) = importer_module
+                            .associated_functions
+                            .iter()
+                            .find(|(ty, f)| *ty == imported_ty && f.name == *func_name)
+                        {
+                            if let Err(e) = existing.equals_as_imported(func) {
+                                state.ok::<_, Infallible>(
+                                    Err(ErrorKind::FunctionImportIssue(
+                                        module_name.clone(),
+                                        func_name.clone(),
+                                        e,
+                                    )),
+                                    import.1,
+                                );
+                            }
+                        }
+
+                        let types = import_type(&func.return_type, false);
+                        let return_type = func.return_type.clone();
+                        imported_types.extend(types);
+
+                        let mut param_tys = Vec::new();
+                        for (param_name, param_ty) in &func.parameters {
+                            let types = import_type(&param_ty, false);
+                            imported_types.extend(types);
+                            param_tys.push((param_name.clone(), param_ty.clone()));
+                        }
+
+                        importer_module.associated_functions.push((
+                            ty.clone(),
+                            FunctionDefinition {
+                                name: func_name.clone(),
+                                linkage_name: Some(format!("{}::{}", ty, func_name)),
+                                is_pub: false,
+                                is_imported: false,
+                                return_type,
+                                parameters: param_tys,
+                                kind: super::FunctionDefinitionKind::Extern(true),
+                            },
+                        ));
                     }
                 } else {
                     state.ok::<_, Infallible>(
@@ -405,8 +466,6 @@ impl<'map> Pass for LinkerPass<'map> {
                 super::ExprKind::Deref(..) => {}
                 super::ExprKind::CastTo(_, type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
                 super::ExprKind::AssociatedFunctionCall(type_kind, _) => {
-                    dbg!(&type_kind);
-                    dbg!(extern_types);
                     *type_kind = type_kind.update_imported(extern_types, mod_id)
                 }
                 _ => {}

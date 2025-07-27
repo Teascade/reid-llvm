@@ -14,7 +14,7 @@ struct String {
 impl String {
     pub fn new() -> String {
         String {
-            inner: char::alloca(0),
+            inner: allocate(0),
             length: 0,
             max_length: 0,
             must_be_freed: true,

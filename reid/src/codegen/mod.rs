@@ -187,7 +187,7 @@ impl mir::Module {
             let is_main = self.is_main && function.name == "main";
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
-                    &function.name,
+                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -198,7 +198,7 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    &function.name,
+                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -238,7 +238,7 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    &function.name,
+                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {

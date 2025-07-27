@@ -36,6 +36,7 @@ impl ast::Module {
                 ExternFunction(signature) => {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
+                        linkage_name: None,
                         is_pub: false,
                         is_imported: false,
                         return_type: signature
@@ -149,6 +150,7 @@ impl ast::FunctionDefinition {
         );
         mir::FunctionDefinition {
             name: signature.name.clone(),
+            linkage_name: None,
             is_pub: *is_pub,
             is_imported: false,
             return_type: signature
