@@ -1,4 +1,4 @@
-use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr};
+use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr, Type};
 
 use crate::{
     codegen::{ErrorKind, StackValueKind},
@@ -284,9 +284,15 @@ impl IntrinsicFunction for IntrinsicNullPtr {
         let zero = scope.block.build(Instr::Constant(ConstValue::I8(0))).unwrap();
         let instr = scope
             .block
-            .build(Instr::IntToPtr(zero, self.0.get_type(scope.type_values)))
+            .build(Instr::IntToPtr(
+                zero,
+                Type::Ptr(Box::new(self.0.get_type(scope.type_values))),
+            ))
             .unwrap();
-        Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
+        Ok(StackValue(
+            StackValueKind::Literal(instr),
+            TypeKind::UserPtr(Box::new(self.0.clone())),
+        ))
     }
 }
 
