@@ -1,10 +1,4 @@
-use std::{
-    alloc::System,
-    path::PathBuf,
-    process::Command,
-    thread,
-    time::{Duration, SystemTime},
-};
+use std::{path::PathBuf, process::Command, time::SystemTime};
 
 use reid::{
     compile_module,

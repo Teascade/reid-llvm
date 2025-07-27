@@ -170,7 +170,7 @@ impl TypeKind {
             return self.clone();
         }
         match (self, other) {
-            (TypeKind::Vague(Vague::Unknown), other) | (other, TypeKind::Vague(Vague::Unknown)) => {
+            (TypeKind::Vague(Vague::Unknown), _) | (_, TypeKind::Vague(Vague::Unknown)) => {
                 TypeKind::Vague(VagueType::Unknown)
             }
             (TypeKind::Vague(Vague::Integer), other) | (other, TypeKind::Vague(Vague::Integer)) => match other {

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    ast::{self, FunctionCallExpression},
+    ast::{self},
     mir::{
         self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind, StructField,
         StructType, WhileStatement,

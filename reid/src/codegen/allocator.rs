@@ -5,9 +5,7 @@ use reid_lib::{
     Block,
 };
 
-use mir::{
-    CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId, TypeKind, WhileStatement,
-};
+use mir::{CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, TypeKind, WhileStatement};
 
 use crate::mir;
 
@@ -18,17 +16,10 @@ pub struct Allocator {
 
 pub struct AllocatorScope<'ctx, 'a> {
     pub(super) block: &'a mut Block<'ctx>,
-    pub(super) module_id: SourceModuleId,
     pub(super) type_values: &'a HashMap<CustomTypeKey, TypeValue>,
 }
 
 impl Allocator {
-    pub fn empty() -> Allocator {
-        Allocator {
-            allocations: Vec::new(),
-        }
-    }
-
     pub fn from(
         func: &FunctionDefinitionKind,
         params: &Vec<(String, TypeKind)>,
@@ -183,7 +174,11 @@ impl mir::Expression {
             mir::ExprKind::CastTo(expression, _) => {
                 allocated.extend(expression.allocate(scope));
             }
-            mir::ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
+            mir::ExprKind::AssociatedFunctionCall(_, FunctionCall { parameters, .. }) => {
+                for param in parameters {
+                    allocated.extend(param.allocate(scope));
+                }
+            }
         }
 
         allocated

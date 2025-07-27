@@ -1,6 +1,6 @@
 use crate::util::maybe;
 
-use super::{pass::ScopeBinopDef, typecheck::typerefs::TypeRefs, *};
+use super::{typecheck::typerefs::TypeRefs, *};
 
 #[derive(Debug, Clone)]
 pub enum ReturnTypeOther {

@@ -8,7 +8,6 @@ use std::{
 };
 
 use crate::{
-    codegen::scope,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
@@ -254,7 +253,7 @@ impl<'map> Pass for LinkerPass<'map> {
                         binop.exported = true;
                         already_imported_binops.insert(binop_key);
                         match &binop.fn_kind {
-                            FunctionDefinitionKind::Local(block, metadata) => {
+                            FunctionDefinitionKind::Local(..) => {
                                 importer_module.binop_defs.push(BinopDefinition {
                                     lhs: binop.lhs.clone(),
                                     op: binop.op,

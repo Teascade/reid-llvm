@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use reid_lib::{builder::InstructionValue, CmpPredicate, Instr};
 
 use crate::{

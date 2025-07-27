@@ -2,7 +2,7 @@ use std::fmt::{Debug, Display, Write};
 
 use crate::pad_adapter::PadAdapter;
 
-use super::{typecheck::typerefs::TypeRefs, *};
+use super::*;
 
 impl Display for Context {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

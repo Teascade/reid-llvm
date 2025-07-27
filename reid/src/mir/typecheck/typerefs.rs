@@ -4,15 +4,9 @@ use std::{
     rc::Rc,
 };
 
-use crate::{
-    ast::BinopDefinition,
-    mir::{pass::BinopMap, BinaryOperator, TypeKind, VagueType},
-};
+use crate::mir::{pass::BinopMap, BinaryOperator, TypeKind, VagueType};
 
-use super::{
-    super::pass::{BinopKey, ScopeBinopDef, Storage},
-    ErrorKind,
-};
+use super::{super::pass::ScopeBinopDef, ErrorKind};
 
 #[derive(Clone)]
 pub struct TypeRef<'scope>(pub(super) TypeIdRef, pub(super) &'scope ScopeTypeRefs<'scope>);

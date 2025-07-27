@@ -20,7 +20,7 @@ use crate::{
 
 use super::{
     super::{
-        pass::{BinopKey, Pass, PassResult, PassState},
+        pass::{BinopKey, Pass, PassResult},
         TypeKind::*,
         VagueType::*,
     },

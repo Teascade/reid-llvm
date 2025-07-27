@@ -227,7 +227,7 @@ impl mir::Module {
                     parameters: (binop.lhs.clone(), binop.rhs.clone()),
                     return_ty: binop.return_type.clone(),
                     kind: match &binop.fn_kind {
-                        FunctionDefinitionKind::Local(block, metadata) => {
+                        FunctionDefinitionKind::Local(..) => {
                             let ir_function = module.function(
                                 &binop_fn_name,
                                 binop.return_type.get_type(&type_values),
@@ -246,7 +246,6 @@ impl mir::Module {
                                 &vec![binop.lhs.clone(), binop.rhs.clone()],
                                 &mut AllocatorScope {
                                     block: &mut entry,
-                                    module_id: self.module_id,
                                     type_values: &type_values,
                                 },
                             );
@@ -320,7 +319,6 @@ impl mir::Module {
                 &mir_function.parameters,
                 &mut AllocatorScope {
                     block: &mut entry,
-                    module_id: self.module_id,
                     type_values: &type_values,
                 },
             );
