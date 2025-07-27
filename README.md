@@ -63,7 +63,7 @@ Currently missing big features (TODOs) are:
 - ~~Not-Unary~~ (DONE)
 - ~~Importing types from other modules~~ (DONE)
 - ~~Importable binops?~~ (DONE)
-- Associated functions (for e.g. sizeof)
+- ~~Associated functions (for e.g. sizeof)~~ (DONE)
 
 Big features that I want later but are not necessary:
 - ~~User-defined binary operations~~ (DONE)
