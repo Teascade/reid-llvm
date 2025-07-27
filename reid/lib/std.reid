@@ -76,6 +76,18 @@ impl String {
         else if rem == 9 { self.add_char('9'); }
     }
 
+    pub fn concat(&mut self, other: &String) {
+        for i in 0 .. *other.length {
+            self.add_char(*other.inner[i]);
+        }
+    }
+
+    pub fn set(&mut self, c: char, position: u64) {
+        if position <= (*self).length {
+            (*self).inner[position] = c;
+        }
+    }
+
     pub fn free(&self) {
         free((*self).inner as *u8);
     }
