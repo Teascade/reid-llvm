@@ -1,23 +1,16 @@
 import std::print;
-import std::from_str;
-import std::set_char;
-import std::free_string;
 import std::String;
-
 
 fn main() {
     let mut test = String::from("hello");
 
-    test.push(String::from(" world"));
-
-    test.add_char('!');
-    test.add_char('\n');
+    test.push(String::from(" world: "));
 
     test.push_num(175);
     
     print(test);
 
-    free_string(&test);
+    test.free();
 
     return;
 }
