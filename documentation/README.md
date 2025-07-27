@@ -18,6 +18,12 @@ A collection of documentation and examples to get you going can be found at [the
 Book of Reid](./book.md). It is recommended you read through the chapter about
 Syntax first though to familiarize yourself with the basic concepts of Reid.
 
+## Intrinsics
+
+Reid also has intrinsic functions that are good to know about. These are more
+in-depth, but when you're feeling up to it, you can read about them
+[here](./intrinsics.md).
+
 ## Syntax and general information
 
 Syntax for Reid is very much inspired by rust, and examples of the language can

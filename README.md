@@ -9,8 +9,8 @@ contains the relevant abstraction to produce a more Rust'y API from that.
 Much of the syntax in Reid is directly inspired by rust, but mostly it is driven
 by simplicity.
 
-Specifications and documentation for the language can be found
-[here](./documentation/).
+Specifications and a bunch of [documentation for the language can be found
+here](./documentation/).
 
 Reid is currently able to (non-exhaustively):
 - Do basic algebra binary and unary-operations (e.g. Add, Sub, Div, Mult, And,
