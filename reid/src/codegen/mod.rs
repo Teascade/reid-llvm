@@ -18,7 +18,7 @@ use crate::{
         self,
         implement::TypeCategory,
         pass::{AssociatedFunctionKey, BinopKey},
-        CustomTypeKey, FunctionDefinitionKind, NamedVariableRef, SourceModuleId, StructField, StructType,
+        CustomTypeKey, FunctionCall, FunctionDefinitionKind, NamedVariableRef, SourceModuleId, StructField, StructType,
         TypeDefinition, TypeDefinitionKind, TypeKind, WhileStatement,
     },
     util::try_all,
@@ -898,72 +898,7 @@ impl mir::Expression {
                     ))
                 }
             }
-            mir::ExprKind::FunctionCall(call) => {
-                let ret_type_kind = call.return_type.known().expect("function return type unknown");
-
-                let ret_type = ret_type_kind.get_type(scope.type_values);
-
-                let params = try_all(
-                    call.parameters
-                        .iter()
-                        .map(|e| e.codegen(scope, state))
-                        .collect::<Vec<_>>(),
-                )
-                .map_err(|e| e.first().cloned().unwrap())?
-                .into_iter()
-                .map(|v| v.unwrap())
-                .collect::<Vec<_>>();
-
-                let callee = scope.functions.get(&call.name).expect("function not found!");
-
-                let val = callee.codegen(
-                    &call.name,
-                    params.as_slice(),
-                    &call.return_type,
-                    if let Some(debug) = &scope.debug {
-                        call.meta.into_debug(scope.tokens, debug.scope)
-                    } else {
-                        None
-                    },
-                    scope,
-                )?;
-
-                let ptr = if ret_type_kind != TypeKind::Void {
-                    let ptr = scope
-                        .block
-                        .build_named(&call.name, Instr::Alloca(ret_type.clone()))
-                        .unwrap();
-                    scope
-                        .block
-                        .build_named(format!("{}.store", call.name), Instr::Store(ptr, val.instr()))
-                        .unwrap();
-
-                    Some(ptr)
-                } else {
-                    None
-                };
-
-                if let Some(ptr) = ptr {
-                    if state.should_load {
-                        Some(StackValue(
-                            StackValueKind::Immutable(
-                                scope
-                                    .block
-                                    .build_named(call.name.clone(), Instr::Load(ptr, ret_type))
-                                    .unwrap(),
-                            ),
-                            ret_type_kind,
-                        ))
-                    } else {
-                        Some(StackValue(
-                            StackValueKind::Immutable(ptr),
-                            TypeKind::CodegenPtr(Box::new(ret_type_kind)),
-                        ))
-                    }
-                } else {
-                    None
-                }
-            }
+            mir::ExprKind::FunctionCall(call) => codegen_function_call(None, call, scope, state)?,
             mir::ExprKind::If(if_expression) => if_expression.codegen(scope, state)?,
             mir::ExprKind::Block(block) => {
                 let inner = scope.function.block("inner");
@@ -1323,89 +1258,110 @@ impl mir::Expression {
                     }
                 }
             }
-            mir::ExprKind::AssociatedFunctionCall(ty, call) => {
-                let ret_type_kind = call.return_type.known().expect("function return type unknown");
-                let call_name = format!("{}::{}", ty, call.name);
-
-                let ret_type = ret_type_kind.get_type(scope.type_values);
-
-                let params = try_all(
-                    call.parameters
-                        .iter()
-                        .map(|e| e.codegen(scope, state))
-                        .collect::<Vec<_>>(),
-                )
-                .map_err(|e| e.first().cloned().unwrap())?
-                .into_iter()
-                .map(|v| v.unwrap())
-                .collect::<Vec<_>>();
-
-                let assoc_key = AssociatedFunctionKey(ty.clone(), call.name.clone());
-                let intrinsic = get_intrinsic_assoc_func(&ty, &call.name);
-                let intrinsic_owned = intrinsic.map(|func_def| {
-                    let FunctionDefinitionKind::Intrinsic(intrinsic) = func_def.kind else {
-                        panic!();
-                    };
-                    ScopeFunctionKind::IntrinsicOwned(intrinsic)
-                });
-                let callee = scope
-                    .assoc_functions
-                    .get(&assoc_key)
-                    .or(intrinsic_owned.as_ref())
-                    .expect(&format!("Function {} does not exist!", call_name));
-
-                let location = if let Some(debug) = &scope.debug {
-                    call.meta.into_debug(scope.tokens, debug.scope)
-                } else {
-                    None
-                };
-
-                let val = callee
-                    .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
-                    .unwrap();
-
-                let ptr = if ret_type_kind != TypeKind::Void {
-                    let ptr = scope
-                        .block
-                        .build_named(&call.name, Instr::Alloca(ret_type.clone()))
-                        .unwrap();
-                    scope
-                        .block
-                        .build_named(format!("{}.store", call_name), Instr::Store(ptr, val.instr()))
-                        .unwrap();
-
-                    Some(ptr)
-                } else {
-                    None
-                };
-
-                if let Some(ptr) = ptr {
-                    if state.should_load {
-                        Some(StackValue(
-                            StackValueKind::Immutable(
-                                scope
-                                    .block
-                                    .build_named(call.name.clone(), Instr::Load(ptr, ret_type))
-                                    .unwrap(),
-                            ),
-                            ret_type_kind,
-                        ))
-                    } else {
-                        Some(StackValue(
-                            StackValueKind::Immutable(ptr),
-                            TypeKind::CodegenPtr(Box::new(ret_type_kind)),
-                        ))
-                    }
-                } else {
-                    None
-                }
-            }
+            mir::ExprKind::AssociatedFunctionCall(ty, call) => codegen_function_call(Some(ty), call, scope, state)?,
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);
         }
         Ok(value)
     }
+}
+
+fn codegen_function_call<'ctx, 'a>(
+    associated_type: Option<&TypeKind>,
+    call: &FunctionCall,
+    scope: &mut Scope<'ctx, 'a>,
+    state: &State,
+) -> Result<Option<StackValue>, ErrorKind> {
+    let ret_type_kind = call.return_type.known().expect("function return type unknown");
+    let call_name = if let Some(ty) = &associated_type {
+        format!("{}::{}", ty, call.name)
+    } else {
+        String::from(call.name.clone())
+    };
+
+    let ret_type = ret_type_kind.get_type(scope.type_values);
+
+    let params = try_all(
+        call.parameters
+            .iter()
+            .map(|e| e.codegen(scope, state))
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|e| e.first().cloned().unwrap())?
+    .into_iter()
+    .map(|v| v.unwrap())
+    .collect::<Vec<_>>();
+
+    let location = if let Some(debug) = &scope.debug {
+        call.meta.into_debug(scope.tokens, debug.scope)
+    } else {
+        None
+    };
+
+    let val = if let Some(ty) = associated_type {
+        let assoc_key = AssociatedFunctionKey(ty.clone(), call.name.clone());
+        let intrinsic_def = get_intrinsic_assoc_func(&ty, &call.name);
+        let intrinsic = intrinsic_def.map(|func_def| {
+            let FunctionDefinitionKind::Intrinsic(intrinsic) = func_def.kind else {
+                panic!();
+            };
+            ScopeFunctionKind::IntrinsicOwned(intrinsic)
+        });
+        let callee = scope
+            .assoc_functions
+            .get(&assoc_key)
+            .or(intrinsic.as_ref())
+            .expect(&format!("Function {} does not exist!", call_name));
+        callee
+            .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
+            .unwrap()
+    } else {
+        let callee = scope
+            .functions
+            .get(&call.name)
+            .expect(&format!("Function {} does not exist!", call_name));
+
+        callee
+            .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
+            .unwrap()
+    };
+
+    let ptr = if ret_type_kind != TypeKind::Void {
+        let ptr = scope
+            .block
+            .build_named(&call.name, Instr::Alloca(ret_type.clone()))
+            .unwrap();
+        scope
+            .block
+            .build_named(format!("{}.store", call_name), Instr::Store(ptr, val.instr()))
+            .unwrap();
+
+        Some(ptr)
+    } else {
+        None
+    };
+
+    Ok(if let Some(ptr) = ptr {
+        if state.should_load {
+            Some(StackValue(
+                StackValueKind::Immutable(
+                    scope
+                        .block
+                        .build_named(call.name.clone(), Instr::Load(ptr, ret_type))
+                        .unwrap(),
+                ),
+                ret_type_kind,
+            ))
+        } else {
+            Some(StackValue(
+                StackValueKind::Immutable(ptr),
+                TypeKind::CodegenPtr(Box::new(ret_type_kind)),
+            ))
+        }
+    } else {
+        None
+    })
 }
 
 impl mir::IfExpression {

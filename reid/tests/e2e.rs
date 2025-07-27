@@ -143,3 +143,12 @@ fn array_short_compiles_well() {
 fn imported_type_compiles_well() {
     test(include_str!("../../examples/imported_type.reid"), "test", Some(0));
 }
+
+#[test]
+fn associated_functions() {
+    test(
+        include_str!("../../examples/associated_functions.reid"),
+        "test",
+        Some(32),
+    );
+}
