@@ -1,0 +1,27 @@
+import std::print;
+import std::from_str;
+import std::String;
+
+struct Otus {
+    field: u32,
+}
+
+impl Otus {
+    fn test(self) -> u32 {
+        self.field
+    }
+}
+
+impl i32 {
+    fn test(self) -> u32 {
+        43
+    }
+}
+
+fn main() -> u32 {
+    let otus = Otus { field: 17 };
+    print(from_str("otus: ") + otus.test() as u64);
+
+
+    return otus.test();
+}

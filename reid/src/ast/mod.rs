@@ -89,6 +89,8 @@ pub enum ExpressionKind {
     Indexed(Box<Expression>, Box<Expression>),
     /// Struct-accessed, e.g. <expr>.<expr>
     Accessed(Box<Expression>, String),
+    /// Associated function call, but with a shorthand
+    AccessCall(Box<Expression>, Box<FunctionCallExpression>),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
     FunctionCall(Box<FunctionCallExpression>),
     AssociatedFunctionCall(Type, Box<FunctionCallExpression>),

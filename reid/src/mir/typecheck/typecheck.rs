@@ -112,7 +112,7 @@ impl BinopDefinition {
     fn typecheck(&mut self, typerefs: &TypeRefs, state: &mut TypecheckPassState) -> Result<TypeKind, ErrorKind> {
         for param in vec![&self.lhs, &self.rhs] {
             let param_t = state.or_else(
-                param.1.assert_known(typerefs, state),
+                param.1.assert_known(state),
                 TypeKind::Vague(Vague::Unknown),
                 self.signature(),
             );
@@ -130,7 +130,7 @@ impl BinopDefinition {
             state.ok(res, self.signature());
         }
 
-        let return_type = self.return_type.clone().assert_known(typerefs, state)?;
+        let return_type = self.return_type.clone().assert_known(state)?;
 
         state.scope.return_type_hint = Some(self.return_type.clone());
         let inferred = self
@@ -150,7 +150,7 @@ impl FunctionDefinition {
     fn typecheck(&mut self, typerefs: &TypeRefs, state: &mut TypecheckPassState) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
             let param_t = state.or_else(
-                param.1.assert_known(typerefs, state),
+                param.1.assert_known(state),
                 TypeKind::Vague(Vague::Unknown),
                 self.signature(),
             );
@@ -168,7 +168,7 @@ impl FunctionDefinition {
             state.ok(res, self.signature());
         }
 
-        let return_type = self.return_type.clone().assert_known(typerefs, state)?;
+        let return_type = self.return_type.clone().assert_known(state)?;
         let inferred = self.kind.typecheck(typerefs, state, Some(self.return_type.clone()));
 
         match inferred {
@@ -327,7 +327,7 @@ impl Block {
                 }
                 StmtKind::While(WhileStatement { condition, block, meta }) => {
                     let condition_ty = condition.typecheck(&mut state, typerefs, HintKind::Coerce(TypeKind::Bool))?;
-                    if condition_ty.assert_known(typerefs, &state)? != TypeKind::Bool {
+                    if condition_ty.assert_known(&state)? != TypeKind::Bool {
                         state.note_errors(&vec![ErrorKind::TypesIncompatible(condition_ty, TypeKind::Bool)], *meta);
                     }
 

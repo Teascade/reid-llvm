@@ -595,6 +595,19 @@ impl Expression {
                 Ok(type_refs.from_type(type_kind).unwrap())
             }
             ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
+                if type_kind.is_known(state).is_err() {
+                    let first_param = function_call
+                        .parameters
+                        .get_mut(0)
+                        .expect("Unknown-type associated function NEEDS to always have at least one parameter!");
+                    let param_ty = first_param.infer_types(state, type_refs).unwrap().resolve_deep();
+                    *type_kind = state.or_else(
+                        param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),
+                        Void,
+                        first_param.1,
+                    );
+                }
+
                 // Get function definition and types
                 let fn_call = state
                     .scope

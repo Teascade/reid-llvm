@@ -422,6 +422,19 @@ impl ast::Expression {
                     meta: fn_call_expr.2.as_meta(module_id),
                 },
             ),
+            ast::ExpressionKind::AccessCall(expression, fn_call_expr) => {
+                let mut params: Vec<_> = fn_call_expr.1.iter().map(|e| e.process(module_id)).collect();
+                params.insert(0, expression.process(module_id));
+                mir::ExprKind::AssociatedFunctionCall(
+                    mir::TypeKind::Vague(mir::VagueType::Unknown),
+                    mir::FunctionCall {
+                        name: fn_call_expr.0.clone(),
+                        return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
+                        parameters: params,
+                        meta: fn_call_expr.2.as_meta(module_id),
+                    },
+                )
+            }
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

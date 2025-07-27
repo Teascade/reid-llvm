@@ -82,6 +82,8 @@ pub enum ErrorKind {
     BinaryOpAlreadyDefined(BinaryOperator, TypeKind, TypeKind),
     #[error("Binary operation {0} between {1} and {2} is not defined")]
     InvalidBinop(BinaryOperator, TypeKind, TypeKind),
+    #[error("Could not infer type for {0:?}. Try adding type annotations.")]
+    CouldNotInferType(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -294,13 +296,13 @@ impl TypeKind {
         }
     }
 
-    pub(super) fn assert_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<TypeKind, ErrorKind> {
-        self.is_known(refs, state).map(|_| self.clone())
+    pub(super) fn assert_known(&self, state: &TypecheckPassState) -> Result<TypeKind, ErrorKind> {
+        self.is_known(state).map(|_| self.clone())
     }
 
-    pub(super) fn is_known(&self, refs: &TypeRefs, state: &TypecheckPassState) -> Result<(), ErrorKind> {
+    pub(super) fn is_known(&self, state: &TypecheckPassState) -> Result<(), ErrorKind> {
         match &self {
-            TypeKind::Array(type_kind, _) => type_kind.as_ref().is_known(refs, state),
+            TypeKind::Array(type_kind, _) => type_kind.as_ref().is_known(state),
             TypeKind::CustomType(custom_type_key) => {
                 state
                     .scope
@@ -311,9 +313,9 @@ impl TypeKind {
                         state.module_id.unwrap(),
                     ))
             }
-            TypeKind::Borrow(type_kind, _) => type_kind.is_known(refs, state),
-            TypeKind::UserPtr(type_kind) => type_kind.is_known(refs, state),
-            TypeKind::CodegenPtr(type_kind) => type_kind.is_known(refs, state),
+            TypeKind::Borrow(type_kind, _) => type_kind.is_known(state),
+            TypeKind::UserPtr(type_kind) => type_kind.is_known(state),
+            TypeKind::CodegenPtr(type_kind) => type_kind.is_known(state),
             TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(*vague_type)),
             _ => Ok(()),
         }

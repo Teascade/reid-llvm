@@ -358,12 +358,20 @@ impl Parse for PrimaryExpression {
                         stream.get_range().unwrap(),
                     );
                 }
-                ValueIndex::Struct(StructValueIndex(name)) => {
-                    expr = Expression(
-                        ExpressionKind::Accessed(Box::new(expr), name),
-                        stream.get_range().unwrap(),
-                    );
-                }
+                ValueIndex::Dot(val) => match val {
+                    DotIndexKind::StructValueIndex(name) => {
+                        expr = Expression(
+                            ExpressionKind::Accessed(Box::new(expr), name),
+                            stream.get_range().unwrap(),
+                        );
+                    }
+                    DotIndexKind::FunctionCall(function_call_expression) => {
+                        expr = Expression(
+                            ExpressionKind::AccessCall(Box::new(expr), Box::new(function_call_expression)),
+                            stream.get_range().unwrap(),
+                        );
+                    }
+                },
             }
         }
 
@@ -473,24 +481,32 @@ impl Parse for BinaryOperator {
 impl Parse for FunctionCallExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
-            stream.expect(Token::ParenOpen)?;
-
-            let mut args = Vec::new();
-
-            if let Ok(exp) = stream.parse() {
-                args.push(exp);
-
-                while stream.expect(Token::Comma).is_ok() {
-                    args.push(stream.parse()?);
-                }
-            }
-
-            stream.expect(Token::ParenClose)?;
-
-            Ok(FunctionCallExpression(name, args, stream.get_range().unwrap()))
+            let args = stream.parse::<FunctionArgs>()?;
+            Ok(FunctionCallExpression(name, args.0, stream.get_range().unwrap()))
         } else {
             Err(stream.expected_err("identifier")?)
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct FunctionArgs(Vec<Expression>);
+
+impl Parse for FunctionArgs {
+    fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        stream.expect(Token::ParenOpen)?;
+
+        let mut params = Vec::new();
+        if let Ok(exp) = stream.parse() {
+            params.push(exp);
+
+            while stream.expect(Token::Comma).is_ok() {
+                params.push(stream.parse()?);
+            }
+        }
+        stream.expect(Token::ParenClose)?;
+
+        Ok(FunctionArgs(params))
     }
 }
 
@@ -766,14 +782,14 @@ impl<T: Parse + std::fmt::Debug> Parse for NamedField<T> {
 #[derive(Debug, Clone)]
 pub enum ValueIndex {
     Array(ArrayValueIndex),
-    Struct(StructValueIndex),
+    Dot(DotIndexKind),
 }
 
 impl Parse for ValueIndex {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         match stream.peek() {
             Some(Token::BracketOpen) => Ok(ValueIndex::Array(stream.parse()?)),
-            Some(Token::Dot) => Ok(ValueIndex::Struct(stream.parse()?)),
+            Some(Token::Dot) => Ok(ValueIndex::Dot(stream.parse()?)),
             _ => Err(stream.expecting_err("value or struct index")?),
         }
     }
@@ -792,13 +808,24 @@ impl Parse for ArrayValueIndex {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructValueIndex(String);
+pub enum DotIndexKind {
+    StructValueIndex(String),
+    FunctionCall(FunctionCallExpression),
+}
 
-impl Parse for StructValueIndex {
+impl Parse for DotIndexKind {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::Dot)?;
         if let Some(Token::Identifier(name)) = stream.next() {
-            Ok(StructValueIndex(name))
+            if let Ok(args) = stream.parse::<FunctionArgs>() {
+                Ok(Self::FunctionCall(FunctionCallExpression(
+                    name,
+                    args.0,
+                    stream.get_range_prev().unwrap(),
+                )))
+            } else {
+                Ok(Self::StructValueIndex(name))
+            }
         } else {
             return Err(stream.expected_err("struct index (number)")?);
         }
