@@ -171,18 +171,27 @@ impl<Data: Clone + Default> Scope<Data> {
     }
 
     pub fn get_associated_function(&mut self, key: &AssociatedFunctionKey) -> Option<ScopeFunction> {
-        let func = self.associated_functions.get(key);
+        let ty = if let TypeKind::Borrow(inner, _) = &key.0 {
+            *inner.clone()
+        } else {
+            key.0.clone()
+        };
+        let key = AssociatedFunctionKey(ty, key.1.clone());
+
+        let func = self.associated_functions.get(&key);
         if let Some(func) = func {
             Some(func.clone())
         } else if let Some(func) = get_intrinsic_assoc_func(&key.0, &key.1) {
-            self.associated_functions.set(
-                key.clone(),
-                ScopeFunction {
-                    ret: func.return_type,
-                    params: func.parameters.iter().map(|(_, p)| p.clone()).collect(),
-                },
-            );
-            self.associated_functions.get(key).cloned()
+            self.associated_functions
+                .set(
+                    key.clone(),
+                    ScopeFunction {
+                        ret: func.return_type,
+                        params: func.parameters.iter().map(|(_, p)| p.clone()).collect(),
+                    },
+                )
+                .unwrap();
+            self.associated_functions.get(&key).cloned()
         } else {
             None
         }

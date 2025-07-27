@@ -415,7 +415,13 @@ impl ast::Expression {
             ),
             ast::ExpressionKind::AccessCall(expression, fn_call_expr) => {
                 let mut params: Vec<_> = fn_call_expr.1.iter().map(|e| e.process(module_id)).collect();
-                params.insert(0, expression.process(module_id));
+                params.insert(
+                    0,
+                    mir::Expression(
+                        mir::ExprKind::Borrow(Box::new(expression.process(module_id)), true),
+                        expression.1.as_meta(module_id),
+                    ),
+                );
                 mir::ExprKind::AssociatedFunctionCall(
                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                     mir::FunctionCall {

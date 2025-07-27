@@ -1292,6 +1292,9 @@ fn codegen_function_call<'ctx, 'a>(
     };
 
     let val = if let Some(ty) = associated_type {
+        // Unwrap type from borrow if it is in a borrow
+        let ty = if let TypeKind::Borrow(inner, _) = ty { inner } else { ty };
+
         let assoc_key = AssociatedFunctionKey(ty.clone(), call.name.clone());
         let intrinsic_def = get_intrinsic_assoc_func(&ty, &call.name);
         let intrinsic = intrinsic_def.map(|func_def| {

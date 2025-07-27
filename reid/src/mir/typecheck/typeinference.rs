@@ -12,8 +12,9 @@ use std::{
 
 use crate::{
     mir::{
-        pass::AssociatedFunctionKey, BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
-        FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
+        pass::{AssociatedFunctionKey, ScopeVariable},
+        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
+        IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -248,6 +249,18 @@ impl Block {
                     if let Some(var_ref) = &var_ref {
                         var.0 = var_ref.as_type();
                     }
+
+                    state
+                        .scope
+                        .variables
+                        .set(
+                            var.1.clone(),
+                            ScopeVariable {
+                                ty: var.0.clone(),
+                                mutable: *mutable,
+                            },
+                        )
+                        .ok();
 
                     // Infer hints for the expression itself
                     let inferred = expr.infer_types(&mut state, &inner_refs);
@@ -592,6 +605,13 @@ impl Expression {
                         Void,
                         first_param.1,
                     );
+                    let backing_var = first_param.backing_var().expect("todo").1.clone();
+                    dbg!(&backing_var);
+                    dbg!(&state.scope.variables.get(&backing_var));
+                    let mutable = state.scope.variables.get(&backing_var).expect("todo").mutable;
+                    if !mutable {
+                        first_param.remove_borrow_mutability();
+                    }
                 }
 
                 // Get function definition and types
@@ -619,6 +639,23 @@ impl Expression {
                 // Provide function return type
                 Ok(type_refs.from_type(&fn_call.ret).unwrap())
             }
+        }
+    }
+
+    fn remove_borrow_mutability(&mut self) {
+        match &mut self.0 {
+            ExprKind::Variable(_) => {}
+            ExprKind::Indexed(value_expr, ..) => value_expr.remove_borrow_mutability(),
+            ExprKind::Accessed(value_expr, ..) => value_expr.remove_borrow_mutability(),
+            ExprKind::Block(block) => {
+                if let Some((_, Some(ret_expr))) = &mut block.return_expression {
+                    ret_expr.remove_borrow_mutability();
+                }
+            }
+            ExprKind::Borrow(_, mutable) => {
+                *mutable = false;
+            }
+            _ => {}
         }
     }
 }
