@@ -599,23 +599,34 @@ impl Parse for FunctionParam {
 #[derive(Debug)]
 pub struct SelfParam(SelfKind);
 
+pub enum SelfParamKind {
+    Owned,
+    Borrow,
+    BorrowMut,
+}
+
 impl Parse for SelfParam {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
-        stream.expect(Token::Et)?;
-        let mutable = if let Some(Token::MutKeyword) = stream.peek() {
+        let kind = if let Some(Token::Et) = stream.peek() {
             stream.next();
-            true
+            if let Some(Token::MutKeyword) = stream.peek() {
+                stream.next();
+                SelfParamKind::BorrowMut
+            } else {
+                SelfParamKind::Borrow
+            }
         } else {
-            false
+            SelfParamKind::Owned
         };
 
         let Some(Token::Identifier(name)) = stream.next() else {
             return Err(stream.expected_err("parameter name")?);
         };
         if name == "self" {
-            match mutable {
-                true => Ok(SelfParam(SelfKind::MutBorrow(TypeKind::Unknown))),
-                false => Ok(SelfParam(SelfKind::Borrow(TypeKind::Unknown))),
+            match kind {
+                SelfParamKind::BorrowMut => Ok(SelfParam(SelfKind::MutBorrow(TypeKind::Unknown))),
+                SelfParamKind::Borrow => Ok(SelfParam(SelfKind::Borrow(TypeKind::Unknown))),
+                SelfParamKind::Owned => Ok(SelfParam(SelfKind::Owned(TypeKind::Unknown))),
             }
         } else {
             Err(stream.expected_err("self parameter")?)
@@ -984,6 +995,7 @@ impl Parse for AssociatedFunctionBlock {
         while let Some(Token::FnKeyword) = stream.peek() {
             let mut fun: FunctionDefinition = stream.parse()?;
             fun.0.self_kind = match fun.0.self_kind {
+                SelfKind::Owned(_) => SelfKind::Owned(ty.0.clone()),
                 SelfKind::Borrow(_) => SelfKind::Borrow(ty.0.clone()),
                 SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.0.clone()),
                 SelfKind::None => SelfKind::None,

@@ -181,6 +181,7 @@ pub struct FunctionSignature {
 
 #[derive(Debug, Clone)]
 pub enum SelfKind {
+    Owned(TypeKind),
     Borrow(TypeKind),
     MutBorrow(TypeKind),
     None,

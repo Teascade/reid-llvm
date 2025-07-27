@@ -13,16 +13,15 @@ impl Otus {
 }
 
 impl i32 {
-    fn test(&self) -> u32 {
+    fn test(self) -> u32 {
         43
     }
 }
 
 fn main() -> u32 {
     let otus = Otus { field: 17 };
-    let num = 54;
     print(from_str("otus: ") + Otus::test(&otus) as u64);
-    print(from_str("i32: ") + i32::test(&num) as u64);
+    print(from_str("i32: ") + i32::test(54) as u64);
 
     return Otus::test(&otus);
 }

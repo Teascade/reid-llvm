@@ -136,6 +136,7 @@ impl ast::FunctionDefinition {
                 "self".to_owned(),
                 mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), true),
             )),
+            ast::SelfKind::Owned(type_kind) => params.push(("self".to_owned(), type_kind.into_mir(module_id))),
             ast::SelfKind::None => {}
         }
 
