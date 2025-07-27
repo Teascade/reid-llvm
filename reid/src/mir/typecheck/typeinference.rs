@@ -609,18 +609,18 @@ impl Expression {
                                 Void,
                                 first_param.1,
                             )
-                            .unroll_borrows()
                             .resolve_ref(type_refs.types);
                         let backing_var = first_param.backing_var().expect("todo").1.clone();
 
-                        *first_param = if backing_var == "self" {
-                            let ExprKind::Borrow(val, _) = &first_param.0 else {
-                                panic!()
-                            };
-                            *val.clone()
-                        } else {
-                            first_param.clone()
-                        };
+                        if let TypeKind::Borrow(inner, _) = type_kind {
+                            if let TypeKind::Borrow(..) = *inner.clone() {
+                                *type_kind = type_kind.unroll_borrows();
+                                let ExprKind::Borrow(val, _) = &first_param.0 else {
+                                    panic!()
+                                };
+                                *first_param = *val.clone();
+                            }
+                        }
 
                         if let Some((mutable, _)) = type_refs.find_var(&backing_var) {
                             if !mutable {
