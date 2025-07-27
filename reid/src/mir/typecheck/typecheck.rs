@@ -1,6 +1,6 @@
 //! This module contains code relevant to doing a type checking pass on the MIR.
 //! During typechecking relevant types are also coerced if possible.
-use std::{collections::HashSet, convert::Infallible, iter};
+use std::{collections::HashSet, convert::Infallible, hint, iter};
 
 use crate::{mir::*, util::try_all};
 use VagueType as Vague;
@@ -668,60 +668,49 @@ impl Expression {
 
                 Ok(TypeKind::CustomType(type_key))
             }
-            ExprKind::Borrow(var_ref, mutable) => {
-                let scope_var = state.scope.variables.get(&var_ref.1).cloned();
-
-                let existing = state
-                    .or_else(
-                        scope_var
-                            .clone()
-                            .map(|var| var.ty)
-                            .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
-                        TypeKind::Vague(Vague::Unknown),
-                        var_ref.2,
-                    )
-                    .resolve_ref(typerefs);
-
-                if let Some(scope_var) = scope_var {
-                    if !scope_var.mutable && *mutable {
-                        return Err(ErrorKind::ImpossibleMutableBorrow(var_ref.1.clone()));
+            ExprKind::Borrow(expr, mutable) => {
+                let hint_t = if let HintKind::Coerce(hint_t) = hint_t {
+                    if let TypeKind::Borrow(inner, _) = hint_t {
+                        HintKind::Coerce(*inner)
+                    } else {
+                        return Err(ErrorKind::TypesIncompatible(
+                            hint_t,
+                            TypeKind::Borrow(Box::new(TypeKind::Vague(VagueType::Unknown)), *mutable),
+                        ));
                     }
-                }
-
-                // Update typing to be more accurate
-                var_ref.0 = state.or_else(
-                    var_ref.0.resolve_ref(typerefs).narrow_into(&existing),
-                    TypeKind::Vague(Vague::Unknown),
-                    var_ref.2,
-                );
-
-                Ok(TypeKind::Borrow(Box::new(var_ref.0.clone()), *mutable))
-            }
-            ExprKind::Deref(var_ref) => {
-                let existing = state
-                    .or_else(
-                        state
-                            .scope
-                            .variables
-                            .get(&var_ref.1)
-                            .map(|var| &var.ty)
-                            .cloned()
-                            .ok_or(ErrorKind::VariableNotDefined(var_ref.1.clone())),
-                        TypeKind::Vague(Vague::Unknown),
-                        var_ref.2,
-                    )
-                    .resolve_ref(typerefs);
-
-                // Update typing to be more accurate
-                let TypeKind::Borrow(inner, mutable) = state.or_else(
-                    var_ref.0.resolve_ref(typerefs).narrow_into(&existing),
-                    TypeKind::Vague(Vague::Unknown),
-                    var_ref.2,
-                ) else {
-                    return Err(ErrorKind::AttemptedDerefNonBorrow(var_ref.1.clone()));
+                } else {
+                    hint_t
                 };
 
-                var_ref.0 = TypeKind::Borrow(inner.clone(), mutable);
+                let expr_ty = expr.typecheck(state, typerefs, hint_t)?.resolve_ref(typerefs);
+
+                if let Some(backing_var) = expr.backing_var() {
+                    if let Some(scope_var) = state.scope.variables.get(&backing_var.1) {
+                        if !scope_var.mutable && *mutable {
+                            return Err(ErrorKind::ImpossibleMutableBorrow(backing_var.1.clone()));
+                        }
+                    } else {
+                        return Err(ErrorKind::VariableNotDefined(backing_var.1.clone()));
+                    }
+                } else {
+                    return Err(ErrorKind::ImpossibleBorrow);
+                }
+
+                Ok(TypeKind::Borrow(Box::new(expr_ty.clone()), *mutable))
+            }
+            ExprKind::Deref(expr) => {
+                let hint_t = if let HintKind::Coerce(hint_t) = hint_t {
+                    HintKind::Coerce(TypeKind::Borrow(Box::new(hint_t), false))
+                } else {
+                    hint_t
+                };
+
+                let expr_ty = expr.typecheck(state, typerefs, hint_t)?.resolve_ref(typerefs);
+
+                // Update typing to be more accurate
+                let TypeKind::Borrow(inner, _) = expr_ty else {
+                    return Err(ErrorKind::AttemptedDerefNonBorrow(expr_ty.clone()));
+                };
 
                 Ok(*inner)
             }

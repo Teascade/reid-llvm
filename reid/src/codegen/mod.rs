@@ -1144,12 +1144,8 @@ impl mir::Expression {
                     TypeKind::CustomType(type_key),
                 ))
             }
-            mir::ExprKind::Borrow(varref, mutable) => {
-                varref.0.known().expect("variable type unknown");
-                let v = scope
-                    .stack_values
-                    .get(&varref.1)
-                    .expect("Variable reference not found?!");
+            mir::ExprKind::Borrow(expr, mutable) => {
+                let v = expr.codegen(scope, &state.load(false))?.unwrap();
 
                 let TypeKind::CodegenPtr(ptr_inner) = &v.1 else {
                     panic!();
@@ -1160,12 +1156,8 @@ impl mir::Expression {
                     TypeKind::Borrow(Box::new(*ptr_inner.clone()), *mutable),
                 ))
             }
-            mir::ExprKind::Deref(varref) => {
-                varref.0.known().expect("variable type unknown");
-                let v = scope
-                    .stack_values
-                    .get(&varref.1)
-                    .expect("Variable reference not found?!");
+            mir::ExprKind::Deref(expr) => {
+                let v = expr.codegen(scope, &state.load(false))?.unwrap();
 
                 let TypeKind::CodegenPtr(ptr_inner) = &v.1 else {
                     panic!();
@@ -1174,7 +1166,7 @@ impl mir::Expression {
                 let var_ptr_instr = scope
                     .block
                     .build_named(
-                        format!("{}.deref", varref.1),
+                        format!("{}.deref", expr.backing_var().unwrap().1),
                         Instr::Load(v.0.instr(), ptr_inner.get_type(scope.type_values)),
                     )
                     .unwrap();
@@ -1187,7 +1179,7 @@ impl mir::Expression {
                                     scope
                                         .block
                                         .build_named(
-                                            format!("{}.deref.inner", varref.1),
+                                            format!("{}.deref.inner", expr.backing_var().unwrap().1),
                                             Instr::Load(var_ptr_instr, inner.get_type(scope.type_values)),
                                         )
                                         .unwrap(),

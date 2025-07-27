@@ -179,6 +179,36 @@ impl Parse for AssociatedFunctionCall {
     }
 }
 
+fn apply_inner<T>(expr: PrimaryExpression, fun: T) -> Expression
+where
+    T: FnOnce(PrimaryExpression) -> Expression,
+{
+    match &expr.0 .0 {
+        ExpressionKind::Indexed(value_expr, index_expr) => Expression(
+            ExpressionKind::Indexed(
+                Box::new(apply_inner(PrimaryExpression(*value_expr.clone()), fun)),
+                index_expr.clone(),
+            ),
+            expr.0 .1,
+        ),
+        ExpressionKind::Accessed(value_expr, index_name) => Expression(
+            ExpressionKind::Accessed(
+                Box::new(apply_inner(PrimaryExpression(*value_expr.clone()), fun)),
+                index_name.clone(),
+            ),
+            expr.0 .1,
+        ),
+        ExpressionKind::AccessCall(value_expr, fn_call) => Expression(
+            ExpressionKind::AccessCall(
+                Box::new(apply_inner(PrimaryExpression(*value_expr.clone()), fun)),
+                fn_call.clone(),
+            ),
+            expr.0 .1,
+        ),
+        _ => fun(expr),
+    }
+}
+
 #[derive(Debug)]
 pub struct PrimaryExpression(Expression);
 
@@ -195,18 +225,21 @@ impl Parse for PrimaryExpression {
         } else if let (Some(Token::Et), Some(Token::MutKeyword)) = (stream.peek(), stream.peek2()) {
             stream.next(); // Consume Et
             stream.next(); // Consume mut
-            let Some(Token::Identifier(name)) = stream.next() else {
-                return Err(stream.expected_err("identifier")?);
-            };
-            Expression(Kind::Borrow(name, true), stream.get_range().unwrap())
-        } else if let (Some(Token::Et), Some(Token::Identifier(name))) = (stream.peek(), stream.peek2()) {
+            Expression(
+                Kind::Borrow(Box::new(stream.parse()?), true),
+                stream.get_range().unwrap(),
+            )
+        } else if let Some(Token::Et) = stream.peek() {
             stream.next(); // Consume Et
-            stream.next(); // Consume identifier
-            Expression(Kind::Borrow(name, false), stream.get_range().unwrap())
-        } else if let (Some(Token::Star), Some(Token::Identifier(name))) = (stream.peek(), stream.peek2()) {
+            Expression(
+                Kind::Borrow(Box::new(stream.parse()?), false),
+                stream.get_range().unwrap(),
+            )
+        } else if let Some(Token::Star) = stream.peek() {
             stream.next(); // Consume Et
-            stream.next(); // Consume identifier
-            Expression(Kind::Deref(name), stream.get_range().unwrap())
+            apply_inner(stream.parse()?, |e| {
+                Expression(Kind::Deref(Box::new(e.0)), stream.get_range().unwrap())
+            })
         } else if let Ok(unary) = stream.parse() {
             Expression(
                 Kind::UnaryOperation(unary, Box::new(stream.parse()?)),

@@ -557,37 +557,23 @@ impl Expression {
                 }
                 Ok(type_refs.from_type(&TypeKind::CustomType(type_key.clone())).unwrap())
             }
-            ExprKind::Borrow(var, mutable) => {
+            ExprKind::Borrow(expr, mutable) => {
                 // Find variable type
-                let type_ref = type_refs
-                    .find_var(&var.1)
-                    .map(|(_, hint)| hint)
-                    .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
-
-                // Update MIR type to TypeRef if found
-                if let Ok(hint) = &type_ref {
-                    var.0 = hint.as_type();
-                }
+                let type_ref = expr.infer_types(state, type_refs)?;
 
                 Ok(type_refs
-                    .from_type(&TypeKind::Borrow(Box::new(var.0.clone()), *mutable))
+                    .from_type(&TypeKind::Borrow(Box::new(type_ref.as_type()), *mutable))
                     .unwrap())
             }
-            ExprKind::Deref(var) => {
+            ExprKind::Deref(expr) => {
                 // Find variable type
-                let type_ref = type_refs
-                    .find_var(&var.1)
-                    .map(|(_, hint)| hint)
-                    .ok_or(ErrorKind::VariableNotDefined(var.1.clone()));
+                let type_ref = expr.infer_types(state, type_refs)?;
 
-                // Update MIR type to TypeRef if found
-                if let Ok(hint) = &type_ref {
-                    var.0 = hint.as_type();
-                }
+                // Update typing to be more accurate
 
-                match &var.0.resolve_weak(type_refs.types) {
-                    Borrow(type_kind, _) => Ok(type_refs.from_type(&type_kind).unwrap()),
-                    _ => Err(ErrorKind::AttemptedDerefNonBorrow(var.1.clone())),
+                match type_ref.resolve_weak().unwrap() {
+                    Borrow(inner, _) => Ok(type_refs.from_type(&inner).unwrap()),
+                    _ => Err(ErrorKind::AttemptedDerefNonBorrow(type_ref.resolve_deep().unwrap())),
                 }
             }
             ExprKind::CastTo(expression, type_kind) => {

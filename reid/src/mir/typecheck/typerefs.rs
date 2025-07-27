@@ -27,6 +27,10 @@ impl<'scope> TypeRef<'scope> {
                 let resolved_elem_ty = self.1.from_type(&elem_ty).unwrap().resolve_weak()?;
                 Some(TypeKind::Array(Box::new(resolved_elem_ty), len))
             }
+            TypeKind::Borrow(inner_ty, mutable) => {
+                let resolved_elem_ty = self.1.from_type(&inner_ty).unwrap().resolve_weak()?;
+                Some(TypeKind::Borrow(Box::new(resolved_elem_ty), mutable))
+            }
             _ => Some(resolved),
         }
     }

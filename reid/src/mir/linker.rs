@@ -401,12 +401,8 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
                 super::ExprKind::BinOp(.., type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
 
-                super::ExprKind::Borrow(var_ref, _) => {
-                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
-                }
-                super::ExprKind::Deref(var_ref) => {
-                    var_ref.0 = var_ref.0.update_imported(extern_types, mod_id);
-                }
+                super::ExprKind::Borrow(expr, _) => {}
+                super::ExprKind::Deref(expr) => {}
                 super::ExprKind::CastTo(_, type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
                 _ => {}
             }

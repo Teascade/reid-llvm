@@ -65,7 +65,9 @@ pub enum ErrorKind {
     #[error("This type of expression can not be used for assignment")]
     InvalidSetExpression,
     #[error("Can not deref {0}, as it is not a borrow")]
-    AttemptedDerefNonBorrow(String),
+    AttemptedDerefNonBorrow(TypeKind),
+    #[error("Can not borrow this kind of expression")]
+    ImpossibleBorrow,
     #[error("Types {0} and {1} differ in mutability")]
     TypesDifferMutability(TypeKind, TypeKind),
     #[error("Cannot mutably borrow variable {0}, which is not declared as mutable")]

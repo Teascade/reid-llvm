@@ -261,8 +261,8 @@ pub enum ExprKind {
     AssociatedFunctionCall(TypeKind, FunctionCall),
     If(IfExpression),
     Block(Block),
-    Borrow(NamedVariableRef, bool),
-    Deref(NamedVariableRef),
+    Borrow(Box<Expression>, bool),
+    Deref(Box<Expression>),
     CastTo(Box<Expression>, TypeKind),
 }
 

@@ -361,19 +361,10 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
             ),
-            ast::ExpressionKind::Borrow(name, mutable) => mir::ExprKind::Borrow(
-                NamedVariableRef(
-                    mir::TypeKind::Vague(mir::VagueType::Unknown),
-                    name.clone(),
-                    self.1.as_meta(module_id),
-                ),
-                *mutable,
-            ),
-            ast::ExpressionKind::Deref(name) => mir::ExprKind::Deref(NamedVariableRef(
-                mir::TypeKind::Vague(mir::VagueType::Unknown),
-                name.clone(),
-                self.1.as_meta(module_id),
-            )),
+            ast::ExpressionKind::Borrow(expr, mutable) => {
+                mir::ExprKind::Borrow(Box::new(expr.process(module_id)), *mutable)
+            }
+            ast::ExpressionKind::Deref(expr) => mir::ExprKind::Deref(Box::new(expr.process(module_id))),
             ast::ExpressionKind::UnaryOperation(unary_operator, expr) => match unary_operator {
                 ast::UnaryOperator::Plus => mir::ExprKind::BinOp(
                     mir::BinaryOperator::Add,

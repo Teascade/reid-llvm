@@ -425,15 +425,15 @@ impl Expression {
                 ReturnKind::Soft,
                 TypeKind::CustomType(CustomTypeKey(name.clone(), mod_id)),
             )),
-            Borrow(var, mutable) => {
-                let ret_type = var.return_type()?;
+            Borrow(expr, mutable) => {
+                let ret_type = expr.return_type(refs, mod_id)?;
                 Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1), *mutable)))
             }
-            Deref(var) => {
-                let (kind, ret_type) = var.return_type()?;
+            Deref(expr) => {
+                let (kind, ret_type) = expr.return_type(refs, mod_id)?;
                 match ret_type.resolve_weak(refs) {
                     TypeKind::Borrow(type_kind, _) => Ok((kind, *type_kind)),
-                    _ => Err(ReturnTypeOther::DerefNonBorrow(var.2)),
+                    _ => Err(ReturnTypeOther::DerefNonBorrow(expr.1)),
                 }
             }
             CastTo(expr, type_kind) => match expr.return_type(refs, mod_id) {
@@ -452,8 +452,8 @@ impl Expression {
             ExprKind::Variable(var_ref) => Some(var_ref),
             ExprKind::Indexed(lhs, _, _) => lhs.backing_var(),
             ExprKind::Accessed(lhs, _, _) => lhs.backing_var(),
-            ExprKind::Borrow(var, _) => Some(var),
-            ExprKind::Deref(var) => Some(var),
+            ExprKind::Borrow(expr, _) => expr.backing_var(),
+            ExprKind::Deref(expr) => expr.backing_var(),
             ExprKind::Block(block) => block.backing_var(),
             ExprKind::Array(_) => None,
             ExprKind::Struct(_, _) => None,

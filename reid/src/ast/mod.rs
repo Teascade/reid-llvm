@@ -80,8 +80,8 @@ pub struct Expression(pub ExpressionKind, pub TokenRange);
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
     VariableName(String),
-    Borrow(String, bool),
-    Deref(String),
+    Borrow(Box<Expression>, bool),
+    Deref(Box<Expression>),
     Literal(Literal),
     Array(Vec<Expression>),
     ArrayShort(Box<Expression>, u64),
