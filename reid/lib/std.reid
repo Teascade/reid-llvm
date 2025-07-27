@@ -11,6 +11,17 @@ struct String {
     must_be_freed: bool,
 }
 
+impl String {
+    pub fn new() -> String {
+        String {
+            inner: char::alloca(0),
+            length: 0,
+            max_length: 0,
+            must_be_freed: true,
+        }
+    }
+}
+
 impl binop (lhs: String) + (rhs: *char) -> String {
     let mut new = lhs;
     let added = from_str(rhs);

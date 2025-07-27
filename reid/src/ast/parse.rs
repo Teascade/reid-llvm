@@ -1052,15 +1052,20 @@ impl Parse for AssociatedFunctionBlock {
         let ty = stream.parse::<Type>()?;
         stream.expect(Token::BraceOpen)?;
         let mut functions = Vec::new();
-        while let Some(Token::FnKeyword) = stream.peek() {
-            let mut fun: FunctionDefinition = stream.parse()?;
-            fun.0.self_kind = match fun.0.self_kind {
-                SelfKind::Owned(_) => SelfKind::Owned(ty.0.clone()),
-                SelfKind::Borrow(_) => SelfKind::Borrow(ty.0.clone()),
-                SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.0.clone()),
-                SelfKind::None => SelfKind::None,
-            };
-            functions.push(fun);
+        loop {
+            match stream.peek() {
+                Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
+                    let mut fun: FunctionDefinition = stream.parse()?;
+                    fun.0.self_kind = match fun.0.self_kind {
+                        SelfKind::Owned(_) => SelfKind::Owned(ty.0.clone()),
+                        SelfKind::Borrow(_) => SelfKind::Borrow(ty.0.clone()),
+                        SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.0.clone()),
+                        SelfKind::None => SelfKind::None,
+                    };
+                    functions.push(fun);
+                }
+                _ => break,
+            }
         }
 
         stream.expect(Token::BraceClose)?;
