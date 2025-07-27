@@ -1,10 +1,12 @@
 import std::print;
+import std::from_str;
 import std::add_char;
 import std::set_char;
 import std::free_string;
-import std::new_string;
 import std::add_num_to_str;
 import std::concat_strings;
+import std::String;
+
 
 fn main() {
     let mut test = String::new();

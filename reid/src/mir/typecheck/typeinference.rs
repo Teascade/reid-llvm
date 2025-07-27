@@ -594,23 +594,27 @@ impl Expression {
                 Ok(type_refs.from_type(type_kind).unwrap())
             }
             ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
-                if type_kind.is_known(state).is_err() {
-                    let first_param = function_call
-                        .parameters
-                        .get_mut(0)
-                        .expect("Unknown-type associated function NEEDS to always have at least one parameter!");
-                    let param_ty = first_param.infer_types(state, type_refs).unwrap().resolve_deep();
-                    *type_kind = state.or_else(
-                        param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),
-                        Void,
-                        first_param.1,
-                    );
-                    let backing_var = first_param.backing_var().expect("todo").1.clone();
-                    dbg!(&backing_var);
-                    dbg!(&state.scope.variables.get(&backing_var));
-                    let mutable = state.scope.variables.get(&backing_var).expect("todo").mutable;
-                    if !mutable {
-                        first_param.remove_borrow_mutability();
+                match type_kind.is_known(state) {
+                    Ok(_) => {}
+                    Err(ErrorKind::NoSuchType(name, mod_id)) => return Err(ErrorKind::NoSuchType(name, mod_id)),
+                    Err(_) => {
+                        let first_param = function_call
+                            .parameters
+                            .get_mut(0)
+                            .expect("Unknown-type associated function NEEDS to always have at least one parameter!");
+                        let param_ty = first_param.infer_types(state, type_refs).unwrap().resolve_deep();
+                        *type_kind = state.or_else(
+                            param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),
+                            Void,
+                            first_param.1,
+                        );
+                        let backing_var = first_param.backing_var().expect("todo").1.clone();
+                        dbg!(&backing_var);
+                        dbg!(&state.scope.variables.get(&backing_var));
+                        let mutable = state.scope.variables.get(&backing_var).expect("todo").mutable;
+                        if !mutable {
+                            first_param.remove_borrow_mutability();
+                        }
                     }
                 }
 
