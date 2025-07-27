@@ -24,11 +24,11 @@ Syntax for Reid is very much inspired by rust, and examples of the language can
 be found in the [examples](../examples/)-folder.
 
 In Reid **modules** (or files) on the top-level are comprised of imports, type
-definitions, binop-definitions and functions.
+definitions, binop-definitions, functions and type-associated function blocks.
 
 In formal grammar
 ```bnf
-<module> :: (<import> | <type-definition> | <binop-definition> | <function>)*
+<module> :: (<import> | <type-definition> | <binop-definition> | <function> | <assoc-function-block>)*
 ```
 
 Table of Contents:
@@ -38,6 +38,7 @@ Table of Contents:
     - [Struct types](#struct-types)
 - [Binary operation Definitions](#binary-operation-definitions)
 - [Function definitions](#function-definition)
+  - [Associated functions](#associated-functions)
 - [Statement](#statement)
 - [Expression](#expression)
 
@@ -140,7 +141,7 @@ impl binop (lhs: u16) + (rhs: u32) -> u32 {
 
 ### Function Definition
 
-Rust syntax for defining functions is similar to rust. There are two types of functions:
+Reid syntax for defining functions is similar to rust. There are two types of functions:
 1. `extern` functions which are defined in another module, used to define functions from outside modules such as `libc`.
 2. `local` functions which are defined locally in the module in Reid. Their
    definition is contained within a `block` which contains a list of
@@ -153,8 +154,9 @@ In formal grammar:
 <local-function> :: [ "pub" ] "fn" <signature> <block>
 
 <signature> :: <ident> "(" [ <params> ] ")" [ "->" <type> ]
-<params> <param> ( "," <param> )*
-<param> :: <ident> ":" <type>
+<params> :: <param-or-self> ( "," <param> )*
+<param-or-self> = <param> | ( [ "&" [ "mut" ] ] "self")
+<param> :: (<ident> ":" <type>)
 <block> :: "{" <statement>* "}"
 ```
 
@@ -164,6 +166,27 @@ extern fn puts(message: *char) -> i32;
 
 fn main() -> u8 {
     return 7;
+}
+```
+
+#### Associated Functions
+
+Reid also has a very similar syntax for defining associated functions as Rust
+does. They are also the only types of functions where usage of initial
+"self"-param is allowed, referring to a potential self-type. Associated
+functions are functions that are defined within certain types such that you can
+have multiple functions of the same name, as long as they are associated with a
+different type. In formal grammar associated function blocks are:
+```bnf
+<assoc-function-block> :: "impl" <type> "{" <function-definition>* "}"
+```
+
+An example of such a block could be:
+```rust
+impl Test {
+    fn get_field(&self) -> u32 {
+        *self.field
+    }
 }
 ```
 
@@ -222,6 +245,8 @@ calls, literals, or if-expressions. Types of supported expressions include:
 - **Binary operations** (such as add/sub/mult)
 - **Unary operations** (such as !value or -value)
 - **Function calls**, to invoke a predefined function with given parameters
+- **Associated function calls**, to invoke a predefined function on a certain
+  *associated type* with given parameters.
 - **Block-expressions**, which can return a value to the higher-level expression
   if they have a statement with a soft-return. Otherwise they return void.
 - **If-expressions**, which can execute one of two expressions depending on the
@@ -238,8 +263,8 @@ In formal grammar:
     <array> | <struct> |
     <indexing> | <accessing> |
     <binary-exp> | <unary-exp> |
-    <function-call> | <block> |
-    <if-expr> | <cast> |
+    <function-call> | <assoc-function-call>
+    <block> | <if-expr> | <cast> |
     ( "(" <expression> ")" )
 
 <variable> :: <ident>
@@ -253,6 +278,7 @@ In formal grammar:
 <binary-exp> :: <expression> <binop> <expression>
 <unary-exp> :: <unary> <expression>
 <function-call> :: <expression> "(" [ <expression> ( "," <expression> )* ] ")"
+<assoc-function-call> :: <type> "::" <function-call>
 <if-expr> :: "if" <expression> <expression> [ "else" <expression> ]
 <cast> :: <expression> "as" <type>
 ```
@@ -269,6 +295,7 @@ test.first // Accessing
 7 + value // Binop
 !bool_value // Unary
 func(value, 14) // Function call
+Test::get_field(&test); // Associated function call
 if varname {} else {} // If-expression
 value as u32 // cast
 (value + 2) // Binop within parenthesis
