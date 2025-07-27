@@ -248,7 +248,7 @@ pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Import(pub Vec<String>, pub Metadata);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprKind {
     Variable(NamedVariableRef),
     Indexed(Box<Expression>, TypeKind, Box<Expression>),
@@ -266,14 +266,14 @@ pub enum ExprKind {
     CastTo(Box<Expression>, TypeKind),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expression(pub ExprKind, pub Metadata);
 
 /// Condition, Then, Else
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IfExpression(pub Box<Expression>, pub Box<Expression>, pub Box<Option<Expression>>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
     pub return_type: TypeKind,
@@ -328,7 +328,7 @@ impl FunctionDefinition {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Block {
     /// List of non-returning statements
     pub statements: Vec<Statement>,
@@ -336,10 +336,10 @@ pub struct Block {
     pub meta: Metadata,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Statement(pub StmtKind, pub Metadata);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StmtKind {
     /// Variable name++mutability+type, evaluation
     Let(NamedVariableRef, bool, Expression),
@@ -349,7 +349,7 @@ pub enum StmtKind {
     While(WhileStatement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub condition: Expression,
     pub block: Block,

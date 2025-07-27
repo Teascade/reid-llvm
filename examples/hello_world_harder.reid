@@ -1,22 +1,19 @@
 import std::print;
 import std::from_str;
-import std::add_char;
 import std::set_char;
 import std::free_string;
-import std::add_num_to_str;
-import std::concat_strings;
 import std::String;
 
 
 fn main() {
-    let mut test = String::new();
+    let mut test = String::from("hello");
 
-    concat_strings(&mut test, from_str(" world"));
+    test.push(String::from(" world"));
 
-    add_char(&mut test, '!');
-    add_char(&mut test, '\n');
+    test.add_char('!');
+    test.add_char('\n');
 
-    add_num_to_str(&mut test, 175);
+    test.push_num(175);
     
     print(test);
 

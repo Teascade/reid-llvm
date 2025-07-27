@@ -749,7 +749,9 @@ impl Expression {
                         .into_iter()
                         .chain(iter::repeat(TypeKind::Vague(Vague::Unknown)));
 
-                    for (param, true_param_t) in function_call.parameters.iter_mut().zip(true_params_iter) {
+                    for (i, (param, true_param_t)) in
+                        function_call.parameters.iter_mut().zip(true_params_iter).enumerate()
+                    {
                         // Typecheck every param separately
                         let param_res = param.typecheck(state, &typerefs, HintKind::Coerce(true_param_t.clone()));
                         let param_t = state.or_else(param_res, TypeKind::Vague(Vague::Unknown), param.1);

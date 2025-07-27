@@ -691,12 +691,23 @@ impl Parse for FunctionSignature {
 
             let self_kind = stream.parse::<SelfParam>().map(|s| s.0).unwrap_or(SelfKind::None);
 
-            if let Ok(param) = stream.parse::<FunctionParam>() {
-                params.push((param.0, param.1));
-                while let Some(Token::Comma) = stream.peek() {
-                    stream.next();
-                    let param = stream.parse::<FunctionParam>()?;
-                    params.push((param.0, param.1));
+            match &self_kind {
+                SelfKind::None => {
+                    if let Ok(param) = stream.parse::<FunctionParam>() {
+                        params.push((param.0, param.1));
+                        while let Some(Token::Comma) = stream.peek() {
+                            stream.next();
+                            let param = stream.parse::<FunctionParam>()?;
+                            params.push((param.0, param.1));
+                        }
+                    }
+                }
+                _ => {
+                    while let Some(Token::Comma) = stream.peek() {
+                        stream.next();
+                        let param = stream.parse::<FunctionParam>()?;
+                        params.push((param.0, param.1));
+                    }
                 }
             }
 

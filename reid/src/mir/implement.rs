@@ -208,6 +208,19 @@ impl TypeKind {
             None
         }
     }
+
+    pub fn unroll_borrows(&self) -> TypeKind {
+        match self {
+            TypeKind::Borrow(type_kind, mut1) => match *type_kind.clone() {
+                TypeKind::Borrow(type_kind, mut2) => match (mut1, mut2) {
+                    (false, false) => TypeKind::Borrow(Box::new(*type_kind.clone()), false),
+                    _ => TypeKind::Borrow(Box::new(*type_kind.clone()), true),
+                },
+                _ => self.clone(),
+            },
+            _ => self.clone(),
+        }
+    }
 }
 
 impl BinaryOperator {

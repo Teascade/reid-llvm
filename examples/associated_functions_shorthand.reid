@@ -1,5 +1,6 @@
 import std::print;
 import std::from_str;
+import std::String;
 
 struct Otus {
     field: u32,

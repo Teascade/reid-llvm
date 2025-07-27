@@ -603,17 +603,31 @@ impl Expression {
                             .get_mut(0)
                             .expect("Unknown-type associated function NEEDS to always have at least one parameter!");
                         let param_ty = first_param.infer_types(state, type_refs).unwrap().resolve_deep();
-                        *type_kind = state.or_else(
-                            param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),
-                            Void,
-                            first_param.1,
-                        );
+                        *type_kind = state
+                            .or_else(
+                                param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),
+                                Void,
+                                first_param.1,
+                            )
+                            .unroll_borrows()
+                            .resolve_ref(type_refs.types);
                         let backing_var = first_param.backing_var().expect("todo").1.clone();
-                        dbg!(&backing_var);
-                        dbg!(&state.scope.variables.get(&backing_var));
-                        let mutable = state.scope.variables.get(&backing_var).expect("todo").mutable;
-                        if !mutable {
-                            first_param.remove_borrow_mutability();
+
+                        *first_param = if backing_var == "self" {
+                            let ExprKind::Borrow(val, _) = &first_param.0 else {
+                                panic!()
+                            };
+                            *val.clone()
+                        } else {
+                            first_param.clone()
+                        };
+
+                        if let Some((mutable, _)) = type_refs.find_var(&backing_var) {
+                            if !mutable {
+                                first_param.remove_borrow_mutability();
+                            }
+                        } else {
+                            return Err(ErrorKind::VariableNotDefined(backing_var));
                         }
                     }
                 }
