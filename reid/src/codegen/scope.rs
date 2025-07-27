@@ -8,7 +8,10 @@ use reid_lib::{
 
 use crate::{
     lexer::FullToken,
-    mir::{pass::BinopKey, CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind},
+    mir::{
+        pass::{AssociatedFunctionKey, BinopKey},
+        CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind,
+    },
 };
 
 use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
@@ -23,6 +26,7 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) block: Block<'ctx>,
     pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
     pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
+    pub(super) assoc_functions: &'scope HashMap<AssociatedFunctionKey, Function<'ctx>>,
     pub(super) functions: &'scope HashMap<String, Function<'ctx>>,
     pub(super) binops: &'scope HashMap<BinopKey, StackBinopDefinition<'ctx>>,
     pub(super) stack_values: HashMap<String, StackValue>,
@@ -40,6 +44,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             context: self.context,
             module: self.module,
             module_id: self.module_id,
+            assoc_functions: self.assoc_functions,
             functions: self.functions,
             types: self.types,
             type_values: self.type_values,
