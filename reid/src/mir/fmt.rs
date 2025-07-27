@@ -49,6 +49,9 @@ impl Display for Module {
         for typedef in &self.typedefs {
             writeln!(inner_f, "{}", typedef)?;
         }
+        for (ty, fun) in &self.associated_functions {
+            writeln!(inner_f, "(Assoc {}) {}", ty, fun)?;
+        }
         for fun in &self.functions {
             writeln!(inner_f, "{}", fun)?;
         }

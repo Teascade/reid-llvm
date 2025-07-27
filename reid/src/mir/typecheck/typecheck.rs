@@ -68,6 +68,11 @@ impl<'t> Pass for TypeCheck<'t> {
             state.ok(res, binop.block_meta().unwrap_or(binop.signature()));
         }
 
+        for (_, function) in &mut module.associated_functions {
+            let res = function.typecheck(&self.refs, &mut state.inner());
+            state.ok(res, function.block_meta());
+        }
+
         for function in &mut module.functions {
             let res = function.typecheck(&self.refs, &mut state.inner());
             state.ok(res, function.block_meta());
