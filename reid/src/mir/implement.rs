@@ -209,7 +209,7 @@ impl TypeKind {
         }
     }
 
-    pub fn unroll_borrows(&self) -> TypeKind {
+    pub fn unroll_borrow(&self) -> TypeKind {
         match self {
             TypeKind::Borrow(type_kind, mut1) => match *type_kind.clone() {
                 TypeKind::Borrow(type_kind, mut2) => match (mut1, mut2) {

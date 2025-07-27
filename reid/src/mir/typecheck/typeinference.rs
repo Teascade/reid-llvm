@@ -614,7 +614,7 @@ impl Expression {
 
                         if let TypeKind::Borrow(inner, _) = type_kind {
                             if let TypeKind::Borrow(..) = *inner.clone() {
-                                *type_kind = type_kind.unroll_borrows();
+                                *type_kind = type_kind.unroll_borrow();
                                 let ExprKind::Borrow(val, _) = &first_param.0 else {
                                     panic!()
                                 };
