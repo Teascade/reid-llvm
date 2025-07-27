@@ -4,11 +4,10 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    Block, BlockData, CompileResult, CustomTypeKind, ErrorKind, FunctionData, Instr,
-    InstructionData, ModuleData, NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
+    Block, BlockData, CompileResult, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData, ModuleData,
+    NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
-        DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue,
-        InstructionDebugRecordData,
+        DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue, InstructionDebugRecordData,
     },
     util::match_types,
 };
@@ -91,11 +90,7 @@ impl Builder {
         value
     }
 
-    pub(crate) fn set_debug_information(
-        &self,
-        mod_val: &ModuleValue,
-        debug_info: DebugInformation,
-    ) {
+    pub(crate) fn set_debug_information(&self, mod_val: &ModuleValue, debug_info: DebugInformation) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(mod_val.0);
@@ -113,11 +108,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn add_function(
-        &self,
-        mod_val: &ModuleValue,
-        data: FunctionData,
-    ) -> FunctionValue {
+    pub(crate) unsafe fn add_function(&self, mod_val: &ModuleValue, data: FunctionData) -> FunctionValue {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(mod_val.0);
@@ -174,11 +165,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn add_instruction_location(
-        &self,
-        value: &InstructionValue,
-        location: DebugLocationValue,
-    ) {
+    pub(crate) unsafe fn add_instruction_location(&self, value: &InstructionValue, location: DebugLocationValue) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0.0.0);
@@ -189,11 +176,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn add_instruction_metadata(
-        &self,
-        value: &InstructionValue,
-        metadata: DebugMetadataValue,
-    ) {
+    pub(crate) unsafe fn add_instruction_metadata(&self, value: &InstructionValue, metadata: DebugMetadataValue) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0.0.0);
@@ -204,11 +187,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn add_instruction_record(
-        &self,
-        value: &InstructionValue,
-        record: InstructionDebugRecordData,
-    ) {
+    pub(crate) unsafe fn add_instruction_record(&self, value: &InstructionValue, record: InstructionDebugRecordData) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0.0.0);
@@ -219,11 +198,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn set_debug_subprogram(
-        &self,
-        value: &FunctionValue,
-        subprogram: DebugProgramValue,
-    ) {
+    pub(crate) unsafe fn set_debug_subprogram(&self, value: &FunctionValue, subprogram: DebugProgramValue) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0);
@@ -232,11 +207,7 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn terminate(
-        &self,
-        block: &BlockValue,
-        value: TerminatorKind,
-    ) -> CompileResult<()> {
+    pub(crate) unsafe fn terminate(&self, block: &BlockValue, value: TerminatorKind) -> CompileResult<()> {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(block.0.0.0);
@@ -354,22 +325,94 @@ impl Builder {
             match self.instr_data(&instruction).kind {
                 Instr::Param(_) => Ok(()),
                 Instr::Constant(_) => Ok(()),
-                Instr::Add(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::FAdd(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::Sub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::FSub(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::Mul(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::FMul(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::UDiv(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::SDiv(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::FDiv(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::URem(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::SRem(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
-                Instr::FRem(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::Add(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category().integer() {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::FAdd(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::Sub(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category().integer() {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::FSub(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::Mul(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category().integer() {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::FMul(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::UDiv(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::SDiv(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::SignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::FDiv(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::URem(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::SRem(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::SignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::FRem(lhs, rhs) => {
+                    if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
                 Instr::And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::ICmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
-                    if t.comparable() || t.category() != TypeCategory::Integer {
+                    if t.category().comparable() || !t.category().integer() {
                         Ok(())
                     } else {
                         Err(ErrorKind::Null) // TODO error: Types not comparable
@@ -377,7 +420,7 @@ impl Builder {
                 }
                 Instr::FCmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
-                    if t.comparable() || t.category() != TypeCategory::Real {
+                    if t.category().comparable() || t.category() != TypeCategory::Real {
                         Ok(())
                     } else {
                         Err(ErrorKind::Null) // TODO error: Types not comparable
@@ -430,7 +473,13 @@ impl Builder {
                         Err(ErrorKind::Null) // TODO error: not a pointer
                     }
                 }
-                Instr::ArrayAlloca(_, _) => Ok(()),
+                Instr::ArrayAlloca(_, val) => {
+                    if val.get_type(self)?.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null) // TODO error: not a pointer
+                    }
+                }
                 Instr::GetElemPtr(ptr_val, _) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
                     match ptr_ty {
@@ -526,11 +575,7 @@ impl InstructionValue {
         self
     }
 
-    pub fn maybe_location(
-        self,
-        block: &mut Block,
-        location: Option<DebugLocationValue>,
-    ) -> InstructionValue {
+    pub fn maybe_location(self, block: &mut Block, location: Option<DebugLocationValue>) -> InstructionValue {
         unsafe {
             if let Some(location) = location {
                 block.builder.add_instruction_location(&self, location);
@@ -572,10 +617,7 @@ impl InstructionValue {
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FCmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
-                Phi(values) => values
-                    .first()
-                    .ok_or(ErrorKind::Null)
-                    .and_then(|v| v.get_type(&builder)),
+                Phi(values) => values.first().ok_or(ErrorKind::Null).and_then(|v| v.get_type(&builder)),
                 Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),

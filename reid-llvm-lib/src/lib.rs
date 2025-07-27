@@ -375,7 +375,7 @@ pub enum Instr {
     Alloca(Type),
     Load(InstructionValue, Type),
     Store(InstructionValue, InstructionValue),
-    ArrayAlloca(Type, u32),
+    ArrayAlloca(Type, InstructionValue),
     GetElemPtr(InstructionValue, Vec<InstructionValue>),
     GetStructElemPtr(InstructionValue, u32),
     ExtractValue(InstructionValue, u32),
@@ -533,77 +533,56 @@ impl ConstValue {
     }
 }
 
-impl Type {
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+enum TypeCategory {
+    SignedInteger,
+    UnsignedInteger,
+    Void,
+    Real,
+    Ptr,
+    CustomType,
+    Array,
+}
+
+impl TypeCategory {
     pub fn comparable(&self) -> bool {
         match self {
-            Type::I8 => true,
-            Type::I16 => true,
-            Type::I32 => true,
-            Type::I64 => true,
-            Type::I128 => true,
-            Type::U8 => true,
-            Type::U16 => true,
-            Type::U32 => true,
-            Type::U64 => true,
-            Type::U128 => true,
-            Type::Bool => true,
-            Type::Void => false,
-            Type::Ptr(_) => false,
-            Type::CustomType(_) => false,
-            Type::Array(_, _) => false,
-            Type::F16 => true,
-            Type::F32B => true,
-            Type::F32 => true,
-            Type::F64 => true,
-            Type::F80 => true,
-            Type::F128 => true,
-            Type::F128PPC => true,
+            TypeCategory::SignedInteger => true,
+            TypeCategory::UnsignedInteger => true,
+            TypeCategory::Real => true,
+            _ => false,
         }
     }
 
     pub fn signed(&self) -> bool {
         match self {
-            Type::I8 => true,
-            Type::I16 => true,
-            Type::I32 => true,
-            Type::I64 => true,
-            Type::I128 => true,
-            Type::U8 => false,
-            Type::U16 => false,
-            Type::U32 => false,
-            Type::U64 => false,
-            Type::U128 => false,
-            Type::Bool => false,
-            Type::Void => false,
-            Type::Ptr(_) => false,
-            Type::CustomType(_) => false,
-            Type::Array(_, _) => false,
-            Type::F16 => true,
-            Type::F32B => true,
-            Type::F32 => true,
-            Type::F64 => true,
-            Type::F80 => true,
-            Type::F128 => true,
-            Type::F128PPC => true,
+            TypeCategory::SignedInteger => true,
+            _ => false,
         }
     }
 
+    pub fn integer(&self) -> bool {
+        match self {
+            TypeCategory::SignedInteger => true,
+            TypeCategory::UnsignedInteger => true,
+            _ => false,
+        }
+    }
+}
+
+impl Type {
     pub fn category(&self) -> TypeCategory {
         match self {
-            Type::I8
-            | Type::I16
-            | Type::I32
-            | Type::I64
-            | Type::I128
-            | Type::U8
-            | Type::U16
-            | Type::U32
-            | Type::U64
-            | Type::U128 => TypeCategory::Integer,
+            Type::I8 | Type::I16 | Type::I32 | Type::I64 | Type::I128 => TypeCategory::SignedInteger,
+            Type::U8 | Type::U16 | Type::U32 | Type::U64 | Type::U128 => TypeCategory::UnsignedInteger,
             Type::F16 | Type::F32B | Type::F32 | Type::F64 | Type::F80 | Type::F128 | Type::F128PPC => {
                 TypeCategory::Real
             }
-            Type::Bool | Type::Void | Type::CustomType(_) | Type::Array(_, _) | Type::Ptr(_) => TypeCategory::Other,
+            Type::Bool => TypeCategory::UnsignedInteger,
+            Type::Void => TypeCategory::Void,
+            Type::CustomType(_) => TypeCategory::CustomType,
+            Type::Array(_, _) => TypeCategory::Array,
+            Type::Ptr(_) => TypeCategory::Ptr,
         }
     }
 
@@ -654,13 +633,6 @@ impl Type {
             _ => None,
         }
     }
-}
-
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-pub enum TypeCategory {
-    Integer,
-    Real,
-    Other,
 }
 
 impl TerminatorKind {

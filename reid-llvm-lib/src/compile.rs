@@ -19,8 +19,8 @@ use llvm_sys::{
         LLVM_InitializeAllTargetMCs, LLVM_InitializeAllTargets, LLVMSetModuleDataLayout,
     },
     target_machine::{
-        LLVMCodeGenFileType, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine,
-        LLVMGetDefaultTargetTriple, LLVMGetTargetFromTriple, LLVMTargetMachineEmitToMemoryBuffer,
+        LLVMCodeGenFileType, LLVMCreateTargetDataLayout, LLVMCreateTargetMachine, LLVMGetDefaultTargetTriple,
+        LLVMGetTargetFromTriple, LLVMTargetMachineEmitToMemoryBuffer,
     },
 };
 
@@ -34,8 +34,8 @@ use crate::{
 use super::{
     CmpPredicate, ConstValue, Context, TerminatorKind, Type,
     builder::{
-        BlockHolder, BlockValue, Builder, FunctionHolder, FunctionValue, InstructionHolder,
-        InstructionValue, ModuleHolder,
+        BlockHolder, BlockValue, Builder, FunctionHolder, FunctionValue, InstructionHolder, InstructionValue,
+        ModuleHolder,
     },
 };
 
@@ -119,8 +119,8 @@ impl CompiledModule {
             );
             err.into_result().unwrap();
 
-            let llvm_ir = from_cstring(LLVMPrintModuleToString(self.module_ref))
-                .expect("Unable to print LLVM IR to string");
+            let llvm_ir =
+                from_cstring(LLVMPrintModuleToString(self.module_ref)).expect("Unable to print LLVM IR to string");
 
             println!("{}", llvm_ir);
 
@@ -224,17 +224,15 @@ pub struct LLVMFunction {
 }
 
 pub struct LLVMValue {
-    _ty: Type,
+    ty: Type,
     value_ref: LLVMValueRef,
 }
 
 impl ModuleHolder {
     fn compile(&self, context: &LLVMContext, builder: &Builder) -> LLVMModuleRef {
         unsafe {
-            let module_ref = LLVMModuleCreateWithNameInContext(
-                into_cstring(&self.data.name).as_ptr(),
-                context.context_ref,
-            );
+            let module_ref =
+                LLVMModuleCreateWithNameInContext(into_cstring(&self.data.name).as_ptr(), context.context_ref);
 
             // Compile the contents
 
@@ -372,11 +370,7 @@ impl ModuleHolder {
 }
 
 impl DebugLocationHolder {
-    unsafe fn compile(
-        &self,
-        context: &LLVMContext,
-        debug: &LLVMDebugInformation,
-    ) -> LLVMMetadataRef {
+    unsafe fn compile(&self, context: &LLVMContext, debug: &LLVMDebugInformation) -> LLVMMetadataRef {
         unsafe {
             LLVMDIBuilderCreateDebugLocation(
                 context.context_ref,
@@ -399,13 +393,7 @@ impl DebugScopeHolder {
     ) {
         unsafe {
             let scope = if let Some(location) = &self.location {
-                LLVMDIBuilderCreateLexicalBlock(
-                    di_builder,
-                    parent,
-                    file,
-                    location.pos.line,
-                    location.pos.column,
-                )
+                LLVMDIBuilderCreateLexicalBlock(di_builder, parent, file, location.pos.line, location.pos.column)
             } else {
                 LLVMDIBuilderCreateLexicalBlockFile(di_builder, parent, file, 0)
             };
@@ -489,8 +477,7 @@ impl DebugTypeHolder {
                     ptr.name.len(),
                 ),
                 DebugTypeData::Array(array) => {
-                    let subrange =
-                        LLVMDIBuilderGetOrCreateSubrange(debug.builder, 0, array.length as i64);
+                    let subrange = LLVMDIBuilderGetOrCreateSubrange(debug.builder, 0, array.length as i64);
                     let mut elements = vec![subrange];
                     LLVMDIBuilderCreateArrayType(
                         debug.builder,
@@ -552,11 +539,7 @@ impl DwarfFlags {
 }
 
 impl TypeHolder {
-    unsafe fn compile_type(
-        &self,
-        context: &LLVMContext,
-        types: &HashMap<TypeValue, LLVMTypeRef>,
-    ) -> LLVMTypeRef {
+    unsafe fn compile_type(&self, context: &LLVMContext, types: &HashMap<TypeValue, LLVMTypeRef>) -> LLVMTypeRef {
         unsafe {
             match &self.data.kind {
                 CustomTypeKind::NamedStruct(named_struct) => {
@@ -564,16 +547,9 @@ impl TypeHolder {
                     for ty in &named_struct.1 {
                         elem_types.push(ty.as_llvm(context.context_ref, types));
                     }
-                    let struct_ty = LLVMStructCreateNamed(
-                        context.context_ref,
-                        into_cstring(named_struct.0.clone()).as_ptr(),
-                    );
-                    LLVMStructSetBody(
-                        struct_ty,
-                        elem_types.as_mut_ptr(),
-                        elem_types.len() as u32,
-                        0,
-                    );
+                    let struct_ty =
+                        LLVMStructCreateNamed(context.context_ref, into_cstring(named_struct.0.clone()).as_ptr());
+                    LLVMStructSetBody(struct_ty, elem_types.as_mut_ptr(), elem_types.len() as u32, 0);
                     struct_ty
                 }
             }
@@ -602,15 +578,10 @@ impl FunctionHolder {
 
             let fn_type = LLVMFunctionType(ret_type, param_ptr, param_len as u32, 0);
 
-            let function_ref =
-                LLVMAddFunction(module_ref, into_cstring(&self.data.name).as_ptr(), fn_type);
+            let function_ref = LLVMAddFunction(module_ref, into_cstring(&self.data.name).as_ptr(), fn_type);
 
             if self.data.flags.inline {
-                let attribute = LLVMCreateEnumAttribute(
-                    context.context_ref,
-                    LLVMEnumAttribute::AlwaysInline as u32,
-                    0,
-                );
+                let attribute = LLVMCreateEnumAttribute(context.context_ref, LLVMEnumAttribute::AlwaysInline as u32, 0);
                 LLVMAddAttributeAtIndex(function_ref, 0, attribute);
             }
 
@@ -667,10 +638,7 @@ impl FunctionHolder {
 
             if self.data.flags.is_imported {
                 if self.data.flags.is_extern {
-                    LLVMSetLinkage(
-                        own_function.value_ref,
-                        LLVMLinkage::LLVMAvailableExternallyLinkage,
-                    );
+                    LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMAvailableExternallyLinkage);
                 } else {
                     LLVMSetLinkage(own_function.value_ref, LLVMLinkage::LLVMExternalLinkage);
                 }
@@ -687,10 +655,8 @@ impl FunctionHolder {
                     continue;
                 }
 
-                let block_ref = LLVMCreateBasicBlockInContext(
-                    module.context_ref,
-                    into_cstring(&block.data.name).as_ptr(),
-                );
+                let block_ref =
+                    LLVMCreateBasicBlockInContext(module.context_ref, into_cstring(&block.data.name).as_ptr());
                 LLVMAppendExistingBasicBlock(own_function.value_ref, block_ref);
                 module.blocks.insert(block.value, block_ref);
             }
@@ -722,22 +688,13 @@ impl BlockHolder {
                 .data
                 .terminator
                 .clone()
-                .expect(&format!(
-                    "Block {} does not have a terminator!",
-                    self.data.name
-                ))
+                .expect(&format!("Block {} does not have a terminator!", self.data.name))
                 .compile(module, function, block_ref);
 
             if let Some(location) = &self.data.terminator_location {
                 LLVMInstructionSetDebugLoc(
                     term_instr.value_ref,
-                    *module
-                        .debug
-                        .as_ref()
-                        .unwrap()
-                        .locations
-                        .get(&location)
-                        .unwrap(),
+                    *module.debug.as_ref().unwrap().locations.get(&location).unwrap(),
                 );
             }
         }
@@ -745,12 +702,7 @@ impl BlockHolder {
 }
 
 impl InstructionHolder {
-    unsafe fn compile(
-        &self,
-        module: &LLVMModule,
-        function: &LLVMFunction,
-        _block: LLVMBasicBlockRef,
-    ) -> LLVMValue {
+    unsafe fn compile(&self, module: &LLVMModule, function: &LLVMFunction, _block: LLVMBasicBlockRef) -> LLVMValue {
         let _ty = self.value.get_type(module.builder).unwrap();
         let name = into_cstring(self.name.clone());
         let val = unsafe {
@@ -829,7 +781,7 @@ impl InstructionHolder {
                     LLVMBuildICmp(
                         module.builder_ref,
                         // Signedness from LHS
-                        pred.as_llvm_int(lhs._ty.signed()),
+                        pred.as_llvm_int(lhs.ty.category().signed()),
                         lhs.value_ref,
                         rhs_val,
                         name.as_ptr(),
@@ -909,15 +861,12 @@ impl InstructionHolder {
                     );
                     store
                 }
-                ArrayAlloca(ty, len) => {
-                    let array_len = ConstValue::U16(*len as u16).as_llvm(module);
-                    LLVMBuildArrayAlloca(
-                        module.builder_ref,
-                        ty.as_llvm(module.context_ref, &module.types),
-                        array_len,
-                        name.as_ptr(),
-                    )
-                }
+                ArrayAlloca(ty, len) => LLVMBuildArrayAlloca(
+                    module.builder_ref,
+                    ty.as_llvm(module.context_ref, &module.types),
+                    module.values.get(&len).unwrap().value_ref,
+                    name.as_ptr(),
+                ),
                 GetElemPtr(arr, indices) => {
                     let t = arr.get_type(module.builder).unwrap();
                     let Type::Ptr(elem_t) = t else { panic!() };
@@ -1033,8 +982,7 @@ impl InstructionHolder {
 
             unsafe {
                 let mut addr = Vec::<u64>::new();
-                let expr =
-                    LLVMDIBuilderCreateExpression(debug.builder, addr.as_mut_ptr(), addr.len());
+                let expr = LLVMDIBuilderCreateExpression(debug.builder, addr.as_mut_ptr(), addr.len());
 
                 let location = LLVMDIBuilderCreateDebugLocation(
                     module.context_ref,
@@ -1045,26 +993,22 @@ impl InstructionHolder {
                 );
 
                 match record.kind {
-                    DebugRecordKind::Declare(instruction_value) => {
-                        LLVMDIBuilderInsertDeclareRecordBefore(
-                            debug.builder,
-                            module.values.get(&instruction_value).unwrap().value_ref,
-                            *debug.metadata.get(&record.variable).unwrap(),
-                            expr,
-                            location,
-                            val,
-                        )
-                    }
-                    DebugRecordKind::Value(instruction_value) => {
-                        LLVMDIBuilderInsertDbgValueRecordBefore(
-                            debug.builder,
-                            module.values.get(&instruction_value).unwrap().value_ref,
-                            *debug.metadata.get(&record.variable).unwrap(),
-                            expr,
-                            location,
-                            val,
-                        )
-                    }
+                    DebugRecordKind::Declare(instruction_value) => LLVMDIBuilderInsertDeclareRecordBefore(
+                        debug.builder,
+                        module.values.get(&instruction_value).unwrap().value_ref,
+                        *debug.metadata.get(&record.variable).unwrap(),
+                        expr,
+                        location,
+                        val,
+                    ),
+                    DebugRecordKind::Value(instruction_value) => LLVMDIBuilderInsertDbgValueRecordBefore(
+                        debug.builder,
+                        module.values.get(&instruction_value).unwrap().value_ref,
+                        *debug.metadata.get(&record.variable).unwrap(),
+                        expr,
+                        location,
+                        val,
+                    ),
                 };
             }
         }
@@ -1077,13 +1021,7 @@ impl InstructionHolder {
                     | LLVMValueKind::LLVMMemoryPhiValueKind => {
                         LLVMInstructionSetDebugLoc(
                             val,
-                            *module
-                                .debug
-                                .as_ref()
-                                .unwrap()
-                                .locations
-                                .get(&location)
-                                .unwrap(),
+                            *module.debug.as_ref().unwrap().locations.get(&location).unwrap(),
                         );
                     }
                     _ => {}
@@ -1091,19 +1029,14 @@ impl InstructionHolder {
             }
         }
         LLVMValue {
-            _ty,
+            ty: _ty,
             value_ref: val,
         }
     }
 }
 
 impl TerminatorKind {
-    fn compile(
-        &self,
-        module: &LLVMModule,
-        _function: &LLVMFunction,
-        _block: LLVMBasicBlockRef,
-    ) -> LLVMValue {
+    fn compile(&self, module: &LLVMModule, _function: &LLVMFunction, _block: LLVMBasicBlockRef) -> LLVMValue {
         let _ty = self.get_type(module.builder).unwrap();
         let val = unsafe {
             match self {
@@ -1125,7 +1058,7 @@ impl TerminatorKind {
             }
         };
         LLVMValue {
-            _ty,
+            ty: _ty,
             value_ref: val,
         }
     }
@@ -1179,11 +1112,9 @@ impl ConstValue {
                 ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::Str(val) => LLVMBuildGlobalString(
-                    module.builder_ref,
-                    into_cstring(val).as_ptr(),
-                    c"string".as_ptr(),
-                ),
+                ConstValue::Str(val) => {
+                    LLVMBuildGlobalString(module.builder_ref, into_cstring(val).as_ptr(), c"string".as_ptr())
+                }
                 ConstValue::F16(val) => LLVMConstReal(t, *val as f64),
                 ConstValue::F32B(val) => LLVMConstReal(t, *val as f64),
                 ConstValue::F32(val) => LLVMConstReal(t, *val as f64),
@@ -1197,11 +1128,7 @@ impl ConstValue {
 }
 
 impl Type {
-    fn as_llvm(
-        &self,
-        context: LLVMContextRef,
-        typemap: &HashMap<TypeValue, LLVMTypeRef>,
-    ) -> LLVMTypeRef {
+    fn as_llvm(&self, context: LLVMContextRef, typemap: &HashMap<TypeValue, LLVMTypeRef>) -> LLVMTypeRef {
         use Type::*;
         unsafe {
             match self {

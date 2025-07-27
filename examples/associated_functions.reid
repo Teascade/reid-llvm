@@ -24,5 +24,11 @@ fn main() -> u32 {
     print(from_str("i32: ") + i32::test(54) as u64);
     print(from_str("sizeof i32: ") + i32::sizeof());
 
+    let nullptr = i32::null();
+    let mut list = u64::alloca(15);
+    list[4] = 17;
+
+    print(from_str("value: ") + list[4]);
+
     return i32::sizeof() as u32;
 }

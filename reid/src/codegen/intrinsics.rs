@@ -1,4 +1,4 @@
-use reid_lib::{builder::InstructionValue, CmpPredicate, Instr};
+use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr};
 
 use crate::{
     codegen::{ErrorKind, StackValueKind},
@@ -45,6 +45,22 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             return_type: TypeKind::U64,
             parameters: Vec::new(),
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
+        }),
+        "alloca" => Some(FunctionDefinition {
+            name: "alloca".to_owned(),
+            is_pub: true,
+            is_imported: false,
+            return_type: TypeKind::UserPtr(Box::new(ty.clone())),
+            parameters: vec![(String::from("size"), TypeKind::U64)],
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicAlloca(ty.clone()))),
+        }),
+        "null" => Some(FunctionDefinition {
+            name: "null".to_owned(),
+            is_pub: true,
+            is_imported: false,
+            return_type: TypeKind::UserPtr(Box::new(ty.clone())),
+            parameters: Vec::new(),
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicNullPtr(ty.clone()))),
         }),
         _ => None,
     }
@@ -233,19 +249,39 @@ where
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IntrinsicSizeOf(TypeKind);
-impl std::fmt::Debug for IntrinsicSizeOf {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("IntrinsicSizeOf").finish()
-    }
-}
-
 impl IntrinsicFunction for IntrinsicSizeOf {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let instr = scope
             .block
             .build(Instr::Constant(reid_lib::ConstValue::U64(self.0.size_of())))
+            .unwrap();
+        Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicAlloca(TypeKind);
+impl IntrinsicFunction for IntrinsicAlloca {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let amount = params.get(0).unwrap();
+        let instr = scope
+            .block
+            .build(Instr::ArrayAlloca(self.0.get_type(scope.type_values), amount.instr()))
+            .unwrap();
+        Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicNullPtr(TypeKind);
+impl IntrinsicFunction for IntrinsicNullPtr {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let zero = scope.block.build(Instr::Constant(ConstValue::I8(0))).unwrap();
+        let instr = scope
+            .block
+            .build(Instr::IntToPtr(zero, self.0.get_type(scope.type_values)))
             .unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
