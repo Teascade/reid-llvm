@@ -11,3 +11,4 @@ main
 *.out
 *.llir
 *.mir
+foo.reid
