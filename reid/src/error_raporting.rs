@@ -194,32 +194,30 @@ impl std::fmt::Display for ReidError {
                 None
             };
 
-            if curr_module != Some(meta.source_module_id) {
+            let module_name = if curr_module != Some(meta.source_module_id) {
                 curr_module = Some(meta.source_module_id);
                 if let Some(module) = self.map.module_map.get(&meta.source_module_id) {
-                    writeln!(
-                        f,
-                        "Errors in module {}:",
-                        color_err(format!("{}", module.name))?
-                    )?;
+                    module.name.clone()
                 } else {
-                    writeln!(f, "Errors detected: {}", color_err("in general")?)?;
+                    "unknown".to_owned()
                 }
-            }
+            } else {
+                "unknown".to_owned()
+            };
+
+            writeln!(f, "Errors detected: {}", color_err(format!("{}", module_name))?)?;
+
             writeln!(f)?;
             write!(f, "  Error: ")?;
             writeln!(f, "{}", color_err(format!("{}", error))?)?;
             write!(
                 f,
-                "{:>20}{}",
+                "{:>20} {}:{}",
                 color_warn("At: ")?,
-                position
-                    .map(|p| fmt_positions(p))
-                    .unwrap_or(String::from("{unknown}")),
+                module_name,
+                position.map(|p| fmt_positions(p)).unwrap_or(String::from("{unknown}")),
             )?;
-            if let (Some(position), Some(source)) =
-                (position, &module.and_then(|m| m.source.clone()))
-            {
+            if let (Some(position), Some(source)) = (position, &module.and_then(|m| m.source.clone())) {
                 writeln!(f, "{}", fmt_lines(source, position, 6)?)?;
             }
         }
@@ -286,9 +284,9 @@ fn fmt_lines(
 
 fn fmt_positions((start, end): (Position, Position)) -> String {
     if start == end {
-        format!("ln {}, col {}", start.1, start.0)
+        format!("{}:{}", start.1, start.0)
     } else if start.1 == end.1 {
-        format!("ln {}, col {}-{}", start.1, start.0, end.0)
+        format!("{}:{} - {}", start.1, start.0, end.0)
     } else {
         format!("{}:{} - {}:{}", start.1, start.0, end.1, end.0)
     }

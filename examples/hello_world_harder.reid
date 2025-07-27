@@ -6,7 +6,7 @@ fn main() {
 
     test.push(String::from(" world: "));
 
-    test.push_num(175);
+    test.push_num("hello");
     
     print(test);
 
