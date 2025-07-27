@@ -443,7 +443,7 @@ impl Expression {
             ExprKind::FunctionCall(function_call) => {
                 let true_function = state
                     .scope
-                    .function_returns
+                    .functions
                     .get(&function_call.name)
                     .cloned()
                     .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
@@ -724,7 +724,56 @@ impl Expression {
                 let expr = expression.typecheck(state, typerefs, HintKind::Default)?;
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
-            ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
+            ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
+                let true_function = state
+                    .scope
+                    .associated_functions
+                    .get(&pass::AssociatedFunctionKey(
+                        type_kind.clone(),
+                        function_call.name.clone(),
+                    ))
+                    .cloned()
+                    .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
+
+                if let Some(f) = state.ok(true_function, self.1) {
+                    let param_len_given = function_call.parameters.len();
+                    let param_len_expected = f.params.len();
+
+                    // Check that there are the same number of parameters given
+                    // as expected
+                    if param_len_given != param_len_expected {
+                        state.ok::<_, Infallible>(
+                            Err(ErrorKind::InvalidAmountParameters(
+                                function_call.name.clone(),
+                                param_len_given,
+                                param_len_expected,
+                            )),
+                            self.1,
+                        );
+                    }
+
+                    let true_params_iter = f
+                        .params
+                        .into_iter()
+                        .chain(iter::repeat(TypeKind::Vague(Vague::Unknown)));
+
+                    for (param, true_param_t) in function_call.parameters.iter_mut().zip(true_params_iter) {
+                        // Typecheck every param separately
+                        let param_res = param.typecheck(state, &typerefs, HintKind::Coerce(true_param_t.clone()));
+                        let param_t = state.or_else(param_res, TypeKind::Vague(Vague::Unknown), param.1);
+                        state.ok(param_t.narrow_into(&true_param_t), param.1);
+                    }
+
+                    // Make sure function return type is the same as the claimed
+                    // return type
+                    let ret_t = f.ret.narrow_into(&function_call.return_type.resolve_ref(typerefs))?;
+                    // Update typing to be more accurate
+                    function_call.return_type = ret_t.clone();
+                    Ok(ret_t.resolve_ref(typerefs))
+                } else {
+                    Ok(function_call.return_type.clone().resolve_ref(typerefs))
+                }
+            }
         }
     }
 }

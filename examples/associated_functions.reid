@@ -9,6 +9,6 @@ impl Otus {
 }
 
 fn main() -> u32 {
-    let otus = Otus {};
+    let otus = Otus { field: 17 };
     return Otus::test(&otus);
 }

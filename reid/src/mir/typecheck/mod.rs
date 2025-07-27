@@ -24,12 +24,16 @@ pub enum ErrorKind {
     TypesIncompatible(TypeKind, TypeKind),
     #[error("Variable not defined: {0}")]
     VariableNotDefined(String),
-    #[error("Function not defined: {0}")]
+    #[error("Function {0} not defined")]
     FunctionNotDefined(String),
+    #[error("Function {0} not defined for type {1}")]
+    AssocFunctionNotDefined(String, TypeKind),
     #[error("Expected a return type of {0}, got {1} instead")]
     ReturnTypeMismatch(TypeKind, TypeKind),
     #[error("Function {0} already defined {1}")]
     FunctionAlreadyDefined(String, ErrorTypedefKind),
+    #[error("Function {0}::{1} already defined {2}")]
+    AssocFunctionAlreadyDefined(TypeKind, String, ErrorTypedefKind),
     #[error("Variable already defined: {0}")]
     VariableAlreadyDefined(String),
     #[error("Variable {0} is not declared as mutable")]

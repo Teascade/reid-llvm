@@ -12,8 +12,8 @@ use std::{
 
 use crate::{
     mir::{
-        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
-        IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
+        pass::AssociatedFunctionKey, BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition,
+        FunctionDefinitionKind, IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -51,6 +51,29 @@ impl<'t> Pass for TypeInference<'t> {
             } else {
                 seen_functions.insert(
                     function.name.clone(),
+                    match function.kind {
+                        FunctionDefinitionKind::Local(..) => ErrorTypedefKind::Local,
+                        FunctionDefinitionKind::Extern(..) => ErrorTypedefKind::Extern,
+                        FunctionDefinitionKind::Intrinsic(..) => ErrorTypedefKind::Intrinsic,
+                    },
+                );
+            }
+        }
+
+        let mut seen_assoc_functions = HashMap::new();
+        for (ty, function) in &mut module.associated_functions {
+            if let Some(kind) = seen_assoc_functions.get(&(ty.clone(), function.name.clone())) {
+                state.note_errors(
+                    &vec![ErrorKind::AssocFunctionAlreadyDefined(
+                        ty.clone(),
+                        function.name.clone(),
+                        *kind,
+                    )],
+                    function.signature(),
+                );
+            } else {
+                seen_assoc_functions.insert(
+                    (ty.clone(), function.name.clone()),
                     match function.kind {
                         FunctionDefinitionKind::Local(..) => ErrorTypedefKind::Local,
                         FunctionDefinitionKind::Extern(..) => ErrorTypedefKind::Extern,
@@ -365,7 +388,7 @@ impl Expression {
                 // Get function definition and types
                 let fn_call = state
                     .scope
-                    .function_returns
+                    .functions
                     .get(&function_call.name)
                     .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()))?
                     .clone();
@@ -566,7 +589,33 @@ impl Expression {
                 expression.infer_types(state, type_refs)?;
                 Ok(type_refs.from_type(type_kind).unwrap())
             }
-            ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
+            ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
+                // Get function definition and types
+                let fn_call = state
+                    .scope
+                    .associated_functions
+                    .get(&AssociatedFunctionKey(type_kind.clone(), function_call.name.clone()))
+                    .ok_or(ErrorKind::AssocFunctionNotDefined(
+                        function_call.name.clone(),
+                        type_kind.clone(),
+                    ))?
+                    .clone();
+
+                // Infer param expression types and narrow them to the
+                // expected function parameters (or Unknown types if too
+                // many were provided)
+                let true_params_iter = fn_call.params.iter().chain(iter::repeat(&Vague(Unknown)));
+
+                for (param_expr, param_t) in function_call.parameters.iter_mut().zip(true_params_iter) {
+                    let expr_res = param_expr.infer_types(state, type_refs);
+                    if let Some(mut param_ref) = state.ok(expr_res, param_expr.1) {
+                        param_ref.narrow(&mut type_refs.from_type(param_t).unwrap());
+                    }
+                }
+
+                // Provide function return type
+                Ok(type_refs.from_type(&fn_call.ret).unwrap())
+            }
         }
     }
 }

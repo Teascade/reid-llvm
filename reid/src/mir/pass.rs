@@ -123,7 +123,8 @@ pub type BinopMap = Storage<BinopKey, ScopeBinopDef>;
 pub struct Scope<Data: Clone + Default> {
     pub module_id: Option<SourceModuleId>,
     pub binops: BinopMap,
-    pub function_returns: Storage<String, ScopeFunction>,
+    pub associated_functions: Storage<AssociatedFunctionKey, ScopeFunction>,
+    pub functions: Storage<String, ScopeFunction>,
     pub variables: Storage<String, ScopeVariable>,
     pub types: Storage<CustomTypeKey, TypeDefinition>,
     /// Hard Return type of this scope, if inside a function
@@ -135,7 +136,8 @@ impl<Data: Clone + Default> Scope<Data> {
     pub fn inner(&self) -> Scope<Data> {
         Scope {
             module_id: self.module_id,
-            function_returns: self.function_returns.clone(),
+            associated_functions: self.associated_functions.clone(),
+            functions: self.functions.clone(),
             variables: self.variables.clone(),
             binops: self.binops.clone(),
             types: self.types.clone(),
@@ -180,6 +182,9 @@ pub struct ScopeVariable {
     pub ty: TypeKind,
     pub mutable: bool,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct AssociatedFunctionKey(pub TypeKind, pub String);
 
 #[derive(Clone, Debug, Eq)]
 pub struct BinopKey {
@@ -389,9 +394,22 @@ impl Module {
 
         for function in &self.functions {
             scope
-                .function_returns
+                .functions
                 .set(
                     function.name.clone(),
+                    ScopeFunction {
+                        ret: function.return_type.clone(),
+                        params: function.parameters.iter().cloned().map(|v| v.1).collect(),
+                    },
+                )
+                .ok();
+        }
+
+        for (ty, function) in &self.associated_functions {
+            scope
+                .associated_functions
+                .set(
+                    AssociatedFunctionKey(ty.clone(), function.name.clone()),
                     ScopeFunction {
                         ret: function.return_type.clone(),
                         params: function.parameters.iter().cloned().map(|v| v.1).collect(),
