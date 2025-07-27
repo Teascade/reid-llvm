@@ -5,9 +5,11 @@ use reid_lib::{
     Block,
 };
 
-use crate::mir::{
-    self, CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId, TypeKind, WhileStatement,
+use mir::{
+    CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, SourceModuleId, TypeKind, WhileStatement,
 };
+
+use crate::mir;
 
 #[derive(Debug)]
 pub struct Allocator {
@@ -100,7 +102,7 @@ impl mir::Statement {
         let mut allocated = Vec::new();
 
         match &self.0 {
-            crate::mir::StmtKind::Let(named_variable_ref, _, expression) => {
+            mir::StmtKind::Let(named_variable_ref, _, expression) => {
                 allocated.extend(expression.allocate(scope));
                 let allocation = scope
                     .block
@@ -115,15 +117,15 @@ impl mir::Statement {
                     allocation,
                 ));
             }
-            crate::mir::StmtKind::Set(lhs, rhs) => {
+            mir::StmtKind::Set(lhs, rhs) => {
                 allocated.extend(lhs.allocate(scope));
                 allocated.extend(rhs.allocate(scope));
             }
-            crate::mir::StmtKind::Import(_) => {}
-            crate::mir::StmtKind::Expression(expression) => {
+            mir::StmtKind::Import(_) => {}
+            mir::StmtKind::Expression(expression) => {
                 allocated.extend(expression.allocate(scope));
             }
-            crate::mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
+            mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
                 allocated.extend(condition.allocate(scope));
                 allocated.extend(block.allocate(scope));
             }
@@ -138,49 +140,50 @@ impl mir::Expression {
         let mut allocated = Vec::new();
 
         match &self.0 {
-            crate::mir::ExprKind::Variable(_) => {}
-            crate::mir::ExprKind::Indexed(expr, _, idx) => {
+            mir::ExprKind::Variable(_) => {}
+            mir::ExprKind::Indexed(expr, _, idx) => {
                 allocated.extend(expr.allocate(scope));
                 allocated.extend(idx.allocate(scope));
             }
-            crate::mir::ExprKind::Accessed(expression, _, _) => {
+            mir::ExprKind::Accessed(expression, _, _) => {
                 allocated.extend(expression.allocate(scope));
             }
-            crate::mir::ExprKind::Array(expressions) => {
+            mir::ExprKind::Array(expressions) => {
                 for expression in expressions {
                     allocated.extend(expression.allocate(scope));
                 }
             }
-            crate::mir::ExprKind::Struct(_, items) => {
+            mir::ExprKind::Struct(_, items) => {
                 for (_, expression) in items {
                     allocated.extend(expression.allocate(scope));
                 }
             }
-            crate::mir::ExprKind::Literal(_) => {}
-            crate::mir::ExprKind::BinOp(_, lhs, rhs, _) => {
+            mir::ExprKind::Literal(_) => {}
+            mir::ExprKind::BinOp(_, lhs, rhs, _) => {
                 allocated.extend(lhs.allocate(scope));
                 allocated.extend(rhs.allocate(scope));
             }
-            crate::mir::ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
+            mir::ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
                 for param in parameters {
                     allocated.extend(param.allocate(scope));
                 }
             }
-            crate::mir::ExprKind::If(IfExpression(cond, then_ex, else_ex)) => {
+            mir::ExprKind::If(IfExpression(cond, then_ex, else_ex)) => {
                 allocated.extend(cond.allocate(scope));
                 allocated.extend(then_ex.allocate(scope));
                 if let Some(else_ex) = else_ex.as_ref() {
                     allocated.extend(else_ex.allocate(scope));
                 }
             }
-            crate::mir::ExprKind::Block(block) => {
+            mir::ExprKind::Block(block) => {
                 allocated.extend(block.allocate(scope));
             }
-            crate::mir::ExprKind::Borrow(_, _) => {}
-            crate::mir::ExprKind::Deref(_) => {}
-            crate::mir::ExprKind::CastTo(expression, _) => {
+            mir::ExprKind::Borrow(_, _) => {}
+            mir::ExprKind::Deref(_) => {}
+            mir::ExprKind::CastTo(expression, _) => {
                 allocated.extend(expression.allocate(scope));
             }
+            mir::ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
         }
 
         allocated

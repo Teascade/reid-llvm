@@ -1217,6 +1217,7 @@ impl mir::Expression {
                     }
                 }
             }
+            mir::ExprKind::AssociatedFunctionCall(..) => todo!(),
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location);

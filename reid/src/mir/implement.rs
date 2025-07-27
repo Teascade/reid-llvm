@@ -443,6 +443,7 @@ impl Expression {
                 },
                 Err(_) => Ok((ReturnKind::Soft, type_kind.clone())),
             },
+            AssociatedFunctionCall(type_kind, function_call) => todo!(),
         }
     }
 
@@ -461,6 +462,7 @@ impl Expression {
             ExprKind::FunctionCall(_) => None,
             ExprKind::If(_) => None,
             ExprKind::CastTo(expression, _) => expression.backing_var(),
+            ExprKind::AssociatedFunctionCall(type_kind, function_call) => None,
         }
     }
 
@@ -499,6 +501,7 @@ impl Expression {
             ExprKind::Borrow(_, _) => None,
             ExprKind::Deref(_) => None,
             ExprKind::CastTo(expression, _) => expression.num_value()?,
+            ExprKind::AssociatedFunctionCall(..) => None,
         })
     }
 }

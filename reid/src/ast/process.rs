@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    ast::{self},
+    ast::{self, FunctionCallExpression},
     mir::{
         self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind, StructField,
         StructType, WhileStatement,
@@ -21,6 +21,7 @@ impl mir::Context {
 impl ast::Module {
     pub fn process(self, module_id: SourceModuleId) -> mir::Module {
         let mut imports = Vec::new();
+        let mut associated_functions = Vec::new();
         let mut functions = Vec::new();
         let mut typedefs = Vec::new();
         let mut binops = Vec::new();
@@ -31,44 +32,7 @@ impl ast::Module {
                 Import(import) => {
                     imports.push(mir::Import(import.0.clone(), import.1.as_meta(module_id)));
                 }
-                FunctionDefinition(ast::FunctionDefinition(signature, is_pub, block, range)) => {
-                    let mut params = Vec::new();
-                    match &signature.self_kind {
-                        ast::SelfKind::Borrow(type_kind) => params.push((
-                            "self".to_owned(),
-                            mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), false),
-                        )),
-                        ast::SelfKind::MutBorrow(type_kind) => params.push((
-                            "self".to_owned(),
-                            mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), true),
-                        )),
-                        ast::SelfKind::None => {}
-                    }
-
-                    params.extend(
-                        signature
-                            .params
-                            .iter()
-                            .cloned()
-                            .map(|p| (p.0, p.1 .0.into_mir(module_id))),
-                    );
-                    let def = mir::FunctionDefinition {
-                        name: signature.name.clone(),
-                        is_pub: *is_pub,
-                        is_imported: false,
-                        return_type: signature
-                            .return_type
-                            .clone()
-                            .map(|r| r.0.into_mir(module_id))
-                            .unwrap_or(mir::TypeKind::Void),
-                        parameters: params,
-                        kind: mir::FunctionDefinitionKind::Local(
-                            block.into_mir(module_id),
-                            (*range).as_meta(module_id),
-                        ),
-                    };
-                    functions.push(def);
-                }
+                FunctionDefinition(function_def) => functions.push(function_def.into_mir(module_id)),
                 ExternFunction(signature) => {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
@@ -135,7 +99,11 @@ impl ast::Module {
                         exported: false,
                     });
                 }
-                AssociatedFunction(_, function_definition) => todo!(),
+                AssociatedFunction(ty, function_definition) => {
+                    for function_def in function_definition {
+                        associated_functions.push((ty.0.into_mir(module_id), function_def.into_mir(module_id)));
+                    }
+                }
             }
         }
 
@@ -144,11 +112,51 @@ impl ast::Module {
             module_id: module_id,
             binop_defs: binops,
             imports,
+            associated_functions,
             functions,
             path: self.path.clone(),
             is_main: self.is_main,
             tokens: self.tokens,
             typedefs,
+        }
+    }
+}
+
+impl ast::FunctionDefinition {
+    pub fn into_mir(&self, module_id: SourceModuleId) -> mir::FunctionDefinition {
+        let &ast::FunctionDefinition(signature, is_pub, block, range) = &self;
+
+        let mut params = Vec::new();
+        match &signature.self_kind {
+            ast::SelfKind::Borrow(type_kind) => params.push((
+                "self".to_owned(),
+                mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), false),
+            )),
+            ast::SelfKind::MutBorrow(type_kind) => params.push((
+                "self".to_owned(),
+                mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), true),
+            )),
+            ast::SelfKind::None => {}
+        }
+
+        params.extend(
+            signature
+                .params
+                .iter()
+                .cloned()
+                .map(|p| (p.0, p.1 .0.into_mir(module_id))),
+        );
+        mir::FunctionDefinition {
+            name: signature.name.clone(),
+            is_pub: *is_pub,
+            is_imported: false,
+            return_type: signature
+                .return_type
+                .clone()
+                .map(|r| r.0.into_mir(module_id))
+                .unwrap_or(mir::TypeKind::Void),
+            parameters: params,
+            kind: mir::FunctionDefinitionKind::Local(block.into_mir(module_id), (range).as_meta(module_id)),
         }
     }
 }
@@ -404,7 +412,15 @@ impl ast::Expression {
                     .map(|e| e.process(module_id))
                     .collect(),
             ),
-            ast::ExpressionKind::AssociatedFunctionCall(_, function_call_expression) => todo!(),
+            ast::ExpressionKind::AssociatedFunctionCall(ty, fn_call_expr) => mir::ExprKind::AssociatedFunctionCall(
+                ty.0.into_mir(module_id),
+                mir::FunctionCall {
+                    name: fn_call_expr.0.clone(),
+                    return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
+                    parameters: fn_call_expr.1.iter().map(|e| e.process(module_id)).collect(),
+                    meta: fn_call_expr.2.as_meta(module_id),
+                },
+            ),
         };
 
         mir::Expression(kind, self.1.as_meta(module_id))

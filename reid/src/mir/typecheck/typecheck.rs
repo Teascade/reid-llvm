@@ -724,6 +724,7 @@ impl Expression {
                 let expr = expression.typecheck(state, typerefs, HintKind::Default)?;
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
+            ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
         }
     }
 }

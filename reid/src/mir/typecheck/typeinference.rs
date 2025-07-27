@@ -566,6 +566,7 @@ impl Expression {
                 expression.infer_types(state, type_refs)?;
                 Ok(type_refs.from_type(type_kind).unwrap())
             }
+            ExprKind::AssociatedFunctionCall(type_kind, function_call) => todo!(),
         }
     }
 }
