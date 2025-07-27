@@ -7,6 +7,6 @@ edition = "2024"
 
 [dependencies]
 ## LLVM Bindings
-llvm-sys = {version ="201.0.1", features=["prefer-dynamic"] }
+llvm-sys = {version ="201.0.1" }
 ## Make it easier to generate errors
 thiserror = "1.0.44"

@@ -205,6 +205,13 @@ where
             ),
             expr.0 .1,
         ),
+        ExpressionKind::CastTo(value_expr, ty) => Expression(
+            ExpressionKind::CastTo(
+                Box::new(apply_inner(PrimaryExpression(*value_expr.clone()), fun)),
+                ty.clone(),
+            ),
+            expr.0 .1,
+        ),
         _ => fun(expr),
     }
 }
