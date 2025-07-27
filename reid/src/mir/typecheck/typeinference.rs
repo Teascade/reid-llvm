@@ -598,8 +598,7 @@ impl Expression {
                 // Get function definition and types
                 let fn_call = state
                     .scope
-                    .associated_functions
-                    .get(&AssociatedFunctionKey(type_kind.clone(), function_call.name.clone()))
+                    .get_associated_function(&AssociatedFunctionKey(type_kind.clone(), function_call.name.clone()))
                     .ok_or(ErrorKind::AssocFunctionNotDefined(
                         function_call.name.clone(),
                         type_kind.clone(),

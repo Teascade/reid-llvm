@@ -22,6 +22,7 @@ fn main() -> u32 {
     let otus = Otus { field: 17 };
     print(from_str("otus: ") + Otus::test(&otus) as u64);
     print(from_str("i32: ") + i32::test(54) as u64);
+    print(from_str("sizeof i32: ") + i32::sizeof());
 
     return Otus::test(&otus);
 }

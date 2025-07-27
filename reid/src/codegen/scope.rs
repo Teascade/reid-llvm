@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
-    debug_information::{DebugInformation, DebugProgramValue, DebugTypeValue},
+    debug_information::{DebugInformation, DebugLocation, DebugProgramValue, DebugTypeValue},
     Block, Context, Function, Instr, Module,
 };
 
@@ -26,8 +26,8 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) block: Block<'ctx>,
     pub(super) types: &'scope HashMap<TypeValue, TypeDefinition>,
     pub(super) type_values: &'scope HashMap<CustomTypeKey, TypeValue>,
-    pub(super) assoc_functions: &'scope HashMap<AssociatedFunctionKey, Function<'ctx>>,
-    pub(super) functions: &'scope HashMap<String, Function<'ctx>>,
+    pub(super) assoc_functions: &'scope HashMap<AssociatedFunctionKey, ScopeFunctionKind<'ctx>>,
+    pub(super) functions: &'scope HashMap<String, ScopeFunctionKind<'ctx>>,
     pub(super) binops: &'scope HashMap<BinopKey, StackBinopDefinition<'ctx>>,
     pub(super) stack_values: HashMap<String, StackValue>,
     pub(super) debug: Option<Debug<'ctx>>,
@@ -131,19 +131,20 @@ impl StackValueKind {
 pub struct StackBinopDefinition<'ctx> {
     pub(super) parameters: ((String, TypeKind), (String, TypeKind)),
     pub(super) return_ty: TypeKind,
-    pub(super) kind: StackBinopFunctionKind<'ctx>,
+    pub(super) kind: ScopeFunctionKind<'ctx>,
 }
 
-pub enum StackBinopFunctionKind<'ctx> {
+pub enum ScopeFunctionKind<'ctx> {
     UserGenerated(Function<'ctx>),
     Intrinsic(&'ctx Box<dyn IntrinsicFunction>),
+    IntrinsicOwned(Box<dyn IntrinsicFunction>),
 }
 
 impl<'ctx> StackBinopDefinition<'ctx> {
     pub fn codegen<'a>(
         &self,
-        lhs: &StackValue,
-        rhs: &StackValue,
+        lhs: StackValue,
+        rhs: StackValue,
         scope: &mut Scope<'ctx, 'a>,
     ) -> Result<StackValue, ErrorKind> {
         let (lhs, rhs) = if lhs.1 == self.parameters.0 .1 && rhs.1 == self.parameters.1 .1 {
@@ -151,15 +152,43 @@ impl<'ctx> StackBinopDefinition<'ctx> {
         } else {
             (rhs, lhs)
         };
-        match &self.kind {
-            StackBinopFunctionKind::UserGenerated(ir) => {
-                let instr = scope
+        let name = format!(
+            "binop.{}.{}.{}.call",
+            self.parameters.0 .1, self.parameters.1 .1, self.return_ty
+        );
+        self.kind.codegen(&name, &[lhs, rhs], &self.return_ty, None, scope)
+    }
+}
+
+impl<'ctx> ScopeFunctionKind<'ctx> {
+    pub fn codegen<'a>(
+        &self,
+        name: &str,
+        params: &[StackValue],
+        return_ty: &TypeKind,
+        location: Option<DebugLocation>,
+        scope: &mut Scope<'ctx, 'a>,
+    ) -> Result<StackValue, ErrorKind> {
+        match self {
+            ScopeFunctionKind::UserGenerated(function) => {
+                let val = scope
                     .block
-                    .build(Instr::FunctionCall(ir.value(), vec![lhs.instr(), rhs.instr()]))
+                    .build_named(
+                        name,
+                        Instr::FunctionCall(function.value(), params.iter().map(|p| p.instr()).collect()),
+                    )
                     .unwrap();
-                Ok(StackValue(StackValueKind::Immutable(instr), self.return_ty.clone()))
+
+                if let Some(debug) = &scope.debug {
+                    if let Some(location) = location {
+                        let location_val = debug.info.location(&debug.scope, location);
+                        val.with_location(&mut scope.block, location_val);
+                    }
+                }
+                Ok(StackValue(StackValueKind::Immutable(val), return_ty.clone()))
             }
-            StackBinopFunctionKind::Intrinsic(fun) => fun.codegen(scope, &[&lhs, &rhs]),
+            ScopeFunctionKind::Intrinsic(fun) => fun.codegen(scope, params),
+            ScopeFunctionKind::IntrinsicOwned(fun) => fun.codegen(scope, params),
         }
     }
 }

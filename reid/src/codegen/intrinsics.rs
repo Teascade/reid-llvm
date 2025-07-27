@@ -36,6 +36,20 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     intrinsics
 }
 
+pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDefinition> {
+    match name {
+        "sizeof" => Some(FunctionDefinition {
+            name: "sizeof".to_owned(),
+            is_pub: true,
+            is_imported: false,
+            return_type: TypeKind::U64,
+            parameters: Vec::new(),
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
+        }),
+        _ => None,
+    }
+}
+
 fn simple_binop_def<T: Clone + 'static>(op: BinaryOperator, ty: &TypeKind, fun: T) -> BinopDefinition
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
@@ -167,28 +181,33 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
 }
 
 pub trait IntrinsicFunction: std::fmt::Debug {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[&StackValue]) -> Result<StackValue, ErrorKind>;
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind>;
+}
+
+macro_rules! intrinsic_debug {
+    ($kind:ty, $name:literal) => {
+        impl<T> std::fmt::Debug for $kind
+        where
+            T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.debug_tuple($name).finish()
+            }
+        }
+    };
 }
 
 #[derive(Clone)]
 pub struct IntrinsicSimpleInstr<T>(T)
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue;
-
-impl<T> std::fmt::Debug for IntrinsicSimpleInstr<T>
-where
-    T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("IntrinsicSimpleInstr").finish()
-    }
-}
+intrinsic_debug!(IntrinsicSimpleInstr<T>, "IntrinsicSimpleInstr");
 
 impl<T: Clone> IntrinsicFunction for IntrinsicSimpleInstr<T>
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
-    fn codegen<'b, 'c>(&self, scope: &mut Scope<'b, 'c>, params: &[&StackValue]) -> Result<StackValue, ErrorKind> {
+    fn codegen<'b, 'c>(&self, scope: &mut Scope<'b, 'c>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let lhs = params.get(0).unwrap();
         let rhs = params.get(1).unwrap();
         let instr = self.clone().0(scope, lhs.instr(), rhs.instr());
@@ -200,25 +219,35 @@ where
 pub struct IntrinsicBooleanInstr<T>(T)
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue;
-
-impl<T> std::fmt::Debug for IntrinsicBooleanInstr<T>
-where
-    T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("IntrinsicBooleanInstr").finish()
-    }
-}
+intrinsic_debug!(IntrinsicBooleanInstr<T>, "IntrinsicBooleanInstr");
 
 impl<T: Clone> IntrinsicFunction for IntrinsicBooleanInstr<T>
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
-    fn codegen<'b, 'c>(&self, scope: &mut Scope<'b, 'c>, params: &[&StackValue]) -> Result<StackValue, ErrorKind> {
+    fn codegen<'b, 'c>(&self, scope: &mut Scope<'b, 'c>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let lhs = params.get(0).unwrap();
         let rhs = params.get(1).unwrap();
         let instr = self.clone().0(scope, lhs.instr(), rhs.instr());
         Ok(StackValue(StackValueKind::Literal(instr), TypeKind::Bool))
+    }
+}
+
+#[derive(Clone)]
+pub struct IntrinsicSizeOf(TypeKind);
+impl std::fmt::Debug for IntrinsicSizeOf {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("IntrinsicSizeOf").finish()
+    }
+}
+
+impl IntrinsicFunction for IntrinsicSizeOf {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let instr = scope
+            .block
+            .build(Instr::Constant(reid_lib::ConstValue::U64(self.0.size_of())))
+            .unwrap();
+        Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
 }
 

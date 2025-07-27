@@ -732,12 +732,10 @@ impl Expression {
             ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
                 let true_function = state
                     .scope
-                    .associated_functions
-                    .get(&pass::AssociatedFunctionKey(
+                    .get_associated_function(&pass::AssociatedFunctionKey(
                         type_kind.clone(),
                         function_call.name.clone(),
                     ))
-                    .cloned()
                     .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
 
                 if let Some(f) = state.ok(true_function, self.1) {

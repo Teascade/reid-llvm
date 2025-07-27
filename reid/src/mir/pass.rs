@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::error::Error as STDError;
 
-use crate::codegen::intrinsics::form_intrinsic_binops;
+use crate::codegen::intrinsics::{form_intrinsic_binops, get_intrinsic_assoc_func};
 use crate::error_raporting::ReidError;
 
 use super::*;
@@ -168,6 +168,24 @@ impl<Data: Clone + Default> Scope<Data> {
             .iter()
             .find(|(key, def)| key.0 == typekey.0 && def.importer == Some(typekey.1))
             .map(|(_, v)| v))
+    }
+
+    pub fn get_associated_function(&mut self, key: &AssociatedFunctionKey) -> Option<ScopeFunction> {
+        let func = self.associated_functions.get(key);
+        if let Some(func) = func {
+            Some(func.clone())
+        } else if let Some(func) = get_intrinsic_assoc_func(&key.0, &key.1) {
+            self.associated_functions.set(
+                key.clone(),
+                ScopeFunction {
+                    ret: func.return_type,
+                    params: func.parameters.iter().map(|(_, p)| p.clone()).collect(),
+                },
+            );
+            self.associated_functions.get(key).cloned()
+        } else {
+            None
+        }
     }
 }
 

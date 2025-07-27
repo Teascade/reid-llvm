@@ -211,7 +211,7 @@ impl mir::Module {
             };
 
             if let Some(func) = func {
-                functions.insert(function.name.clone(), func);
+                functions.insert(function.name.clone(), ScopeFunctionKind::UserGenerated(func));
             }
         }
 
@@ -251,7 +251,10 @@ impl mir::Module {
             };
 
             if let Some(func) = func {
-                associated_functions.insert(AssociatedFunctionKey(ty.clone(), function.name.clone()), func);
+                associated_functions.insert(
+                    AssociatedFunctionKey(ty.clone(), function.name.clone()),
+                    ScopeFunctionKind::UserGenerated(func),
+                );
             }
         }
 
@@ -332,22 +335,20 @@ impl mir::Module {
                                 )
                                 .unwrap();
 
-                            StackBinopFunctionKind::UserGenerated(ir_function)
+                            ScopeFunctionKind::UserGenerated(ir_function)
                         }
-                        FunctionDefinitionKind::Extern(imported) => {
-                            StackBinopFunctionKind::UserGenerated(module.function(
-                                &binop_fn_name,
-                                binop.return_type.get_type(&type_values),
-                                vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
-                                FunctionFlags {
-                                    is_extern: true,
-                                    is_imported: *imported,
-                                    ..FunctionFlags::default()
-                                },
-                            ))
-                        }
+                        FunctionDefinitionKind::Extern(imported) => ScopeFunctionKind::UserGenerated(module.function(
+                            &binop_fn_name,
+                            binop.return_type.get_type(&type_values),
+                            vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
+                            FunctionFlags {
+                                is_extern: true,
+                                is_imported: *imported,
+                                ..FunctionFlags::default()
+                            },
+                        )),
                         FunctionDefinitionKind::Intrinsic(intrinsic_function) => {
-                            StackBinopFunctionKind::Intrinsic(intrinsic_function)
+                            ScopeFunctionKind::Intrinsic(intrinsic_function)
                         }
                     },
                 },
@@ -355,111 +356,118 @@ impl mir::Module {
         }
 
         for mir_function in &self.functions {
-            let function = functions.get(&mir_function.name).unwrap();
-            let mut entry = function.block("entry");
+            if let ScopeFunctionKind::UserGenerated(function) = functions.get(&mir_function.name).unwrap() {
+                let mut entry = function.block("entry");
 
-            let allocator = Allocator::from(
-                &mir_function.kind,
-                &mir_function.parameters,
-                &mut AllocatorScope {
-                    block: &mut entry,
-                    type_values: &type_values,
-                },
-            );
-
-            let mut scope = Scope {
-                context,
-                modules: &modules,
-                tokens,
-                module: &module,
-                module_id: self.module_id,
-                function,
-                block: entry,
-                assoc_functions: &associated_functions,
-                functions: &functions,
-                types: &types,
-                type_values: &type_values,
-                stack_values: HashMap::new(),
-                debug: Some(Debug {
-                    info: &debug,
-                    scope: compile_unit,
-                    types: &debug_types,
-                }),
-                binops: &binops,
-                allocator: Rc::new(RefCell::new(allocator)),
-            };
-
-            mir_function
-                .kind
-                .codegen(
-                    mir_function.name.clone(),
-                    mir_function.is_pub,
-                    &mut scope,
+                let allocator = Allocator::from(
+                    &mir_function.kind,
                     &mir_function.parameters,
-                    &mir_function.return_type,
-                    &function,
-                    match &mir_function.kind {
-                        FunctionDefinitionKind::Local(..) => mir_function.signature().into_debug(tokens, compile_unit),
-                        FunctionDefinitionKind::Extern(_) => None,
-                        FunctionDefinitionKind::Intrinsic(_) => None,
+                    &mut AllocatorScope {
+                        block: &mut entry,
+                        type_values: &type_values,
                     },
-                )
-                .unwrap();
+                );
+
+                let mut scope = Scope {
+                    context,
+                    modules: &modules,
+                    tokens,
+                    module: &module,
+                    module_id: self.module_id,
+                    function,
+                    block: entry,
+                    assoc_functions: &associated_functions,
+                    functions: &functions,
+                    types: &types,
+                    type_values: &type_values,
+                    stack_values: HashMap::new(),
+                    debug: Some(Debug {
+                        info: &debug,
+                        scope: compile_unit,
+                        types: &debug_types,
+                    }),
+                    binops: &binops,
+                    allocator: Rc::new(RefCell::new(allocator)),
+                };
+
+                mir_function
+                    .kind
+                    .codegen(
+                        mir_function.name.clone(),
+                        mir_function.is_pub,
+                        &mut scope,
+                        &mir_function.parameters,
+                        &mir_function.return_type,
+                        &function,
+                        match &mir_function.kind {
+                            FunctionDefinitionKind::Local(..) => {
+                                mir_function.signature().into_debug(tokens, compile_unit)
+                            }
+                            FunctionDefinitionKind::Extern(_) => None,
+                            FunctionDefinitionKind::Intrinsic(_) => None,
+                        },
+                    )
+                    .unwrap();
+            }
         }
 
         for (ty, mir_function) in &self.associated_functions {
-            let function = associated_functions
+            if let ScopeFunctionKind::UserGenerated(function) = associated_functions
                 .get(&AssociatedFunctionKey(ty.clone(), mir_function.name.clone()))
-                .unwrap();
-            let mut entry = function.block("entry");
+                .unwrap()
+            {
+                let mut entry = function.block("entry");
 
-            let allocator = Allocator::from(
-                &mir_function.kind,
-                &mir_function.parameters,
-                &mut AllocatorScope {
-                    block: &mut entry,
-                    type_values: &type_values,
-                },
-            );
-
-            let mut scope = Scope {
-                context,
-                modules: &modules,
-                tokens,
-                module: &module,
-                module_id: self.module_id,
-                function,
-                block: entry,
-                assoc_functions: &associated_functions,
-                functions: &functions,
-                types: &types,
-                type_values: &type_values,
-                stack_values: HashMap::new(),
-                debug: Some(Debug {
-                    info: &debug,
-                    scope: compile_unit,
-                    types: &debug_types,
-                }),
-                binops: &binops,
-                allocator: Rc::new(RefCell::new(allocator)),
-            };
-
-            mir_function
-                .kind
-                .codegen(
-                    mir_function.name.clone(),
-                    mir_function.is_pub,
-                    &mut scope,
+                let allocator = Allocator::from(
+                    &mir_function.kind,
                     &mir_function.parameters,
-                    &mir_function.return_type,
-                    &function,
-                    match &mir_function.kind {
-                        FunctionDefinitionKind::Local(..) => mir_function.signature().into_debug(tokens, compile_unit),
-                        FunctionDefinitionKind::Extern(_) => None,
-                        FunctionDefinitionKind::Intrinsic(_) => None,
+                    &mut AllocatorScope {
+                        block: &mut entry,
+                        type_values: &type_values,
                     },
-                )
-                .unwrap();
+                );
+
+                let mut scope = Scope {
+                    context,
+                    modules: &modules,
+                    tokens,
+                    module: &module,
+                    module_id: self.module_id,
+                    function,
+                    block: entry,
+                    assoc_functions: &associated_functions,
+                    functions: &functions,
+                    types: &types,
+                    type_values: &type_values,
+                    stack_values: HashMap::new(),
+                    debug: Some(Debug {
+                        info: &debug,
+                        scope: compile_unit,
+                        types: &debug_types,
+                    }),
+                    binops: &binops,
+                    allocator: Rc::new(RefCell::new(allocator)),
+                };
+
+                mir_function
+                    .kind
+                    .codegen(
+                        mir_function.name.clone(),
+                        mir_function.is_pub,
+                        &mut scope,
+                        &mir_function.parameters,
+                        &mir_function.return_type,
+                        &function,
+                        match &mir_function.kind {
+                            FunctionDefinitionKind::Local(..) => {
+                                mir_function.signature().into_debug(tokens, compile_unit)
+                            }
+                            FunctionDefinitionKind::Extern(_) => None,
+                            FunctionDefinitionKind::Intrinsic(_) => None,
+                        },
+                    )
+                    .unwrap();
+            }
         }
 
         Ok(ModuleCodegen { module })
@@ -821,7 +829,7 @@ impl mir::Expression {
                 });
 
                 if let Some(operation) = operation {
-                    let a = operation.codegen(&lhs_val, &rhs_val, scope)?;
+                    let a = operation.codegen(lhs_val.clone(), rhs_val.clone(), scope)?;
                     Some(a)
                 } else {
                     let lhs_type = lhs_exp.return_type(&Default::default(), scope.module_id).unwrap().1;
@@ -906,19 +914,19 @@ impl mir::Expression {
                 .map(|v| v.unwrap())
                 .collect::<Vec<_>>();
 
-                let param_instrs = params.iter().map(|e| e.instr()).collect();
                 let callee = scope.functions.get(&call.name).expect("function not found!");
 
-                let val = scope
-                    .block
-                    .build_named(call.name.clone(), Instr::FunctionCall(callee.value(), param_instrs))
-                    .unwrap();
-
-                if let Some(debug) = &scope.debug {
-                    let location = call.meta.into_debug(scope.tokens, debug.scope).unwrap();
-                    let location_val = debug.info.location(&debug.scope, location);
-                    val.with_location(&mut scope.block, location_val);
-                }
+                let val = callee.codegen(
+                    &call.name,
+                    params.as_slice(),
+                    &call.return_type,
+                    if let Some(debug) = &scope.debug {
+                        call.meta.into_debug(scope.tokens, debug.scope)
+                    } else {
+                        None
+                    },
+                    scope,
+                )?;
 
                 let ptr = if ret_type_kind != TypeKind::Void {
                     let ptr = scope
@@ -927,7 +935,7 @@ impl mir::Expression {
                         .unwrap();
                     scope
                         .block
-                        .build_named(format!("{}.store", call.name), Instr::Store(ptr, val))
+                        .build_named(format!("{}.store", call.name), Instr::Store(ptr, val.instr()))
                         .unwrap();
 
                     Some(ptr)
@@ -1332,31 +1340,38 @@ impl mir::Expression {
                 .map(|v| v.unwrap())
                 .collect::<Vec<_>>();
 
-                let param_instrs = params.iter().map(|e| e.instr()).collect();
+                let assoc_key = AssociatedFunctionKey(ty.clone(), call.name.clone());
+                let intrinsic = get_intrinsic_assoc_func(&ty, &call.name);
+                let intrinsic_owned = intrinsic.map(|func_def| {
+                    let FunctionDefinitionKind::Intrinsic(intrinsic) = func_def.kind else {
+                        panic!();
+                    };
+                    ScopeFunctionKind::IntrinsicOwned(intrinsic)
+                });
                 let callee = scope
                     .assoc_functions
-                    .get(&AssociatedFunctionKey(ty.clone(), call.name.clone()))
-                    .expect("function not found!");
+                    .get(&assoc_key)
+                    .or(intrinsic_owned.as_ref())
+                    .expect(&format!("Function {} does not exist!", call_name));
 
-                let val = scope
-                    .block
-                    .build_named(&call_name, Instr::FunctionCall(callee.value(), param_instrs))
+                let location = if let Some(debug) = &scope.debug {
+                    call.meta.into_debug(scope.tokens, debug.scope)
+                } else {
+                    None
+                };
+
+                let val = callee
+                    .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
                     .unwrap();
-
-                if let Some(debug) = &scope.debug {
-                    let location = call.meta.into_debug(scope.tokens, debug.scope).unwrap();
-                    let location_val = debug.info.location(&debug.scope, location);
-                    val.with_location(&mut scope.block, location_val);
-                }
 
                 let ptr = if ret_type_kind != TypeKind::Void {
                     let ptr = scope
                         .block
-                        .build_named(&call_name, Instr::Alloca(ret_type.clone()))
+                        .build_named(&call.name, Instr::Alloca(ret_type.clone()))
                         .unwrap();
                     scope
                         .block
-                        .build_named(format!("{}.store", call_name), Instr::Store(ptr, val))
+                        .build_named(format!("{}.store", call_name), Instr::Store(ptr, val.instr()))
                         .unwrap();
 
                     Some(ptr)
