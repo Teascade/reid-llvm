@@ -22,6 +22,7 @@ or simply casting the value (e.g. `5 as u32`).
 ## Table of Contents:
 - [Hello World](#hello-world)
 - [Borrowing and Pointers](#borrowing-and-pointers)
+- [Harder Hello World](#harder-hello-world)
 
 ### Hello World
 
@@ -120,3 +121,73 @@ This example will always return `17`. Notice also, how a **mutable** borrow was
 passed to `mutate`-function. While borrows do not always need to be mutable,
 this example would not work without the `mut`-keyword. Try it out for yourself
 to see why!
+
+### Harder Hello World
+
+A little bit harder example to the previous hello world would be
+`hello_world_harder.reid` from [examples](../examples/hello_world_harder.reid)
+
+```rust
+import std::print;
+import std::String;
+
+fn main() {
+    let mut test = String::from("hello");
+
+    test.push(String::from(" world: "));
+    test.push_num(175);
+    
+    print(test);
+
+    test.free();
+    return;
+}
+```
+
+Let's go through this again line-by-line
+
+```rust
+import std::print;
+import std::String;
+```
+
+At the start are the standard imports, like in the original Hello World, but
+notice that instead of importing just functions we import the type `String` as
+well. When importing types, not only are the type imported, but also any binary
+functions or associated functions related to it with it.
+
+```rust
+    let mut test = String::from("hello");
+```
+
+Next we create the initial string, just like in our original example, but this
+time the message is not complete. We also use an associated function to create
+the string instead one of the now-deprecated global functions.
+
+```rust
+    test.push(String::from(" world: "));
+    test.push_num(175);
+```
+
+After that we edit the message by first pushing ` world: ` to it, and also
+appending the number `175` at the end of it. For both of these operations we are
+again using associated functions, but in a different short-hand syntax.
+
+These two lines would be actually equivalent to the above ones:
+```rust
+    String::push(&mut test, String::from(" world: "));
+    String::push_num(&mut test, 175);
+```
+
+----
+
+```rust
+
+    print(test);
+
+    test.free();
+    return;
+```
+
+After that we simply print the string, and free up the string (again with an
+associated function) before returning. Nothing special there!

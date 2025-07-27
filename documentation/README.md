@@ -247,6 +247,8 @@ calls, literals, or if-expressions. Types of supported expressions include:
 - **Function calls**, to invoke a predefined function with given parameters
 - **Associated function calls**, to invoke a predefined function on a certain
   *associated type* with given parameters.
+  - **Accessing function calls**, a shorthand to call associated function calls
+    which have `&self` or `&mut self` as their first parameter.
 - **Block-expressions**, which can return a value to the higher-level expression
   if they have a statement with a soft-return. Otherwise they return void.
 - **If-expressions**, which can execute one of two expressions depending on the
@@ -263,7 +265,7 @@ In formal grammar:
     <array> | <struct> |
     <indexing> | <accessing> |
     <binary-exp> | <unary-exp> |
-    <function-call> | <assoc-function-call>
+    <function-call> | <accessing-function-call> | <assoc-function-call>
     <block> | <if-expr> | <cast> |
     ( "(" <expression> ")" )
 
@@ -278,6 +280,7 @@ In formal grammar:
 <binary-exp> :: <expression> <binop> <expression>
 <unary-exp> :: <unary> <expression>
 <function-call> :: <expression> "(" [ <expression> ( "," <expression> )* ] ")"
+<accessing-function-call> :: <accessing> "(" [ <expression> ( "," <expression> )* ] ")"
 <assoc-function-call> :: <type> "::" <function-call>
 <if-expr> :: "if" <expression> <expression> [ "else" <expression> ]
 <cast> :: <expression> "as" <type>
@@ -296,6 +299,7 @@ test.first // Accessing
 !bool_value // Unary
 func(value, 14) // Function call
 Test::get_field(&test); // Associated function call
+test.get_field(); // Same, but using a the dot-form shorthand
 if varname {} else {} // If-expression
 value as u32 // cast
 (value + 2) // Binop within parenthesis
