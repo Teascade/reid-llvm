@@ -298,6 +298,7 @@ pub struct FunctionDefinition {
     pub return_type: TypeKind,
     pub parameters: Vec<FunctionParam>,
     pub kind: FunctionDefinitionKind,
+    pub source: Option<SourceModuleId>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

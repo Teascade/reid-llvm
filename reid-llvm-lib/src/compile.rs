@@ -587,9 +587,15 @@ impl FunctionHolder {
             let param_ptr = param_types.as_mut_ptr();
             let param_len = param_types.len();
 
+            let name = if self.data.flags.is_main {
+                c"main"
+            } else {
+                &into_cstring(&self.data.name)
+            };
+
             let fn_type = LLVMFunctionType(ret_type, param_ptr, param_len as u32, 0);
 
-            let function_ref = LLVMAddFunction(module_ref, into_cstring(&self.data.name).as_ptr(), fn_type);
+            let function_ref = LLVMAddFunction(module_ref, name.as_ptr(), fn_type);
 
             if self.data.flags.inline {
                 let attribute = LLVMCreateEnumAttribute(context.context_ref, LLVMEnumAttribute::AlwaysInline as u32, 0);

@@ -49,6 +49,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             return_type: TypeKind::U64,
             parameters: Vec::new(),
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
+            source: None,
         }),
         "alloca" => Some(FunctionDefinition {
             name: "alloca".to_owned(),
@@ -62,6 +63,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
                 meta: Default::default(),
             }],
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicAlloca(ty.clone()))),
+            source: None,
         }),
         "null" => Some(FunctionDefinition {
             name: "null".to_owned(),
@@ -71,6 +73,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             return_type: TypeKind::UserPtr(Box::new(ty.clone())),
             parameters: Vec::new(),
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicNullPtr(ty.clone()))),
+            source: None,
         }),
         _ => None,
     }

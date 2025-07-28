@@ -68,6 +68,7 @@ impl mir::Context {
 
 #[derive(Clone)]
 struct ModuleCodegen<'ctx> {
+    name: String,
     module: Module<'ctx>,
 }
 
@@ -186,9 +187,30 @@ impl mir::Module {
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
+
+            let is_true_extern = match function.kind {
+                FunctionDefinitionKind::Extern(i) => !i,
+                _ => false,
+            };
+            let module_prefix = if is_true_extern {
+                String::new()
+            } else if let Some(module) = function.source {
+                if module == self.module_id {
+                    format!("reid.{}.", self.name)
+                } else {
+                    format!("reid.{}.", modules.get(&module).unwrap().name)
+                }
+            } else {
+                format!("reid.intrinsic.")
+            };
+            let linkage_name = format!(
+                "{}{}",
+                module_prefix,
+                function.linkage_name.clone().unwrap_or(function.name.clone())
+            );
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
-                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
+                    &linkage_name,
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -199,7 +221,7 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
+                    &linkage_name,
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -226,9 +248,18 @@ impl mir::Module {
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
+            let module_name = if let Some(module) = function.source {
+                if module == self.module_id {
+                    format!("reid.{}", self.name)
+                } else {
+                    format!("reid.{}", modules.get(&module).unwrap().name)
+                }
+            } else {
+                format!("reid.intrinsic")
+            };
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
-                    &format!("{}::{}", ty, function.name),
+                    &format!("{}.{}.{}", module_name, ty, function.name),
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -475,7 +506,10 @@ impl mir::Module {
             }
         }
 
-        Ok(ModuleCodegen { module })
+        Ok(ModuleCodegen {
+            name: self.name.clone(),
+            module,
+        })
     }
 }
 

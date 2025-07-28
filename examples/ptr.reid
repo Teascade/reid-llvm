@@ -1,9 +1,7 @@
 // Arithmetic, function calls and imports!
 
-import std::allocate;
-
 fn main() -> u8 {
-    let mut ptr = allocate(4);
+    let mut ptr = u8::alloca(4);
 
     ptr[0] = 5;
 

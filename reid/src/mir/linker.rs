@@ -186,6 +186,7 @@ impl<'map> Pass for LinkerPass<'map> {
                 .borrow_mut();
 
                 let import_name = unsafe { path.get_unchecked(1) };
+                let import_id = imported.module_id;
 
                 let mut imported_types = Vec::new();
 
@@ -234,6 +235,7 @@ impl<'map> Pass for LinkerPass<'map> {
                         return_type,
                         parameters: param_tys,
                         kind: super::FunctionDefinitionKind::Extern(true),
+                        source: Some(imported.module_id),
                     });
                 } else if let Some(ty) = imported.typedefs.iter_mut().find(|f| f.name == *import_name) {
                     let external_key = CustomTypeKey(ty.name.clone(), ty.source_module);
@@ -319,12 +321,13 @@ impl<'map> Pass for LinkerPass<'map> {
                             ty.clone(),
                             FunctionDefinition {
                                 name: func_name.clone(),
-                                linkage_name: Some(format!("{}::{}", ty, func_name)),
+                                linkage_name: Some(format!("{}.{}", ty, func_name)),
                                 is_pub: false,
                                 is_imported: false,
                                 return_type,
                                 parameters: param_tys,
                                 kind: super::FunctionDefinitionKind::Extern(true),
+                                source: Some(import_id),
                             },
                         ));
                     }
