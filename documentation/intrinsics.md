@@ -11,10 +11,10 @@ for the binary operators, because there are hundreds of those).
 
 #### `<T>::sizeof() -> u64`
 
-Simply returns the size of type `T` in bits.
+Simply returns the size of type `T` in bytes.
 
 ```rust
-i32::sizeof(); // Returns 32
+i32::sizeof(); // Returns 4
 ```
 
 #### `<T>::null() -> *T`
@@ -25,9 +25,9 @@ Returns a null-pointer of type `T`.
 i32::null(); // Returns *i32 (null-ptr)
 ```
 
-#### `<T>::alloca(size: u64) -> *T`
+#### `<T>::malloc(size: u64) -> *T`
 
-Allocates `T::sizeof() * size` bits and returns a pointer to `T`.
+Allocates `T::sizeof() * size` bytes and returns a pointer to `T`.
 
 **Note:** This does not seem to work correctly currently.
 
