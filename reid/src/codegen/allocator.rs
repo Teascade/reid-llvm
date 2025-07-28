@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
-    Block,
+    Block, Instr,
 };
 
 use mir::{CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, TypeKind, WhileStatement};
 
-use crate::mir::{self, FunctionParam, Metadata};
+use crate::mir::{self, FunctionParam, Metadata, SourceModuleId};
 
 #[derive(Debug)]
 pub struct Allocator {
@@ -16,6 +16,7 @@ pub struct Allocator {
 
 pub struct AllocatorScope<'ctx, 'a> {
     pub(super) block: &'a mut Block<'ctx>,
+    pub(super) mod_id: SourceModuleId,
     pub(super) type_values: &'a HashMap<CustomTypeKey, TypeValue>,
 }
 
@@ -136,13 +137,38 @@ impl mir::Expression {
                 allocated.extend(expression.allocate(scope));
             }
             mir::ExprKind::Array(expressions) => {
+                let (_, ty) = self.return_type(&Default::default(), scope.mod_id).unwrap();
+                let TypeKind::Array(elem_ty, _) = &ty else { panic!() };
+                let array_name = format!("{}.{}", elem_ty, expressions.len());
+
+                let allocation = scope
+                    .block
+                    .build_named(array_name, Instr::Alloca(ty.get_type(scope.type_values)))
+                    .unwrap();
+                allocated.push(Allocation(self.1, ty, allocation));
+
                 for expression in expressions {
                     allocated.extend(expression.allocate(scope));
                 }
             }
-            mir::ExprKind::Struct(_, items) => {
-                for (_, expression) in items {
+            mir::ExprKind::Struct(name, items) => {
+                let (_, ty) = self.return_type(&Default::default(), scope.mod_id).unwrap();
+                let allocation = scope
+                    .block
+                    .build_named(name, Instr::Alloca(ty.get_type(scope.type_values)))
+                    .unwrap();
+                allocated.push(Allocation(self.1, ty, allocation));
+
+                for (field_name, expression) in items {
                     allocated.extend(expression.allocate(scope));
+
+                    let (_, ty) = expression.return_type(&Default::default(), scope.mod_id).unwrap();
+
+                    let allocation = scope
+                        .block
+                        .build_named(field_name, Instr::Alloca(ty.get_type(scope.type_values)))
+                        .unwrap();
+                    allocated.push(Allocation(expression.1, ty, allocation));
                 }
             }
             mir::ExprKind::Literal(_) => {}
@@ -186,10 +212,7 @@ impl mir::FunctionCall {
         if self.return_type != TypeKind::Void {
             let allocation = scope
                 .block
-                .build_named(
-                    name,
-                    reid_lib::Instr::Alloca(self.return_type.get_type(scope.type_values)),
-                )
+                .build_named(name, Instr::Alloca(self.return_type.get_type(scope.type_values)))
                 .unwrap();
             allocated.push(Allocation(self.meta, self.return_type.clone(), allocation));
         }

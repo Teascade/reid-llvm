@@ -83,7 +83,11 @@ Common token used throughout this document to express parts of grammar include:
     "i8" | "i16" | "i32" | "i64" | "i128" |
     "f16" | "f32" | "f32b" | "f64" | "f80" | "f128" | "f128ppc"
 
-<binop> :: "+" | "-" | "*" | "/" | "%" | "&&" | <cmp>
+<binop> :: "+" | "-" | "*" 
+  | "/" | "%" | "&&" | "||" 
+  | "&" | "|" | "^" | ">>" 
+  | "<<" | <cmp>
+
 <cmp> :: "<" | "<=" | "==" | "!=" | ">=" | >"
 <unary> :: "+" | "-" | "!"
 ```

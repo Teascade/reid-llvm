@@ -293,6 +293,7 @@ impl mir::Module {
                                 &mut AllocatorScope {
                                     block: &mut entry,
                                     type_values: &type_values,
+                                    mod_id: self.module_id,
                                 },
                             );
 
@@ -367,6 +368,7 @@ impl mir::Module {
                     &mut AllocatorScope {
                         block: &mut entry,
                         type_values: &type_values,
+                        mod_id: self.module_id,
                     },
                 );
 
@@ -426,6 +428,7 @@ impl mir::Module {
                     &mut AllocatorScope {
                         block: &mut entry,
                         type_values: &type_values,
+                        mod_id: self.module_id,
                     },
                 );
 
@@ -1037,8 +1040,10 @@ impl mir::Expression {
                 let load_n = format!("{}.load", array_name);
 
                 let array = scope
-                    .block
-                    .build_named(&array_name, Instr::Alloca(array_ty.clone()))
+                    .allocate(
+                        &self.1,
+                        &TypeKind::Array(Box::new(elem_ty_kind.clone()), expressions.len() as u64),
+                    )
                     .unwrap()
                     .maybe_location(&mut scope.block, location.clone());
 
@@ -1135,8 +1140,7 @@ impl mir::Expression {
                 let load_n = format!("{}.load", name);
 
                 let struct_ptr = scope
-                    .block
-                    .build_named(name, Instr::Alloca(ty.clone()))
+                    .allocate(&self.1, &TypeKind::CustomType(type_key.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location.clone());
 
