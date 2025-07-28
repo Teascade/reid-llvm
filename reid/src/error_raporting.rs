@@ -7,7 +7,7 @@ use crate::{
     ast::token_stream::{self, TokenRange},
     codegen,
     lexer::{self, Cursor, FullToken, Position},
-    mir::{self, pass, typecheck, Metadata, SourceModuleId},
+    mir::{self, macros, pass, typecheck, Metadata, SourceModuleId},
 };
 
 use crate::mir::typecheck::ErrorKind as TypecheckError;
@@ -33,6 +33,8 @@ pub enum ErrorKind {
     TypeInferenceError(#[source] mir::pass::Error<TypecheckError>),
     #[error("{}{}", label("(Linker) "), .0.kind)]
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
+    #[error("{}{}", label("(Macro) "), .0)]
+    MacroError(#[from] mir::pass::Error<macros::ErrorKind>),
     #[error("{}{}", label("(Codegen) "), .0)]
     CodegenError(#[from] codegen::ErrorKind),
 }
@@ -58,6 +60,7 @@ impl ErrorKind {
             ErrorKind::CodegenError(error) => match error {
                 codegen::ErrorKind::Null => Default::default(),
             },
+            ErrorKind::MacroError(error) => error.metadata,
         }
     }
 }

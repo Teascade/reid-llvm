@@ -503,6 +503,10 @@ impl Block {
             statement.pass(pass, state, &mut scope, mod_id)?;
         }
 
+        if let Some((_, Some(return_expr))) = &mut self.return_expression {
+            return_expr.pass(pass, state, &mut scope, mod_id)?;
+        }
+
         pass.block(self, PassState::from(state, &mut scope, Some(mod_id)))
     }
 }

@@ -7,10 +7,8 @@ use reid_lib::{
 };
 
 use crate::{
-    codegen::intrinsics::MacroFunction,
     lexer::FullToken,
     mir::{
-        self,
         pass::{AssociatedFunctionKey, BinopKey},
         CustomTypeKey, FunctionParam, Metadata, SourceModuleId, TypeDefinition, TypeKind,
     },
