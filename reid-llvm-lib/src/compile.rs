@@ -1052,6 +1052,7 @@ impl InstructionHolder {
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
                     LLVMBuildShl(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
+                GetGlobal(global_value) => module.globals.get(global_value).unwrap().clone(),
             }
         };
         if let Some(record) = &self.record {

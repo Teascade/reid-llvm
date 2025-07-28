@@ -392,6 +392,7 @@ impl Debug for Instr {
             Instr::ShiftRightLogical(lhs, rhs) => fmt_binop(f, lhs, &">>l", rhs),
             Instr::ShiftRightArithmetic(lhs, rhs) => fmt_binop(f, lhs, &">>a", rhs),
             Instr::ShiftLeft(lhs, rhs) => fmt_binop(f, lhs, &"<<", rhs),
+            Instr::GetGlobal(global_value) => write!(f, "global {:?}", global_value),
         }
     }
 }

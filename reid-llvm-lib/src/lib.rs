@@ -276,6 +276,7 @@ impl Instr {
             Instr::ShiftRightLogical(..) => "lshr",
             Instr::ShiftRightArithmetic(..) => "ashr",
             Instr::ShiftLeft(..) => "shl",
+            Instr::GetGlobal(global_value) => todo!(),
         }
     }
 }
@@ -373,6 +374,7 @@ pub enum CmpPredicate {
 pub enum Instr {
     Param(usize),
     Constant(ConstValueKind),
+    GetGlobal(GlobalValue),
 
     /// Add two integers
     Add(InstructionValue, InstructionValue),

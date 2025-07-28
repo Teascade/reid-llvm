@@ -28,10 +28,10 @@ pub struct BlockValue(pub(crate) FunctionValue, pub(crate) usize);
 pub struct InstructionValue(pub(crate) BlockValue, pub(crate) usize);
 
 #[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
-pub struct ConstantValue(pub(crate) usize);
+pub struct ConstantValue(pub(crate) ModuleValue, pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
-pub struct GlobalValue(pub(crate) usize);
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
+pub struct GlobalValue(pub(crate) ModuleValue, pub(crate) usize);
 
 #[derive(Clone)]
 pub struct ModuleHolder {
@@ -194,7 +194,7 @@ impl Builder {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(module.0);
-            let value = ConstantValue(module.constants.len());
+            let value = ConstantValue(module.value, module.constants.len());
             module.constants.push(ConstantValueHolder { value, kind });
             value
         }
@@ -209,7 +209,7 @@ impl Builder {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(module.0);
-            let value = GlobalValue(module.globals.len());
+            let value = GlobalValue(module.value, module.globals.len());
             module.globals.push(GlobalValueHolder {
                 value,
                 name,
@@ -381,6 +381,24 @@ impl Builder {
 
     pub(crate) fn get_modules(&self) -> Rc<RefCell<Vec<ModuleHolder>>> {
         self.modules.clone()
+    }
+
+    pub(crate) fn get_global_initializer(&self, value: GlobalValue) -> ConstantValue {
+        unsafe {
+            let modules = self.modules.borrow();
+            let module = modules.get_unchecked(value.0.0);
+            let global = module.globals.get_unchecked(value.1);
+            global.initializer
+        }
+    }
+
+    pub(crate) fn get_const_kind(&self, value: ConstantValue) -> ConstValueKind {
+        unsafe {
+            let modules = self.modules.borrow();
+            let module = modules.get_unchecked(value.0.0);
+            let constant = module.constants.get_unchecked(value.1);
+            constant.kind.clone()
+        }
     }
 
     pub fn check_instruction(&self, instruction: &InstructionValue) -> CompileResult<()> {
@@ -617,6 +635,7 @@ impl Builder {
                         Err(ErrorKind::Null)
                     }
                 }
+                Instr::GetGlobal(_) => Ok(()),
             }
         }
     }
@@ -768,6 +787,11 @@ impl InstructionValue {
                 ShiftRightLogical(lhs, _) => lhs.get_type(builder),
                 ShiftRightArithmetic(lhs, _) => lhs.get_type(builder),
                 ShiftLeft(lhs, _) => lhs.get_type(builder),
+                GetGlobal(global_value) => {
+                    let constant = builder.get_global_initializer(*global_value);
+                    let kind = builder.get_const_kind(constant);
+                    Ok(kind.get_type())
+                }
             }
         }
     }
