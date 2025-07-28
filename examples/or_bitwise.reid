@@ -2,9 +2,9 @@
 
 
 fn main() -> bool {
-  let bwand = (0xff & 0xf0) >> 4;
-  let bwor = (0x0f | 0x00) << 4;
-  let bwxor = (0xf0 | 0x0f);
+  let bwand = (0xffu32 & 0xf0) >> 4;
+  let bwor = (0x0fu32 | 0x00) << 4;
+  let bwxor = (0xf0u32 | 0x0f);
 
   return (bwxor == 255) && ((bwand == 15) || false) && (bwor == 240);
 }
