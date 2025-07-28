@@ -5,8 +5,9 @@ use intrinsics::*;
 use reid_lib::{
     compile::CompiledModule,
     debug_information::{
-        DebugFileData, DebugLocalVariable, DebugLocation, DebugMetadata, DebugRecordKind, DebugSubprogramData,
-        DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DwarfFlags, InstructionDebugRecordData,
+        DebugFileData, DebugLexicalScope, DebugLocalVariable, DebugLocation, DebugMetadata, DebugRecordKind,
+        DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DwarfFlags,
+        InstructionDebugRecordData,
     },
     CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr, Module, NamedStruct,
     TerminatorKind as Term, Type,
@@ -546,36 +547,10 @@ impl FunctionDefinitionKind {
                             TypeKind::CodegenPtr(Box::new(p_ty.clone())),
                         ),
                     );
-
-                    // Generate debug info
-                    // if let (Some(debug_scope), Some(location)) = (
-                    //     &debug_scope,
-                    //     mir_function.signature().into_debug(tokens, compile_unit),
-                    // ) {
-                    //     debug.metadata(
-                    //         &location,
-                    //         DebugMetadata::ParamVar(DebugParamVariable {
-                    //             name: p_name.clone(),
-                    //             arg_idx: i as u32,
-                    //             ty: p_ty.get_debug_type_hard(
-                    //                 *debug_scope,
-                    //                 &debug,
-                    //                 &debug_types,
-                    //                 &type_values,
-                    //                 &types,
-                    //                 self.module_id,
-                    //                 &self.tokens,
-                    //                 &modules,
-                    //             ),
-                    //             always_preserve: true,
-                    //             flags: DwarfFlags,
-                    //         }),
-                    //     );
-                    // }
                 }
 
                 let state = State::default();
-                if let Some(ret) = block.codegen(scope, &state)? {
+                if let Some(ret) = block.codegen(scope, &state, false)? {
                     scope.block.terminate(Term::Ret(ret.instr())).unwrap();
                 } else {
                     if !scope.block.delete_if_unused().unwrap() {
@@ -604,7 +579,20 @@ impl mir::Block {
         &self,
         mut scope: &mut Scope<'ctx, 'a>,
         state: &State,
+        create_debug_scope: bool,
     ) -> Result<Option<StackValue>, ErrorKind> {
+        let parent_scope = if let Some(debug) = &mut scope.debug {
+            let parent_scope = debug.scope.clone();
+            if create_debug_scope {
+                let location = self.meta.into_debug(scope.tokens, &debug.scope).unwrap();
+                let scope = debug.info.lexical_scope(&debug.scope, DebugLexicalScope { location });
+                debug.scope = scope;
+            }
+            Some(parent_scope)
+        } else {
+            None
+        };
+
         for stmt in &self.statements {
             stmt.codegen(&mut scope, state)?.map(|s| {
                 if let Some(debug) = &scope.debug {
@@ -615,7 +603,7 @@ impl mir::Block {
             });
         }
 
-        if let Some((kind, expr)) = &self.return_expression {
+        let return_value = if let Some((kind, expr)) = &self.return_expression {
             if let Some(expr) = expr {
                 let ret = expr.codegen(&mut scope, &mut state.load(true))?;
                 match kind {
@@ -638,7 +626,13 @@ impl mir::Block {
             }
         } else {
             Ok(None)
+        };
+
+        if let Some(parent_scope) = parent_scope {
+            scope.debug.as_mut().unwrap().scope = parent_scope;
         }
+
+        return_value
     }
 }
 
@@ -759,7 +753,7 @@ impl mir::Statement {
                     .unwrap();
 
                 let mut condition_true_scope = scope.with_block(condition_true_block);
-                block.codegen(&mut condition_true_scope, state)?;
+                block.codegen(&mut condition_true_scope, state, true)?;
 
                 condition_true_scope
                     .block
@@ -933,7 +927,7 @@ impl mir::Expression {
                 scope.block.terminate(Term::Br(inner.value())).unwrap();
 
                 let mut inner_scope = scope.with_block(inner);
-                let ret = if let Some(ret) = block.codegen(&mut inner_scope, state)? {
+                let ret = if let Some(ret) = block.codegen(&mut inner_scope, state, true)? {
                     Some(ret)
                 } else {
                     None

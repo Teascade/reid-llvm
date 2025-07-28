@@ -399,12 +399,12 @@ impl DebugScopeHolder {
         unsafe {
             let scope = match &self.data.kind {
                 DebugScopeKind::CodegenContext => panic!(),
-                DebugScopeKind::LexicalScope => LLVMDIBuilderCreateLexicalBlock(
+                DebugScopeKind::LexicalScope(data) => LLVMDIBuilderCreateLexicalBlock(
                     di_builder,
                     parent,
                     file,
-                    self.data.location.as_ref().unwrap().pos.line,
-                    self.data.location.as_ref().unwrap().pos.column,
+                    data.location.pos.line,
+                    data.location.pos.column,
                 ),
                 DebugScopeKind::Subprogram(_) => panic!(),
             };
@@ -607,7 +607,7 @@ impl FunctionHolder {
 
                     let subprogram = match scope_data.kind {
                         DebugScopeKind::CodegenContext => panic!(),
-                        DebugScopeKind::LexicalScope => panic!(),
+                        DebugScopeKind::LexicalScope(_) => panic!(),
                         DebugScopeKind::Subprogram(subprogram) => LLVMDIBuilderCreateFunction(
                             debug.builder,
                             *debug.scopes.get(&scope_data.parent.unwrap()).unwrap(),

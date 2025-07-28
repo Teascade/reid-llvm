@@ -71,10 +71,6 @@ impl DebugInformation {
                     inner_scopes: Vec::new(),
                     data: DebugScopeData {
                         parent: None,
-                        location: Some(DebugLocation {
-                            scope: DebugScopeValue(Vec::new()),
-                            pos: DebugPosition { line: 0, column: 0 },
-                        }),
                         kind: DebugScopeKind::CodegenContext,
                     },
                 })),
@@ -84,32 +80,6 @@ impl DebugInformation {
             },
             scope_value,
         )
-    }
-
-    pub fn inner_scope(&self, parent: &DebugScopeValue, location: DebugLocation) -> DebugScopeValue {
-        unsafe {
-            let mut outer_scope = RefMut::map(self.scope.borrow_mut(), |mut v| {
-                for i in &parent.0 {
-                    v = v.inner_scopes.get_unchecked_mut(*i);
-                }
-                v
-            });
-
-            let mut arr = parent.0.clone();
-            arr.push(parent.0.len());
-            let value = DebugScopeValue(arr);
-
-            outer_scope.inner_scopes.push(DebugScopeHolder {
-                value: value.clone(),
-                inner_scopes: Vec::new(),
-                data: DebugScopeData {
-                    parent: Some(parent.clone()),
-                    location: Some(location),
-                    kind: DebugScopeKind::LexicalScope,
-                },
-            });
-            value
-        }
     }
 
     pub fn location(&self, scope_value: &DebugScopeValue, location: DebugLocation) -> DebugLocationValue {
@@ -162,8 +132,31 @@ impl DebugInformation {
                 inner_scopes: Vec::new(),
                 data: DebugScopeData {
                     parent: Some(parent.clone()),
-                    location: None,
                     kind: DebugScopeKind::Subprogram(kind),
+                },
+            });
+            value
+        }
+    }
+    pub fn lexical_scope(&self, parent: &DebugScopeValue, data: DebugLexicalScope) -> DebugScopeValue {
+        unsafe {
+            let mut outer_scope = RefMut::map(self.scope.borrow_mut(), |mut v| {
+                for i in &parent.0 {
+                    v = v.inner_scopes.get_unchecked_mut(*i);
+                }
+                v
+            });
+
+            let mut arr = parent.0.clone();
+            arr.push(outer_scope.inner_scopes.len());
+            let value = DebugScopeValue(arr);
+
+            outer_scope.inner_scopes.push(DebugScopeHolder {
+                value: value.clone(),
+                inner_scopes: Vec::new(),
+                data: DebugScopeData {
+                    parent: Some(parent.clone()),
+                    kind: DebugScopeKind::LexicalScope(data),
                 },
             });
             value
@@ -352,15 +345,19 @@ pub enum DwarfEncoding {
 #[derive(Debug, Clone)]
 pub struct DebugScopeData {
     pub parent: Option<DebugScopeValue>,
-    pub location: Option<DebugLocation>,
     pub kind: DebugScopeKind,
 }
 
 #[derive(Debug, Clone)]
 pub enum DebugScopeKind {
     CodegenContext,
-    LexicalScope,
+    LexicalScope(DebugLexicalScope),
     Subprogram(DebugSubprogramData),
+}
+
+#[derive(Debug, Clone)]
+pub struct DebugLexicalScope {
+    pub location: DebugLocation,
 }
 
 #[derive(Debug, Clone)]
