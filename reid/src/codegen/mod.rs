@@ -237,7 +237,6 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Intrinsic(_) => None,
-                mir::FunctionDefinitionKind::Macro(_) => None,
             };
 
             if let Some(func) = func {
@@ -290,7 +289,6 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Intrinsic(_) => None,
-                mir::FunctionDefinitionKind::Macro(_) => None,
             };
 
             if let Some(func) = func {
@@ -377,7 +375,6 @@ impl mir::Module {
                                         }
                                         FunctionDefinitionKind::Extern(_) => None,
                                         FunctionDefinitionKind::Intrinsic(_) => None,
-                                        FunctionDefinitionKind::Macro(_) => None,
                                     },
                                 )
                                 .unwrap();
@@ -398,7 +395,6 @@ impl mir::Module {
                         FunctionDefinitionKind::Intrinsic(intrinsic_function) => {
                             ScopeFunctionKind::Intrinsic(intrinsic_function)
                         }
-                        FunctionDefinitionKind::Macro(macro_function) => ScopeFunctionKind::Macro(macro_function),
                     },
                 },
             );
@@ -455,7 +451,6 @@ impl mir::Module {
                             }
                             FunctionDefinitionKind::Extern(_) => None,
                             FunctionDefinitionKind::Intrinsic(_) => None,
-                            FunctionDefinitionKind::Macro(macro_function) => None,
                         },
                     )
                     .unwrap();
@@ -516,7 +511,6 @@ impl mir::Module {
                             }
                             FunctionDefinitionKind::Extern(_) => None,
                             FunctionDefinitionKind::Intrinsic(_) => None,
-                            FunctionDefinitionKind::Macro(_) => None,
                         },
                     )
                     .unwrap();
@@ -623,7 +617,6 @@ impl FunctionDefinitionKind {
             }
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
-            FunctionDefinitionKind::Macro(_) => {}
         };
         Ok(())
     }
@@ -1387,14 +1380,7 @@ fn codegen_function_call<'ctx, 'a>(
             .or(intrinsic.as_ref())
             .expect(&format!("Function {} does not exist!", call_name));
         callee
-            .codegen(
-                &call_name,
-                params.as_slice(),
-                &call.parameters,
-                &call.return_type,
-                location,
-                scope,
-            )
+            .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
             .unwrap()
     } else {
         let callee = scope
@@ -1403,14 +1389,7 @@ fn codegen_function_call<'ctx, 'a>(
             .expect(&format!("Function {} does not exist!", call_name));
 
         callee
-            .codegen(
-                &call_name,
-                params.as_slice(),
-                &call.parameters,
-                &call.return_type,
-                location,
-                scope,
-            )
+            .codegen(&call_name, params.as_slice(), &call.return_type, location, scope)
             .unwrap()
     };
 

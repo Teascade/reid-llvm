@@ -269,7 +269,6 @@ impl<'map> Pass for LinkerPass<'map> {
                             }
                             FunctionDefinitionKind::Extern(_) => {}
                             FunctionDefinitionKind::Intrinsic(_) => {}
-                            FunctionDefinitionKind::Macro(_) => {}
                         }
                     }
 

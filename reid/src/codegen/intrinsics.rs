@@ -310,7 +310,11 @@ pub trait IntrinsicFunction: std::fmt::Debug {
 }
 
 pub trait MacroFunction: std::fmt::Debug {
-    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[mir::Literal]) -> Result<StackValue, ErrorKind>;
+    fn generate<'ctx, 'a>(
+        &self,
+        scope: &mut Scope<'ctx, 'a>,
+        params: &[mir::Literal],
+    ) -> Result<mir::Expression, ErrorKind>;
 }
 
 macro_rules! intrinsic_debug {

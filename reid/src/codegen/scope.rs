@@ -140,7 +140,6 @@ pub enum ScopeFunctionKind<'ctx> {
     UserGenerated(Function<'ctx>),
     Intrinsic(&'ctx Box<dyn IntrinsicFunction>),
     IntrinsicOwned(Box<dyn IntrinsicFunction>),
-    Macro(&'ctx Box<dyn MacroFunction>),
 }
 
 impl<'ctx> StackBinopDefinition<'ctx> {
@@ -159,7 +158,7 @@ impl<'ctx> StackBinopDefinition<'ctx> {
             "binop.{}.{}.{}.call",
             self.parameters.0.ty, self.parameters.1.ty, self.return_ty
         );
-        self.kind.codegen(&name, &[lhs, rhs], &[], &self.return_ty, None, scope)
+        self.kind.codegen(&name, &[lhs, rhs], &self.return_ty, None, scope)
     }
 }
 
@@ -168,7 +167,6 @@ impl<'ctx> ScopeFunctionKind<'ctx> {
         &self,
         name: &str,
         params: &[StackValue],
-        param_exprs: &[mir::Expression],
         return_ty: &TypeKind,
         location: Option<DebugLocation>,
         scope: &mut Scope<'ctx, 'a>,
@@ -193,16 +191,6 @@ impl<'ctx> ScopeFunctionKind<'ctx> {
             }
             ScopeFunctionKind::Intrinsic(fun) => fun.codegen(scope, params),
             ScopeFunctionKind::IntrinsicOwned(fun) => fun.codegen(scope, params),
-            ScopeFunctionKind::Macro(fun) => fun.codegen(
-                scope,
-                &param_exprs
-                    .iter()
-                    .map(|e| match &e.0 {
-                        crate::mir::ExprKind::Literal(lit) => lit.clone(),
-                        _ => panic!(),
-                    })
-                    .collect::<Vec<_>>(),
-            ),
         }
     }
 }

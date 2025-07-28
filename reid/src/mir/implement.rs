@@ -615,7 +615,6 @@ impl FunctionDefinition {
                 }
             }
             FunctionDefinitionKind::Intrinsic(_) => Err(EqualsIssue::ExistsAsIntrinsic),
-            FunctionDefinitionKind::Macro(_) => Err(EqualsIssue::ExistsAsIntrinsic),
         }
     }
 }

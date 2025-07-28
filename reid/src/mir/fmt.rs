@@ -151,7 +151,6 @@ impl Display for FunctionDefinitionKind {
             FunctionDefinitionKind::Extern(true) => write!(f, "<Imported Extern>"),
             FunctionDefinitionKind::Extern(false) => write!(f, "<Linked Extern>"),
             FunctionDefinitionKind::Intrinsic(_) => write!(f, "<Intrinsic>"),
-            FunctionDefinitionKind::Macro(_) => write!(f, "<Macro>"),
         }
     }
 }

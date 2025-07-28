@@ -13,6 +13,7 @@ use crate::{
 mod fmt;
 pub mod implement;
 pub mod linker;
+pub mod macros;
 pub mod pass;
 pub mod typecheck;
 
@@ -322,8 +323,6 @@ pub enum FunctionDefinitionKind {
     Extern(bool),
     /// Intrinsic definition, defined within the compiler
     Intrinsic(Box<dyn IntrinsicFunction>),
-    /// Macro function, executed entirely on the compiler
-    Macro(Box<dyn MacroFunction>),
 }
 
 impl FunctionDefinition {
@@ -332,7 +331,6 @@ impl FunctionDefinition {
             FunctionDefinitionKind::Local(block, _) => block.meta.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
             FunctionDefinitionKind::Intrinsic(_) => Metadata::default(),
-            FunctionDefinitionKind::Macro(_) => Metadata::default(),
         }
     }
 
@@ -341,7 +339,6 @@ impl FunctionDefinition {
             FunctionDefinitionKind::Local(_, metadata) => metadata.clone(),
             FunctionDefinitionKind::Extern(_) => Metadata::default(),
             FunctionDefinitionKind::Intrinsic(_) => Metadata::default(),
-            FunctionDefinitionKind::Macro(_) => Metadata::default(),
         }
     }
 }
@@ -406,7 +403,6 @@ impl BinopDefinition {
             FunctionDefinitionKind::Local(block, _) => Some(block.meta),
             FunctionDefinitionKind::Extern(_) => None,
             FunctionDefinitionKind::Intrinsic(_) => None,
-            FunctionDefinitionKind::Macro(_) => None,
         }
     }
 
