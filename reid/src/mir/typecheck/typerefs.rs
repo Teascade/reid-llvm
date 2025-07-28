@@ -356,6 +356,12 @@ impl<'outer> ScopeTypeRefs<'outer> {
                         rhs_ref.narrow(&self.from_type(&rhs_widened).unwrap());
                     }
                 }
+                (TypeRefKind::BinOp(_, lhs1, rhs1), TypeRefKind::BinOp(_, lhs2, rhs2)) => {
+                    let mut lhs_ref = self.from_type(&lhs1).unwrap();
+                    let mut rhs_ref = self.from_type(&rhs1).unwrap();
+                    lhs_ref.narrow(&self.from_type(&lhs2).unwrap());
+                    rhs_ref.narrow(&self.from_type(&rhs2).unwrap());
+                }
                 _ => {}
             }
 

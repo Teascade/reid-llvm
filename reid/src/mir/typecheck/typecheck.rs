@@ -415,6 +415,7 @@ impl Expression {
                 // First find unfiltered parameters to binop
                 let lhs_res = lhs.typecheck(state, &typerefs, HintKind::None);
                 let rhs_res = rhs.typecheck(state, &typerefs, HintKind::None);
+                dbg!(&lhs_res, &rhs_res, &ret_ty);
                 let lhs_type = state.or_else(lhs_res, TypeKind::Vague(Vague::Unknown), lhs.1);
                 let rhs_type = state.or_else(rhs_res, TypeKind::Vague(Vague::Unknown), rhs.1);
 
@@ -431,6 +432,8 @@ impl Expression {
                     params: (lhs_type.clone(), rhs_type.clone()),
                     operator: *op,
                 });
+
+                dbg!(&binops);
                 // dbg!(&lhs_type, &rhs_type, &binops, &ret_ty, &expected_return_ty);
                 if let Some(binop) = binops
                     .iter()
