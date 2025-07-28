@@ -71,11 +71,11 @@ impl Display for BinopDefinition {
             f,
             "{}impl binop ({}: {:#}) {} ({}: {:#}) -> {:#} ",
             if self.exported { "exported " } else { "" },
-            self.lhs.0,
-            self.lhs.1,
+            self.lhs.name,
+            self.lhs.ty,
             self.op,
-            self.rhs.0,
-            self.rhs.1,
+            self.rhs.name,
+            self.rhs.ty,
             self.return_type
         )?;
         Display::fmt(&self.fn_kind, f)
@@ -132,7 +132,7 @@ impl Display for FunctionDefinition {
             self.name,
             self.parameters
                 .iter()
-                .map(|(n, t)| format!("{}: {:#}", n, t))
+                .map(|FunctionParam { name, ty, .. }| format!("{}: {:#}", name, ty))
                 .collect::<Vec<_>>()
                 .join(", "),
             self.return_type

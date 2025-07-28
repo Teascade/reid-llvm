@@ -696,9 +696,18 @@ impl Parse for SelfParam {
         };
         if name == "self" {
             match kind {
-                SelfParamKind::BorrowMut => Ok(SelfParam(SelfKind::MutBorrow(TypeKind::Unknown))),
-                SelfParamKind::Borrow => Ok(SelfParam(SelfKind::Borrow(TypeKind::Unknown))),
-                SelfParamKind::Owned => Ok(SelfParam(SelfKind::Owned(TypeKind::Unknown))),
+                SelfParamKind::BorrowMut => Ok(SelfParam(SelfKind::MutBorrow(Type(
+                    TypeKind::Unknown,
+                    stream.get_range_prev().unwrap(),
+                )))),
+                SelfParamKind::Borrow => Ok(SelfParam(SelfKind::Borrow(Type(
+                    TypeKind::Unknown,
+                    stream.get_range_prev().unwrap(),
+                )))),
+                SelfParamKind::Owned => Ok(SelfParam(SelfKind::Owned(Type(
+                    TypeKind::Unknown,
+                    stream.get_range_prev().unwrap(),
+                )))),
             }
         } else {
             Err(stream.expected_err("self parameter")?)
@@ -1091,9 +1100,9 @@ impl Parse for AssociatedFunctionBlock {
                 Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
                     let mut fun: FunctionDefinition = stream.parse()?;
                     fun.0.self_kind = match fun.0.self_kind {
-                        SelfKind::Owned(_) => SelfKind::Owned(ty.0.clone()),
-                        SelfKind::Borrow(_) => SelfKind::Borrow(ty.0.clone()),
-                        SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.0.clone()),
+                        SelfKind::Owned(_) => SelfKind::Owned(ty.clone()),
+                        SelfKind::Borrow(_) => SelfKind::Borrow(ty.clone()),
+                        SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.clone()),
                         SelfKind::None => SelfKind::None,
                     };
                     functions.push(fun);

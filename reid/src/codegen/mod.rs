@@ -19,8 +19,8 @@ use crate::{
         self,
         implement::TypeCategory,
         pass::{AssociatedFunctionKey, BinopKey},
-        CustomTypeKey, FunctionCall, FunctionDefinitionKind, NamedVariableRef, SourceModuleId, StructField, StructType,
-        TypeDefinition, TypeDefinitionKind, TypeKind, WhileStatement,
+        CustomTypeKey, FunctionCall, FunctionDefinitionKind, FunctionParam, NamedVariableRef, SourceModuleId,
+        StructField, StructType, TypeDefinition, TypeDefinitionKind, TypeKind, WhileStatement,
     },
     util::try_all,
 };
@@ -182,7 +182,7 @@ impl mir::Module {
             let param_types: Vec<Type> = function
                 .parameters
                 .iter()
-                .map(|(_, p)| p.get_type(&type_values))
+                .map(|FunctionParam { ty, .. }| ty.get_type(&type_values))
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
@@ -222,7 +222,7 @@ impl mir::Module {
             let param_types: Vec<Type> = function
                 .parameters
                 .iter()
-                .map(|(_, p)| p.get_type(&type_values))
+                .map(|FunctionParam { ty, .. }| ty.get_type(&type_values))
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
@@ -263,11 +263,11 @@ impl mir::Module {
         for binop in &self.binop_defs {
             let binop_fn_name = format!(
                 "binop.{}.{:?}.{}.{}",
-                binop.lhs.1, binop.op, binop.rhs.1, binop.return_type
+                binop.lhs.ty, binop.op, binop.rhs.ty, binop.return_type
             );
             binops.insert(
                 BinopKey {
-                    params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                    params: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                     operator: binop.op,
                 },
                 StackBinopDefinition {
@@ -278,7 +278,7 @@ impl mir::Module {
                             let ir_function = module.function(
                                 &binop_fn_name,
                                 binop.return_type.get_type(&type_values),
-                                vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
+                                vec![binop.lhs.ty.get_type(&type_values), binop.rhs.ty.get_type(&type_values)],
                                 FunctionFlags {
                                     is_pub: binop.exported,
                                     is_imported: binop.exported,
@@ -342,7 +342,7 @@ impl mir::Module {
                         FunctionDefinitionKind::Extern(imported) => ScopeFunctionKind::UserGenerated(module.function(
                             &binop_fn_name,
                             binop.return_type.get_type(&type_values),
-                            vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
+                            vec![binop.lhs.ty.get_type(&type_values), binop.rhs.ty.get_type(&type_values)],
                             FunctionFlags {
                                 is_extern: true,
                                 is_imported: *imported,
@@ -482,7 +482,7 @@ impl FunctionDefinitionKind {
         name: String,
         is_pub: bool,
         scope: &mut Scope,
-        parameters: &Vec<(String, TypeKind)>,
+        parameters: &Vec<FunctionParam>,
         return_type: &TypeKind,
         ir_function: &Function,
         debug_location: Option<DebugLocation>,
@@ -526,25 +526,25 @@ impl FunctionDefinitionKind {
                 }
 
                 // Compile actual IR part
-                for (i, (p_name, p_ty)) in parameters.iter().enumerate() {
+                for (i, p) in parameters.iter().enumerate() {
                     // Codegen actual parameters
-                    let arg_name = format!("arg.{}", p_name);
+                    let arg_name = format!("arg.{}", p.name);
                     let param = scope
                         .block
                         .build_named(format!("{}.get", arg_name), Instr::Param(i))
                         .unwrap();
 
-                    let alloca = scope.allocate(&p_name, &p_ty).unwrap();
+                    let alloca = scope.allocate(&p.meta, &p.ty).unwrap();
 
                     scope
                         .block
                         .build_named(format!("{}.store", arg_name), Instr::Store(alloca, param))
                         .unwrap();
                     scope.stack_values.insert(
-                        p_name.clone(),
+                        p.name.clone(),
                         StackValue(
-                            StackValueKind::mutable(p_ty.is_mutable(), alloca),
-                            TypeKind::CodegenPtr(Box::new(p_ty.clone())),
+                            StackValueKind::mutable(p.ty.is_mutable(), alloca),
+                            TypeKind::CodegenPtr(Box::new(p.ty.clone())),
                         ),
                     );
                 }
@@ -644,11 +644,11 @@ impl mir::Statement {
         });
 
         match &self.0 {
-            mir::StmtKind::Let(NamedVariableRef(ty, name, _), mutable, expression) => {
+            mir::StmtKind::Let(NamedVariableRef(ty, name, meta), mutable, expression) => {
                 let value = expression.codegen(scope, &state)?.unwrap();
 
                 let alloca = scope
-                    .allocate(name, &value.1)
+                    .allocate(meta, &value.1)
                     .unwrap()
                     .maybe_location(&mut scope.block, location.clone());
 
@@ -1348,7 +1348,7 @@ fn codegen_function_call<'ctx, 'a>(
         let ptr = scope
             .allocator
             .borrow_mut()
-            .allocate(&call_name, &call.return_type)
+            .allocate(&call.meta, &call.return_type)
             .unwrap();
         scope
             .block

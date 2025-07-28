@@ -7,7 +7,7 @@ use reid_lib::{
 
 use mir::{CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, TypeKind, WhileStatement};
 
-use crate::mir;
+use crate::mir::{self, FunctionParam, Metadata};
 
 #[derive(Debug)]
 pub struct Allocator {
@@ -20,17 +20,13 @@ pub struct AllocatorScope<'ctx, 'a> {
 }
 
 impl Allocator {
-    pub fn from(
-        func: &FunctionDefinitionKind,
-        params: &Vec<(String, TypeKind)>,
-        scope: &mut AllocatorScope,
-    ) -> Allocator {
+    pub fn from(func: &FunctionDefinitionKind, params: &Vec<FunctionParam>, scope: &mut AllocatorScope) -> Allocator {
         func.allocate(scope, params)
     }
 
-    pub fn allocate(&mut self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
+    pub fn allocate(&mut self, meta: &Metadata, ty: &TypeKind) -> Option<InstructionValue> {
         let mut allocs = self.allocations.iter().cloned().enumerate();
-        let val = allocs.find(|a| a.1 .0 == *name && a.1 .1 == *ty);
+        let val = allocs.find(|a| a.1 .0 == *meta && a.1 .1 == *ty);
         if let Some((i, _)) = val {
             self.allocations.remove(i);
         }
@@ -39,13 +35,13 @@ impl Allocator {
 }
 
 #[derive(Clone, Debug)]
-pub struct Allocation(String, TypeKind, InstructionValue);
+pub struct Allocation(Metadata, TypeKind, InstructionValue);
 
 impl mir::FunctionDefinitionKind {
     fn allocate<'ctx, 'a>(
         &self,
         scope: &mut AllocatorScope<'ctx, 'a>,
-        parameters: &Vec<(String, TypeKind)>,
+        parameters: &Vec<mir::FunctionParam>,
     ) -> Allocator {
         let mut allocated = Vec::new();
         match &self {
@@ -54,11 +50,11 @@ impl mir::FunctionDefinitionKind {
                     let allocation = scope
                         .block
                         .build_named(
-                            param.0.clone(),
-                            reid_lib::Instr::Alloca(param.1.get_type(scope.type_values)),
+                            param.name.clone(),
+                            reid_lib::Instr::Alloca(param.ty.get_type(scope.type_values)),
                         )
                         .unwrap();
-                    allocated.push(Allocation(param.0.clone(), param.1.clone(), allocation));
+                    allocated.push(Allocation(param.meta, param.ty.clone(), allocation));
                 }
                 allocated.extend(block.allocate(scope));
             }
@@ -103,7 +99,7 @@ impl mir::Statement {
                     )
                     .unwrap();
                 allocated.push(Allocation(
-                    named_variable_ref.1.clone(),
+                    named_variable_ref.2,
                     named_variable_ref.0.clone(),
                     allocation,
                 ));
@@ -195,7 +191,7 @@ impl mir::FunctionCall {
                     reid_lib::Instr::Alloca(self.return_type.get_type(scope.type_values)),
                 )
                 .unwrap();
-            allocated.push(Allocation(name.clone(), self.return_type.clone(), allocation));
+            allocated.push(Allocation(self.meta, self.return_type.clone(), allocation));
         }
 
         allocated

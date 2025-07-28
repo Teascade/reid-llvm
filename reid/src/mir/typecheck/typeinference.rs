@@ -87,16 +87,16 @@ impl<'t> Pass for TypeInference<'t> {
         let mut seen_binops = HashSet::new();
         for binop in &module.binop_defs {
             let binop_key = BinopKey {
-                params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                params: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                 operator: binop.op,
             };
-            if seen_binops.contains(&binop_key) || (binop.lhs == binop.rhs && binop.lhs.1.category().is_simple_maths())
+            if seen_binops.contains(&binop_key) || (binop.lhs == binop.rhs && binop.lhs.ty.category().is_simple_maths())
             {
                 state.note_errors(
                     &vec![ErrorKind::BinaryOpAlreadyDefined(
                         binop.op,
-                        binop.lhs.1.clone(),
-                        binop.rhs.1.clone(),
+                        binop.lhs.ty.clone(),
+                        binop.rhs.ty.clone(),
                     )],
                     binop.signature(),
                 );
@@ -107,7 +107,7 @@ impl<'t> Pass for TypeInference<'t> {
                     .set(
                         binop_key,
                         crate::mir::pass::ScopeBinopDef {
-                            hands: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                            hands: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                             operator: binop.op,
                             return_ty: binop.return_type.clone(),
                         },
@@ -138,20 +138,20 @@ impl BinopDefinition {
     fn infer_types(&mut self, type_refs: &TypeRefs, state: &mut TypecheckPassState) -> Result<(), ErrorKind> {
         let scope_hints = ScopeTypeRefs::from(type_refs);
 
-        let lhs_ty = state.or_else(self.lhs.1.assert_unvague(), Vague(Unknown), self.signature());
+        let lhs_ty = state.or_else(self.lhs.ty.assert_unvague(), Vague(Unknown), self.signature());
         state.ok(
             scope_hints
-                .new_var(self.lhs.0.clone(), false, &lhs_ty)
-                .or(Err(ErrorKind::VariableAlreadyDefined(self.lhs.0.clone()))),
+                .new_var(self.lhs.name.clone(), false, &lhs_ty)
+                .or(Err(ErrorKind::VariableAlreadyDefined(self.lhs.name.clone()))),
             self.signature(),
         );
 
-        let rhs_ty = state.or_else(self.rhs.1.assert_unvague(), Vague(Unknown), self.signature());
+        let rhs_ty = state.or_else(self.rhs.ty.assert_unvague(), Vague(Unknown), self.signature());
 
         state.ok(
             scope_hints
-                .new_var(self.rhs.0.clone(), false, &rhs_ty)
-                .or(Err(ErrorKind::VariableAlreadyDefined(self.rhs.0.clone()))),
+                .new_var(self.rhs.name.clone(), false, &rhs_ty)
+                .or(Err(ErrorKind::VariableAlreadyDefined(self.rhs.name.clone()))),
             self.signature(),
         );
 
@@ -170,10 +170,10 @@ impl FunctionDefinition {
     fn infer_types(&mut self, type_refs: &TypeRefs, state: &mut TypecheckPassState) -> Result<(), ErrorKind> {
         let scope_refs = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
-            let param_t = state.or_else(param.1.assert_unvague(), Vague(Unknown), self.signature());
+            let param_t = state.or_else(param.ty.assert_unvague(), Vague(Unknown), self.signature());
             let res = scope_refs
-                .new_var(param.0.clone(), false, &param_t)
-                .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
+                .new_var(param.name.clone(), false, &param_t)
+                .or(Err(ErrorKind::VariableAlreadyDefined(param.name.clone())));
             state.ok(res, self.signature());
         }
 

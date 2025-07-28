@@ -296,8 +296,15 @@ pub struct FunctionDefinition {
     /// Whether this module is from an external module, and has been imported
     pub is_imported: bool,
     pub return_type: TypeKind,
-    pub parameters: Vec<(String, TypeKind)>,
+    pub parameters: Vec<FunctionParam>,
     pub kind: FunctionDefinitionKind,
+}
+
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct FunctionParam {
+    pub name: String,
+    pub ty: TypeKind,
+    pub meta: Metadata,
 }
 
 pub enum SelfKind {
@@ -378,9 +385,9 @@ pub enum TypeDefinitionKind {
 
 #[derive(Debug)]
 pub struct BinopDefinition {
-    pub lhs: (String, TypeKind),
+    pub lhs: FunctionParam,
     pub op: BinaryOperator,
-    pub rhs: (String, TypeKind),
+    pub rhs: FunctionParam,
     pub return_type: TypeKind,
     pub fn_kind: FunctionDefinitionKind,
     pub meta: Metadata,

@@ -131,11 +131,11 @@ pub fn perform_all_passes<'map>(
             binops
                 .set(
                     mir::pass::BinopKey {
-                        params: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        params: (intrinsic.lhs.ty.clone(), intrinsic.rhs.ty.clone()),
                         operator: intrinsic.op,
                     },
                     mir::pass::ScopeBinopDef {
-                        hands: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        hands: (intrinsic.lhs.ty.clone(), intrinsic.rhs.ty.clone()),
                         operator: intrinsic.op,
                         return_ty: intrinsic.return_type.clone(),
                     },

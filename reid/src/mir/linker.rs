@@ -11,8 +11,8 @@ use crate::{
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, SourceModuleId, TypeDefinition,
-        TypeKind,
+        pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, FunctionParam, SourceModuleId,
+        TypeDefinition, TypeKind,
     },
     parse_module,
 };
@@ -220,10 +220,10 @@ impl<'map> Pass for LinkerPass<'map> {
                     imported_types.extend(types);
 
                     let mut param_tys = Vec::new();
-                    for (param_name, param_ty) in &func.parameters {
-                        let types = import_type(&param_ty, false);
+                    for param in &func.parameters {
+                        let types = import_type(&param.ty, false);
                         imported_types.extend(types);
-                        param_tys.push((param_name.clone(), param_ty.clone()));
+                        param_tys.push(param.clone());
                     }
 
                     importer_module.functions.push(FunctionDefinition {
@@ -241,11 +241,11 @@ impl<'map> Pass for LinkerPass<'map> {
                     imported_types.push((external_key, true));
 
                     for binop in &mut imported.binop_defs {
-                        if binop.lhs.1 != imported_ty && binop.rhs.1 != imported_ty {
+                        if binop.lhs.ty != imported_ty && binop.rhs.ty != imported_ty {
                             continue;
                         }
                         let binop_key = BinopKey {
-                            params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                            params: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                             operator: binop.op,
                         };
                         if already_imported_binops.contains(&binop_key) {
@@ -309,10 +309,10 @@ impl<'map> Pass for LinkerPass<'map> {
                         imported_types.extend(types);
 
                         let mut param_tys = Vec::new();
-                        for (param_name, param_ty) in &func.parameters {
-                            let types = import_type(&param_ty, false);
+                        for param in &func.parameters {
+                            let types = import_type(&param.ty, false);
                             imported_types.extend(types);
-                            param_tys.push((param_name.clone(), param_ty.clone()));
+                            param_tys.push(param.clone());
                         }
 
                         importer_module.associated_functions.push((
@@ -424,7 +424,7 @@ impl<'map> Pass for LinkerPass<'map> {
             if let Some(extern_types) = extern_types {
                 function.return_type = function.return_type.update_imported(*extern_types, mod_id);
                 for param in function.parameters.iter_mut() {
-                    param.1 = param.1.update_imported(extern_types, mod_id);
+                    param.ty = param.ty.update_imported(extern_types, mod_id);
                 }
             }
         }

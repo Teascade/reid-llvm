@@ -112,7 +112,7 @@ impl BinopDefinition {
     fn typecheck(&mut self, typerefs: &TypeRefs, state: &mut TypecheckPassState) -> Result<TypeKind, ErrorKind> {
         for param in vec![&self.lhs, &self.rhs] {
             let param_t = state.or_else(
-                param.1.assert_known(state),
+                param.ty.assert_known(state),
                 TypeKind::Vague(Vague::Unknown),
                 self.signature(),
             );
@@ -120,13 +120,13 @@ impl BinopDefinition {
                 .scope
                 .variables
                 .set(
-                    param.0.clone(),
+                    param.name.clone(),
                     ScopeVariable {
                         ty: param_t.clone(),
                         mutable: param_t.is_mutable(),
                     },
                 )
-                .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
+                .or(Err(ErrorKind::VariableAlreadyDefined(param.name.clone())));
             state.ok(res, self.signature());
         }
 
@@ -150,7 +150,7 @@ impl FunctionDefinition {
     fn typecheck(&mut self, typerefs: &TypeRefs, state: &mut TypecheckPassState) -> Result<TypeKind, ErrorKind> {
         for param in &self.parameters {
             let param_t = state.or_else(
-                param.1.assert_known(state),
+                param.ty.assert_known(state),
                 TypeKind::Vague(Vague::Unknown),
                 self.signature(),
             );
@@ -158,13 +158,13 @@ impl FunctionDefinition {
                 .scope
                 .variables
                 .set(
-                    param.0.clone(),
+                    param.name.clone(),
                     ScopeVariable {
                         ty: param_t.clone(),
                         mutable: param_t.is_mutable(),
                     },
                 )
-                .or(Err(ErrorKind::VariableAlreadyDefined(param.0.clone())));
+                .or(Err(ErrorKind::VariableAlreadyDefined(param.name.clone())));
             state.ok(res, self.signature());
         }
 

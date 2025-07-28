@@ -187,7 +187,7 @@ impl<Data: Clone + Default> Scope<Data> {
                     key.clone(),
                     ScopeFunction {
                         ret: func.return_type,
-                        params: func.parameters.iter().map(|(_, p)| p.clone()).collect(),
+                        params: func.parameters.iter().map(|p| p.ty.clone()).collect(),
                     },
                 )
                 .unwrap();
@@ -369,11 +369,11 @@ impl Context {
                 .binops
                 .set(
                     BinopKey {
-                        params: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        params: (intrinsic.lhs.ty.clone(), intrinsic.rhs.ty.clone()),
                         operator: intrinsic.op,
                     },
                     ScopeBinopDef {
-                        hands: (intrinsic.lhs.1.clone(), intrinsic.rhs.1.clone()),
+                        hands: (intrinsic.lhs.ty.clone(), intrinsic.rhs.ty.clone()),
                         operator: intrinsic.op,
                         return_ty: intrinsic.return_type.clone(),
                     },
@@ -407,11 +407,11 @@ impl Module {
                 .binops
                 .set(
                     BinopKey {
-                        params: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                        params: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                         operator: binop.op,
                     },
                     ScopeBinopDef {
-                        hands: (binop.lhs.1.clone(), binop.rhs.1.clone()),
+                        hands: (binop.lhs.ty.clone(), binop.rhs.ty.clone()),
                         operator: binop.op,
                         return_ty: binop.return_type.clone(),
                     },
@@ -426,7 +426,7 @@ impl Module {
                     function.name.clone(),
                     ScopeFunction {
                         ret: function.return_type.clone(),
-                        params: function.parameters.iter().cloned().map(|v| v.1).collect(),
+                        params: function.parameters.iter().cloned().map(|v| v.ty).collect(),
                     },
                 )
                 .ok();
@@ -439,7 +439,7 @@ impl Module {
                     AssociatedFunctionKey(ty.clone(), function.name.clone()),
                     ScopeFunction {
                         ret: function.return_type.clone(),
-                        params: function.parameters.iter().cloned().map(|v| v.1).collect(),
+                        params: function.parameters.iter().cloned().map(|v| v.ty).collect(),
                     },
                 )
                 .ok();
@@ -466,9 +466,9 @@ impl FunctionDefinition {
             scope
                 .variables
                 .set(
-                    param.0.clone(),
+                    param.name.clone(),
                     ScopeVariable {
-                        ty: param.1.clone(),
+                        ty: param.ty.clone(),
                         mutable: false,
                     },
                 )

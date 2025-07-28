@@ -2,7 +2,10 @@ use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr, Type}
 
 use crate::{
     codegen::{ErrorKind, StackValueKind},
-    mir::{BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition, FunctionDefinitionKind, TypeKind},
+    mir::{
+        BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition, FunctionDefinitionKind, FunctionParam,
+        TypeKind,
+    },
 };
 
 use super::scope::{Scope, StackValue};
@@ -53,7 +56,11 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             is_pub: true,
             is_imported: false,
             return_type: TypeKind::UserPtr(Box::new(ty.clone())),
-            parameters: vec![(String::from("size"), TypeKind::U64)],
+            parameters: vec![FunctionParam {
+                name: String::from("size"),
+                ty: TypeKind::U64,
+                meta: Default::default(),
+            }],
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicAlloca(ty.clone()))),
         }),
         "null" => Some(FunctionDefinition {
@@ -74,9 +81,17 @@ where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
     BinopDefinition {
-        lhs: ("lhs".to_owned(), ty.clone()),
+        lhs: FunctionParam {
+            name: "lhs".to_owned(),
+            ty: ty.clone(),
+            meta: Default::default(),
+        },
         op,
-        rhs: ("rhs".to_owned(), ty.clone()),
+        rhs: FunctionParam {
+            name: "rhs".to_owned(),
+            ty: ty.clone(),
+            meta: Default::default(),
+        },
         return_type: ty.clone(),
         fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
         meta: Default::default(),
@@ -89,9 +104,17 @@ where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
     BinopDefinition {
-        lhs: ("lhs".to_owned(), lhs.clone()),
+        lhs: FunctionParam {
+            name: "lhs".to_owned(),
+            ty: lhs.clone(),
+            meta: Default::default(),
+        },
         op,
-        rhs: ("rhs".to_owned(), rhs.clone()),
+        rhs: FunctionParam {
+            name: "rhs".to_owned(),
+            ty: rhs.clone(),
+            meta: Default::default(),
+        },
         return_type: lhs.clone(),
         fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
         meta: Default::default(),
@@ -104,9 +127,17 @@ where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
     BinopDefinition {
-        lhs: ("lhs".to_owned(), ty.clone()),
+        lhs: FunctionParam {
+            name: "lhs".to_owned(),
+            ty: ty.clone(),
+            meta: Default::default(),
+        },
         op,
-        rhs: ("rhs".to_owned(), ty.clone()),
+        rhs: FunctionParam {
+            name: "rhs".to_owned(),
+            ty: ty.clone(),
+            meta: Default::default(),
+        },
         return_type: TypeKind::Bool,
         fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicBooleanInstr(fun))),
         meta: Default::default(),

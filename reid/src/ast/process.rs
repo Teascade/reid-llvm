@@ -3,8 +3,8 @@ use std::path::PathBuf;
 use crate::{
     ast::{self},
     mir::{
-        self, CustomTypeKey, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind, StructField,
-        StructType, WhileStatement,
+        self, CustomTypeKey, FunctionParam, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind,
+        StructField, StructType, WhileStatement,
     },
 };
 
@@ -48,7 +48,11 @@ impl ast::Module {
                             .params
                             .iter()
                             .cloned()
-                            .map(|p| (p.0, p.1 .0.into_mir(module_id)))
+                            .map(|p| mir::FunctionParam {
+                                name: p.0,
+                                ty: p.1 .0.into_mir(module_id),
+                                meta: p.1 .1.as_meta(module_id),
+                            })
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Extern(false),
                     };
@@ -88,9 +92,17 @@ impl ast::Module {
                     signature_range,
                 }) => {
                     binops.push(mir::BinopDefinition {
-                        lhs: (lhs.0.clone(), lhs.1 .0.into_mir(module_id)),
+                        lhs: mir::FunctionParam {
+                            name: lhs.0.clone(),
+                            ty: lhs.1 .0.into_mir(module_id),
+                            meta: lhs.1 .1.as_meta(module_id),
+                        },
                         op: op.mir(),
-                        rhs: (rhs.0.clone(), rhs.1 .0.into_mir(module_id)),
+                        rhs: mir::FunctionParam {
+                            name: rhs.0.clone(),
+                            ty: rhs.1 .0.into_mir(module_id),
+                            meta: rhs.1 .1.as_meta(module_id),
+                        },
                         return_type: return_ty.0.into_mir(module_id),
                         fn_kind: mir::FunctionDefinitionKind::Local(
                             block.into_mir(module_id),
@@ -129,25 +141,29 @@ impl ast::FunctionDefinition {
 
         let mut params = Vec::new();
         match &signature.self_kind {
-            ast::SelfKind::Borrow(type_kind) => params.push((
-                "self".to_owned(),
-                mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), false),
-            )),
-            ast::SelfKind::MutBorrow(type_kind) => params.push((
-                "self".to_owned(),
-                mir::TypeKind::Borrow(Box::new(type_kind.into_mir(module_id)), true),
-            )),
-            ast::SelfKind::Owned(type_kind) => params.push(("self".to_owned(), type_kind.into_mir(module_id))),
+            ast::SelfKind::Borrow(ty) => params.push(mir::FunctionParam {
+                name: "self".to_owned(),
+                ty: mir::TypeKind::Borrow(Box::new(ty.0.into_mir(module_id)), false),
+                meta: ty.1.as_meta(module_id),
+            }),
+            ast::SelfKind::MutBorrow(ty) => params.push(mir::FunctionParam {
+                name: "self".to_owned(),
+                ty: mir::TypeKind::Borrow(Box::new(ty.0.into_mir(module_id)), true),
+                meta: ty.1.as_meta(module_id),
+            }),
+            ast::SelfKind::Owned(ty) => params.push(mir::FunctionParam {
+                name: "self".to_owned(),
+                ty: ty.0.into_mir(module_id),
+                meta: ty.1.as_meta(module_id),
+            }),
             ast::SelfKind::None => {}
         }
 
-        params.extend(
-            signature
-                .params
-                .iter()
-                .cloned()
-                .map(|p| (p.0, p.1 .0.into_mir(module_id))),
-        );
+        params.extend(signature.params.iter().cloned().map(|p| FunctionParam {
+            name: p.0,
+            ty: p.1 .0.into_mir(module_id),
+            meta: p.1 .1.as_meta(module_id),
+        }));
         mir::FunctionDefinition {
             name: signature.name.clone(),
             linkage_name: None,

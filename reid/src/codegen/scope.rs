@@ -10,7 +10,7 @@ use crate::{
     lexer::FullToken,
     mir::{
         pass::{AssociatedFunctionKey, BinopKey},
-        CustomTypeKey, SourceModuleId, TypeDefinition, TypeKind,
+        CustomTypeKey, FunctionParam, Metadata, SourceModuleId, TypeDefinition, TypeKind,
     },
 };
 
@@ -67,8 +67,8 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
         self.type_values.get(key).and_then(|v| self.types.get(v))
     }
 
-    pub fn allocate(&self, name: &String, ty: &TypeKind) -> Option<InstructionValue> {
-        self.allocator.borrow_mut().allocate(name, ty)
+    pub fn allocate(&self, meta: &Metadata, ty: &TypeKind) -> Option<InstructionValue> {
+        self.allocator.borrow_mut().allocate(meta, ty)
     }
 }
 
@@ -129,7 +129,7 @@ impl StackValueKind {
 }
 
 pub struct StackBinopDefinition<'ctx> {
-    pub(super) parameters: ((String, TypeKind), (String, TypeKind)),
+    pub(super) parameters: (FunctionParam, FunctionParam),
     pub(super) return_ty: TypeKind,
     pub(super) kind: ScopeFunctionKind<'ctx>,
 }
@@ -147,14 +147,14 @@ impl<'ctx> StackBinopDefinition<'ctx> {
         rhs: StackValue,
         scope: &mut Scope<'ctx, 'a>,
     ) -> Result<StackValue, ErrorKind> {
-        let (lhs, rhs) = if lhs.1 == self.parameters.0 .1 && rhs.1 == self.parameters.1 .1 {
+        let (lhs, rhs) = if lhs.1 == self.parameters.0.ty && rhs.1 == self.parameters.1.ty {
             (lhs, rhs)
         } else {
             (rhs, lhs)
         };
         let name = format!(
             "binop.{}.{}.{}.call",
-            self.parameters.0 .1, self.parameters.1 .1, self.return_ty
+            self.parameters.0.ty, self.parameters.1.ty, self.return_ty
         );
         self.kind.codegen(&name, &[lhs, rhs], &self.return_ty, None, scope)
     }
