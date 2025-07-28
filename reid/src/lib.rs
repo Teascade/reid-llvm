@@ -125,6 +125,21 @@ pub fn perform_all_passes<'map>(
     #[cfg(debug_assertions)]
     dbg!(&context);
 
+    #[cfg(debug_assertions)]
+    println!("{:#}", &context);
+
+    let state = context.pass(&mut LinkerPass {
+        module_map,
+        is_lib: true,
+    })?;
+
+    #[cfg(debug_assertions)]
+    println!("{:-^100}", "LINKER OUTPUT");
+    #[cfg(debug_assertions)]
+    println!("{:#}", &context);
+    #[cfg(debug_assertions)]
+    dbg!(&state);
+
     let mut binops = BinopMap::default();
     for module in &mut context.modules {
         for intrinsic in form_intrinsic_binops() {
@@ -150,21 +165,6 @@ pub fn perform_all_passes<'map>(
             module.1.functions.insert(0, intrinsic);
         }
     }
-
-    #[cfg(debug_assertions)]
-    println!("{:#}", &context);
-
-    let state = context.pass(&mut LinkerPass {
-        module_map,
-        is_lib: true,
-    })?;
-
-    #[cfg(debug_assertions)]
-    println!("{:-^100}", "LINKER OUTPUT");
-    #[cfg(debug_assertions)]
-    println!("{:#}", &context);
-    #[cfg(debug_assertions)]
-    dbg!(&state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(

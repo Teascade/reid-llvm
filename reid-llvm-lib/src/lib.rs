@@ -290,6 +290,10 @@ impl<'builder> Block<'builder> {
         }
     }
 
+    pub fn find_function(&mut self, name: &String) -> Option<FunctionValue> {
+        unsafe { self.builder.find_function(self.value.0.0, name) }
+    }
+
     pub fn set_instr_location(&self, instruction: InstructionValue, location: DebugLocationValue) {
         unsafe {
             self.builder.add_instruction_location(&instruction, location);

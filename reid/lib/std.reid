@@ -1,6 +1,5 @@
 
 extern fn puts(message: *char) -> i32;
-extern fn malloc(size: u64) -> *u8;
 extern fn free(ptr: *u8);
 extern fn div(numerator: i32, denominator: i32) -> div_t;
 
@@ -14,7 +13,7 @@ struct String {
 impl String {
     pub fn new() -> String {
         String {
-            inner: allocate(0),
+            inner: char::alloca(0),
             length: 0,
             max_length: 0,
             must_be_freed: true,
@@ -42,7 +41,7 @@ impl String {
 
     pub fn add_char(&mut self, c: char) {
         if ((*self).length + 1) >= (*self).max_length {
-            let new = allocate((*self).max_length + 4) as *char;
+            let new = char::alloca((*self).max_length + 4);
             copy_bits((*self).inner, new, (*self).max_length);
 
             if (*self).must_be_freed == true {
@@ -120,13 +119,9 @@ pub fn int_div(numerator: i32, denominator: i32) -> div_t {
     return div(numerator, denominator);
 }
 
-pub fn allocate(size: u64) -> *u8 {
-    malloc(size)
-}
-
 pub fn new_string() -> String {
     String {
-        inner: allocate(0),
+        inner: char::alloca(0),
         length: 0,
         max_length: 0,
         must_be_freed: true,
@@ -148,7 +143,7 @@ pub fn from_str(str: *char) -> String {
 
 pub fn add_char(string: &mut String, c: char) {
     if ((*string).length + 1) >= (*string).max_length {
-        let new = allocate((*string).max_length + 4) as *char;
+        let new = char::alloca((*string).max_length + 4);
         copy_bits((*string).inner, new, (*string).max_length);
 
         if (*string).must_be_freed == true {

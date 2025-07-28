@@ -168,6 +168,15 @@ impl Builder {
         }
     }
 
+    pub(crate) unsafe fn find_function(&self, module: ModuleValue, name: &String) -> Option<FunctionValue> {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(module.0);
+            dbg!(module.functions.iter().map(|f| f.data.name.clone()).collect::<Vec<_>>());
+            module.functions.iter().find(|f| f.data.name == *name).map(|f| f.value)
+        }
+    }
+
     pub(crate) unsafe fn add_instruction_location(&self, value: &InstructionValue, location: DebugLocationValue) {
         unsafe {
             let mut modules = self.modules.borrow_mut();

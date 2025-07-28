@@ -33,8 +33,25 @@ const FLOATS: [TypeKind; 7] = [
     TypeKind::F128PPC,
 ];
 
+const MALLOC_IDENT: &str = "reid.malloc";
+
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
-    let intrinsics = Vec::new();
+    let mut intrinsics = Vec::new();
+
+    intrinsics.push(FunctionDefinition {
+        name: MALLOC_IDENT.to_owned(),
+        linkage_name: Some("malloc".to_owned()),
+        is_pub: false,
+        is_imported: true,
+        return_type: TypeKind::UserPtr(Box::new(TypeKind::U8)),
+        parameters: vec![FunctionParam {
+            name: "size".to_owned(),
+            ty: TypeKind::U64,
+            meta: Default::default(),
+        }],
+        kind: FunctionDefinitionKind::Extern(false),
+        source: None,
+    });
 
     intrinsics
 }
@@ -62,7 +79,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
                 ty: TypeKind::U64,
                 meta: Default::default(),
             }],
-            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicAlloca(ty.clone()))),
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMalloc(ty.clone()))),
             source: None,
         }),
         "null" => Some(FunctionDefinition {
@@ -353,13 +370,14 @@ impl IntrinsicFunction for IntrinsicSizeOf {
 }
 
 #[derive(Clone, Debug)]
-pub struct IntrinsicAlloca(TypeKind);
-impl IntrinsicFunction for IntrinsicAlloca {
+pub struct IntrinsicMalloc(TypeKind);
+impl IntrinsicFunction for IntrinsicMalloc {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let amount = params.get(0).unwrap();
+        let function = scope.block.find_function(&"malloc".to_owned()).unwrap();
         let instr = scope
             .block
-            .build(Instr::ArrayAlloca(self.0.get_type(scope.type_values), amount.instr()))
+            .build(Instr::FunctionCall(function, vec![amount.instr()]))
             .unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
