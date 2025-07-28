@@ -255,18 +255,19 @@ impl mir::Module {
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
-            let module_name = if let Some(module) = function.source {
+            let module_prefix = if let Some(module) = function.source {
                 if module == self.module_id {
-                    format!("reid.{}", self.name)
+                    format!("reid.{}.", self.name)
                 } else {
-                    format!("reid.{}", modules.get(&module).unwrap().name)
+                    format!("reid.{}.", modules.get(&module).unwrap().name)
                 }
             } else {
-                format!("reid.intrinsic")
+                format!("reid.intrinsic.")
             };
+            let full_name = format!("{}{}::{}", module_prefix, ty, function.name);
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
-                    &format!("{}.{}.{}", module_name, ty, function.name),
+                    &full_name,
                     None,
                     function.return_type.get_type(&type_values),
                     param_types,
@@ -278,7 +279,7 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    &function.linkage_name.clone().unwrap_or(function.name.clone()),
+                    &full_name,
                     None,
                     function.return_type.get_type(&type_values),
                     param_types,
