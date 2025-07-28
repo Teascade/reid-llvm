@@ -129,8 +129,8 @@ impl<'ctx> Module<'ctx> {
         unsafe { self.builder.build_constant(self.value, constant) }
     }
 
-    pub fn add_global(&self, name: String, constant: ConstantValue) -> GlobalValue {
-        unsafe { self.builder.add_global(self.value, name, constant) }
+    pub fn add_global<T: Into<String>>(&self, name: T, constant: ConstantValue) -> GlobalValue {
+        unsafe { self.builder.add_global(self.value, name.into(), constant) }
     }
 }
 

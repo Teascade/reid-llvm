@@ -105,6 +105,9 @@ impl mir::Module {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
 
+        let const_value = module.add_constant(ConstValueKind::I128(132));
+        module.add_global("some_global", const_value);
+
         let (debug, compile_unit) = if let Some(path) = &self.path {
             module.create_debug_info(DebugFileData {
                 name: path.file_name().unwrap().to_str().unwrap().to_owned(),

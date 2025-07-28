@@ -1,6 +1,3 @@
-import std::print;
-import std::String;
-
 fn main() -> u32 {
     // let message = String::from(include_bytes!("./macro_easy_file.txt"));
     return test_macro!();

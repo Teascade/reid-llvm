@@ -27,7 +27,7 @@ use llvm_sys::{
 
 use crate::{
     CustomTypeKind,
-    builder::{TypeHolder, TypeValue},
+    builder::{ConstantValue, GlobalValue, TypeHolder, TypeValue},
     debug_information::*,
     util::{ErrorMessageHolder, MemoryBufferHolder, from_cstring, into_cstring},
 };
@@ -193,6 +193,8 @@ pub struct LLVMModule<'a> {
     blocks: HashMap<BlockValue, LLVMBasicBlockRef>,
     values: HashMap<InstructionValue, LLVMValue>,
     types: HashMap<TypeValue, LLVMTypeRef>,
+    constants: HashMap<ConstantValue, LLVMValue>,
+    globals: HashMap<GlobalValue, LLVMValueRef>,
     debug: Option<LLVMDebugInformation<'a>>,
 }
 
@@ -237,6 +239,8 @@ impl ModuleHolder {
             // Compile the contents
 
             let mut types = HashMap::new();
+            let mut constants = HashMap::new();
+            let mut globals = HashMap::new();
             let mut metadata = HashMap::new();
             let mut scopes = HashMap::new();
             let mut locations = HashMap::new();
@@ -320,6 +324,27 @@ impl ModuleHolder {
                 types.insert(ty.value, ty.compile_type(context, &types));
             }
 
+            for constant in &self.constants {
+                constants.insert(
+                    constant.value,
+                    LLVMValue {
+                        ty: constant.kind.get_type(),
+                        value_ref: constant.kind.as_llvm(context.context_ref, context.builder_ref, &types),
+                    },
+                );
+            }
+
+            for global in &self.globals {
+                let initializer = constants.get(&global.initializer).expect("No initializer?");
+                let global_value = LLVMAddGlobal(
+                    module_ref,
+                    initializer.ty.as_llvm(context.context_ref, &types),
+                    into_cstring(global.name.clone()).as_ptr(),
+                );
+                LLVMSetInitializer(global_value, initializer.value_ref);
+                globals.insert(global.value, global_value);
+            }
+
             let mut functions = HashMap::new();
             for function in &self.functions {
                 let func = function.compile_signature(context, module_ref, &types, &mut debug);
@@ -358,6 +383,8 @@ impl ModuleHolder {
                 types,
                 blocks: HashMap::new(),
                 values: HashMap::new(),
+                constants,
+                globals,
                 debug,
             };
 
@@ -732,7 +759,7 @@ impl InstructionHolder {
             use super::Instr::*;
             match &self.data.kind {
                 Param(nth) => LLVMGetParam(function.value_ref, *nth as u32),
-                Constant(val) => val.as_llvm(module),
+                Constant(val) => val.as_llvm(module.context_ref, module.builder_ref, &module.types),
                 Add(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
@@ -1145,9 +1172,14 @@ impl CmpPredicate {
 }
 
 impl ConstValueKind {
-    fn as_llvm(&self, module: &LLVMModule) -> LLVMValueRef {
+    fn as_llvm(
+        &self,
+        context: LLVMContextRef,
+        builder: LLVMBuilderRef,
+        types: &HashMap<TypeValue, LLVMTypeRef>,
+    ) -> LLVMValueRef {
         unsafe {
-            let t = self.get_type().as_llvm(module.context_ref, &module.types);
+            let t = self.get_type().as_llvm(context, &types);
             match self {
                 ConstValueKind::Bool(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValueKind::I8(val) => LLVMConstInt(t, *val as u64, 1),
@@ -1161,7 +1193,7 @@ impl ConstValueKind {
                 ConstValueKind::U64(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValueKind::U128(val) => LLVMConstInt(t, *val as u64, 1),
                 ConstValueKind::Str(val) => {
-                    LLVMBuildGlobalString(module.builder_ref, into_cstring(val).as_ptr(), c"string".as_ptr())
+                    LLVMBuildGlobalString(builder, into_cstring(val).as_ptr(), c"string".as_ptr())
                 }
                 ConstValueKind::F16(val) => LLVMConstReal(t, *val as f64),
                 ConstValueKind::F32B(val) => LLVMConstReal(t, *val as f64),
