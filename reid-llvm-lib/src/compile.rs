@@ -975,11 +975,31 @@ impl InstructionHolder {
                     ty.as_llvm(module.context_ref, &module.types),
                     name.as_ptr(),
                 ),
-                Or(instruction_value, instruction_value1) => todo!(),
-                XOr(instruction_value, instruction_value1) => todo!(),
-                ShiftRightLogical(instruction_value, instruction_value1) => todo!(),
-                ShiftRightArithmetic(instruction_value, instruction_value1) => todo!(),
-                ShiftLeft(instruction_value, instruction_value1) => todo!(),
+                Or(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildOr(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                XOr(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildXor(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                ShiftRightLogical(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildLShr(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                ShiftRightArithmetic(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildAShr(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
+                ShiftLeft(lhs, rhs) => {
+                    let lhs_val = module.values.get(&lhs).unwrap().value_ref;
+                    let rhs_val = module.values.get(&rhs).unwrap().value_ref;
+                    LLVMBuildShl(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
+                }
             }
         };
         if let Some(record) = &self.record {
