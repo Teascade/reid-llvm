@@ -1346,8 +1346,9 @@ fn codegen_function_call<'ctx, 'a>(
 
     let ptr = if ret_type_kind != TypeKind::Void {
         let ptr = scope
-            .block
-            .build_named(&call.name, Instr::Alloca(ret_type.clone()))
+            .allocator
+            .borrow_mut()
+            .allocate(&call_name, &call.return_type)
             .unwrap();
         scope
             .block

@@ -154,11 +154,7 @@ impl mir::Expression {
                 allocated.extend(lhs.allocate(scope));
                 allocated.extend(rhs.allocate(scope));
             }
-            mir::ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
-                for param in parameters {
-                    allocated.extend(param.allocate(scope));
-                }
-            }
+            mir::ExprKind::FunctionCall(fn_call) => allocated.extend(fn_call.allocate(&fn_call.name, scope)),
             mir::ExprKind::If(IfExpression(cond, then_ex, else_ex)) => {
                 allocated.extend(cond.allocate(scope));
                 allocated.extend(then_ex.allocate(scope));
@@ -174,11 +170,32 @@ impl mir::Expression {
             mir::ExprKind::CastTo(expression, _) => {
                 allocated.extend(expression.allocate(scope));
             }
-            mir::ExprKind::AssociatedFunctionCall(_, FunctionCall { parameters, .. }) => {
-                for param in parameters {
-                    allocated.extend(param.allocate(scope));
-                }
+            mir::ExprKind::AssociatedFunctionCall(ty, fn_call) => {
+                allocated.extend(fn_call.allocate(&format!("{}::{}", ty, fn_call.name), scope))
             }
+        }
+
+        allocated
+    }
+}
+
+impl mir::FunctionCall {
+    fn allocate<'ctx, 'a>(&self, name: &String, scope: &mut AllocatorScope<'ctx, 'a>) -> Vec<Allocation> {
+        let mut allocated = Vec::new();
+
+        for param in &self.parameters {
+            allocated.extend(param.allocate(scope));
+        }
+
+        if self.return_type != TypeKind::Void {
+            let allocation = scope
+                .block
+                .build_named(
+                    name,
+                    reid_lib::Instr::Alloca(self.return_type.get_type(scope.type_values)),
+                )
+                .unwrap();
+            allocated.push(Allocation(name.clone(), self.return_type.clone(), allocation));
         }
 
         allocated
