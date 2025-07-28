@@ -615,6 +615,7 @@ impl Expression {
             ExprKind::Borrow(expression, _) => expression.pass(pass, state, scope, mod_id)?,
             ExprKind::Deref(expression) => expression.pass(pass, state, scope, mod_id)?,
             ExprKind::CastTo(expression, _) => expression.pass(pass, state, scope, mod_id)?,
+            ExprKind::GlobalRef(..) => {}
         }
         Ok(())
     }

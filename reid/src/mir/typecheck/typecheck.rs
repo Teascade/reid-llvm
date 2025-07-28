@@ -767,6 +767,10 @@ impl Expression {
                     Ok(function_call.return_type.clone().resolve_ref(typerefs))
                 }
             }
+            ExprKind::GlobalRef(global_value, type_kind) => Ok(self
+                .return_type(typerefs, state.scope.module_id.unwrap())
+                .map(|r| r.1)
+                .unwrap()),
         }
     }
 }

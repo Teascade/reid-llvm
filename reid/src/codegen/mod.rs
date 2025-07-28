@@ -201,9 +201,10 @@ impl mir::Module {
             insert_debug!(&TypeKind::CustomType(type_key.clone()));
         }
 
+        let mut globals = HashMap::new();
         for global in &self.globals {
             let (const_value, _) = global.kind.codegen(context, &type_values, &module)?;
-            module.add_global(&global.name, const_value);
+            globals.insert(global.name.clone(), module.add_global(&global.name, const_value));
         }
 
         let mut functions = HashMap::new();
@@ -379,6 +380,7 @@ impl mir::Module {
                                 functions: &functions,
                                 types: &types,
                                 type_values: &type_values,
+                                globals: &globals,
                                 stack_values: HashMap::new(),
                                 debug: Some(Debug {
                                     info: &debug,
@@ -461,6 +463,7 @@ impl mir::Module {
                         scope: compile_unit.clone(),
                         types: &debug_types,
                     }),
+                    globals: &globals,
                     binops: &binops,
                     allocator: Rc::new(RefCell::new(allocator)),
                 };
@@ -521,6 +524,7 @@ impl mir::Module {
                         scope: compile_unit.clone(),
                         types: &debug_types,
                     }),
+                    globals: &globals,
                     binops: &binops,
                     allocator: Rc::new(RefCell::new(allocator)),
                 };
@@ -724,6 +728,7 @@ impl mir::Statement {
             mir::StmtKind::Let(NamedVariableRef(ty, name, meta), mutable, expression) => {
                 let value = expression.codegen(scope, &state)?.unwrap();
 
+                dbg!(&scope.allocator, &meta, &value.1);
                 let alloca = scope
                     .allocate(meta, &value.1)
                     .unwrap()
@@ -1351,6 +1356,14 @@ impl mir::Expression {
                 }
             }
             mir::ExprKind::AssociatedFunctionCall(ty, call) => codegen_function_call(Some(ty), call, scope, state)?,
+            mir::ExprKind::GlobalRef(global_name, ty) => {
+                let global_value = scope.globals.get(global_name).unwrap();
+                let a = Some(StackValue(
+                    StackValueKind::Literal(scope.block.build(Instr::GetGlobal(global_value.clone())).unwrap()),
+                    TypeKind::UserPtr(Box::new(ty.clone())),
+                ));
+                a
+            }
         };
         if let Some(value) = &value {
             value.instr().maybe_location(&mut scope.block, location.clone());

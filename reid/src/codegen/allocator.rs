@@ -195,6 +195,7 @@ impl mir::Expression {
             mir::ExprKind::AssociatedFunctionCall(ty, fn_call) => {
                 allocated.extend(fn_call.allocate(&format!("{}::{}", ty, fn_call.name), scope))
             }
+            mir::ExprKind::GlobalRef(..) => {}
         }
 
         allocated

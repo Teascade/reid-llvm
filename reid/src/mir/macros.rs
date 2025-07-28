@@ -173,6 +173,7 @@ impl mir::Expression {
             mir::ExprKind::CastTo(expression, _) => {
                 globals.extend(expression.gen_macros(data, state));
             }
+            mir::ExprKind::GlobalRef(..) => {}
         }
         globals
     }
@@ -211,12 +212,17 @@ impl MacroFunction for TestMacro {
             .map(|c| GlobalKind::Literal(Literal::U8(*c)))
             .collect::<Vec<_>>();
 
+        let len = literals.len();
+
+        let global_name = "sometestglobalvalue".to_owned();
+        let global = GlobalValue {
+            name: global_name.clone(),
+            kind: GlobalKind::Array(literals),
+        };
+
         Ok((
-            vec![GlobalValue {
-                name: "sometestglobalvalue".to_owned(),
-                kind: GlobalKind::Array(literals),
-            }],
-            mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(5))),
+            vec![global.clone()],
+            mir::ExprKind::GlobalRef(global_name, TypeKind::U8),
         ))
     }
 }

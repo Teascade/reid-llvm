@@ -429,6 +429,7 @@ impl Expression {
                 Err(_) => Ok((ReturnKind::Soft, type_kind.clone())),
             },
             AssociatedFunctionCall(_, fcall) => fcall.return_type(),
+            GlobalRef(_, type_kind) => Ok((ReturnKind::Soft, TypeKind::UserPtr(Box::new(type_kind.clone())))),
         }
     }
 
@@ -448,6 +449,7 @@ impl Expression {
             ExprKind::If(_) => None,
             ExprKind::CastTo(expression, _) => expression.backing_var(),
             ExprKind::AssociatedFunctionCall(..) => None,
+            ExprKind::GlobalRef(..) => None,
         }
     }
 
@@ -493,6 +495,7 @@ impl Expression {
             ExprKind::Deref(_) => None,
             ExprKind::CastTo(expression, _) => expression.num_value()?,
             ExprKind::AssociatedFunctionCall(..) => None,
+            ExprKind::GlobalRef(..) => None,
         })
     }
 }

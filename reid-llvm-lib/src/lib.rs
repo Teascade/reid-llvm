@@ -276,7 +276,7 @@ impl Instr {
             Instr::ShiftRightLogical(..) => "lshr",
             Instr::ShiftRightArithmetic(..) => "ashr",
             Instr::ShiftLeft(..) => "shl",
-            Instr::GetGlobal(global_value) => todo!(),
+            Instr::GetGlobal(..) => "global",
         }
     }
 }

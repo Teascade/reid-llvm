@@ -660,6 +660,10 @@ impl Expression {
                 // Provide function return type
                 Ok(type_refs.from_type(&fn_call.ret).unwrap())
             }
+            ExprKind::GlobalRef(global_value, type_kind) => Ok(self
+                .return_type(type_refs.types, state.scope.module_id.unwrap())
+                .map(|r| type_refs.from_type(&r.1).unwrap())
+                .unwrap()),
         }
     }
 

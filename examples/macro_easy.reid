@@ -1,4 +1,5 @@
 fn main() -> u8 {
     // let message = String::from(include_bytes!("./macro_easy_file.txt"));
-    return test_macro!("./examples/macro_easy_file.txt");
+    let bytes = test_macro!("./examples/macro_easy_file.txt");
+    return bytes[0];
 }

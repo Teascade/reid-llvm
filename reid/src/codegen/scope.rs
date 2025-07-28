@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
-    builder::{InstructionValue, TypeValue},
+    builder::{GlobalValue, InstructionValue, TypeValue},
     debug_information::{DebugInformation, DebugLocation, DebugScopeValue, DebugTypeValue},
     Block, Context, Function, Instr, Module,
 };
@@ -30,6 +30,7 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) functions: &'scope HashMap<String, ScopeFunctionKind<'ctx>>,
     pub(super) binops: &'scope HashMap<BinopKey, StackBinopDefinition<'ctx>>,
     pub(super) stack_values: HashMap<String, StackValue>,
+    pub(super) globals: &'scope HashMap<String, GlobalValue>,
     pub(super) debug: Option<Debug<'ctx>>,
     pub(super) allocator: Rc<RefCell<Allocator>>,
 }
@@ -51,6 +52,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             stack_values: self.stack_values.clone(),
             debug: self.debug.clone(),
             allocator: self.allocator.clone(),
+            globals: self.globals,
             binops: self.binops,
         }
     }

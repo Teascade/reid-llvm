@@ -271,6 +271,7 @@ pub enum ExprKind {
     Borrow(Box<Expression>, bool),
     Deref(Box<Expression>),
     CastTo(Box<Expression>, TypeKind),
+    GlobalRef(String, TypeKind),
 }
 
 #[derive(Debug, Clone)]
@@ -427,13 +428,13 @@ pub struct Module {
     pub is_main: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalValue {
     pub name: String,
     pub kind: GlobalKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GlobalKind {
     Literal(Literal),
     Array(Vec<GlobalKind>),

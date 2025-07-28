@@ -280,6 +280,7 @@ impl Display for ExprKind {
                 write!(f, "::")?;
                 Display::fmt(function_call, f)
             }
+            ExprKind::GlobalRef(global_value, type_kind) => write!(f, "todo globals"),
         }
     }
 }
