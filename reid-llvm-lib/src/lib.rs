@@ -78,7 +78,6 @@ impl<'ctx> Module<'ctx> {
                         ret,
                         params,
                         flags,
-                        scope: None,
                     },
                 ),
             }
@@ -130,7 +129,6 @@ pub struct FunctionData {
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,
-    scope: Option<DebugScopeValue>,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]

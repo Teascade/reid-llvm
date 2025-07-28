@@ -74,7 +74,7 @@ impl FunctionHolder {
         let mut state = Default::default();
         let mut inner = PadAdapter::wrap(f, &mut state);
         writeln!(inner, "(Value = {:?}) ", self.value)?;
-        if let Some(debug) = &self.data.scope {
+        if let Some(debug) = &self.debug_info {
             writeln!(inner, "(Debug = {:?})", debug)?;
         }
 

@@ -47,6 +47,8 @@ pub struct FunctionHolder {
     pub(crate) value: FunctionValue,
     pub(crate) data: FunctionData,
     pub(crate) blocks: Vec<BlockHolder>,
+    /// Debug scope value of this current function
+    pub(crate) debug_info: Option<DebugScopeValue>,
 }
 
 #[derive(Clone)]
@@ -117,6 +119,7 @@ impl Builder {
                 value,
                 data,
                 blocks: Vec::new(),
+                debug_info: None,
             });
             value
         }
@@ -203,7 +206,7 @@ impl Builder {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0);
             let function = module.functions.get_unchecked_mut(value.1);
-            function.data.scope = Some(subprogram)
+            function.debug_info = Some(subprogram)
         }
     }
 
