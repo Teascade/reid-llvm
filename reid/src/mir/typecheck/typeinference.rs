@@ -390,6 +390,9 @@ impl Expression {
                         widened_rhs = widened_rhs.widen_into(&binop.hands.1);
                     }
                     let binop_res = type_refs.from_binop(*op, &lhs_ref, &rhs_ref);
+                    // dbg!(&return_ty);
+                    // dbg!(&binop_res);
+                    // dbg!(&lhs_ref, &rhs_ref, &binops, &widened_lhs, &widened_rhs);
                     lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
                     *return_ty = binop_res.as_type();

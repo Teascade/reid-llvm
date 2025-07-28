@@ -332,21 +332,56 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 .widen(self.types);
             self.narrow_to_type(&hint1, &ty)?;
             let hint1_typeref = self.types.retrieve_typeref(*hint1.0.borrow()).unwrap();
+            let hint2_typeref = self.types.retrieve_typeref(*hint2.0.borrow()).unwrap();
+
+            match (&hint1_typeref, &hint2_typeref) {
+                (TypeRefKind::Direct(ret_ty), TypeRefKind::BinOp(op, lhs, rhs)) => {
+                    let mut lhs_ref = self.from_type(&lhs).unwrap();
+                    let mut rhs_ref = self.from_type(&rhs).unwrap();
+                    let binops = self.available_binops(op, &mut lhs_ref, &mut rhs_ref);
+                    let mut binops = binops
+                        .iter()
+                        .filter(|b| b.return_ty.narrow_into(ret_ty).is_ok())
+                        .into_iter();
+
+                    if let Some(binop) = binops.next() {
+                        let mut lhs_widened = binop.hands.0.clone();
+                        let mut rhs_widened = binop.hands.1.clone();
+                        while let Some(binop) = binops.next() {
+                            lhs_widened = lhs_widened.widen_into(&binop.hands.0);
+                            rhs_widened = rhs_widened.widen_into(&binop.hands.1);
+                        }
+
+                        lhs_ref.narrow(&self.from_type(&lhs_widened).unwrap());
+                        rhs_ref.narrow(&self.from_type(&rhs_widened).unwrap());
+                    }
+                }
+                _ => {}
+            }
+
             for idx in self.types.type_refs.borrow_mut().iter_mut() {
-                match hint1_typeref {
-                    TypeRefKind::Direct(_) => {
+                match (&hint1_typeref, &hint2_typeref) {
+                    (TypeRefKind::Direct(_), TypeRefKind::Direct(_)) => {
                         if *idx == hint2.0 && idx != &hint1.0 {
                             *idx.borrow_mut() = *hint1.0.borrow();
                         }
                     }
-                    TypeRefKind::BinOp(_, _, _) => {
+                    (TypeRefKind::Direct(_), TypeRefKind::BinOp(..)) => {}
+                    (TypeRefKind::BinOp(..), TypeRefKind::Direct(..)) => {
                         // TODO may not be good ?
                         // if *idx == hint2.0 && idx != &hint1.0 {
                         //     *idx.borrow_mut() = *hint1.0.borrow();
                         // }
                     }
+                    (TypeRefKind::BinOp(..), TypeRefKind::BinOp(..)) => {
+                        // TODO may not be good ?
+                        if *idx == hint2.0 && idx != &hint1.0 {
+                            *idx.borrow_mut() = *hint1.0.borrow();
+                        }
+                    }
                 }
             }
+
             Some(TypeRef(hint1.0.clone(), self))
         }
     }

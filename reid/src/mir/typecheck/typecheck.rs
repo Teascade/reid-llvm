@@ -431,7 +431,7 @@ impl Expression {
                     params: (lhs_type.clone(), rhs_type.clone()),
                     operator: *op,
                 });
-                dbg!(&binops, &expected_return_ty);
+                // dbg!(&lhs_type, &rhs_type, &binops, &ret_ty, &expected_return_ty);
                 if let Some(binop) = binops
                     .iter()
                     .filter(|f| f.1.return_ty.narrow_into(&expected_return_ty).is_ok())
