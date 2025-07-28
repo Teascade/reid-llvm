@@ -352,6 +352,12 @@ impl Display for BinaryOperator {
             BinaryOperator::Cmp(op) => Display::fmt(op, f),
             BinaryOperator::Div => write!(f, "/"),
             BinaryOperator::Mod => write!(f, "%"),
+            BinaryOperator::Or => write!(f, "||"),
+            BinaryOperator::Xor => write!(f, "^"),
+            BinaryOperator::BitwiseOr => write!(f, "|"),
+            BinaryOperator::BitwiseAnd => write!(f, "&"),
+            BinaryOperator::BitshiftRight => write!(f, ">>"),
+            BinaryOperator::BitshiftLeft => write!(f, "<<"),
         }
     }
 }

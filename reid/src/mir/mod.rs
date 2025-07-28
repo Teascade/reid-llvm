@@ -222,6 +222,12 @@ pub enum BinaryOperator {
     Div,
     Mod,
     And,
+    Or,
+    Xor,
+    BitwiseOr,
+    BitwiseAnd,
+    BitshiftRight,
+    BitshiftLeft,
     Cmp(CmpOperator),
 }
 

@@ -26,40 +26,6 @@ enum BlockReturn<'b> {
 }
 
 impl TypeKind {
-    /// Return the type that is the result of a binary operator between two
-    /// values of this type
-    pub fn simple_binop_type(&self, op: &BinaryOperator) -> Option<TypeKind> {
-        if !self.category().is_simple_maths() {
-            return None;
-        }
-        Some(match op {
-            BinaryOperator::Add => self.clone(),
-            BinaryOperator::Minus => self.clone(),
-            BinaryOperator::Mult => self.clone(),
-            BinaryOperator::And => TypeKind::Bool,
-            BinaryOperator::Cmp(_) => TypeKind::Bool,
-            BinaryOperator::Div => self.clone(),
-            BinaryOperator::Mod => self.clone(),
-        })
-    }
-
-    /// Reverse of binop_type, where the given hint is the known required output
-    /// type of the binop, and the output is the hint for the lhs/rhs type.
-    pub fn simple_binop_hint(&self, op: &BinaryOperator) -> Option<TypeKind> {
-        if !self.category().is_simple_maths() {
-            return None;
-        }
-        match op {
-            BinaryOperator::Add
-            | BinaryOperator::Minus
-            | BinaryOperator::Mult
-            | BinaryOperator::Div
-            | BinaryOperator::Mod => Some(self.clone()),
-            BinaryOperator::And => None,
-            BinaryOperator::Cmp(_) => None,
-        }
-    }
-
     pub fn signed(&self) -> bool {
         match self {
             TypeKind::Bool => false,
@@ -240,6 +206,12 @@ impl BinaryOperator {
                 CmpOperator::EQ => true,
                 CmpOperator::NE => true,
             },
+            BinaryOperator::Or => true,
+            BinaryOperator::Xor => true,
+            BinaryOperator::BitwiseOr => true,
+            BinaryOperator::BitwiseAnd => true,
+            BinaryOperator::BitshiftRight => false,
+            BinaryOperator::BitshiftLeft => false,
         }
     }
 }
@@ -507,6 +479,12 @@ impl Expression {
                     }
                     maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a % b)
                 }
+                BinaryOperator::Or => None,
+                BinaryOperator::Xor => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a ^ b),
+                BinaryOperator::BitwiseOr => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a | b),
+                BinaryOperator::BitwiseAnd => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a & b),
+                BinaryOperator::BitshiftRight => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a >> b),
+                BinaryOperator::BitshiftLeft => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a << b),
             },
             ExprKind::FunctionCall(..) => None,
             ExprKind::If(_) => None,

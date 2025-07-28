@@ -885,6 +885,30 @@ impl mir::Expression {
                                 .maybe_location(&mut scope.block, location);
                             Instr::Sub(lhs, mul)
                         }
+                        (mir::BinaryOperator::Or, true, true) => todo!(),
+                        (mir::BinaryOperator::Or, true, false) => todo!(),
+                        (mir::BinaryOperator::Or, false, true) => todo!(),
+                        (mir::BinaryOperator::Or, false, false) => todo!(),
+                        (mir::BinaryOperator::Xor, true, true) => todo!(),
+                        (mir::BinaryOperator::Xor, true, false) => todo!(),
+                        (mir::BinaryOperator::Xor, false, true) => todo!(),
+                        (mir::BinaryOperator::Xor, false, false) => todo!(),
+                        (mir::BinaryOperator::BitwiseOr, true, true) => todo!(),
+                        (mir::BinaryOperator::BitwiseOr, true, false) => todo!(),
+                        (mir::BinaryOperator::BitwiseOr, false, true) => todo!(),
+                        (mir::BinaryOperator::BitwiseOr, false, false) => todo!(),
+                        (mir::BinaryOperator::BitwiseAnd, true, true) => todo!(),
+                        (mir::BinaryOperator::BitwiseAnd, true, false) => todo!(),
+                        (mir::BinaryOperator::BitwiseAnd, false, true) => todo!(),
+                        (mir::BinaryOperator::BitwiseAnd, false, false) => todo!(),
+                        (mir::BinaryOperator::BitshiftRight, true, true) => todo!(),
+                        (mir::BinaryOperator::BitshiftRight, true, false) => todo!(),
+                        (mir::BinaryOperator::BitshiftRight, false, true) => todo!(),
+                        (mir::BinaryOperator::BitshiftRight, false, false) => todo!(),
+                        (mir::BinaryOperator::BitshiftLeft, true, true) => todo!(),
+                        (mir::BinaryOperator::BitshiftLeft, true, false) => todo!(),
+                        (mir::BinaryOperator::BitshiftLeft, false, true) => todo!(),
+                        (mir::BinaryOperator::BitshiftLeft, false, false) => todo!(),
                     };
                     Some(StackValue(
                         StackValueKind::Immutable(
