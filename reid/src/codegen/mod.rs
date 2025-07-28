@@ -9,7 +9,7 @@ use reid_lib::{
         DebugSubprogramData, DebugSubprogramOptionals, DebugSubprogramType, DebugTypeData, DwarfFlags,
         InstructionDebugRecordData,
     },
-    CmpPredicate, ConstValue, Context, CustomTypeKind, Function, FunctionFlags, Instr, Module, NamedStruct,
+    CmpPredicate, ConstValueKind, Context, CustomTypeKind, Function, FunctionFlags, Instr, Module, NamedStruct,
     TerminatorKind as Term, Type,
 };
 use scope::*;
@@ -784,7 +784,7 @@ impl mir::Statement {
                 let condition_res = condition.codegen(&mut condition_scope, state)?.unwrap();
                 let true_instr = condition_scope
                     .block
-                    .build(Instr::Constant(ConstValue::Bool(true)))
+                    .build(Instr::Constant(ConstValueKind::Bool(true)))
                     .unwrap();
                 let check = condition_scope
                     .block
@@ -1031,7 +1031,7 @@ impl mir::Expression {
 
                     let first = scope
                         .block
-                        .build_named("array.zero", Instr::Constant(ConstValue::U32(0)))
+                        .build_named("array.zero", Instr::Constant(ConstValueKind::U32(0)))
                         .unwrap();
                     (
                         scope
@@ -1098,11 +1098,11 @@ impl mir::Expression {
 
                     let index_expr = scope
                         .block
-                        .build_named(index.to_string(), Instr::Constant(ConstValue::U32(index as u32)))
+                        .build_named(index.to_string(), Instr::Constant(ConstValueKind::U32(index as u32)))
                         .unwrap();
                     let first = scope
                         .block
-                        .build_named("zero", Instr::Constant(ConstValue::U32(0)))
+                        .build_named("zero", Instr::Constant(ConstValueKind::U32(0)))
                         .unwrap();
                     let ptr = scope
                         .block

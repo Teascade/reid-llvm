@@ -4,8 +4,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 use crate::{
-    Block, BlockData, CompileResult, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData, ModuleData,
-    NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
+    Block, BlockData, CompileResult, ConstValueKind, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData,
+    ModuleData, NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
         DebugInformation, DebugLocationValue, DebugMetadataValue, DebugScopeValue, InstructionDebugRecordData,
     },
@@ -27,6 +27,12 @@ pub struct BlockValue(pub(crate) FunctionValue, pub(crate) usize);
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
 pub struct InstructionValue(pub(crate) BlockValue, pub(crate) usize);
 
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct ConstantValue(pub(crate) usize);
+
+#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+pub struct GlobalValue(pub(crate) usize);
+
 #[derive(Clone)]
 pub struct ModuleHolder {
     pub(crate) value: ModuleValue,
@@ -34,6 +40,20 @@ pub struct ModuleHolder {
     pub(crate) functions: Vec<FunctionHolder>,
     pub(crate) types: Vec<TypeHolder>,
     pub(crate) debug_information: Option<DebugInformation>,
+    pub(crate) constants: Vec<ConstantValueHolder>,
+    pub(crate) globals: Vec<GlobalValueHolder>,
+}
+
+#[derive(Clone)]
+pub struct ConstantValueHolder {
+    pub(crate) value: ConstantValue,
+    pub(crate) kind: ConstValueKind,
+}
+#[derive(Clone)]
+pub struct GlobalValueHolder {
+    pub(crate) value: GlobalValue,
+    pub(crate) name: String,
+    pub(crate) initializer: ConstantValue,
 }
 
 #[derive(Clone)]
@@ -88,6 +108,8 @@ impl Builder {
             functions: Vec::new(),
             types: Vec::new(),
             debug_information: None,
+            constants: Vec::new(),
+            globals: Vec::new(),
         });
         value
     }
@@ -165,6 +187,35 @@ impl Builder {
 
             self.check_instruction(&value)?;
             Ok(value)
+        }
+    }
+
+    pub(crate) unsafe fn build_constant(&self, module: ModuleValue, kind: ConstValueKind) -> ConstantValue {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(module.0);
+            let value = ConstantValue(module.constants.len());
+            module.constants.push(ConstantValueHolder { value, kind });
+            value
+        }
+    }
+
+    pub(crate) unsafe fn add_global(
+        &self,
+        module: ModuleValue,
+        name: String,
+        initializer: ConstantValue,
+    ) -> GlobalValue {
+        unsafe {
+            let mut modules = self.modules.borrow_mut();
+            let module = modules.get_unchecked_mut(module.0);
+            let value = GlobalValue(module.globals.len());
+            module.globals.push(GlobalValueHolder {
+                value,
+                name,
+                initializer,
+            });
+            value
         }
     }
 

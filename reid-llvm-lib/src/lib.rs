@@ -8,7 +8,10 @@ use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue,
 use debug_information::{DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue};
 use fmt::PrintableModule;
 
-use crate::debug_information::DebugScopeValue;
+use crate::{
+    builder::{ConstantValue, GlobalValue},
+    debug_information::DebugScopeValue,
+};
 
 pub mod builder;
 pub mod compile;
@@ -120,6 +123,14 @@ impl<'ctx> Module<'ctx> {
 
     pub fn get_debug_info(&self) -> &Option<DebugInformation> {
         &self.debug_info
+    }
+
+    pub fn add_constant(&self, constant: ConstValueKind) -> ConstantValue {
+        unsafe { self.builder.build_constant(self.value, constant) }
+    }
+
+    pub fn add_global(&self, name: String, constant: ConstantValue) -> GlobalValue {
+        unsafe { self.builder.add_global(self.value, name, constant) }
     }
 }
 
@@ -361,7 +372,7 @@ pub enum CmpPredicate {
 #[derive(Clone)]
 pub enum Instr {
     Param(usize),
-    Constant(ConstValue),
+    Constant(ConstValueKind),
 
     /// Add two integers
     Add(InstructionValue, InstructionValue),
@@ -487,7 +498,7 @@ pub enum Type {
 }
 
 #[derive(Debug, Clone)]
-pub enum ConstValue {
+pub enum ConstValueKind {
     I8(i8),
     I16(i16),
     I32(i32),
@@ -531,29 +542,29 @@ pub enum CustomTypeKind {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct NamedStruct(pub String, pub Vec<Type>);
 
-impl ConstValue {
+impl ConstValueKind {
     pub fn get_type(&self) -> Type {
         use Type::*;
         match self {
-            ConstValue::I8(_) => I8,
-            ConstValue::I16(_) => I16,
-            ConstValue::I32(_) => I32,
-            ConstValue::I64(_) => I64,
-            ConstValue::I128(_) => I128,
-            ConstValue::U8(_) => U8,
-            ConstValue::U16(_) => U16,
-            ConstValue::U32(_) => U32,
-            ConstValue::U64(_) => U64,
-            ConstValue::U128(_) => U128,
-            ConstValue::Str(_) => Type::Ptr(Box::new(U8)),
-            ConstValue::Bool(_) => Bool,
-            ConstValue::F16(_) => F16,
-            ConstValue::F32B(_) => F32B,
-            ConstValue::F32(_) => F32,
-            ConstValue::F64(_) => F64,
-            ConstValue::F80(_) => F80,
-            ConstValue::F128(_) => F128,
-            ConstValue::F128PPC(_) => F128PPC,
+            ConstValueKind::I8(_) => I8,
+            ConstValueKind::I16(_) => I16,
+            ConstValueKind::I32(_) => I32,
+            ConstValueKind::I64(_) => I64,
+            ConstValueKind::I128(_) => I128,
+            ConstValueKind::U8(_) => U8,
+            ConstValueKind::U16(_) => U16,
+            ConstValueKind::U32(_) => U32,
+            ConstValueKind::U64(_) => U64,
+            ConstValueKind::U128(_) => U128,
+            ConstValueKind::Str(_) => Type::Ptr(Box::new(U8)),
+            ConstValueKind::Bool(_) => Bool,
+            ConstValueKind::F16(_) => F16,
+            ConstValueKind::F32B(_) => F32B,
+            ConstValueKind::F32(_) => F32,
+            ConstValueKind::F64(_) => F64,
+            ConstValueKind::F80(_) => F80,
+            ConstValueKind::F128(_) => F128,
+            ConstValueKind::F128PPC(_) => F128PPC,
         }
     }
 }

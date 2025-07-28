@@ -82,7 +82,6 @@ impl mir::Statement {
 
 impl mir::Expression {
     fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState) -> PassResult {
-        dbg!("asd?");
         match &mut self.0 {
             mir::ExprKind::FunctionCall(function_call) => {
                 if function_call.is_macro {

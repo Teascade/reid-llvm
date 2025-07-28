@@ -1,7 +1,7 @@
-use reid_lib::{CmpPredicate, ConstValue, Context, FunctionFlags, Instr, TerminatorKind, Type};
+use reid_lib::{CmpPredicate, ConstValueKind, Context, FunctionFlags, Instr, TerminatorKind, Type};
 
 fn main() {
-    use ConstValue::*;
+    use ConstValueKind::*;
     use Instr::*;
 
     let context = Context::new("libtest");

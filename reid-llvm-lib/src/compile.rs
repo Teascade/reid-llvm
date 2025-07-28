@@ -33,7 +33,7 @@ use crate::{
 };
 
 use super::{
-    CmpPredicate, ConstValue, Context, TerminatorKind, Type,
+    CmpPredicate, ConstValueKind, Context, TerminatorKind, Type,
     builder::{
         BlockHolder, BlockValue, Builder, FunctionHolder, FunctionValue, InstructionHolder, InstructionValue,
         ModuleHolder,
@@ -1144,32 +1144,32 @@ impl CmpPredicate {
     }
 }
 
-impl ConstValue {
+impl ConstValueKind {
     fn as_llvm(&self, module: &LLVMModule) -> LLVMValueRef {
         unsafe {
             let t = self.get_type().as_llvm(module.context_ref, &module.types);
             match self {
-                ConstValue::Bool(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::I8(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::I16(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::I32(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::I64(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::I128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::U8(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::U16(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::U32(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::U64(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::U128(val) => LLVMConstInt(t, *val as u64, 1),
-                ConstValue::Str(val) => {
+                ConstValueKind::Bool(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::I8(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::I16(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::I32(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::I64(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::I128(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::U8(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::U16(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::U32(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::U64(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::U128(val) => LLVMConstInt(t, *val as u64, 1),
+                ConstValueKind::Str(val) => {
                     LLVMBuildGlobalString(module.builder_ref, into_cstring(val).as_ptr(), c"string".as_ptr())
                 }
-                ConstValue::F16(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F32B(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F32(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F64(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F80(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F128(val) => LLVMConstReal(t, *val as f64),
-                ConstValue::F128PPC(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F16(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F32B(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F32(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F64(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F80(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F128(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::F128PPC(val) => LLVMConstReal(t, *val as f64),
             }
         }
     }
