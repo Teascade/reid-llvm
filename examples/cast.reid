@@ -1,6 +1,5 @@
 // Arithmetic, function calls and imports!
 
-import std::allocate;
 import std::print;
 
 fn other() -> i16 {
@@ -9,7 +8,7 @@ fn other() -> i16 {
 
 fn main() -> u32 {
 
-  let mut v = (allocate(4) as *u32);
+  let mut v = (malloc(4) as *u32);
   v[0] = other() as u32;
 
   return v[0];

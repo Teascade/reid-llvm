@@ -321,7 +321,7 @@ impl<'map> Pass for LinkerPass<'map> {
                             ty.clone(),
                             FunctionDefinition {
                                 name: func_name.clone(),
-                                linkage_name: Some(format!("{}.{}", ty, func_name)),
+                                linkage_name: Some(format!("{}::{}", ty, func_name)),
                                 is_pub: false,
                                 is_imported: false,
                                 return_type,

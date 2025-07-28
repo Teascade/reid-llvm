@@ -149,6 +149,6 @@ fn associated_functions() {
     test(
         include_str!("../../examples/associated_functions.reid"),
         "test",
-        Some(32),
+        Some(4),
     );
 }
