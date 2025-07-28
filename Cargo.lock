@@ -78,7 +78,7 @@ checksum = "53a49587ad06b26609c52e423de037e7f57f20d53535d66e08c695f347df952a"
 
 [[package]]
 name = "reid"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 dependencies = [
  "colored",
  "reid-lib",
@@ -87,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "reid-lib"
-version = "1.0.0-beta.1"
+version = "1.0.0-beta.2"
 dependencies = [
  "llvm-sys",
  "thiserror",
