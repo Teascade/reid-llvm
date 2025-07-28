@@ -116,7 +116,14 @@ pub enum BinaryOperator {
     Div,
     Mod,
 
+    BitshiftRight,
+    BitshiftLeft,
+
     And,
+    Or,
+    Xor,
+    BWAnd,
+    BWOr,
     LT,
     LE,
     GT,
@@ -126,7 +133,7 @@ pub enum BinaryOperator {
 }
 
 impl BinaryOperator {
-    pub fn get_precedence(&self) -> i8 {
+    pub fn get_precedence(&self) -> u8 {
         use BinaryOperator::*;
         match &self {
             Minus => 5,
@@ -134,13 +141,20 @@ impl BinaryOperator {
             Mult => 15,
             Div => 20,
             Mod => 20,
-            And => 100,
-            LT => 100,
-            LE => 100,
-            GT => 100,
-            GE => 100,
-            EQ => 100,
-            NE => 100,
+            BWAnd => 90,
+            BWOr => 90,
+            BWXor => 90,
+            BitshiftLeft => 100,
+            BitshiftRight => 100,
+            And => 150,
+            Or => 150,
+            Xor => 150,
+            LT => 150,
+            LE => 150,
+            GT => 150,
+            GE => 150,
+            EQ => 150,
+            NE => 150,
         }
     }
 }

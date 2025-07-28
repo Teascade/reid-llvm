@@ -88,6 +88,10 @@ pub enum Token {
     LessThan,
     /// `&`
     Et,
+    /// `|`
+    Pipe,
+    /// `^`
+    Hat,
     /// `!`
     Exclamation,
 
@@ -174,6 +178,8 @@ impl ToString for Token {
             Token::GreaterThan => String::from('>'),
             Token::LessThan => String::from('<'),
             Token::Et => String::from('&'),
+            Token::Pipe => String::from('|'),
+            Token::Hat => String::from('^'),
             Token::Exclamation => String::from('!'),
             Token::ParenOpen => String::from('('),
             Token::ParenClose => String::from(')'),
@@ -411,6 +417,8 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             '>' => Token::GreaterThan,
             '<' => Token::LessThan,
             '&' => Token::Et,
+            '|' => Token::Pipe,
+            '^' => Token::Hat,
             '!' => Token::Exclamation,
             '(' => Token::ParenOpen,
             ')' => Token::ParenClose,

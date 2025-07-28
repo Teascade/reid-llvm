@@ -135,7 +135,14 @@ impl TypeKind {
                 | TypeKind::U16
                 | TypeKind::U32
                 | TypeKind::U64
-                | TypeKind::U128 => Ok(other.clone()),
+                | TypeKind::U128
+                | TypeKind::F16
+                | TypeKind::F32B
+                | TypeKind::F32
+                | TypeKind::F64
+                | TypeKind::F80
+                | TypeKind::F128
+                | TypeKind::F128PPC => Ok(other.clone()),
                 _ => Err(ErrorKind::TypesIncompatible(self.clone(), other.clone())),
             },
             (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => match other {

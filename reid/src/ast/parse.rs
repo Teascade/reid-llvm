@@ -488,6 +488,10 @@ impl Parse for BinaryOperator {
                 stream.next();
                 BinaryOperator::And
             }
+            (Some(Token::Pipe), Some(Token::Pipe)) => {
+                stream.next();
+                BinaryOperator::Or
+            }
             (Some(Token::LessThan), Some(Token::Equals)) => {
                 stream.next();
                 BinaryOperator::LE
@@ -504,6 +508,18 @@ impl Parse for BinaryOperator {
                 stream.next();
                 BinaryOperator::NE
             }
+            (Some(Token::GreaterThan), Some(Token::GreaterThan)) => {
+                stream.next();
+                BinaryOperator::BitshiftRight
+            }
+            (Some(Token::LessThan), Some(Token::LessThan)) => {
+                stream.next();
+                BinaryOperator::BitshiftLeft
+            }
+
+            (Some(Token::Hat), _) => BinaryOperator::Xor,
+            (Some(Token::Et), _) => BinaryOperator::BWAnd,
+            (Some(Token::Pipe), _) => BinaryOperator::BWOr,
 
             (Some(Token::LessThan), _) => BinaryOperator::LT,
             (Some(Token::GreaterThan), _) => BinaryOperator::GT,

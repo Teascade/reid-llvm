@@ -455,6 +455,12 @@ impl ast::BinaryOperator {
             ast::BinaryOperator::GE => mir::BinaryOperator::Cmp(mir::CmpOperator::GE),
             ast::BinaryOperator::EQ => mir::BinaryOperator::Cmp(mir::CmpOperator::EQ),
             ast::BinaryOperator::NE => mir::BinaryOperator::Cmp(mir::CmpOperator::NE),
+            ast::BinaryOperator::BitshiftRight => todo!(),
+            ast::BinaryOperator::BitshiftLeft => todo!(),
+            ast::BinaryOperator::Or => todo!(),
+            ast::BinaryOperator::Xor => todo!(),
+            ast::BinaryOperator::BWAnd => todo!(),
+            ast::BinaryOperator::BWOr => todo!(),
         }
     }
 }

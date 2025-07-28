@@ -1,0 +1,7 @@
+// Arithmetic, function calls and imports!
+
+
+fn main() -> bool {
+
+  return 5.0 > -1;
+}
