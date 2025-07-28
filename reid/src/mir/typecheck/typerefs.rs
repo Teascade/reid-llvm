@@ -366,7 +366,11 @@ impl<'outer> ScopeTypeRefs<'outer> {
                             *idx.borrow_mut() = *hint1.0.borrow();
                         }
                     }
-                    (TypeRefKind::Direct(_), TypeRefKind::BinOp(..)) => {}
+                    (TypeRefKind::Direct(_), TypeRefKind::BinOp(..)) => {
+                        if *idx == hint1.0 && idx != &hint2.0 {
+                            *idx.borrow_mut() = *hint2.0.borrow();
+                        }
+                    }
                     (TypeRefKind::BinOp(..), TypeRefKind::Direct(..)) => {
                         // TODO may not be good ?
                         // if *idx == hint2.0 && idx != &hint1.0 {

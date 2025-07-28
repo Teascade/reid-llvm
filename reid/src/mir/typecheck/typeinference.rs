@@ -285,8 +285,8 @@ impl Block {
                     let rhs_ref = state.ok(rhs_infer, rhs.1);
 
                     // Try to narrow the lhs with rhs
-                    if let (Some(mut lhs_ref), Some(rhs_ref)) = (lhs_ref, rhs_ref) {
-                        lhs_ref.narrow(&rhs_ref);
+                    if let (Some(mut lhs_ref), Some(mut rhs_ref)) = (lhs_ref, rhs_ref) {
+                        rhs_ref.narrow(&lhs_ref);
                     }
                 }
                 StmtKind::Import(_) => panic!(),
