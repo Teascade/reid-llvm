@@ -537,8 +537,20 @@ impl Parse for BinaryOperator {
 impl Parse for FunctionCallExpression {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
+            let is_macro = if let Some(Token::Exclamation) = stream.peek() {
+                stream.next(); // Consume !
+                true
+            } else {
+                false
+            };
+
             let args = stream.parse::<FunctionArgs>()?;
-            Ok(FunctionCallExpression(name, args.0, stream.get_range().unwrap()))
+            Ok(FunctionCallExpression {
+                name,
+                params: args.0,
+                range: stream.get_range().unwrap(),
+                is_macro,
+            })
         } else {
             Err(stream.expected_err("identifier")?)
         }
@@ -894,11 +906,12 @@ impl Parse for DotIndexKind {
         stream.expect(Token::Dot)?;
         if let Some(Token::Identifier(name)) = stream.next() {
             if let Ok(args) = stream.parse::<FunctionArgs>() {
-                Ok(Self::FunctionCall(FunctionCallExpression(
+                Ok(Self::FunctionCall(FunctionCallExpression {
                     name,
-                    args.0,
-                    stream.get_range_prev().unwrap(),
-                )))
+                    params: args.0,
+                    range: stream.get_range_prev().unwrap(),
+                    is_macro: false,
+                }))
             } else {
                 Ok(Self::StructValueIndex(name))
             }

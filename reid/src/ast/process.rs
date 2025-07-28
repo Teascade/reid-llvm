@@ -340,10 +340,11 @@ impl ast::Expression {
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
             ),
             ast::ExpressionKind::FunctionCall(fn_call_expr) => mir::ExprKind::FunctionCall(mir::FunctionCall {
-                name: fn_call_expr.0.clone(),
+                name: fn_call_expr.name.clone(),
                 return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
-                parameters: fn_call_expr.1.iter().map(|e| e.process(module_id)).collect(),
-                meta: fn_call_expr.2.as_meta(module_id),
+                parameters: fn_call_expr.params.iter().map(|e| e.process(module_id)).collect(),
+                meta: fn_call_expr.range.as_meta(module_id),
+                is_macro: fn_call_expr.is_macro,
             }),
             ast::ExpressionKind::BlockExpr(block) => mir::ExprKind::Block(block.into_mir(module_id)),
             ast::ExpressionKind::IfExpr(if_expression) => {
@@ -427,14 +428,15 @@ impl ast::Expression {
             ast::ExpressionKind::AssociatedFunctionCall(ty, fn_call_expr) => mir::ExprKind::AssociatedFunctionCall(
                 ty.0.into_mir(module_id),
                 mir::FunctionCall {
-                    name: fn_call_expr.0.clone(),
+                    name: fn_call_expr.name.clone(),
                     return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
-                    parameters: fn_call_expr.1.iter().map(|e| e.process(module_id)).collect(),
-                    meta: fn_call_expr.2.as_meta(module_id),
+                    parameters: fn_call_expr.params.iter().map(|e| e.process(module_id)).collect(),
+                    meta: fn_call_expr.range.as_meta(module_id),
+                    is_macro: fn_call_expr.is_macro,
                 },
             ),
             ast::ExpressionKind::AccessCall(expression, fn_call_expr) => {
-                let mut params: Vec<_> = fn_call_expr.1.iter().map(|e| e.process(module_id)).collect();
+                let mut params: Vec<_> = fn_call_expr.params.iter().map(|e| e.process(module_id)).collect();
                 params.insert(
                     0,
                     mir::Expression(
@@ -442,13 +444,18 @@ impl ast::Expression {
                         expression.1.as_meta(module_id),
                     ),
                 );
+                if fn_call_expr.is_macro {
+                    panic!("Macros aren't supported as access-calls!");
+                };
+
                 mir::ExprKind::AssociatedFunctionCall(
                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                     mir::FunctionCall {
-                        name: fn_call_expr.0.clone(),
+                        name: fn_call_expr.name.clone(),
                         return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
                         parameters: params,
-                        meta: fn_call_expr.2.as_meta(module_id),
+                        meta: fn_call_expr.range.as_meta(module_id),
+                        is_macro: fn_call_expr.is_macro,
                     },
                 )
             }

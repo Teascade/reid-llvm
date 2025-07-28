@@ -159,7 +159,12 @@ impl BinaryOperator {
 }
 
 #[derive(Debug, Clone)]
-pub struct FunctionCallExpression(pub String, pub Vec<Expression>, pub TokenRange);
+pub struct FunctionCallExpression {
+    pub name: String,
+    pub params: Vec<Expression>,
+    pub range: TokenRange,
+    pub is_macro: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct IfExpression(

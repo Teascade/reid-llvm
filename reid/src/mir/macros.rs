@@ -16,13 +16,13 @@ pub struct MacroPass {
     macros: HashMap<String, Box<dyn MacroFunction>>,
 }
 
-type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+type MacroPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
 impl Pass for MacroPass {
     type Data = ();
     type TError = ErrorKind;
 
-    fn expr(&mut self, expr: &mut super::Expression, state: PassState<Self::Data, Self::TError>) -> PassResult {
+    fn expr(&mut self, expr: &mut super::Expression, state: MacroPassState) -> PassResult {
         Ok(())
     }
 }

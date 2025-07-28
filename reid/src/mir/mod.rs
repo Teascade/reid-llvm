@@ -285,6 +285,7 @@ pub struct FunctionCall {
     pub name: String,
     pub return_type: TypeKind,
     pub parameters: Vec<Expression>,
+    pub is_macro: bool,
     pub meta: Metadata,
 }
 
