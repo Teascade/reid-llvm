@@ -187,7 +187,7 @@ impl MacroFunction for TestMacro {
         Ok((
             vec![GlobalValue {
                 name: "sometestglobalvalue".to_owned(),
-                kind: GlobalKind::Literal(Literal::I16(12)),
+                kind: GlobalKind::Array(vec![GlobalKind::Literal(Literal::I16(12))]),
             }],
             mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(5))),
         ))
