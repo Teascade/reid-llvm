@@ -193,7 +193,8 @@ impl FunctionDefinitionKind {
                 block.typecheck(&mut state.inner(), &typerefs, hint.into())
             }
             FunctionDefinitionKind::Extern(_) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
-            FunctionDefinitionKind::Intrinsic(..) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
+            FunctionDefinitionKind::Intrinsic(intrinsic) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
+            FunctionDefinitionKind::Macro(_) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
         }
     }
 }
@@ -469,6 +470,16 @@ impl Expression {
                             )),
                             self.1,
                         );
+                    }
+
+                    if f.is_macro {
+                        for param in &function_call.parameters {
+                            match &param.0 {
+                                ExprKind::Literal(_) => {}
+                                _ => return Err(ErrorKind::Null),
+                            }
+                        }
+                        return Ok(function_call.return_type.clone());
                     }
 
                     let true_params_iter = f

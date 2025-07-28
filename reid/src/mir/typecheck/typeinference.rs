@@ -56,6 +56,7 @@ impl<'t> Pass for TypeInference<'t> {
                         FunctionDefinitionKind::Local(..) => ErrorTypedefKind::Local,
                         FunctionDefinitionKind::Extern(..) => ErrorTypedefKind::Extern,
                         FunctionDefinitionKind::Intrinsic(..) => ErrorTypedefKind::Intrinsic,
+                        FunctionDefinitionKind::Macro(..) => ErrorTypedefKind::Intrinsic,
                     },
                 );
             }
@@ -79,6 +80,7 @@ impl<'t> Pass for TypeInference<'t> {
                         FunctionDefinitionKind::Local(..) => ErrorTypedefKind::Local,
                         FunctionDefinitionKind::Extern(..) => ErrorTypedefKind::Extern,
                         FunctionDefinitionKind::Intrinsic(..) => ErrorTypedefKind::Intrinsic,
+                        FunctionDefinitionKind::Macro(..) => ErrorTypedefKind::Intrinsic,
                     },
                 );
             }
@@ -191,6 +193,7 @@ impl FunctionDefinition {
             }
             FunctionDefinitionKind::Extern(_) => {}
             FunctionDefinitionKind::Intrinsic(_) => {}
+            FunctionDefinitionKind::Macro(_) => {}
         };
         let return_ty = self
             .kind
@@ -223,6 +226,7 @@ impl FunctionDefinitionKind {
             }
             FunctionDefinitionKind::Extern(_) => None,
             FunctionDefinitionKind::Intrinsic(_) => None,
+            FunctionDefinitionKind::Macro(_) => todo!(),
         })
     }
 }

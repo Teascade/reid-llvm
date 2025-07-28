@@ -61,6 +61,7 @@ impl mir::FunctionDefinitionKind {
             }
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
+            mir::FunctionDefinitionKind::Macro(_) => {}
         }
 
         Allocator { allocations: allocated }

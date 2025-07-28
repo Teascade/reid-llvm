@@ -88,6 +88,8 @@ pub enum ErrorKind {
     InvalidBinop(BinaryOperator, TypeKind, TypeKind),
     #[error("Could not infer type for {0:?}. Try adding type annotations.")]
     CouldNotInferType(String),
+    #[error("Arguments for a macro-function may only contain literals")]
+    MacroMustBeLiterals,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

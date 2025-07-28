@@ -188,6 +188,7 @@ impl<Data: Clone + Default> Scope<Data> {
                     ScopeFunction {
                         ret: func.return_type,
                         params: func.parameters.iter().map(|p| p.ty.clone()).collect(),
+                        is_macro: matches!(func.kind, FunctionDefinitionKind::Macro(_)),
                     },
                 )
                 .unwrap();
@@ -202,6 +203,7 @@ impl<Data: Clone + Default> Scope<Data> {
 pub struct ScopeFunction {
     pub ret: TypeKind,
     pub params: Vec<TypeKind>,
+    pub is_macro: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -427,6 +429,7 @@ impl Module {
                     ScopeFunction {
                         ret: function.return_type.clone(),
                         params: function.parameters.iter().cloned().map(|v| v.ty).collect(),
+                        is_macro: matches!(function.kind, FunctionDefinitionKind::Macro(_)),
                     },
                 )
                 .ok();
@@ -440,6 +443,7 @@ impl Module {
                     ScopeFunction {
                         ret: function.return_type.clone(),
                         params: function.parameters.iter().cloned().map(|v| v.ty).collect(),
+                        is_macro: matches!(function.kind, FunctionDefinitionKind::Macro(_)),
                     },
                 )
                 .ok();
@@ -484,6 +488,7 @@ impl FunctionDefinition {
             }
             FunctionDefinitionKind::Extern(_) => {}
             FunctionDefinitionKind::Intrinsic(..) => {}
+            FunctionDefinitionKind::Macro(_) => {}
         };
         Ok(())
     }

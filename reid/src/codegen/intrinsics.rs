@@ -3,7 +3,7 @@ use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr, Type}
 use crate::{
     codegen::{ErrorKind, StackValueKind},
     mir::{
-        BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition, FunctionDefinitionKind, FunctionParam,
+        self, BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition, FunctionDefinitionKind, FunctionParam,
         TypeKind,
     },
 };
@@ -307,6 +307,10 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
 
 pub trait IntrinsicFunction: std::fmt::Debug {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind>;
+}
+
+pub trait MacroFunction: std::fmt::Debug {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[mir::Literal]) -> Result<StackValue, ErrorKind>;
 }
 
 macro_rules! intrinsic_debug {
