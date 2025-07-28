@@ -429,7 +429,7 @@ impl Expression {
                 Err(_) => Ok((ReturnKind::Soft, type_kind.clone())),
             },
             AssociatedFunctionCall(_, fcall) => fcall.return_type(),
-            GlobalRef(_, type_kind) => Ok((ReturnKind::Soft, TypeKind::UserPtr(Box::new(type_kind.clone())))),
+            GlobalRef(_, type_kind) => Ok((ReturnKind::Soft, type_kind.clone())),
         }
     }
 

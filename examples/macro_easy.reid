@@ -1,5 +1,11 @@
+import std::String;
+import std::print;
+
 fn main() -> u8 {
-    // let message = String::from(include_bytes!("./macro_easy_file.txt"));
+    // - TODO make a type of global identifier for globls?
+    // - TODO figure out if it is possible to map the path to the path of the
+    //   module and not the PWD.
     let bytes = test_macro!("./examples/macro_easy_file.txt");
-    return bytes[0];
+    print(String::new() + bytes.length());
+    return *bytes[0];
 }

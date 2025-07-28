@@ -222,7 +222,10 @@ impl MacroFunction for TestMacro {
 
         Ok((
             vec![global.clone()],
-            mir::ExprKind::GlobalRef(global_name, TypeKind::U8),
+            mir::ExprKind::GlobalRef(
+                global_name,
+                TypeKind::Borrow(Box::new(TypeKind::Array(Box::new(TypeKind::U8), len as u64)), false),
+            ),
         ))
     }
 }

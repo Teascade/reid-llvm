@@ -1360,7 +1360,7 @@ impl mir::Expression {
                 let global_value = scope.globals.get(global_name).unwrap();
                 let a = Some(StackValue(
                     StackValueKind::Literal(scope.block.build(Instr::GetGlobal(global_value.clone())).unwrap()),
-                    TypeKind::UserPtr(Box::new(ty.clone())),
+                    ty.clone(),
                 ));
                 a
             }

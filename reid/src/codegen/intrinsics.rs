@@ -58,6 +58,28 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
 }
 
 pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDefinition> {
+    if let TypeKind::Array(_, len) = ty {
+        match name {
+            "length" => {
+                return Some(FunctionDefinition {
+                    name: "length".to_owned(),
+                    linkage_name: None,
+                    is_pub: true,
+                    is_imported: false,
+                    return_type: TypeKind::U64,
+                    parameters: vec![FunctionParam {
+                        name: String::from("self"),
+                        ty: TypeKind::Borrow(Box::new(ty.clone()), false),
+                        meta: Default::default(),
+                    }],
+                    kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicConst(*len))),
+                    source: None,
+                })
+            }
+            _ => {}
+        }
+    }
+
     match name {
         "sizeof" => Some(FunctionDefinition {
             name: "sizeof".to_owned(),
@@ -406,6 +428,14 @@ impl IntrinsicFunction for IntrinsicNullPtr {
             StackValueKind::Literal(instr),
             TypeKind::UserPtr(Box::new(self.0.clone())),
         ))
+    }
+}
+#[derive(Clone, Debug)]
+pub struct IntrinsicConst(u64);
+impl IntrinsicFunction for IntrinsicConst {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let zero = scope.block.build(Instr::Constant(ConstValueKind::U64(self.0))).unwrap();
+        Ok(StackValue(StackValueKind::Literal(zero), TypeKind::U64))
     }
 }
 
