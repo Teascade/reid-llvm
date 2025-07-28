@@ -11,8 +11,8 @@ use crate::{
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable, DebugLocation,
         DebugLocationValue, DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugPointerType, DebugPosition,
-        DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType, DebugSubprogramType, DebugTypeData,
-        DebugTypeHolder, DebugTypeValue,
+        DebugRecordKind, DebugScopeValue, DebugStructType, DebugSubprogramType, DebugTypeData, DebugTypeHolder,
+        DebugTypeValue,
     },
     pad_adapter::PadAdapter,
 };
@@ -74,7 +74,7 @@ impl FunctionHolder {
         let mut state = Default::default();
         let mut inner = PadAdapter::wrap(f, &mut state);
         writeln!(inner, "(Value = {:?}) ", self.value)?;
-        if let Some(debug) = self.data.debug {
+        if let Some(debug) = &self.data.scope {
             writeln!(inner, "(Debug = {:?})", debug)?;
         }
 
@@ -111,7 +111,7 @@ impl BlockHolder {
         if let Some(terminator) = &self.data.terminator {
             terminator.builder_fmt(&mut inner, builder, debug)?;
         }
-        if let Some(location) = self.data.terminator_location {
+        if let Some(location) = &self.data.terminator_location {
             writeln!(inner, "  ^  (At {}) ", debug.as_ref().unwrap().get_location(location))?;
         }
 
@@ -142,7 +142,7 @@ impl InstructionHolder {
         }
         writeln!(f, "{:?} ({}) = {:?} ", self.value, self.name, self.data.kind)?;
         if let Some(debug) = debug {
-            if let Some(location) = self.data.location {
+            if let Some(location) = &self.data.location {
                 writeln!(f, "  ^  (At {}) ", debug.get_location(location))?;
             }
             if let Some(meta) = self.data.meta {
@@ -261,7 +261,7 @@ impl Debug for InstructionHolder {
 impl Debug for InstructionData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.kind.fmt(f)?;
-        if let Some(location) = self.location {
+        if let Some(location) = &self.location {
             write!(f, " ({:?})", location)?;
         }
         Ok(())
@@ -571,12 +571,6 @@ impl Debug for DebugScopeValue {
 impl Debug for DebugTypeValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Type[{}]", self.0)
-    }
-}
-
-impl Debug for DebugProgramValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Subprogram[{}]", self.0)
     }
 }
 

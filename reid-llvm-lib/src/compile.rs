@@ -209,9 +209,8 @@ pub struct LLVMDebugInformation<'a> {
     debug: &'a DebugInformation,
     builder: LLVMDIBuilderRef,
     file_ref: LLVMMetadataRef,
-    // scopes: &'a HashMap<DebugScopeValue, LLVMMetadataRef>,
+    scopes: &'a HashMap<DebugScopeValue, LLVMMetadataRef>,
     types: &'a mut HashMap<DebugTypeValue, LLVMMetadataRef>,
-    programs: &'a mut HashMap<DebugProgramValue, LLVMMetadataRef>,
     metadata: &'a mut HashMap<DebugMetadataValue, LLVMMetadataRef>,
     locations: &'a mut HashMap<DebugLocationValue, LLVMMetadataRef>,
 }
@@ -238,7 +237,7 @@ impl ModuleHolder {
 
             let mut types = HashMap::new();
             let mut metadata = HashMap::new();
-            let mut programs = HashMap::new();
+            let mut scopes = HashMap::new();
             let mut locations = HashMap::new();
 
             let mut debug = if let Some(debug) = &self.debug_information {
@@ -294,7 +293,11 @@ impl ModuleHolder {
                 // }
                 // dbg!("after!");
 
-                programs.insert(DebugProgramValue(0), compile_unit);
+                let scope = debug.get_scope();
+                scopes.insert(DebugScopeValue(Vec::new()), compile_unit);
+                for scope in &scope.borrow().inner_scopes {
+                    scope.compile_scope(compile_unit, file_ref, &mut scopes, di_builder);
+                }
 
                 let debug = LLVMDebugInformation {
                     builder: di_builder,
@@ -302,7 +305,7 @@ impl ModuleHolder {
                     file_ref,
                     types: &mut types,
                     metadata: &mut metadata,
-                    programs: &mut programs,
+                    scopes: &mut scopes,
                     locations: &mut locations,
                 };
 
@@ -324,18 +327,12 @@ impl ModuleHolder {
             for function in &self.functions {
                 let func = function.compile_signature(context, module_ref, &types, &debug);
                 functions.insert(function.value, func);
-
-                if let Some(debug) = &mut debug {
-                    if let Some(program_value) = function.data.debug {
-                        debug.programs.insert(program_value, func.metadata.unwrap());
-                    }
-                }
             }
 
             if let Some(debug) = &mut debug {
                 for location in debug.debug.get_locations().borrow().iter() {
                     let location_ref = location.compile(context, &debug);
-                    debug.locations.insert(location.value, location_ref);
+                    debug.locations.insert(location.value.clone(), location_ref);
                 }
 
                 for meta in debug.debug.get_metadatas().borrow().iter() {
@@ -376,7 +373,7 @@ impl DebugLocationHolder {
                 context.context_ref,
                 self.location.pos.line,
                 self.location.pos.column,
-                *debug.programs.get(&self.program).unwrap(),
+                *debug.scopes.get(&self.scope).unwrap(),
                 null_mut(),
             )
         }
@@ -392,7 +389,7 @@ impl DebugScopeHolder {
         di_builder: LLVMDIBuilderRef,
     ) {
         unsafe {
-            let scope = if let Some(location) = &self.location {
+            let scope = if let Some(location) = &self.data.location {
                 LLVMDIBuilderCreateLexicalBlock(di_builder, parent, file, location.pos.line, location.pos.column)
             } else {
                 LLVMDIBuilderCreateLexicalBlockFile(di_builder, parent, file, 0)
@@ -413,7 +410,7 @@ impl DebugMetadataHolder {
             match &self.data {
                 DebugMetadata::ParamVar(param) => LLVMDIBuilderCreateParameterVariable(
                     debug.builder,
-                    *debug.programs.get(&self.location.scope).unwrap(),
+                    *debug.scopes.get(&self.location.scope).unwrap(),
                     into_cstring(param.name.clone()).as_ptr(),
                     param.name.len(),
                     param.arg_idx + 1,
@@ -425,7 +422,7 @@ impl DebugMetadataHolder {
                 ),
                 DebugMetadata::LocalVar(var) => LLVMDIBuilderCreateAutoVariable(
                     debug.builder,
-                    *debug.programs.get(&self.location.scope).unwrap(),
+                    *debug.scopes.get(&self.location.scope).unwrap(),
                     into_cstring(var.name.clone()).as_ptr(),
                     var.name.len(),
                     debug.file_ref,
@@ -495,7 +492,7 @@ impl DebugTypeHolder {
                         .map(|field| {
                             LLVMDIBuilderCreateMemberType(
                                 debug.builder,
-                                *debug.programs.get(&st.scope).unwrap(),
+                                *debug.scopes.get(&st.scope).unwrap(),
                                 into_cstring(field.name.clone()).as_ptr(),
                                 field.name.len(),
                                 debug.file_ref,
@@ -510,7 +507,7 @@ impl DebugTypeHolder {
                         .collect::<Vec<_>>();
                     LLVMDIBuilderCreateStructType(
                         debug.builder,
-                        *debug.programs.get(&st.scope).unwrap(),
+                        *debug.scopes.get(&st.scope).unwrap(),
                         into_cstring(st.name.clone()).as_ptr(),
                         st.name.len(),
                         debug.file_ref,
@@ -586,29 +583,34 @@ impl FunctionHolder {
             }
 
             let metadata = if let Some(debug) = debug {
-                if let Some(value) = &self.data.debug {
-                    let subprogram = debug.debug.get_subprogram_data_unchecked(&value);
+                if let Some(scope_value) = &self.data.scope {
+                    let scope = debug.debug.get_scope_data(scope_value).unwrap();
 
                     let mangled_length_ptr = &mut 0;
                     let mangled_name = LLVMGetValueName2(function_ref, mangled_length_ptr);
                     let mangled_length = *mangled_length_ptr;
 
-                    let subprogram = LLVMDIBuilderCreateFunction(
-                        debug.builder,
-                        *debug.programs.get(&subprogram.outer_scope).unwrap(),
-                        into_cstring(subprogram.name.clone()).as_ptr(),
-                        subprogram.name.clone().len(),
-                        mangled_name,
-                        mangled_length,
-                        debug.file_ref,
-                        subprogram.location.pos.line,
-                        *debug.types.get(&subprogram.ty).unwrap(),
-                        subprogram.opts.is_local as i32,
-                        subprogram.opts.is_definition as i32,
-                        subprogram.opts.scope_line,
-                        subprogram.opts.flags.as_llvm(),
-                        subprogram.opts.is_optimized as i32,
-                    );
+                    let subprogram = match scope.kind {
+                        DebugScopeKind::CodegenContext => panic!(),
+                        DebugScopeKind::LexicalScope => panic!(),
+                        DebugScopeKind::Subprogram(subprogram) => LLVMDIBuilderCreateFunction(
+                            debug.builder,
+                            *debug.scopes.get(&scope.parent.unwrap()).unwrap(),
+                            into_cstring(subprogram.name.clone()).as_ptr(),
+                            subprogram.name.clone().len(),
+                            mangled_name,
+                            mangled_length,
+                            debug.file_ref,
+                            subprogram.location.pos.line,
+                            *debug.types.get(&subprogram.ty).unwrap(),
+                            subprogram.opts.is_local as i32,
+                            subprogram.opts.is_definition as i32,
+                            subprogram.opts.scope_line,
+                            subprogram.opts.flags.as_llvm(),
+                            subprogram.opts.is_optimized as i32,
+                        ),
+                    };
+
                     LLVMSetSubprogram(function_ref, subprogram);
                     Some(subprogram)
                 } else {
@@ -1013,7 +1015,7 @@ impl InstructionHolder {
                     module.context_ref,
                     record.location.pos.line,
                     record.location.pos.column,
-                    *debug.programs.get(&record.scope).unwrap(),
+                    *debug.scopes.get(&record.scope).unwrap(),
                     null_mut(),
                 );
 

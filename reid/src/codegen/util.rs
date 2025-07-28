@@ -3,19 +3,15 @@ use std::collections::HashMap;
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
     debug_information::{
-        DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocation,
-        DebugPointerType, DebugPosition, DebugProgramValue, DebugStructType, DebugTypeData,
-        DebugTypeValue, DwarfEncoding, DwarfFlags,
+        DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocation, DebugPointerType,
+        DebugPosition, DebugScopeValue, DebugStructType, DebugTypeData, DebugTypeValue, DwarfEncoding, DwarfFlags,
     },
     Block, CmpPredicate, ConstValue, Instr, Type,
 };
 
 use crate::{
     lexer::{FullToken, Position},
-    mir::{
-        self, CustomTypeKey, Metadata, SourceModuleId, TypeDefinition, TypeDefinitionKind,
-        TypeKind, VagueLiteral,
-    },
+    mir::{self, CustomTypeKey, Metadata, SourceModuleId, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral},
 };
 
 use super::{
@@ -38,9 +34,7 @@ impl mir::CmpOperator {
 
 impl mir::Literal {
     pub(super) fn as_const(&self, block: &mut Block) -> InstructionValue {
-        block
-            .build_named(format!("{}", self), self.as_const_kind())
-            .unwrap()
+        block.build_named(format!("{}", self), self.as_const_kind()).unwrap()
     }
 
     pub(super) fn as_const_kind(&self) -> Instr {
@@ -110,7 +104,7 @@ impl TypeKind {
 impl TypeKind {
     pub(super) fn get_debug_type(&self, debug: &Debug, scope: &Scope) -> DebugTypeValue {
         self.get_debug_type_hard(
-            debug.scope,
+            &debug.scope,
             debug.info,
             debug.types,
             scope.type_values,
@@ -123,7 +117,7 @@ impl TypeKind {
 
     pub(super) fn get_debug_type_hard(
         &self,
-        scope: DebugProgramValue,
+        scope: &DebugScopeValue,
         debug_info: &DebugInformation,
         debug_types: &HashMap<TypeKind, DebugTypeValue>,
         type_values: &HashMap<CustomTypeKey, TypeValue>,
@@ -184,11 +178,11 @@ impl TypeKind {
                             let location = if typedef.source_module != local_mod {
                                 None
                             } else {
-                                field.2.into_debug(&tokens, scope)
+                                field.2.into_debug(&tokens, &scope)
                             };
                             fields.push(DebugFieldType {
                                 name: field.0.clone(),
-                                scope,
+                                scope: scope.clone(),
                                 pos: location.map(|l| l.pos),
                                 size_bits: field.1.size_of(),
                                 offset: size_bits,
@@ -214,7 +208,7 @@ impl TypeKind {
                             };
                             DebugTypeData::Struct(DebugStructType {
                                 name: key.0.clone(),
-                                scope,
+                                scope: scope.clone(),
                                 pos: location.map(|l| l.pos),
                                 size_bits,
                                 flags: DwarfFlags,
@@ -231,12 +225,8 @@ impl TypeKind {
                     TypeKind::Bool => DwarfEncoding::Boolean,
                     TypeKind::I8 => DwarfEncoding::SignedChar,
                     TypeKind::U8 => DwarfEncoding::UnsignedChar,
-                    TypeKind::I16 | TypeKind::I32 | TypeKind::I64 | TypeKind::I128 => {
-                        DwarfEncoding::Signed
-                    }
-                    TypeKind::U16 | TypeKind::U32 | TypeKind::U64 | TypeKind::U128 => {
-                        DwarfEncoding::Unsigned
-                    }
+                    TypeKind::I16 | TypeKind::I32 | TypeKind::I64 | TypeKind::I128 => DwarfEncoding::Signed,
+                    TypeKind::U16 | TypeKind::U32 | TypeKind::U64 | TypeKind::U128 => DwarfEncoding::Unsigned,
                     TypeKind::F16
                     | TypeKind::F32
                     | TypeKind::F32B
@@ -258,13 +248,9 @@ impl TypeKind {
 }
 
 impl Metadata {
-    pub(super) fn into_debug(
-        &self,
-        tokens: &Vec<FullToken>,
-        scope: DebugProgramValue,
-    ) -> Option<DebugLocation> {
+    pub(super) fn into_debug(&self, tokens: &Vec<FullToken>, scope: &DebugScopeValue) -> Option<DebugLocation> {
         if let Some((start, _)) = self.into_positions(tokens) {
-            Some(start.debug(scope))
+            Some(start.debug(scope.clone()))
         } else {
             None
         }
@@ -272,7 +258,7 @@ impl Metadata {
 }
 
 impl Position {
-    pub(super) fn debug(self, scope: DebugProgramValue) -> DebugLocation {
+    pub(super) fn debug(self, scope: DebugScopeValue) -> DebugLocation {
         DebugLocation {
             pos: DebugPosition {
                 line: self.1,

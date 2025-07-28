@@ -7,7 +7,7 @@ use crate::{
     Block, BlockData, CompileResult, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData, ModuleData,
     NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
     debug_information::{
-        DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue, InstructionDebugRecordData,
+        DebugInformation, DebugLocationValue, DebugMetadataValue, DebugScopeValue, InstructionDebugRecordData,
     },
     util::match_types,
 };
@@ -198,12 +198,12 @@ impl Builder {
         }
     }
 
-    pub(crate) unsafe fn set_debug_subprogram(&self, value: &FunctionValue, subprogram: DebugProgramValue) {
+    pub(crate) unsafe fn set_debug_subprogram(&self, value: &FunctionValue, subprogram: DebugScopeValue) {
         unsafe {
             let mut modules = self.modules.borrow_mut();
             let module = modules.get_unchecked_mut(value.0.0);
             let function = module.functions.get_unchecked_mut(value.1);
-            function.data.debug = Some(subprogram)
+            function.data.scope = Some(subprogram)
         }
     }
 

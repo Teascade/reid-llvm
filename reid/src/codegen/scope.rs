@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
     builder::{InstructionValue, TypeValue},
-    debug_information::{DebugInformation, DebugLocation, DebugProgramValue, DebugTypeValue},
+    debug_information::{DebugInformation, DebugLocation, DebugScopeValue, DebugTypeValue},
     Block, Context, Function, Instr, Module,
 };
 
@@ -75,7 +75,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 #[derive(Debug, Clone)]
 pub struct Debug<'ctx> {
     pub(super) info: &'ctx DebugInformation,
-    pub(super) scope: DebugProgramValue,
+    pub(super) scope: DebugScopeValue,
     pub(super) types: &'ctx HashMap<TypeKind, DebugTypeValue>,
 }
 

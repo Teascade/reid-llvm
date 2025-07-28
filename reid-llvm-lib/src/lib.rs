@@ -5,8 +5,10 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use builder::{BlockValue, Builder, FunctionValue, InstructionValue, ModuleValue, TypeValue};
-use debug_information::{DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue, DebugProgramValue};
+use debug_information::{DebugFileData, DebugInformation, DebugLocationValue, DebugMetadataValue};
 use fmt::PrintableModule;
+
+use crate::debug_information::DebugScopeValue;
 
 pub mod builder;
 pub mod compile;
@@ -76,7 +78,7 @@ impl<'ctx> Module<'ctx> {
                         ret,
                         params,
                         flags,
-                        debug: None,
+                        scope: None,
                     },
                 ),
             }
@@ -103,10 +105,10 @@ impl<'ctx> Module<'ctx> {
         }
     }
 
-    pub fn create_debug_info(&mut self, file: DebugFileData) -> (DebugInformation, DebugProgramValue) {
-        let (debug_info, program_value) = DebugInformation::from_file(file);
+    pub fn create_debug_info(&mut self, file: DebugFileData) -> (DebugInformation, DebugScopeValue) {
+        let (debug_info, scope_value) = DebugInformation::from_file(file);
         self.debug_info = Some(debug_info.clone());
-        (debug_info, program_value)
+        (debug_info, scope_value)
     }
 
     pub fn get_debug_info(&self) -> &Option<DebugInformation> {
@@ -128,7 +130,7 @@ pub struct FunctionData {
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,
-    debug: Option<DebugProgramValue>,
+    scope: Option<DebugScopeValue>,
 }
 
 #[derive(Debug, Clone, Copy, Hash)]
@@ -184,7 +186,7 @@ impl<'ctx> Function<'ctx> {
         }
     }
 
-    pub fn set_debug(&self, subprogram: DebugProgramValue) {
+    pub fn set_debug(&self, subprogram: DebugScopeValue) {
         unsafe {
             self.builder.set_debug_subprogram(&self.value, subprogram);
         }

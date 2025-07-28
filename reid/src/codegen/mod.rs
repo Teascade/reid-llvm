@@ -124,7 +124,7 @@ impl mir::Module {
                 debug_types.insert(
                     $kind.clone(),
                     $kind.get_debug_type_hard(
-                        compile_unit,
+                        &compile_unit,
                         &debug,
                         &debug_types,
                         &type_values,
@@ -311,7 +311,7 @@ impl mir::Module {
                                 stack_values: HashMap::new(),
                                 debug: Some(Debug {
                                     info: &debug,
-                                    scope: compile_unit,
+                                    scope: compile_unit.clone(),
                                     types: &debug_types,
                                 }),
                                 binops: &binops,
@@ -328,7 +328,9 @@ impl mir::Module {
                                     &binop.return_type,
                                     &ir_function,
                                     match &binop.fn_kind {
-                                        FunctionDefinitionKind::Local(_, meta) => meta.into_debug(tokens, compile_unit),
+                                        FunctionDefinitionKind::Local(_, meta) => {
+                                            meta.into_debug(tokens, &compile_unit)
+                                        }
                                         FunctionDefinitionKind::Extern(_) => None,
                                         FunctionDefinitionKind::Intrinsic(_) => None,
                                     },
@@ -383,7 +385,7 @@ impl mir::Module {
                     stack_values: HashMap::new(),
                     debug: Some(Debug {
                         info: &debug,
-                        scope: compile_unit,
+                        scope: compile_unit.clone(),
                         types: &debug_types,
                     }),
                     binops: &binops,
@@ -401,7 +403,7 @@ impl mir::Module {
                         &function,
                         match &mir_function.kind {
                             FunctionDefinitionKind::Local(..) => {
-                                mir_function.signature().into_debug(tokens, compile_unit)
+                                mir_function.signature().into_debug(tokens, &compile_unit)
                             }
                             FunctionDefinitionKind::Extern(_) => None,
                             FunctionDefinitionKind::Intrinsic(_) => None,
@@ -442,7 +444,7 @@ impl mir::Module {
                     stack_values: HashMap::new(),
                     debug: Some(Debug {
                         info: &debug,
-                        scope: compile_unit,
+                        scope: compile_unit.clone(),
                         types: &debug_types,
                     }),
                     binops: &binops,
@@ -460,7 +462,7 @@ impl mir::Module {
                         &function,
                         match &mir_function.kind {
                             FunctionDefinitionKind::Local(..) => {
-                                mir_function.signature().into_debug(tokens, compile_unit)
+                                mir_function.signature().into_debug(tokens, &compile_unit)
                             }
                             FunctionDefinitionKind::Extern(_) => None,
                             FunctionDefinitionKind::Intrinsic(_) => None,
@@ -499,22 +501,25 @@ impl FunctionDefinitionKind {
                             flags: DwarfFlags,
                         }));
 
-                        let subprogram = debug.info.subprogram(DebugSubprogramData {
-                            name: name.clone(),
-                            outer_scope: debug.scope.clone(),
-                            location,
-                            ty: debug_ty,
-                            opts: DebugSubprogramOptionals {
-                                is_local: !is_pub,
-                                is_definition: true,
-                                ..DebugSubprogramOptionals::default()
+                        let subprogram = debug.info.subprogram(
+                            debug.scope.clone(),
+                            DebugSubprogramData {
+                                name: name.clone(),
+                                outer_scope: debug.scope.clone(),
+                                location,
+                                ty: debug_ty,
+                                opts: DebugSubprogramOptionals {
+                                    is_local: !is_pub,
+                                    is_definition: true,
+                                    ..DebugSubprogramOptionals::default()
+                                },
                             },
-                        });
+                        );
 
-                        ir_function.set_debug(subprogram);
+                        ir_function.set_debug(subprogram.clone());
                         scope.debug = Some(Debug {
                             info: debug.info,
-                            scope: subprogram,
+                            scope: subprogram.clone(),
                             types: debug.types,
                         });
                     }
@@ -582,8 +587,8 @@ impl FunctionDefinitionKind {
                 }
 
                 if let Some(debug) = &scope.debug {
-                    if let Some(location) = &block.return_meta().into_debug(scope.tokens, debug.scope) {
-                        let location = debug.info.location(&debug.scope, *location);
+                    if let Some(location) = &block.return_meta().into_debug(scope.tokens, &debug.scope) {
+                        let location = debug.info.location(&debug.scope, location.clone());
                         scope.block.set_terminator_location(location).unwrap();
                     }
                 }
@@ -604,7 +609,7 @@ impl mir::Block {
         for stmt in &self.statements {
             stmt.codegen(&mut scope, state)?.map(|s| {
                 if let Some(debug) = &scope.debug {
-                    let location = stmt.1.into_debug(scope.tokens, debug.scope).unwrap();
+                    let location = stmt.1.into_debug(scope.tokens, &debug.scope).unwrap();
                     let loc_val = debug.info.location(&debug.scope, location);
                     s.instr().with_location(&mut scope.block, loc_val);
                 }
@@ -641,7 +646,7 @@ impl mir::Block {
 impl mir::Statement {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, state: &State) -> Result<Option<StackValue>, ErrorKind> {
         let location = scope.debug.clone().map(|d| {
-            let location = self.1.into_debug(scope.tokens, d.scope).unwrap();
+            let location = self.1.into_debug(scope.tokens, &d.scope).unwrap();
             d.info.location(&d.scope, location)
         });
 
@@ -652,7 +657,7 @@ impl mir::Statement {
                 let alloca = scope
                     .allocate(name, &value.1)
                     .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                    .maybe_location(&mut scope.block, location.clone());
 
                 let store = scope
                     .block
@@ -670,7 +675,7 @@ impl mir::Statement {
                     StackValue(stack_value, TypeKind::CodegenPtr(Box::new(value.clone().1))),
                 );
                 if let Some(debug) = &scope.debug {
-                    let location = self.1.into_debug(scope.tokens, debug.scope).unwrap();
+                    let location = self.1.into_debug(scope.tokens, &debug.scope).unwrap();
                     let var = debug.info.metadata(
                         &location,
                         DebugMetadata::LocalVar(DebugLocalVariable {
@@ -686,7 +691,7 @@ impl mir::Statement {
                             variable: var,
                             location,
                             kind: DebugRecordKind::Declare(alloca),
-                            scope: debug.scope,
+                            scope: debug.scope.clone(),
                         },
                     );
                 }
@@ -777,7 +782,7 @@ impl mir::Expression {
             Some(
                 debug
                     .info
-                    .location(&debug.scope, self.1.into_debug(scope.tokens, debug.scope).unwrap()),
+                    .location(&debug.scope, self.1.into_debug(scope.tokens, &debug.scope).unwrap()),
             )
         } else {
             None
@@ -851,12 +856,12 @@ impl mir::Expression {
                                 .block
                                 .build(Instr::UDiv(lhs, rhs))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             let mul = scope
                                 .block
                                 .build(Instr::Mul(rhs, div))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             Instr::Sub(lhs, mul)
                         }
                         (mir::BinaryOperator::Mod, true, false) => {
@@ -864,12 +869,12 @@ impl mir::Expression {
                                 .block
                                 .build(Instr::SDiv(lhs, rhs))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             let mul = scope
                                 .block
                                 .build(Instr::Mul(rhs, div))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             Instr::Sub(lhs, mul)
                         }
                         (mir::BinaryOperator::Mod, _, true) => {
@@ -877,12 +882,12 @@ impl mir::Expression {
                                 .block
                                 .build(Instr::FDiv(lhs, rhs))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             let mul = scope
                                 .block
                                 .build(Instr::Mul(rhs, div))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location);
+                                .maybe_location(&mut scope.block, location.clone());
                             Instr::Sub(lhs, mul)
                         }
                         (mir::BinaryOperator::Or, true, true) => todo!(),
@@ -916,7 +921,7 @@ impl mir::Expression {
                                 .block
                                 .build(instr)
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location),
+                                .maybe_location(&mut scope.block, location.clone()),
                         ),
                         return_ty.clone(),
                     ))
@@ -962,7 +967,7 @@ impl mir::Expression {
                             .block
                             .build_named(format!("gep"), Instr::GetElemPtr(loaded, vec![idx]))
                             .unwrap()
-                            .maybe_location(&mut scope.block, location),
+                            .maybe_location(&mut scope.block, location.clone()),
                         *further_inner,
                     )
                 } else if let TypeKind::CodegenPtr(further_inner) = *inner.clone() {
@@ -975,7 +980,7 @@ impl mir::Expression {
                             .block
                             .build_named(format!("array.gep"), Instr::GetElemPtr(kind.instr(), vec![idx]))
                             .unwrap()
-                            .maybe_location(&mut scope.block, location),
+                            .maybe_location(&mut scope.block, location.clone()),
                         val_t.clone(),
                     )
                 } else {
@@ -992,7 +997,7 @@ impl mir::Expression {
                             .block
                             .build_named(format!("array.gep"), Instr::GetElemPtr(kind.instr(), vec![first, idx]))
                             .unwrap()
-                            .maybe_location(&mut scope.block, location),
+                            .maybe_location(&mut scope.block, location.clone()),
                         val_t.clone(),
                     )
                 };
@@ -1004,7 +1009,7 @@ impl mir::Expression {
                                 .block
                                 .build_named("array.load", Instr::Load(ptr, contained_ty.get_type(scope.type_values)))
                                 .unwrap()
-                                .maybe_location(&mut scope.block, location),
+                                .maybe_location(&mut scope.block, location.clone()),
                         ),
                         contained_ty,
                     ))
@@ -1042,7 +1047,7 @@ impl mir::Expression {
                     .block
                     .build_named(&array_name, Instr::Alloca(array_ty.clone()))
                     .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                    .maybe_location(&mut scope.block, location.clone());
 
                 for (index, instr) in instr_list.iter().enumerate() {
                     let gep_n = format!("{}.{}.gep", array_name, index);
@@ -1060,19 +1065,19 @@ impl mir::Expression {
                         .block
                         .build_named(gep_n, Instr::GetElemPtr(array, vec![first, index_expr]))
                         .unwrap()
-                        .maybe_location(&mut scope.block, location);
+                        .maybe_location(&mut scope.block, location.clone());
                     scope
                         .block
                         .build_named(store_n, Instr::Store(ptr, *instr))
                         .unwrap()
-                        .maybe_location(&mut scope.block, location);
+                        .maybe_location(&mut scope.block, location.clone());
                 }
 
                 let array_val = scope
                     .block
                     .build_named(load_n, Instr::Load(array, array_ty))
                     .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                    .maybe_location(&mut scope.block, location.clone());
 
                 Some(StackValue(
                     StackValueKind::Literal(array_val),
@@ -1140,7 +1145,7 @@ impl mir::Expression {
                     .block
                     .build_named(name, Instr::Alloca(ty.clone()))
                     .unwrap()
-                    .maybe_location(&mut scope.block, location);
+                    .maybe_location(&mut scope.block, location.clone());
 
                 for (field_n, exp) in items {
                     let gep_n = format!("{}.{}.gep", name, field_n);
@@ -1151,13 +1156,13 @@ impl mir::Expression {
                         .block
                         .build_named(gep_n, Instr::GetStructElemPtr(struct_ptr, i as u32))
                         .unwrap()
-                        .maybe_location(&mut scope.block, location);
+                        .maybe_location(&mut scope.block, location.clone());
                     if let Some(val) = exp.codegen(scope, state)? {
                         scope
                             .block
                             .build_named(store_n, Instr::Store(elem_ptr, val.instr()))
                             .unwrap()
-                            .maybe_location(&mut scope.block, location);
+                            .maybe_location(&mut scope.block, location.clone());
                     }
                 }
 
@@ -1277,7 +1282,7 @@ impl mir::Expression {
             mir::ExprKind::AssociatedFunctionCall(ty, call) => codegen_function_call(Some(ty), call, scope, state)?,
         };
         if let Some(value) = &value {
-            value.instr().maybe_location(&mut scope.block, location);
+            value.instr().maybe_location(&mut scope.block, location.clone());
         }
         Ok(value)
     }
@@ -1310,7 +1315,7 @@ fn codegen_function_call<'ctx, 'a>(
     .collect::<Vec<_>>();
 
     let location = if let Some(debug) = &scope.debug {
-        call.meta.into_debug(scope.tokens, debug.scope)
+        call.meta.into_debug(scope.tokens, &debug.scope)
     } else {
         None
     };
@@ -1393,16 +1398,16 @@ impl mir::IfExpression {
         let after_b = scope.function.block("after");
 
         if let Some(debug) = &scope.debug {
-            let before_location = self.0 .1.into_debug(scope.tokens, debug.scope).unwrap();
+            let before_location = self.0 .1.into_debug(scope.tokens, &debug.scope).unwrap();
             let before_v = debug.info.location(&debug.scope, before_location);
             scope.block.set_terminator_location(before_v).ok();
 
-            let then_location = self.1 .1.into_debug(scope.tokens, debug.scope).unwrap();
-            let then_v = debug.info.location(&debug.scope, then_location);
+            let then_location = self.1 .1.into_debug(scope.tokens, &debug.scope).unwrap();
+            let then_v = debug.info.location(&debug.scope, then_location.clone());
             then_b.set_terminator_location(then_v).unwrap();
 
             let else_location = if let Some(else_expr) = self.2.as_ref() {
-                else_expr.1.into_debug(scope.tokens, debug.scope).unwrap()
+                else_expr.1.into_debug(scope.tokens, &debug.scope).unwrap()
             } else {
                 then_location
             };
