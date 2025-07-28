@@ -27,7 +27,9 @@ in-depth, but when you're feeling up to it, you can read about them
 ## Syntax and general information
 
 Syntax for Reid is very much inspired by rust, and examples of the language can
-be found in the [examples](../examples/)-folder.
+be found in the [examples](../examples/)-folder. A larger example of a whole
+program written in Reid (a CPU Pathtracer) can be found  [in
+examples/cpu_raytracer.reid](../examples/cpu_raytracer.reid).
 
 In Reid **modules** (or files) on the top-level are comprised of imports, type
 definitions, binop-definitions, functions and type-associated function blocks.

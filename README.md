@@ -12,6 +12,9 @@ by simplicity.
 Specifications and a bunch of [documentation for the language can be found
 here](./documentation/).
 
+An example of a real whole program (a CPU pathtracer) can be found [in
+examples/cpu_raytracer.reid](./examples/cpu_raytracer.reid), go have a look!
+
 Reid is currently able to (non-exhaustively):
 - Do basic algebra binary and unary-operations (e.g. Add, Sub, Div, Mult, And,
   Not)
