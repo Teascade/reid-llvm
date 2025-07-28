@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::mir::VagueType as Vague;
 use crate::mir::*;
 use typecheck::ErrorTypedefKind;
@@ -291,7 +293,7 @@ impl TypeKind {
 
     pub(super) fn resolve_weak(&self, refs: &TypeRefs) -> TypeKind {
         match self {
-            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_wide_type(*idx).unwrap(),
+            TypeKind::Vague(Vague::TypeRef(idx)) => refs.retrieve_wide_type(*idx, &mut HashSet::new()).unwrap(),
             _ => self.clone(),
         }
     }

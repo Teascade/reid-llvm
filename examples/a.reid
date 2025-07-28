@@ -1,0 +1,6 @@
+
+pub fn main() -> u32 {
+    let b = 4;
+    let c = b + 4;
+    return c;
+}

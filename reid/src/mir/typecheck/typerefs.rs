@@ -15,7 +15,7 @@ impl<'scope> TypeRef<'scope> {
     /// Resolve current type in a weak manner, not resolving any Arrays or
     /// further inner types
     pub fn resolve_weak(&self) -> Option<TypeKind> {
-        Some(self.1.types.retrieve_wide_type(*self.0.borrow())?)
+        Some(self.1.types.retrieve_wide_type(*self.0.borrow(), &mut HashSet::new())?)
     }
 
     /// Resolve type deeply, trying to resolve any inner types as well.
@@ -62,17 +62,16 @@ pub enum TypeRefKind {
 }
 
 impl TypeRefKind {
-    pub fn widen(&self, types: &TypeRefs) -> TypeKind {
+    pub fn widen(&self, types: &TypeRefs, seen: &mut HashSet<usize>) -> TypeKind {
         match self {
             TypeRefKind::BinOp(op, lhs, rhs) => {
+                let lhs_resolved = types.cut_recursion(lhs, seen).resolve_ref(types);
+                let rhs_resolved = types.cut_recursion(rhs, seen).resolve_ref(types);
                 let mut binops = types
                     .binop_types
                     .iter()
                     .filter(|b| b.1.operator == *op)
-                    .map(|b| {
-                        b.1.narrow(&lhs.resolve_ref(types), &rhs.resolve_ref(types))
-                            .map(|b| b.2)
-                    })
+                    .map(|b| b.1.narrow(&lhs_resolved, &rhs_resolved).map(|b| b.2))
                     .filter_map(|s| s);
                 if let Some(mut ty) = binops.next() {
                     while let Some(other) = binops.next() {
@@ -84,7 +83,7 @@ impl TypeRefKind {
                 }
             }
             TypeRefKind::Direct(ty) => match ty {
-                TypeKind::Vague(VagueType::TypeRef(id)) => types.retrieve_wide_type(*id).unwrap(),
+                TypeKind::Vague(VagueType::TypeRef(id)) => types.retrieve_wide_type(*id, seen).unwrap(),
                 _ => ty.clone(),
             },
         }
@@ -110,7 +109,7 @@ impl std::fmt::Display for TypeRefs {
                 i,
                 unsafe { *self.recurse_type_ref(idx).borrow() },
                 self.retrieve_typeref(idx),
-                self.retrieve_wide_type(idx),
+                self.retrieve_wide_type(idx, &mut HashSet::new()),
             )?;
         }
         Ok(())
@@ -182,8 +181,35 @@ impl TypeRefs {
         self.hints.borrow().get(inner_idx).cloned()
     }
 
-    pub fn retrieve_wide_type(&self, idx: usize) -> Option<TypeKind> {
-        self.retrieve_typeref(idx).map(|t| t.widen(self))
+    pub fn retrieve_wide_type(&self, idx: usize, seen: &mut HashSet<usize>) -> Option<TypeKind> {
+        self.retrieve_typeref(idx).map(|t| t.widen(self, seen))
+    }
+
+    pub fn cut_recursion_weak<'s>(&self, idx: usize, seen: &mut HashSet<usize>) -> Option<TypeRefKind> {
+        if seen.insert(idx) {
+            self.retrieve_typeref(idx)
+        } else {
+            None
+        }
+    }
+
+    pub(super) fn cut_recursion(&self, kind: &TypeKind, seen: &mut HashSet<usize>) -> TypeKind {
+        match kind {
+            TypeKind::Array(type_kind, len) => TypeKind::Array(Box::new(self.cut_recursion(&type_kind, seen)), *len),
+            TypeKind::Borrow(type_kind, mutable) => {
+                TypeKind::Borrow(Box::new(self.cut_recursion(&type_kind, seen)), *mutable)
+            }
+            TypeKind::UserPtr(type_kind) => TypeKind::UserPtr(Box::new(self.cut_recursion(&type_kind, seen))),
+            TypeKind::CodegenPtr(type_kind) => TypeKind::CodegenPtr(Box::new(self.cut_recursion(&type_kind, seen))),
+            TypeKind::Vague(VagueType::TypeRef(idx)) => {
+                if let Some(tyref) = self.cut_recursion_weak(*idx, seen) {
+                    tyref.widen(self, seen)
+                } else {
+                    TypeKind::Vague(VagueType::Unknown)
+                }
+            }
+            _ => kind.clone(),
+        }
     }
 }
 
@@ -329,7 +355,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 .borrow()
                 .get_unchecked(*hint2.0.borrow())
                 .clone()
-                .widen(self.types);
+                .widen(self.types, &mut HashSet::new());
             self.narrow_to_type(&hint1, &ty)?;
             let hint1_typeref = self.types.retrieve_typeref(*hint1.0.borrow()).unwrap();
             let hint2_typeref = self.types.retrieve_typeref(*hint2.0.borrow()).unwrap();
@@ -357,10 +383,22 @@ impl<'outer> ScopeTypeRefs<'outer> {
                     }
                 }
                 (TypeRefKind::BinOp(_, lhs1, rhs1), TypeRefKind::BinOp(_, lhs2, rhs2)) => {
-                    let mut lhs_ref = self.from_type(&lhs1).unwrap();
-                    let mut rhs_ref = self.from_type(&rhs1).unwrap();
-                    lhs_ref.narrow(&self.from_type(&lhs2).unwrap());
-                    rhs_ref.narrow(&self.from_type(&rhs2).unwrap());
+                    let mut lhs_ref = self
+                        .from_type(&self.types.cut_recursion(lhs1, &mut HashSet::new()))
+                        .unwrap();
+                    let mut rhs_ref = self
+                        .from_type(&self.types.cut_recursion(rhs1, &mut HashSet::new()))
+                        .unwrap();
+                    lhs_ref.narrow(
+                        &self
+                            .from_type(&self.types.cut_recursion(lhs2, &mut HashSet::new()))
+                            .unwrap(),
+                    );
+                    rhs_ref.narrow(
+                        &self
+                            .from_type(&self.types.cut_recursion(rhs2, &mut HashSet::new()))
+                            .unwrap(),
+                    );
                 }
                 _ => {}
             }
