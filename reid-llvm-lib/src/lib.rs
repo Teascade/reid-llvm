@@ -251,6 +251,11 @@ impl Instr {
             Instr::PtrToInt(_, _) => "ptrtoint",
             Instr::IntToPtr(_, _) => "inttoptr",
             Instr::BitCast(_, _) => "bitcast",
+            Instr::Or(..) => "or",
+            Instr::XOr(..) => "xor",
+            Instr::ShiftRightLogical(..) => "lshr",
+            Instr::ShiftRightArithmetic(..) => "ashr",
+            Instr::ShiftLeft(..) => "shl",
         }
     }
 }
@@ -369,7 +374,14 @@ pub enum Instr {
     SRem(InstructionValue, InstructionValue),
     /// Get the remainder from two floats
     FRem(InstructionValue, InstructionValue),
+
     And(InstructionValue, InstructionValue),
+    Or(InstructionValue, InstructionValue),
+    XOr(InstructionValue, InstructionValue),
+    ShiftRightLogical(InstructionValue, InstructionValue),
+    ShiftRightArithmetic(InstructionValue, InstructionValue),
+    ShiftLeft(InstructionValue, InstructionValue),
+
     Phi(Vec<InstructionValue>),
 
     Alloca(Type),

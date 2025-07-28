@@ -975,6 +975,11 @@ impl InstructionHolder {
                     ty.as_llvm(module.context_ref, &module.types),
                     name.as_ptr(),
                 ),
+                Or(instruction_value, instruction_value1) => todo!(),
+                XOr(instruction_value, instruction_value1) => todo!(),
+                ShiftRightLogical(instruction_value, instruction_value1) => todo!(),
+                ShiftRightArithmetic(instruction_value, instruction_value1) => todo!(),
+                ShiftLeft(instruction_value, instruction_value1) => todo!(),
             }
         };
         if let Some(record) = &self.record {

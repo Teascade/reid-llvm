@@ -9,10 +9,10 @@ use crate::{
     CmpPredicate, Context, Instr, InstructionData, TerminatorKind,
     builder::*,
     debug_information::{
-        DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable,
-        DebugLocation, DebugLocationValue, DebugMetadata, DebugMetadataValue, DebugParamVariable,
-        DebugPointerType, DebugPosition, DebugProgramValue, DebugRecordKind, DebugScopeValue,
-        DebugStructType, DebugSubprogramType, DebugTypeData, DebugTypeHolder, DebugTypeValue,
+        DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable, DebugLocation,
+        DebugLocationValue, DebugMetadata, DebugMetadataValue, DebugParamVariable, DebugPointerType, DebugPosition,
+        DebugProgramValue, DebugRecordKind, DebugScopeValue, DebugStructType, DebugSubprogramType, DebugTypeData,
+        DebugTypeHolder, DebugTypeValue,
     },
     pad_adapter::PadAdapter,
 };
@@ -68,11 +68,7 @@ impl FunctionHolder {
             .map(|p| format!("{:?}", p))
             .collect::<Vec<_>>()
             .join(", ");
-        write!(
-            f,
-            "fn {}({}) -> {:?} ",
-            self.data.name, params, self.data.ret
-        )?;
+        write!(f, "fn {}({}) -> {:?} ", self.data.name, params, self.data.ret)?;
 
         writeln!(f, "{{")?;
         let mut state = Default::default();
@@ -116,11 +112,7 @@ impl BlockHolder {
             terminator.builder_fmt(&mut inner, builder, debug)?;
         }
         if let Some(location) = self.data.terminator_location {
-            writeln!(
-                inner,
-                "  ^  (At {}) ",
-                debug.as_ref().unwrap().get_location(location)
-            )?;
+            writeln!(inner, "  ^  (At {}) ", debug.as_ref().unwrap().get_location(location))?;
         }
 
         Ok(())
@@ -148,11 +140,7 @@ impl InstructionHolder {
                 writeln!(f, "  (Debug {} {})", record.variable.hr(debug), kind)?;
             }
         }
-        writeln!(
-            f,
-            "{:?} ({}) = {:?} ",
-            self.value, self.name, self.data.kind
-        )?;
+        writeln!(f, "{:?} ({}) = {:?} ", self.value, self.name, self.data.kind)?;
         if let Some(debug) = debug {
             if let Some(location) = self.data.location {
                 writeln!(f, "  ^  (At {}) ", debug.get_location(location))?;
@@ -188,9 +176,9 @@ impl TerminatorKind {
 impl DebugMetadataValue {
     fn hr(&self, debug: &DebugInformation) -> String {
         let kind = match debug.get_metadata(*self) {
-            DebugMetadata::ParamVar(DebugParamVariable {
-                name, arg_idx, ty, ..
-            }) => format!("param {} (idx {}) (type {:?}) ", name, arg_idx, ty),
+            DebugMetadata::ParamVar(DebugParamVariable { name, arg_idx, ty, .. }) => {
+                format!("param {} (idx {}) (type {:?}) ", name, arg_idx, ty)
+            }
             DebugMetadata::LocalVar(DebugLocalVariable { name, ty, .. }) => {
                 format!("var {} (type {:?}) ", name, ty)
             }
@@ -253,14 +241,11 @@ impl Debug for FunctionHolder {
 impl Debug for BlockHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let deleted = if self.data.deleted { " (deleted)" } else { "" };
-        f.debug_tuple(&format!(
-            "{}[{:?}]{} ",
-            &self.data.name, &self.value, deleted
-        ))
-        .field(&self.instructions)
-        .field(&self.data.terminator)
-        .field(&self.data.terminator_location)
-        .finish()
+        f.debug_tuple(&format!("{}[{:?}]{} ", &self.data.name, &self.value, deleted))
+            .field(&self.instructions)
+            .field(&self.data.terminator)
+            .field(&self.data.terminator_location)
+            .finish()
     }
 }
 
@@ -303,11 +288,7 @@ impl Debug for BlockValue {
 
 impl Debug for InstructionValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "%{}.{}.{}.{}",
-            self.0.0.0.0, self.0.0.1, self.0.1, self.1
-        )
+        write!(f, "%{}.{}.{}.{}", self.0.0.0.0, self.0.0.1, self.0.1, self.1)
     }
 }
 
@@ -369,9 +350,7 @@ impl Debug for Instr {
                 fmt_index(f, instruction_value, &index.to_string())?;
                 write!(f, ")")
             }
-            Instr::ExtractValue(instruction_value, index) => {
-                fmt_index(f, instruction_value, &index.to_string())
-            }
+            Instr::ExtractValue(instruction_value, index) => fmt_index(f, instruction_value, &index.to_string()),
             Instr::Trunc(instr_val, ty) => {
                 write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
             }
@@ -408,6 +387,11 @@ impl Debug for Instr {
             Instr::BitCast(instr_val, ty) => {
                 write!(f, "{:?} to {:?} ({})", instr_val, ty, self.default_name())
             }
+            Instr::Or(lhs, rhs) => fmt_binop(f, lhs, &"||", rhs),
+            Instr::XOr(lhs, rhs) => fmt_binop(f, lhs, &"^", rhs),
+            Instr::ShiftRightLogical(lhs, rhs) => fmt_binop(f, lhs, &">>l", rhs),
+            Instr::ShiftRightArithmetic(lhs, rhs) => fmt_binop(f, lhs, &">>a", rhs),
+            Instr::ShiftLeft(lhs, rhs) => fmt_binop(f, lhs, &"<<", rhs),
         }
     }
 }
@@ -579,11 +563,7 @@ impl Debug for DebugScopeValue {
         write!(
             f,
             "Scope[{}]",
-            self.0
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(", ")
+            self.0.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")
         )
     }
 }

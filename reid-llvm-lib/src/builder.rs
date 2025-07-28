@@ -410,6 +410,8 @@ impl Builder {
                     }
                 }
                 Instr::And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::Or(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::XOr(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::ICmp(_, lhs, rhs) => {
                     let t = match_types(&lhs, &rhs, self)?;
                     if t.category().comparable() || !t.category().integer() {
@@ -528,6 +530,30 @@ impl Builder {
                 Instr::PtrToInt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::IntToPtr(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::BitCast(..) => Ok(()),
+                Instr::ShiftRightLogical(_, rhs) => {
+                    let rhs_ty = rhs.get_type(&self)?;
+                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::ShiftRightArithmetic(_, rhs) => {
+                    let rhs_ty = rhs.get_type(&self)?;
+                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
+                Instr::ShiftLeft(_, rhs) => {
+                    let rhs_ty = rhs.get_type(&self)?;
+                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
             }
         }
     }
@@ -614,6 +640,8 @@ impl InstructionValue {
                 SRem(lhs, rhs) => match_types(lhs, rhs, &builder),
                 FRem(lhs, rhs) => match_types(lhs, rhs, &builder),
                 And(lhs, rhs) => match_types(lhs, rhs, &builder),
+                Or(lhs, rhs) => match_types(lhs, rhs, &builder),
+                XOr(lhs, rhs) => match_types(lhs, rhs, &builder),
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FCmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
@@ -674,6 +702,9 @@ impl InstructionValue {
                 PtrToInt(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
                 IntToPtr(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
                 BitCast(_, ty) => Ok(ty.clone()),
+                ShiftRightLogical(lhs, _) => lhs.get_type(builder),
+                ShiftRightArithmetic(lhs, _) => lhs.get_type(builder),
+                ShiftLeft(lhs, _) => lhs.get_type(builder),
             }
         }
     }
