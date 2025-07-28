@@ -188,10 +188,6 @@ impl mir::Module {
 
             let is_main = self.is_main && function.name == "main";
 
-            let is_true_extern = match function.kind {
-                FunctionDefinitionKind::Extern(i) => !i,
-                _ => false,
-            };
             let module_prefix = if let Some(module) = function.source {
                 if module == self.module_id {
                     format!("reid.{}.", self.name)
@@ -222,11 +218,7 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    if function.source == None {
-                        &function.name
-                    } else {
-                        &full_name
-                    },
+                    &full_name,
                     if function.source == None {
                         Some(function.linkage_name.clone().unwrap())
                     } else {

@@ -33,7 +33,8 @@ const FLOATS: [TypeKind; 7] = [
     TypeKind::F128PPC,
 ];
 
-const MALLOC_IDENT: &str = "reid.malloc";
+const INTRINSIC_IDENT: &str = "reid.intrinsic";
+const MALLOC_IDENT: &str = "malloc";
 
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     let mut intrinsics = Vec::new();
@@ -68,8 +69,8 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
             source: None,
         }),
-        "alloca" => Some(FunctionDefinition {
-            name: "alloca".to_owned(),
+        "malloc" => Some(FunctionDefinition {
+            name: "malloc".to_owned(),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
@@ -363,7 +364,7 @@ impl IntrinsicFunction for IntrinsicSizeOf {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let instr = scope
             .block
-            .build(Instr::Constant(reid_lib::ConstValue::U64(self.0.size_of())))
+            .build(Instr::Constant(reid_lib::ConstValue::U64(self.0.size_of() / 8)))
             .unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
@@ -374,11 +375,17 @@ pub struct IntrinsicMalloc(TypeKind);
 impl IntrinsicFunction for IntrinsicMalloc {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let amount = params.get(0).unwrap();
-        let function = scope.block.find_function(&MALLOC_IDENT.to_owned()).unwrap();
-        let instr = scope
+        let function = scope
             .block
-            .build(Instr::FunctionCall(function, vec![amount.instr()]))
+            .find_function(&format!("{}.{}", INTRINSIC_IDENT, MALLOC_IDENT))
             .unwrap();
+
+        let sizeof = scope
+            .block
+            .build(Instr::Constant(ConstValue::U64(self.0.size_of() / 8)))
+            .unwrap();
+        let bytes = scope.block.build(Instr::Mul(sizeof, amount.instr())).unwrap();
+        let instr = scope.block.build(Instr::FunctionCall(function, vec![bytes])).unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
 }

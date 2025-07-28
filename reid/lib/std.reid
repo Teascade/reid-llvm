@@ -13,7 +13,7 @@ struct String {
 impl String {
     pub fn new() -> String {
         String {
-            inner: char::alloca(0),
+            inner: char::malloc(0),
             length: 0,
             max_length: 0,
             must_be_freed: true,
@@ -41,7 +41,7 @@ impl String {
 
     pub fn add_char(&mut self, c: char) {
         if ((*self).length + 1) >= (*self).max_length {
-            let new = char::alloca((*self).max_length + 4);
+            let new = char::malloc((*self).max_length + 4);
             copy_bits((*self).inner, new, (*self).max_length);
 
             if (*self).must_be_freed == true {
@@ -121,7 +121,7 @@ pub fn int_div(numerator: i32, denominator: i32) -> div_t {
 
 pub fn new_string() -> String {
     String {
-        inner: char::alloca(0),
+        inner: char::malloc(0),
         length: 0,
         max_length: 0,
         must_be_freed: true,
@@ -143,7 +143,7 @@ pub fn from_str(str: *char) -> String {
 
 pub fn add_char(string: &mut String, c: char) {
     if ((*string).length + 1) >= (*string).max_length {
-        let new = char::alloca((*string).max_length + 4);
+        let new = char::malloc((*string).max_length + 4);
         copy_bits((*string).inner, new, (*string).max_length);
 
         if (*string).must_be_freed == true {
