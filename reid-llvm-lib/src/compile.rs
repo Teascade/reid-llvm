@@ -329,7 +329,9 @@ impl ModuleHolder {
                     constant.value,
                     LLVMValue {
                         ty: constant.kind.get_type(),
-                        value_ref: constant.kind.as_llvm(context.context_ref, context.builder_ref, &types),
+                        value_ref: constant
+                            .kind
+                            .as_llvm(context.context_ref, context.builder_ref, &constants, &types),
                     },
                 );
             }
@@ -759,7 +761,7 @@ impl InstructionHolder {
             use super::Instr::*;
             match &self.data.kind {
                 Param(nth) => LLVMGetParam(function.value_ref, *nth as u32),
-                Constant(val) => val.as_llvm(module.context_ref, module.builder_ref, &module.types),
+                Constant(val) => val.as_llvm(module.context_ref, module.builder_ref, &module.constants, &module.types),
                 Add(lhs, rhs) => {
                     let lhs_val = module.values.get(&lhs).unwrap().value_ref;
                     let rhs_val = module.values.get(&rhs).unwrap().value_ref;
@@ -1176,6 +1178,7 @@ impl ConstValueKind {
         &self,
         context: LLVMContextRef,
         builder: LLVMBuilderRef,
+        constants: &HashMap<ConstantValue, LLVMValue>,
         types: &HashMap<TypeValue, LLVMTypeRef>,
     ) -> LLVMValueRef {
         unsafe {
@@ -1202,6 +1205,18 @@ impl ConstValueKind {
                 ConstValueKind::F80(val) => LLVMConstReal(t, *val as f64),
                 ConstValueKind::F128(val) => LLVMConstReal(t, *val as f64),
                 ConstValueKind::F128PPC(val) => LLVMConstReal(t, *val as f64),
+                ConstValueKind::Array(constant_values, elem_ty) => {
+                    let mut values = constant_values
+                        .iter()
+                        .map(|v| constants.get(v).unwrap().value_ref)
+                        .collect::<Vec<_>>();
+
+                    LLVMConstArray2(
+                        elem_ty.as_llvm(context, &types),
+                        values.as_mut_ptr(),
+                        values.len() as u64,
+                    )
+                }
             }
         }
     }

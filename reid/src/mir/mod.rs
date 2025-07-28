@@ -436,6 +436,7 @@ pub struct GlobalValue {
 #[derive(Debug)]
 pub enum GlobalKind {
     Literal(Literal),
+    Array(Vec<GlobalKind>),
 }
 
 pub type ModuleMap = HashMap<SourceModuleId, Module>;

@@ -98,9 +98,24 @@ impl Default for State {
 }
 
 impl mir::GlobalKind {
-    fn codegen<'ctx>(&'ctx self, context: &'ctx Context, module: &Module) -> Result<ConstantValue, ErrorKind> {
+    fn codegen<'ctx>(
+        &'ctx self,
+        context: &'ctx Context,
+        types: &HashMap<CustomTypeKey, reid_lib::builder::TypeValue>,
+        module: &Module,
+    ) -> Result<(ConstantValue, TypeKind), ErrorKind> {
         Ok(match self {
-            mir::GlobalKind::Literal(literal) => module.add_constant(literal.as_const_kind()),
+            mir::GlobalKind::Literal(literal) => (module.add_constant(literal.as_const_kind()), literal.as_type()),
+            mir::GlobalKind::Array(globals) => {
+                let values = try_all(globals.into_iter().map(|g| g.codegen(context, types, module)).collect())
+                    .map_err(|e| e.first().unwrap().clone())?;
+                let elem_ty = values.iter().map(|(_, t)| t.clone()).next().unwrap_or(TypeKind::Void);
+                let values = values.iter().map(|(v, _)| *v).collect::<Vec<_>>();
+                (
+                    module.add_constant(ConstValueKind::Array(values, elem_ty.get_type(&types))),
+                    TypeKind::Array(Box::new(elem_ty), globals.len() as u64),
+                )
+            }
         })
     }
 }
@@ -113,11 +128,6 @@ impl mir::Module {
     ) -> Result<ModuleCodegen<'ctx>, ErrorKind> {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
-
-        for global in &self.globals {
-            let const_value = global.kind.codegen(context, &module)?;
-            module.add_global(&global.name, const_value);
-        }
 
         let (debug, compile_unit) = if let Some(path) = &self.path {
             module.create_debug_info(DebugFileData {
@@ -189,6 +199,11 @@ impl mir::Module {
             types.insert(type_value, typedef.clone());
             type_values.insert(type_key.clone(), type_value);
             insert_debug!(&TypeKind::CustomType(type_key.clone()));
+        }
+
+        for global in &self.globals {
+            let (const_value, _) = global.kind.codegen(context, &type_values, &module)?;
+            module.add_global(&global.name, const_value);
         }
 
         let mut functions = HashMap::new();

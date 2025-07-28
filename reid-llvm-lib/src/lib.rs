@@ -518,6 +518,7 @@ pub enum ConstValueKind {
     F80(f64),
     F128(f64),
     F128PPC(f64),
+    Array(Vec<ConstantValue>, Type),
 }
 
 #[derive(Clone, Hash)]
@@ -565,6 +566,7 @@ impl ConstValueKind {
             ConstValueKind::F80(_) => F80,
             ConstValueKind::F128(_) => F128,
             ConstValueKind::F128PPC(_) => F128PPC,
+            ConstValueKind::Array(vals, ty) => Type::Array(Box::new(ty.clone()), vals.len() as u64),
         }
     }
 }

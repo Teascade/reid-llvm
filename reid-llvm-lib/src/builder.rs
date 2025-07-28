@@ -27,7 +27,7 @@ pub struct BlockValue(pub(crate) FunctionValue, pub(crate) usize);
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
 pub struct InstructionValue(pub(crate) BlockValue, pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
 pub struct ConstantValue(pub(crate) usize);
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
