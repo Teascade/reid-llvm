@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::mir::{self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, WhileStatement};
+use crate::mir::{self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, TypeKind, WhileStatement};
 
 use super::pass::{Pass, PassResult, PassState};
 
@@ -16,6 +16,12 @@ pub enum ErrorKind {
     NoSuchMacro(String),
     #[error("Macro arguments may only be literals")]
     InvalidMacroArgs,
+    #[error("Got {0} parameters, expected {1}")]
+    InvalidAmountOfParams(u32, u32),
+    #[error("Expected argument type of {0}, got {1}")]
+    InvalidArgumentType(TypeKind, TypeKind),
+    #[error("Error executing macro: {0}")]
+    MacroExecutionError(String),
 }
 
 /// Struct used to implement a type-checking pass that can be performed on the
@@ -183,11 +189,32 @@ pub fn form_macros() -> HashMap<String, Box<dyn MacroFunction>> {
 #[derive(Debug)]
 pub struct TestMacro;
 impl MacroFunction for TestMacro {
-    fn generate<'ctx, 'a>(&self, _: &[mir::Literal]) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind> {
+    fn generate<'ctx, 'a>(&self, literals: &[mir::Literal]) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind> {
+        if literals.len() != 1 {
+            return Err(ErrorKind::InvalidAmountOfParams(literals.len() as u32, 1));
+        }
+        let literal = literals.get(0).unwrap();
+        let Literal::String(path) = literal else {
+            return Err(ErrorKind::InvalidArgumentType(
+                literal.as_type(),
+                TypeKind::UserPtr(Box::new(TypeKind::Char)),
+            ));
+        };
+
+        let contents = match std::fs::read(path) {
+            Ok(content) => content,
+            Err(e) => return Err(ErrorKind::MacroExecutionError(format!("{}", e))),
+        };
+
+        let literals = contents
+            .iter()
+            .map(|c| GlobalKind::Literal(Literal::U8(*c)))
+            .collect::<Vec<_>>();
+
         Ok((
             vec![GlobalValue {
                 name: "sometestglobalvalue".to_owned(),
-                kind: GlobalKind::Array(vec![GlobalKind::Literal(Literal::I16(12))]),
+                kind: GlobalKind::Array(literals),
             }],
             mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(5))),
         ))
