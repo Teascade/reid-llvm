@@ -208,8 +208,8 @@ impl BinaryOperator {
             },
             BinaryOperator::Or => true,
             BinaryOperator::Xor => true,
-            BinaryOperator::BitwiseOr => true,
-            BinaryOperator::BitwiseAnd => true,
+            BinaryOperator::BitOr => true,
+            BinaryOperator::BitAnd => true,
             BinaryOperator::BitshiftRight => false,
             BinaryOperator::BitshiftLeft => false,
         }
@@ -481,8 +481,8 @@ impl Expression {
                 }
                 BinaryOperator::Or => None,
                 BinaryOperator::Xor => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a ^ b),
-                BinaryOperator::BitwiseOr => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a | b),
-                BinaryOperator::BitwiseAnd => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a & b),
+                BinaryOperator::BitOr => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a | b),
+                BinaryOperator::BitAnd => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a & b),
                 BinaryOperator::BitshiftRight => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a >> b),
                 BinaryOperator::BitshiftLeft => maybe(lhs.num_value()?, rhs.num_value()?, |a, b| a << b),
             },

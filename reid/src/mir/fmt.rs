@@ -354,8 +354,8 @@ impl Display for BinaryOperator {
             BinaryOperator::Mod => write!(f, "%"),
             BinaryOperator::Or => write!(f, "||"),
             BinaryOperator::Xor => write!(f, "^"),
-            BinaryOperator::BitwiseOr => write!(f, "|"),
-            BinaryOperator::BitwiseAnd => write!(f, "&"),
+            BinaryOperator::BitOr => write!(f, "|"),
+            BinaryOperator::BitAnd => write!(f, "&"),
             BinaryOperator::BitshiftRight => write!(f, ">>"),
             BinaryOperator::BitshiftLeft => write!(f, "<<"),
         }

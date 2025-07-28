@@ -1,3 +1,5 @@
+use std::ops::BitAnd;
+
 use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr, Type};
 
 use crate::{
@@ -84,6 +86,21 @@ where
     }
 }
 
+fn complex_binop_def<T: Clone + 'static>(op: BinaryOperator, lhs: &TypeKind, rhs: &TypeKind, fun: T) -> BinopDefinition
+where
+    T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
+{
+    BinopDefinition {
+        lhs: ("lhs".to_owned(), lhs.clone()),
+        op,
+        rhs: ("rhs".to_owned(), rhs.clone()),
+        return_type: lhs.clone(),
+        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
+        meta: Default::default(),
+        exported: false,
+    }
+}
+
 fn boolean_binop_def<T: Clone + 'static>(op: BinaryOperator, ty: &TypeKind, fun: T) -> BinopDefinition
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
@@ -145,6 +162,39 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::LE), &ty, |scope, lhs, rhs| {
             scope.block.build(Instr::ICmp(CmpPredicate::LE, lhs, rhs)).unwrap()
         }));
+
+        // Bitwise operations
+        intrinsics.push(simple_binop_def(BitOr, &ty, |scope, lhs, rhs| {
+            scope.block.build(Instr::Or(lhs, rhs)).unwrap()
+        }));
+        intrinsics.push(simple_binop_def(BitAnd, &ty, |scope, lhs, rhs| {
+            scope.block.build(Instr::And(lhs, rhs)).unwrap()
+        }));
+
+        intrinsics.push(complex_binop_def(Xor, &ty, &TypeKind::U64, |scope, lhs, rhs| {
+            scope.block.build(Instr::XOr(lhs, rhs)).unwrap()
+        }));
+        if ty.signed() {
+            intrinsics.push(complex_binop_def(
+                BitshiftRight,
+                &ty,
+                &TypeKind::U64,
+                |scope, lhs, rhs| scope.block.build(Instr::ShiftRightArithmetic(lhs, rhs)).unwrap(),
+            ));
+        } else {
+            intrinsics.push(complex_binop_def(
+                BitshiftRight,
+                &ty,
+                &TypeKind::U64,
+                |scope, lhs, rhs| scope.block.build(Instr::ShiftRightLogical(lhs, rhs)).unwrap(),
+            ));
+        }
+        intrinsics.push(complex_binop_def(
+            BitshiftLeft,
+            &ty,
+            &TypeKind::U64,
+            |scope, lhs, rhs| scope.block.build(Instr::ShiftLeft(lhs, rhs)).unwrap(),
+        ));
     }
     for ty in INTEGERS.iter().chain(&[TypeKind::Bool, TypeKind::Char]) {
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::EQ), &ty, |scope, lhs, rhs| {
@@ -194,6 +244,12 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
 
     intrinsics.push(boolean_binop_def(And, &TypeKind::Bool, |scope, lhs, rhs| {
         scope.block.build(Instr::And(lhs, rhs)).unwrap()
+    }));
+    intrinsics.push(boolean_binop_def(Or, &TypeKind::Bool, |scope, lhs, rhs| {
+        scope.block.build(Instr::Or(lhs, rhs)).unwrap()
+    }));
+    intrinsics.push(boolean_binop_def(Xor, &TypeKind::Bool, |scope, lhs, rhs| {
+        scope.block.build(Instr::XOr(lhs, rhs)).unwrap()
     }));
 
     intrinsics
