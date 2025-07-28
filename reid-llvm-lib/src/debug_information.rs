@@ -154,7 +154,7 @@ impl DebugInformation {
             });
 
             let mut arr = parent.0.clone();
-            arr.push(parent.0.len());
+            arr.push(outer_scope.inner_scopes.len());
             let value = DebugScopeValue(arr);
 
             outer_scope.inner_scopes.push(DebugScopeHolder {

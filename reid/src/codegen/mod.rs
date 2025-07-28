@@ -279,7 +279,6 @@ impl mir::Module {
                                 binop.return_type.get_type(&type_values),
                                 vec![binop.lhs.1.get_type(&type_values), binop.rhs.1.get_type(&type_values)],
                                 FunctionFlags {
-                                    inline: true,
                                     is_pub: binop.exported,
                                     is_imported: binop.exported,
                                     ..Default::default()
