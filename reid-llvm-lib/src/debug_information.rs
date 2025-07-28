@@ -208,11 +208,7 @@ impl DebugInformation {
         self.metadata.clone()
     }
 
-    // pub fn get_scopes(&self) -> Rc<RefCell<DebugScopeHolder>> {
-    //     self.scope.clone()
-    // }
-
-    pub fn get_scope(&self) -> Rc<RefCell<DebugScopeHolder>> {
+    pub(crate) fn get_scope(&self) -> Rc<RefCell<DebugScopeHolder>> {
         self.scope.clone()
     }
 

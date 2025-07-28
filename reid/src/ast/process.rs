@@ -459,8 +459,8 @@ impl ast::BinaryOperator {
             ast::BinaryOperator::BitshiftRight => mir::BinaryOperator::BitshiftRight,
             ast::BinaryOperator::BitshiftLeft => mir::BinaryOperator::BitshiftLeft,
             ast::BinaryOperator::Xor => mir::BinaryOperator::Xor,
-            ast::BinaryOperator::BWAnd => mir::BinaryOperator::BitAnd,
-            ast::BinaryOperator::BWOr => mir::BinaryOperator::BitOr,
+            ast::BinaryOperator::BitAnd => mir::BinaryOperator::BitAnd,
+            ast::BinaryOperator::BitOr => mir::BinaryOperator::BitOr,
         }
     }
 }

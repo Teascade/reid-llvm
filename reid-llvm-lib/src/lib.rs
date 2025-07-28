@@ -546,7 +546,7 @@ impl ConstValue {
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
-enum TypeCategory {
+pub enum TypeCategory {
     SignedInteger,
     UnsignedInteger,
     Void,

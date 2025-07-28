@@ -1,6 +1,6 @@
 //! This module contains code relevant to doing a type checking pass on the MIR.
 //! During typechecking relevant types are also coerced if possible.
-use std::{collections::HashSet, convert::Infallible, hint, iter};
+use std::{collections::HashSet, convert::Infallible, iter};
 
 use crate::{mir::*, util::try_all};
 use VagueType as Vague;
@@ -750,9 +750,7 @@ impl Expression {
                         .into_iter()
                         .chain(iter::repeat(TypeKind::Vague(Vague::Unknown)));
 
-                    for (i, (param, true_param_t)) in
-                        function_call.parameters.iter_mut().zip(true_params_iter).enumerate()
-                    {
+                    for (param, true_param_t) in function_call.parameters.iter_mut().zip(true_params_iter) {
                         // Typecheck every param separately
                         let param_res = param.typecheck(state, &typerefs, HintKind::Coerce(true_param_t.clone()));
                         let param_t = state.or_else(param_res, TypeKind::Vague(Vague::Unknown), param.1);

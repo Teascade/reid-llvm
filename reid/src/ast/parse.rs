@@ -518,8 +518,8 @@ impl Parse for BinaryOperator {
             }
 
             (Some(Token::Hat), _) => BinaryOperator::Xor,
-            (Some(Token::Et), _) => BinaryOperator::BWAnd,
-            (Some(Token::Pipe), _) => BinaryOperator::BWOr,
+            (Some(Token::Et), _) => BinaryOperator::BitAnd,
+            (Some(Token::Pipe), _) => BinaryOperator::BitOr,
 
             (Some(Token::LessThan), _) => BinaryOperator::LT,
             (Some(Token::GreaterThan), _) => BinaryOperator::GT,

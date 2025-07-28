@@ -569,42 +569,6 @@ impl TypeHolder {
 }
 
 impl FunctionHolder {
-    unsafe fn compile_debug_info(
-        &self,
-        di_builder: LLVMDIBuilderRef,
-        parent: LLVMMetadataRef,
-        file: LLVMMetadataRef,
-        types: &mut HashMap<DebugTypeValue, LLVMMetadataRef>,
-        func: LLVMFunction,
-        scope: DebugScopeHolder,
-    ) -> LLVMMetadataRef {
-        unsafe {
-            let DebugScopeKind::Subprogram(subprogram) = scope.data.kind else {
-                panic!();
-            };
-
-            let mangled_length_ptr = &mut 0;
-            let mangled_name = LLVMGetValueName2(func.value_ref, mangled_length_ptr);
-            let mangled_length = *mangled_length_ptr;
-            LLVMDIBuilderCreateFunction(
-                di_builder,
-                parent,
-                into_cstring(subprogram.name.clone()).as_ptr(),
-                subprogram.name.clone().len(),
-                mangled_name,
-                mangled_length,
-                file,
-                subprogram.location.pos.line,
-                *types.get(&subprogram.ty).unwrap(),
-                subprogram.opts.is_local as i32,
-                subprogram.opts.is_definition as i32,
-                subprogram.opts.scope_line,
-                subprogram.opts.flags.as_llvm(),
-                subprogram.opts.is_optimized as i32,
-            )
-        }
-    }
-
     unsafe fn compile_signature(
         &self,
         context: &LLVMContext,

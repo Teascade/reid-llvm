@@ -1,5 +1,3 @@
-use std::ops::BitAnd;
-
 use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValue, Instr, Type};
 
 use crate::{
