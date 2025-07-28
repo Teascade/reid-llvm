@@ -374,7 +374,7 @@ pub struct IntrinsicMalloc(TypeKind);
 impl IntrinsicFunction for IntrinsicMalloc {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let amount = params.get(0).unwrap();
-        let function = scope.block.find_function(&"malloc".to_owned()).unwrap();
+        let function = scope.block.find_function(&MALLOC_IDENT.to_owned()).unwrap();
         let instr = scope
             .block
             .build(Instr::FunctionCall(function, vec![amount.instr()]))

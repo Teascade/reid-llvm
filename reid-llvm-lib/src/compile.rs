@@ -590,7 +590,7 @@ impl FunctionHolder {
             let name = if self.data.flags.is_main {
                 c"main"
             } else {
-                &into_cstring(&self.data.name)
+                &into_cstring(&self.data.linkage_name.clone().unwrap_or(self.data.name.clone()))
             };
 
             let fn_type = LLVMFunctionType(ret_type, param_ptr, param_len as u32, 0);
@@ -605,7 +605,6 @@ impl FunctionHolder {
             let metadata = if let Some(debug) = debug {
                 if let Some(scope_value) = &self.debug_info {
                     let scope_data = debug.info.get_scope_data(scope_value).unwrap();
-                    dbg!(&debug.info.get_scope());
 
                     let mangled_length_ptr = &mut 0;
                     let mangled_name = LLVMGetValueName2(function_ref, mangled_length_ptr);

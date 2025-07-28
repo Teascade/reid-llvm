@@ -66,7 +66,14 @@ pub struct Module<'ctx> {
 }
 
 impl<'ctx> Module<'ctx> {
-    pub fn function(&self, name: &str, ret: Type, params: Vec<Type>, flags: FunctionFlags) -> Function<'ctx> {
+    pub fn function(
+        &self,
+        name: &str,
+        linkage: Option<String>,
+        ret: Type,
+        params: Vec<Type>,
+        flags: FunctionFlags,
+    ) -> Function<'ctx> {
         unsafe {
             Function {
                 phantom: PhantomData,
@@ -75,6 +82,7 @@ impl<'ctx> Module<'ctx> {
                     &self.value,
                     FunctionData {
                         name: name.to_owned(),
+                        linkage_name: linkage,
                         ret,
                         params,
                         flags,
@@ -126,6 +134,7 @@ impl<'ctx> Drop for Module<'ctx> {
 #[derive(Debug, Clone, Hash)]
 pub struct FunctionData {
     name: String,
+    linkage_name: Option<String>,
     ret: Type,
     params: Vec<Type>,
     flags: FunctionFlags,

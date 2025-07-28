@@ -192,9 +192,7 @@ impl mir::Module {
                 FunctionDefinitionKind::Extern(i) => !i,
                 _ => false,
             };
-            let module_prefix = if is_true_extern {
-                String::new()
-            } else if let Some(module) = function.source {
+            let module_prefix = if let Some(module) = function.source {
                 if module == self.module_id {
                     format!("reid.{}.", self.name)
                 } else {
@@ -203,14 +201,17 @@ impl mir::Module {
             } else {
                 format!("reid.intrinsic.")
             };
-            let linkage_name = format!(
+            let linkage_name = function.linkage_name.clone().unwrap_or(function.name.clone());
+            let full_name = format!(
                 "{}{}",
                 module_prefix,
                 function.linkage_name.clone().unwrap_or(function.name.clone())
             );
+
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
-                    &linkage_name,
+                    &full_name,
+                    None,
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -221,7 +222,20 @@ impl mir::Module {
                     },
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
-                    &linkage_name,
+                    if function.source == None {
+                        &function.name
+                    } else {
+                        &full_name
+                    },
+                    if function.source == None {
+                        Some(function.linkage_name.clone().unwrap())
+                    } else {
+                        if !*imported {
+                            Some(linkage_name.clone())
+                        } else {
+                            None
+                        }
+                    },
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -260,6 +274,7 @@ impl mir::Module {
             let func = match &function.kind {
                 mir::FunctionDefinitionKind::Local(_, _) => Some(module.function(
                     &format!("{}.{}.{}", module_name, ty, function.name),
+                    None,
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -271,6 +286,7 @@ impl mir::Module {
                 )),
                 mir::FunctionDefinitionKind::Extern(imported) => Some(module.function(
                     &function.linkage_name.clone().unwrap_or(function.name.clone()),
+                    None,
                     function.return_type.get_type(&type_values),
                     param_types,
                     FunctionFlags {
@@ -308,6 +324,7 @@ impl mir::Module {
                         FunctionDefinitionKind::Local(..) => {
                             let ir_function = module.function(
                                 &binop_fn_name,
+                                None,
                                 binop.return_type.get_type(&type_values),
                                 vec![binop.lhs.ty.get_type(&type_values), binop.rhs.ty.get_type(&type_values)],
                                 FunctionFlags {
@@ -373,6 +390,7 @@ impl mir::Module {
                         }
                         FunctionDefinitionKind::Extern(imported) => ScopeFunctionKind::UserGenerated(module.function(
                             &binop_fn_name,
+                            None,
                             binop.return_type.get_type(&type_values),
                             vec![binop.lhs.ty.get_type(&type_values), binop.rhs.ty.get_type(&type_values)],
                             FunctionFlags {

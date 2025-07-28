@@ -8,23 +8,16 @@ fn main() {
 
     let module = context.module("test", true);
 
-    let main = module.function("main", Type::I32, Vec::new(), FunctionFlags::default());
+    let main = module.function("main", None, Type::I32, Vec::new(), FunctionFlags::default());
     let mut m_entry = main.block("entry");
 
-    let fibonacci = module.function(
-        "fibonacci",
-        Type::I32,
-        vec![Type::I32],
-        FunctionFlags::default(),
-    );
+    let fibonacci = module.function("fibonacci", None, Type::I32, vec![Type::I32], FunctionFlags::default());
 
     let arg = m_entry.build_named("const", Constant(I32(5))).unwrap();
     let fibonacci_call = m_entry
         .build_named("const", FunctionCall(fibonacci.value(), vec![arg]))
         .unwrap();
-    m_entry
-        .terminate(TerminatorKind::Ret(fibonacci_call))
-        .unwrap();
+    m_entry.terminate(TerminatorKind::Ret(fibonacci_call)).unwrap();
 
     let mut f_entry = fibonacci.block("entry");
 
