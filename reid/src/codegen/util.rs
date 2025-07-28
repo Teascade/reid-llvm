@@ -34,11 +34,13 @@ impl mir::CmpOperator {
 
 impl mir::Literal {
     pub(super) fn as_const(&self, block: &mut Block) -> InstructionValue {
-        block.build_named(format!("{}", self), self.as_const_kind()).unwrap()
+        block
+            .build_named(format!("{}", self), Instr::Constant(self.as_const_kind()))
+            .unwrap()
     }
 
-    pub(super) fn as_const_kind(&self) -> Instr {
-        Instr::Constant(match self.clone() {
+    pub(super) fn as_const_kind(&self) -> ConstValueKind {
+        match self.clone() {
             mir::Literal::I8(val) => ConstValueKind::I8(val),
             mir::Literal::I16(val) => ConstValueKind::I16(val),
             mir::Literal::I32(val) => ConstValueKind::I32(val),
@@ -61,7 +63,7 @@ impl mir::Literal {
             mir::Literal::F128(val) => ConstValueKind::F128(val),
             mir::Literal::F128PPC(val) => ConstValueKind::F128PPC(val),
             mir::Literal::Char(c) => ConstValueKind::U8(c as u8),
-        })
+        }
     }
 }
 

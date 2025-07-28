@@ -3,6 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use allocator::{Allocator, AllocatorScope};
 use intrinsics::*;
 use reid_lib::{
+    builder::ConstantValue,
     compile::CompiledModule,
     debug_information::{
         DebugFileData, DebugLexicalScope, DebugLocalVariable, DebugLocation, DebugMetadata, DebugRecordKind,
@@ -96,6 +97,14 @@ impl Default for State {
     }
 }
 
+impl mir::GlobalKind {
+    fn codegen<'ctx>(&'ctx self, context: &'ctx Context, module: &Module) -> Result<ConstantValue, ErrorKind> {
+        Ok(match self {
+            mir::GlobalKind::Literal(literal) => module.add_constant(literal.as_const_kind()),
+        })
+    }
+}
+
 impl mir::Module {
     fn codegen<'ctx>(
         &'ctx self,
@@ -105,8 +114,10 @@ impl mir::Module {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
 
-        let const_value = module.add_constant(ConstValueKind::I128(132));
-        module.add_global("some_global", const_value);
+        for global in &self.globals {
+            let const_value = global.kind.codegen(context, &module)?;
+            module.add_global(&global.name, const_value);
+        }
 
         let (debug, compile_unit) = if let Some(path) = &self.path {
             module.create_debug_info(DebugFileData {

@@ -128,6 +128,7 @@ impl ast::Module {
             imports,
             associated_functions,
             functions,
+            globals: Vec::new(),
             path: self.path.clone(),
             is_main: self.is_main,
             tokens: self.tokens,

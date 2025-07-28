@@ -421,9 +421,21 @@ pub struct Module {
     pub functions: Vec<FunctionDefinition>,
     pub typedefs: Vec<TypeDefinition>,
     pub binop_defs: Vec<BinopDefinition>,
+    pub globals: Vec<GlobalValue>,
     pub path: Option<PathBuf>,
     pub tokens: Vec<FullToken>,
     pub is_main: bool,
+}
+
+#[derive(Debug)]
+pub struct GlobalValue {
+    pub name: String,
+    pub kind: GlobalKind,
+}
+
+#[derive(Debug)]
+pub enum GlobalKind {
+    Literal(Literal),
 }
 
 pub type ModuleMap = HashMap<SourceModuleId, Module>;
