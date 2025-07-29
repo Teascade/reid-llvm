@@ -1,0 +1,9 @@
+[package]
+name = "reid-lsp"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+socket = "0.0.7"
+tokio = { version = "1.47.0", features = ["full"] }
+tower-lsp = "0.20.0"

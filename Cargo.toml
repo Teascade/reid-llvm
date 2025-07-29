@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "reid",
-    "reid-llvm-lib"
+    "reid-llvm-lib", 
+    "reid-lsp"
 ]
