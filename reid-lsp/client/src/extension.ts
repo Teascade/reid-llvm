@@ -57,6 +57,9 @@ export function activate(context: ExtensionContext) {
 
 	client.info("hello");
 
+	workspace.onDidOpenTextDocument((e) => {
+	});
+
 	// Start the client. This will also launch the server
 	client.start();
 }

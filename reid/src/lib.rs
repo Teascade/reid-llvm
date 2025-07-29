@@ -72,7 +72,7 @@ use crate::{
     mir::macros::{form_macros, MacroModule, MacroPass},
 };
 
-mod ast;
+pub mod ast;
 mod codegen;
 pub mod error_raporting;
 pub mod ld;
@@ -93,6 +93,7 @@ pub fn parse_module<'map, T: Into<String>>(
     map.set_tokens(id, tokens.clone());
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#?}", &tokens);
 
     Ok((id, tokens))
@@ -127,6 +128,7 @@ pub fn compile_module<'map>(
     };
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&ast_module);
 
     Ok(ast_module.process(module_id))
@@ -137,9 +139,11 @@ pub fn perform_all_passes<'map>(
     module_map: &'map mut ErrorModules,
 ) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&context);
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &context);
 
     let state = context.pass(&mut LinkerPass {
@@ -154,10 +158,13 @@ pub fn perform_all_passes<'map>(
     }
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:-^100}", "LINKER OUTPUT");
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &context);
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&state);
 
     if !state.errors.is_empty() {
@@ -179,10 +186,13 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut macro_pass)?;
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:-^100}", "MACRO OUTPUT");
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &context);
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&state);
 
     if !state.errors.is_empty() {
@@ -217,12 +227,16 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut TypeInference { refs: &mut refs })?;
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:-^100}", "TYPE INFERRER OUTPUT");
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{}", &refs);
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &context);
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&state);
 
     if !state.errors.is_empty() {
@@ -239,10 +253,13 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut TypeCheck { refs: &refs })?;
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:-^100}", "TYPECHECKER OUTPUT");
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &context);
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     dbg!(&state);
 
     if !state.errors.is_empty() {
@@ -280,8 +297,10 @@ pub fn compile_and_pass<'map>(
     perform_all_passes(&mut mir_context, module_map)?;
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:-^100}", "FINAL OUTPUT");
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{:#}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
@@ -291,6 +310,7 @@ pub fn compile_and_pass<'map>(
     };
 
     #[cfg(debug_assertions)]
+    #[cfg(feature = "log_output")]
     println!("{}", &codegen_modules.context);
 
     let compiled = codegen_modules.compile(cpu, features);

@@ -26,12 +26,11 @@ impl LDRunner {
         let dyn_linker_path = find_objectfile(&self.dynamic_linker);
         let crt1_path = find_objectfile("crt1.o");
 
+        #[cfg(feature = "log_output")]
         println!("LDRunner: Using dynamic linker at: {:?}", dyn_linker_path);
 
         let mut ld = Command::new(&self.command);
-        ld.arg("-dynamic-linker")
-            .arg(dyn_linker_path)
-            .arg(crt1_path);
+        ld.arg("-dynamic-linker").arg(dyn_linker_path).arg(crt1_path);
 
         for library in &self.libraries {
             ld.arg(format!("-l{}", library));
@@ -41,22 +40,21 @@ impl LDRunner {
             .arg("-o")
             .arg(out_path.to_str().unwrap());
 
+        #[cfg(feature = "log_output")]
         println!(
             "LDRunner: Executing linker to objfile at {:?} => {:?}",
             input_path, out_path
         );
+        #[cfg(feature = "log_output")]
         dbg!(&ld);
 
         ld.spawn().expect("Unable to execute ld!");
 
         thread::sleep(Duration::from_millis(100));
 
+        #[cfg(feature = "log_output")]
         println!("Setting executable bit to {:?}..", out_path);
-        Command::new("chmod")
-            .arg("+x")
-            .arg(out_path)
-            .spawn()
-            .unwrap();
+        Command::new("chmod").arg("+x").arg(out_path).spawn().unwrap();
         thread::sleep(Duration::from_millis(100));
     }
 }

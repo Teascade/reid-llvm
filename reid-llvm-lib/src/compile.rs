@@ -123,8 +123,6 @@ impl CompiledModule {
             let llvm_ir =
                 from_cstring(LLVMPrintModuleToString(self.module_ref)).expect("Unable to print LLVM IR to string");
 
-            println!("{}", llvm_ir);
-
             let mut err = ErrorMessageHolder::null();
             LLVMVerifyModule(
                 self.module_ref,

@@ -50,7 +50,7 @@ impl ErrorKind {
 }
 
 impl ErrorKind {
-    fn get_meta(&self) -> Metadata {
+    pub fn get_meta(&self) -> Metadata {
         match &self {
             ErrorKind::LexerError(error) => error.metadata,
             ErrorKind::ParserError(error) => error.metadata,
@@ -61,6 +61,18 @@ impl ErrorKind {
                 codegen::ErrorKind::Null => Default::default(),
             },
             ErrorKind::MacroError(error) => error.metadata,
+        }
+    }
+
+    pub fn get_type_str(&self) -> &str {
+        match self {
+            ErrorKind::LexerError(_) => "lexer",
+            ErrorKind::ParserError(_) => "parser",
+            ErrorKind::TypeCheckError(_) => "typechecker",
+            ErrorKind::TypeInferenceError(_) => "type-inferrer",
+            ErrorKind::LinkerError(_) => "linker",
+            ErrorKind::MacroError(_) => "macro-pass",
+            ErrorKind::CodegenError(_) => "codegen",
         }
     }
 }
@@ -120,7 +132,7 @@ impl ErrorModules {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ReidError {
     map: ErrorModules,
-    errors: Vec<ErrorKind>,
+    pub errors: Vec<ErrorKind>,
 }
 
 impl ReidError {
@@ -185,9 +197,7 @@ impl std::fmt::Display for ReidError {
             let module = self.map.module(&meta.source_module_id);
             let position = if let Some(module) = module {
                 if let Some(tokens) = &module.tokens {
-                    let range_tokens = meta.range.into_tokens(&tokens);
-
-                    get_position(&range_tokens).or(meta.position.map(|p| (p, p)))
+                    meta.range.into_position(tokens).or(meta.position.map(|p| (p, p)))
                 } else if let Some(position) = meta.position {
                     Some((position, position))
                 } else {
@@ -236,6 +246,11 @@ impl TokenRange {
             .by_ref()
             .take(self.end + 1 - self.start)
             .collect::<Vec<_>>()
+    }
+
+    pub fn into_position<'v>(&self, tokens: &'v Vec<FullToken>) -> Option<(Position, Position)> {
+        let tokens = self.into_tokens(tokens);
+        get_position(&tokens)
     }
 }
 

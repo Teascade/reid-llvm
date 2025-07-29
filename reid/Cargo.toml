@@ -10,6 +10,7 @@ edition = "2021"
 default = ["color"]
 
 color = ["colored"]
+log_output = []
 
 [dependencies]
 ## Make it easier to generate errors

@@ -41,16 +41,7 @@ impl Metadata {
     }
 
     pub fn into_positions(&self, tokens: &Vec<FullToken>) -> Option<(Position, Position)> {
-        let mut iter = tokens
-            .iter()
-            .skip(self.range.start)
-            .take(self.range.end - self.range.start);
-        if let Some(first) = iter.next() {
-            let last = iter.last().unwrap_or(first);
-            Some((first.position, last.position.add(last.token.len() as u32)))
-        } else {
-            None
-        }
+        self.range.into_position(tokens)
     }
 }
 

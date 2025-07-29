@@ -728,7 +728,6 @@ impl mir::Statement {
             mir::StmtKind::Let(NamedVariableRef(ty, name, meta), mutable, expression) => {
                 let value = expression.codegen(scope, &state)?.unwrap();
 
-                dbg!(&scope.allocator, &meta, &value.1);
                 let alloca = scope
                     .allocate(meta, &value.1)
                     .unwrap()

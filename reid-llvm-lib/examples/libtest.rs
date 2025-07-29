@@ -52,7 +52,5 @@ fn main() {
 
     else_b.terminate(TerminatorKind::Ret(add)).unwrap();
 
-    dbg!(&context);
-
     context.compile(None, Vec::new());
 }

@@ -42,13 +42,11 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     /// Useful in conjunction with [`TokenStream::next`]
     pub fn expecting_err<T: Into<String>>(&mut self, expected: T) -> Result<Error, Error> {
         let next_token = self.peek().unwrap_or(Token::Eof);
+        let pos = self.next_token(self.position).0;
         Ok(Error::Expected(
             expected.into(),
             next_token,
-            TokenRange {
-                start: self.position,
-                end: self.position,
-            },
+            TokenRange { start: pos, end: pos },
         ))
     }
 
@@ -173,7 +171,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     pub fn get_range_prev(&self) -> Option<TokenRange> {
         self.ref_position.as_ref().map(|ref_pos| TokenRange {
             start: **ref_pos,
-            end: self.position - 1,
+            end: self.previous_token(self.position).0,
         })
     }
 
