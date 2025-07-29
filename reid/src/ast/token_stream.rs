@@ -180,7 +180,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     fn previous_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
         from -= 1;
         while let Some(token) = self.tokens.get(from) {
-            if let Token::Whitespace(_) = token.token {
+            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_)) {
                 from -= 1;
             } else {
                 break;
@@ -191,7 +191,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
 
     fn next_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
         while let Some(token) = self.tokens.get(from) {
-            if let Token::Whitespace(_) = token.token {
+            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_)) {
                 from += 1;
             } else {
                 break;
