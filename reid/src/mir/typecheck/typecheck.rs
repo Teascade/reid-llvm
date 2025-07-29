@@ -97,9 +97,10 @@ fn check_typedefs_for_recursion<'a, 'b>(
                             typedef.meta,
                         );
                     } else {
-                        seen.insert(name.clone());
                         if let Some(inner_typedef) = defmap.get(name) {
-                            check_typedefs_for_recursion(defmap, inner_typedef, seen.clone(), state)
+                            let mut inner_seen = seen.clone();
+                            inner_seen.insert(name.clone());
+                            check_typedefs_for_recursion(defmap, inner_typedef, inner_seen.clone(), state)
                         }
                     }
                 }
