@@ -3,12 +3,12 @@ use std::path::PathBuf;
 
 use dashmap::DashMap;
 use reid::ast::lexer::{FullToken, Position};
+use reid::error_raporting::{ErrorModules, ReidError};
 use reid::mir::{
     self, Context, FunctionCall, FunctionDefinition, FunctionParam, IfExpression, SourceModuleId, StructType, TypeKind,
     WhileStatement,
 };
 use reid::{compile_module, parse_module, perform_all_passes};
-use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverContents, HoverParams, HoverProviderCapability,
@@ -16,7 +16,7 @@ use tower_lsp::lsp_types::{
     TextDocumentItem, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
-use tower_lsp::{Client, LanguageServer, LspService, Server};
+use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
 #[derive(Debug)]
 struct Backend {
@@ -28,7 +28,7 @@ struct Backend {
 
 #[tower_lsp::async_trait]
 impl LanguageServer for Backend {
-    async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+    async fn initialize(&self, _: InitializeParams) -> jsonrpc::Result<InitializeResult> {
         self.client
             .log_message(MessageType::INFO, "Initializing Reid Language Server")
             .await;
@@ -64,18 +64,18 @@ impl LanguageServer for Backend {
             .await;
     }
 
-    async fn shutdown(&self) -> Result<()> {
+    async fn shutdown(&self) -> jsonrpc::Result<()> {
         Ok(())
     }
 
-    async fn completion(&self, _: CompletionParams) -> Result<Option<CompletionResponse>> {
+    async fn completion(&self, _: CompletionParams) -> jsonrpc::Result<Option<CompletionResponse>> {
         Ok(Some(CompletionResponse::Array(vec![
             CompletionItem::new_simple("Hello".to_string(), "Some detail".to_string()),
             CompletionItem::new_simple("Bye".to_string(), "More detail".to_string()),
         ])))
     }
 
-    async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+    async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {
         let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
         let tokens = self.tokens.get(&file_name);
@@ -134,55 +134,24 @@ impl LanguageServer for Backend {
 
 impl Backend {
     async fn recompile(&self, params: TextDocumentItem) {
-        let mut map = Default::default();
         let path = PathBuf::from(params.uri.clone().path());
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-        let mut reid_error = None;
-        let mut tokens = None;
-        let mut token_types_opt = None;
+        let mut map = Default::default();
+        let parse_res = parse(&params.text, path.clone(), &mut map);
+        let (tokens, result) = match parse_res {
+            Ok((module_id, tokens)) => (tokens.clone(), compile(module_id, tokens, path, &mut map)),
+            Err(e) => (Vec::new(), Err(e)),
+        };
 
-        match parse_module(&params.text, file_name.clone(), &mut map) {
-            Ok(module) => {
-                self.client
-                    .log_message(MessageType::INFO, format!("successfully parsed!"))
-                    .await;
-                tokens = Some(module.1.clone());
-                match compile_module(module.0, module.1, &mut map, Some(path.clone()), true) {
-                    Ok(module) => {
-                        let module_id = module.module_id;
-                        let mut context = Context::from(vec![module], path.parent().unwrap().to_owned());
-                        match perform_all_passes(&mut context, &mut map) {
-                            Ok(_) => {
-                                for module in context.modules.values() {
-                                    if module.module_id != module_id {
-                                        continue;
-                                    }
-                                    let token_types = DashMap::new();
-                                    for (idx, token) in module.tokens.iter().enumerate() {
-                                        token_types.insert(token.clone(), find_type_in_context(&module, idx));
-                                    }
-                                    token_types_opt = Some(token_types);
-                                }
-                            }
-                            Err(e) => {
-                                reid_error = Some(e);
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        reid_error = Some(e);
-                    }
-                }
+        let mut diagnostics = Vec::new();
+        match result {
+            Ok(Some(result)) => {
+                self.tokens.insert(file_name.clone(), result.tokens);
+                self.types.insert(file_name.clone(), result.types);
             }
-            Err(e) => {
-                reid_error = Some(e);
-            }
-        }
-
-        if let Some(tokens) = &tokens {
-            if let Some(mut reid_error) = reid_error {
-                let mut diagnostics = Vec::new();
+            Ok(_) => {}
+            Err(mut reid_error) => {
                 reid_error.errors.dedup();
                 for error in reid_error.errors {
                     let meta = error.get_meta();
@@ -217,23 +186,54 @@ impl Backend {
                     });
                     self.client.log_message(MessageType::INFO, format!("{}", error)).await;
                 }
-                self.client
-                    .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
-                    .await;
-            } else {
-                self.client
-                    .publish_diagnostics(params.uri.clone(), Vec::new(), Some(params.version))
-                    .await;
             }
         }
 
-        if let Some(tokens) = tokens.take() {
-            self.tokens.insert(file_name.clone(), tokens);
-        }
-        if let Some(token_types) = token_types_opt {
-            self.types.insert(file_name.clone(), token_types);
-        }
+        self.client
+            .publish_diagnostics(params.uri.clone(), diagnostics, Some(params.version))
+            .await;
     }
+}
+
+struct CompileResult {
+    tokens: Vec<FullToken>,
+    types: DashMap<FullToken, Option<TypeKind>>,
+}
+
+fn parse(source: &str, path: PathBuf, map: &mut ErrorModules) -> Result<(SourceModuleId, Vec<FullToken>), ReidError> {
+    let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+
+    Ok(parse_module(source, file_name.clone(), map)?)
+}
+
+fn compile(
+    module_id: SourceModuleId,
+    tokens: Vec<FullToken>,
+    path: PathBuf,
+    map: &mut ErrorModules,
+) -> Result<Option<CompileResult>, ReidError> {
+    let token_types = DashMap::new();
+
+    let module = compile_module(module_id, tokens, map, Some(path.clone()), true)?;
+
+    let module_id = module.module_id;
+    let mut context = Context::from(vec![module], path.parent().unwrap().to_owned());
+    perform_all_passes(&mut context, map)?;
+
+    for module in context.modules.into_values() {
+        if module.module_id != module_id {
+            continue;
+        }
+        for (idx, token) in module.tokens.iter().enumerate() {
+            token_types.insert(token.clone(), find_type_in_context(&module, idx));
+        }
+
+        return Ok(Some(CompileResult {
+            tokens: module.tokens,
+            types: token_types,
+        }));
+    }
+    return Ok(None);
 }
 
 #[tokio::main]
