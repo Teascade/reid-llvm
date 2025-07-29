@@ -51,7 +51,7 @@ impl ast::Module {
                             .map(|p| mir::FunctionParam {
                                 name: p.0,
                                 ty: p.1 .0.into_mir(module_id),
-                                meta: p.1 .1.as_meta(module_id),
+                                meta: p.2.as_meta(module_id),
                             })
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Extern(false),
@@ -164,7 +164,7 @@ impl ast::FunctionDefinition {
         params.extend(signature.params.iter().cloned().map(|p| FunctionParam {
             name: p.0,
             ty: p.1 .0.into_mir(module_id),
-            meta: p.1 .1.as_meta(module_id),
+            meta: p.2.as_meta(module_id),
         }));
         mir::FunctionDefinition {
             name: signature.name.clone(),

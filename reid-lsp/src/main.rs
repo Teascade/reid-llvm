@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use dashmap::DashMap;
 use reid::ast::lexer::{FullToken, Position};
-use reid::{compile_module, parse_module};
+use reid::mir::{self, Context, StructType, TypeKind};
+use reid::{compile_module, parse_module, perform_all_passes};
 use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
@@ -18,6 +20,7 @@ struct Backend {
     client: Client,
     tokens: DashMap<String, Vec<FullToken>>,
     ast: DashMap<String, reid::ast::Module>,
+    types: DashMap<String, DashMap<FullToken, Option<TypeKind>>>,
 }
 
 #[tower_lsp::async_trait]
@@ -72,7 +75,7 @@ impl LanguageServer for Backend {
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let tokens = self.tokens.get(&file_name).unwrap();
+        let tokens = self.tokens.get(&file_name);
         let position = params.text_document_position_params.position;
 
         self.client
@@ -81,20 +84,33 @@ impl LanguageServer for Backend {
                 format!("line {}, col {}", position.line, position.character),
             )
             .await;
-        let token = tokens.iter().find(|tok| {
-            tok.position.1 == position.line + 1
-                && (tok.position.0 <= position.character + 1
-                    && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
-        });
+        let token = if let Some(tokens) = &tokens {
+            tokens.iter().find(|tok| {
+                tok.position.1 == position.line + 1
+                    && (tok.position.0 <= position.character + 1
+                        && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
+            })
+        } else {
+            None
+        };
+
+        let ty = if let Some(token) = token {
+            if let Some(ty) = self.types.get(&file_name).unwrap().get(token) {
+                ty.clone()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         Ok(Some(Hover {
-            contents: HoverContents::Scalar(MarkedString::String(format!("{:?}", token))),
+            contents: HoverContents::Scalar(MarkedString::String(format!("{:?}", ty))),
             range: None,
         }))
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.client.log_message(MessageType::INFO, "opened!").await;
         self.recompile(TextDocumentItem {
             uri: params.text_document.uri,
             language_id: params.text_document.language_id,
@@ -105,7 +121,6 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        self.client.log_message(MessageType::INFO, "changed!").await;
         self.recompile(TextDocumentItem {
             text: params.content_changes[0].text.clone(),
             uri: params.text_document.uri,
@@ -124,6 +139,7 @@ impl Backend {
 
         let mut reid_error = None;
         let mut tokens = None;
+        let token_types = DashMap::new();
 
         match parse_module(&params.text, file_name.clone(), &mut map) {
             Ok(module) => {
@@ -131,14 +147,34 @@ impl Backend {
                     .log_message(MessageType::INFO, format!("successfully parsed!"))
                     .await;
                 tokens = Some(module.1.clone());
-                match compile_module(module.0, module.1, &mut map, Some(path), true) {
-                    Ok(_) => {}
+                match compile_module(module.0, module.1, &mut map, Some(path.clone()), true) {
+                    Ok(module) => {
+                        let module_id = module.module_id;
+                        let mut context = Context::from(vec![module], path.parent().unwrap().to_owned());
+                        match perform_all_passes(&mut context, &mut map) {
+                            Ok(_) => {
+                                for module in context.modules.values() {
+                                    if module.module_id != module_id {
+                                        continue;
+                                    }
+                                    for (idx, token) in module.tokens.iter().enumerate() {
+                                        token_types.insert(token.clone(), find_type_in_context(&module, idx));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                reid_error = Some(e);
+                            }
+                        }
+                    }
                     Err(e) => {
                         reid_error = Some(e);
                     }
                 }
             }
-            Err(_) => {}
+            Err(e) => {
+                reid_error = Some(e);
+            }
         }
 
         if let Some(tokens) = &tokens {
@@ -151,9 +187,6 @@ impl Backend {
                         .into_position(&tokens)
                         .unwrap_or((Position(0, 0), Position(0, 0)));
                     self.client.log_message(MessageType::INFO, format!("{:?}", &meta)).await;
-                    self.client
-                        .log_message(MessageType::INFO, format!("{:?}", &tokens))
-                        .await;
                     self.client
                         .log_message(MessageType::INFO, format!("{:?}", &positions))
                         .await;
@@ -193,6 +226,7 @@ impl Backend {
         if let Some(tokens) = tokens.take() {
             self.tokens.insert(file_name.clone(), tokens);
         }
+        self.types.insert(file_name.clone(), token_types);
     }
 }
 
@@ -205,6 +239,55 @@ async fn main() {
         client,
         ast: DashMap::new(),
         tokens: DashMap::new(),
+        types: DashMap::new(),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
+}
+
+pub fn find_type_in_context(module: &mir::Module, token_idx: usize) -> Option<TypeKind> {
+    for import in &module.imports {
+        if import.1.contains(token_idx) {
+            return None;
+        }
+    }
+    for typedef in &module.typedefs {
+        if !typedef.meta.contains(token_idx) {
+            continue;
+        }
+
+        match &typedef.kind {
+            mir::TypeDefinitionKind::Struct(StructType(fields)) => {
+                for field in fields {
+                    if field.2.contains(token_idx) {
+                        return Some(field.1.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    for function in &module.functions {
+        if !(function.signature() + function.block_meta()).contains(token_idx) {
+            continue;
+        }
+
+        for param in &function.parameters {
+            if param.meta.contains(token_idx) {
+                return Some(param.ty.clone());
+            }
+        }
+
+        return match &function.kind {
+            mir::FunctionDefinitionKind::Local(block, _) => find_type_in_block(&block, token_idx),
+            mir::FunctionDefinitionKind::Extern(_) => None,
+            mir::FunctionDefinitionKind::Intrinsic(_) => None,
+        };
+    }
+    None
+}
+
+pub fn find_type_in_block(block: &mir::Block, token_idx: usize) -> Option<TypeKind> {
+    for statement in &block.statements {}
+
+    None
 }

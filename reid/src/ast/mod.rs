@@ -193,7 +193,7 @@ pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub To
 pub struct FunctionSignature {
     pub name: String,
     pub self_kind: SelfKind,
-    pub params: Vec<(String, Type)>,
+    pub params: Vec<(String, Type, TokenRange)>,
     pub return_type: Option<Type>,
     #[allow(dead_code)]
     pub range: TokenRange,

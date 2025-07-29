@@ -273,6 +273,9 @@ pub fn perform_all_passes<'map>(
         ));
     }
 
+    #[cfg(feature = "context_debug")]
+    dbg!(&context);
+
     Ok(())
 }
 

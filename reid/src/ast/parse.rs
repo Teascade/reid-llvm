@@ -668,7 +668,7 @@ impl Parse for FunctionDefinition {
 }
 
 #[derive(Debug)]
-struct FunctionParam(String, Type);
+struct FunctionParam(String, Type, TokenRange);
 
 impl Parse for FunctionParam {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
@@ -676,7 +676,7 @@ impl Parse for FunctionParam {
             return Err(stream.expected_err("parameter name")?);
         };
         stream.expect(Token::Colon)?;
-        Ok(FunctionParam(arg_name, stream.parse()?))
+        Ok(FunctionParam(arg_name, stream.parse()?, stream.get_range().unwrap()))
     }
 }
 
@@ -738,11 +738,11 @@ impl Parse for FunctionSignature {
             match &self_kind {
                 SelfKind::None => {
                     if let Ok(param) = stream.parse::<FunctionParam>() {
-                        params.push((param.0, param.1));
+                        params.push((param.0, param.1, param.2));
                         while let Some(Token::Comma) = stream.peek() {
                             stream.next();
                             let param = stream.parse::<FunctionParam>()?;
-                            params.push((param.0, param.1));
+                            params.push((param.0, param.1, param.2));
                         }
                     }
                 }
@@ -750,7 +750,7 @@ impl Parse for FunctionSignature {
                     while let Some(Token::Comma) = stream.peek() {
                         stream.next();
                         let param = stream.parse::<FunctionParam>()?;
-                        params.push((param.0, param.1));
+                        params.push((param.0, param.1, param.2));
                     }
                 }
             }

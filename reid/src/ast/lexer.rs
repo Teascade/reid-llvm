@@ -7,7 +7,7 @@ static HEXADECIMAL_NUMERICS: &[char] = &[
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
 ];
 
-#[derive(Eq, PartialEq, Clone, PartialOrd, Ord)]
+#[derive(Eq, PartialEq, Clone, PartialOrd, Ord, Hash)]
 pub enum Token {
     /// Values
     Identifier(String),
@@ -211,7 +211,7 @@ impl std::fmt::Debug for Token {
 }
 
 /// A token with a position
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FullToken {
     pub token: Token,
     pub position: Position,

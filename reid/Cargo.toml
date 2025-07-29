@@ -11,6 +11,7 @@ default = ["color"]
 
 color = ["colored"]
 log_output = []
+context_debug = []
 
 [dependencies]
 ## Make it easier to generate errors

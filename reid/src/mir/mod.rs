@@ -43,6 +43,18 @@ impl Metadata {
     pub fn into_positions(&self, tokens: &Vec<FullToken>) -> Option<(Position, Position)> {
         self.range.into_position(tokens)
     }
+
+    pub fn is_after(&self, token_idx: usize) -> bool {
+        return token_idx < self.range.start;
+    }
+
+    pub fn is_before(&self, token_idx: usize) -> bool {
+        return token_idx > self.range.end;
+    }
+
+    pub fn contains(&self, token_idx: usize) -> bool {
+        return token_idx >= self.range.start && token_idx <= self.range.end;
+    }
 }
 
 impl std::ops::Add for Metadata {
