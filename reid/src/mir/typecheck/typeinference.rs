@@ -614,24 +614,36 @@ impl Expression {
                                 first_param.1,
                             )
                             .resolve_ref(type_refs.types);
-                        let backing_var = first_param.backing_var().expect("todo").1.clone();
-
-                        if let TypeKind::Borrow(inner, _) = type_kind {
-                            if let TypeKind::Borrow(..) = *inner.clone() {
-                                *type_kind = type_kind.unroll_borrow();
-                                let ExprKind::Borrow(val, _) = &first_param.0 else {
-                                    panic!()
-                                };
-                                *first_param = *val.clone();
-                            }
-                        }
-
-                        if let Some((mutable, _)) = type_refs.find_var(&backing_var) {
-                            if !mutable {
-                                first_param.remove_borrow_mutability();
+                        let backing_var = first_param.backing_var();
+                        let is_mutable = if let Some(backing_var) = first_param.backing_var() {
+                            if let Some((mutable, _)) = type_refs.find_var(&backing_var.1) {
+                                mutable
+                            } else {
+                                return Err(ErrorKind::VariableNotDefined(backing_var.1.clone()));
                             }
                         } else {
-                            return Err(ErrorKind::VariableNotDefined(backing_var));
+                            false
+                        };
+
+                        if backing_var.is_some() {
+                            if let TypeKind::Borrow(inner, _) = type_kind {
+                                if let TypeKind::Borrow(..) = *inner.clone() {
+                                    *type_kind = type_kind.unroll_borrow();
+                                    let ExprKind::Borrow(val, _) = &first_param.0 else {
+                                        panic!()
+                                    };
+                                    *first_param = *val.clone();
+                                }
+                            }
+                        } else {
+                            let ExprKind::Borrow(val, _) = &first_param.0 else {
+                                panic!()
+                            };
+                            *first_param = *val.clone();
+                        }
+
+                        if !is_mutable {
+                            first_param.remove_borrow_mutability();
                         }
                     }
                 }
