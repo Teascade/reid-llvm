@@ -49,6 +49,9 @@ impl Display for Module {
         for typedef in &self.typedefs {
             writeln!(inner_f, "{}", typedef)?;
         }
+        for global in &self.globals {
+            writeln!(inner_f, "global {} = {}", global.name, global.kind)?;
+        }
         for (ty, fun) in &self.associated_functions {
             writeln!(inner_f, "(Assoc {}) {}", ty, fun)?;
         }
@@ -56,6 +59,26 @@ impl Display for Module {
             writeln!(inner_f, "{}", fun)?;
         }
         writeln!(f, "}}")
+    }
+}
+
+impl Display for GlobalKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GlobalKind::Literal(literal) => Display::fmt(literal, f),
+            GlobalKind::Array(global_kinds) => {
+                f.write_char('[')?;
+                let mut iter = global_kinds.iter();
+                if let Some(global) = iter.next() {
+                    Display::fmt(global, f)?;
+                    while let Some(global) = iter.next() {
+                        write!(f, ", ")?;
+                        Display::fmt(global, f)?;
+                    }
+                }
+                f.write_char(']')
+            }
+        }
     }
 }
 
@@ -280,7 +303,7 @@ impl Display for ExprKind {
                 write!(f, "::")?;
                 Display::fmt(function_call, f)
             }
-            ExprKind::GlobalRef(global_value, type_kind) => write!(f, "todo globals"),
+            ExprKind::GlobalRef(global_value, type_kind) => write!(f, "global<{}>(${})", type_kind, global_value),
         }
     }
 }
