@@ -76,12 +76,12 @@ Big features that I want later but are not necessary:
 - LSP implementation
 
 Smaller features:
-- ~~Hex-numbers~~
-- ~~Bitwise operations~~
-- ~~Easier way to initialize arrays with a single value~~
-- ~~Void-returns (`return;` for void-returning functions)~~
-- ~~Only include standard library at all if it is imported~~
-- Lexical scopes for Debug Information
+- ~~Hex-numbers~~ (DONE)
+- ~~Bitwise operations~~ (DONE)
+- ~~Easier way to initialize arrays with a single value~~ (DONE)
+- ~~Void-returns (`return;` for void-returning functions)~~ (DONE)
+- ~~Only include standard library at all if it is imported~~ (DONE)
+- ~~Lexical scopes for Debug Information~~ (DONE)
 
 ### Why "Reid"
 
