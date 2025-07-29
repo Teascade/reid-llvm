@@ -157,10 +157,6 @@ cmake llvm -B build -DCMAKE_BUILD_TYPE=MinSizeRel -DLLVM_ENABLE_ASSERTIONS=ON -D
 ninja -j23
 ```
 
-*Also Note:* Building LLVM with `Ninja` was not successful for me, but this
-method was. Ninja may be successful with you, to try it, add `-G Ninja` to the
-`cmake`-command, and instead of `make` run `ninja install`.
-
 ### Building this crate itself
 
 Assuming `llvm-project` from the previous step was at
@@ -170,6 +166,5 @@ Assuming `llvm-project` from the previous step was at
 LLVM_SYS_201_PREFIX=/path/llvm-project/build cargo build
 ```
 
-## In conclusion
-Good luck! It took me a good 10 hours to figure this out for myself, I sure hope
-these instructions help both myself and someone else in the future!
+Alternatively assuming you have LLVM 20.1 or newer installed you may use omit
+the environment variable entirely and use dynamic linking instead
