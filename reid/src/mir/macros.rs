@@ -244,7 +244,6 @@ impl MacroFunction for TestMacro {
             .parent()
             .expect("Module path has no parent!")
             .join(path);
-        dbg!(&path);
 
         let contents = match std::fs::read(path) {
             Ok(content) => content,

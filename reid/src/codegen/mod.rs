@@ -1313,7 +1313,7 @@ impl mir::Expression {
                     Some(val)
                 } else {
                     match (&val.1, type_kind) {
-                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(_)) => match *inner.clone() {
+                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(ty2)) => match *inner.clone() {
                             TypeKind::UserPtr(_) => Some(StackValue(
                                 val.0.derive(
                                     scope
@@ -1326,6 +1326,27 @@ impl mir::Expression {
                                 ),
                                 TypeKind::CodegenPtr(Box::new(type_kind.clone())),
                             )),
+                            TypeKind::Borrow(ty1, _) => match *ty1.clone() {
+                                TypeKind::Array(ty1, _) => {
+                                    if ty1 == *ty2 {
+                                        Some(StackValue(
+                                            val.0.derive(
+                                                scope
+                                                    .block
+                                                    .build(Instr::BitCast(
+                                                        val.instr(),
+                                                        Type::Ptr(Box::new(type_kind.get_type(scope.type_values))),
+                                                    ))
+                                                    .unwrap(),
+                                            ),
+                                            TypeKind::CodegenPtr(Box::new(type_kind.clone())),
+                                        ))
+                                    } else {
+                                        return Err(ErrorKind::Null);
+                                    }
+                                }
+                                _ => return Err(ErrorKind::Null),
+                            },
                             _ => panic!(),
                         },
                         (TypeKind::UserPtr(_), TypeKind::UserPtr(_))

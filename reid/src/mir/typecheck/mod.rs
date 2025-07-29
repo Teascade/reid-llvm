@@ -256,6 +256,16 @@ impl TypeKind {
             let other_cat = other.category();
             match (self, other) {
                 (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Ok(other.clone()),
+                (TypeKind::Borrow(ty1, _), TypeKind::UserPtr(ty2)) => match *ty1.clone() {
+                    TypeKind::Array(ty1, _) => {
+                        if ty1 == *ty2 {
+                            Ok(other.clone())
+                        } else {
+                            Err(ErrorKind::NotCastableTo(self.clone(), other.clone()))
+                        }
+                    }
+                    _ => Err(ErrorKind::NotCastableTo(self.clone(), other.clone())),
+                },
                 (TypeKind::Char, TypeKind::U8) => Ok(other.clone()),
                 (TypeKind::U8, TypeKind::Char) => Ok(other.clone()),
                 _ => match (&self_cat, &other_cat) {
