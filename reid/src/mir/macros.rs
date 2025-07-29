@@ -1,11 +1,15 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::mir::{self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, TypeKind, WhileStatement};
 
 use super::pass::{Pass, PassResult, PassState};
 
 pub trait MacroFunction: std::fmt::Debug {
-    fn generate<'ctx, 'a>(&self, params: &[mir::Literal]) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind>;
+    fn generate<'ctx, 'a>(
+        &self,
+        params: &[mir::Literal],
+        prefix: String,
+    ) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind>;
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -29,6 +33,8 @@ pub enum ErrorKind {
 pub struct MacroPass {
     pub(crate) macros: HashMap<String, Box<dyn MacroFunction>>,
 }
+
+pub struct MacroData {}
 
 type MacroPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
@@ -106,7 +112,13 @@ impl mir::Expression {
                         }
                         let (generated_globals, expr) = state.or_else(
                             existing_macro
-                                .generate(&literals)
+                                .generate(
+                                    &literals,
+                                    format!(
+                                        "macro.{}.{}.{}",
+                                        function_call.name, self.1.range.start, self.1.range.end
+                                    ),
+                                )
                                 .map(|(globals, kind)| (globals, mir::Expression(kind, self.1))),
                             (Vec::new(), self.clone()),
                             self.1,
@@ -190,7 +202,11 @@ pub fn form_macros() -> HashMap<String, Box<dyn MacroFunction>> {
 #[derive(Debug)]
 pub struct TestMacro;
 impl MacroFunction for TestMacro {
-    fn generate<'ctx, 'a>(&self, literals: &[mir::Literal]) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind> {
+    fn generate<'ctx, 'a>(
+        &self,
+        literals: &[mir::Literal],
+        global_name: String,
+    ) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind> {
         if literals.len() != 1 {
             return Err(ErrorKind::InvalidAmountOfParams(literals.len() as u32, 1));
         }
@@ -214,7 +230,6 @@ impl MacroFunction for TestMacro {
 
         let len = literals.len();
 
-        let global_name = "sometestglobalvalue".to_owned();
         let global = GlobalValue {
             name: global_name.clone(),
             kind: GlobalKind::Array(literals),
