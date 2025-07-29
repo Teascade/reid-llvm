@@ -212,14 +212,14 @@ impl mir::Expression {
 pub fn form_macros() -> HashMap<String, Box<dyn MacroFunction>> {
     let mut macros: HashMap<String, Box<dyn MacroFunction>> = HashMap::new();
 
-    macros.insert("test_macro".to_owned(), Box::new(TestMacro));
+    macros.insert("include_bytes".to_owned(), Box::new(IncludeBytes));
 
     macros
 }
 
 #[derive(Debug)]
-pub struct TestMacro;
-impl MacroFunction for TestMacro {
+pub struct IncludeBytes;
+impl MacroFunction for IncludeBytes {
     fn generate<'ctx, 'a>(
         &self,
         module: &MacroModule,

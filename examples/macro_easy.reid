@@ -2,8 +2,7 @@ import std::String;
 import std::print;
 
 fn main() -> u8 {
-    // - TODO possibly allow to cast between &[ty] and *ty
-    let bytes = test_macro!("./macro_easy_file.txt");
+    let bytes = include_bytes!("./macro_easy_file.txt");
     print(String::new() + bytes.length());
     return (bytes as *u8)[0];
 }
