@@ -261,6 +261,9 @@ calls, literals, or if-expressions. Types of supported expressions include:
   *associated type* with given parameters.
   - **Accessing function calls**, a shorthand to call associated function calls
     which have `&self` or `&mut self` as their first parameter.
+  - **Macro invocations** for invoking **macros** which are evaluated at
+    compile-time rather than runtime. Currently it is not possible to define
+    your own macros, but there are some pre-defined in the intrinsics.
 - **Block-expressions**, which can return a value to the higher-level expression
   if they have a statement with a soft-return. Otherwise they return void.
 - **If-expressions**, which can execute one of two expressions depending on the
@@ -278,7 +281,7 @@ In formal grammar:
     <indexing> | <accessing> |
     <binary-exp> | <unary-exp> |
     <function-call> | <accessing-function-call> | <assoc-function-call>
-    <block> | <if-expr> | <cast> |
+    <macro-invocation> | <block> | <if-expr> | <cast> |
     ( "(" <expression> ")" )
 
 <variable> :: <ident>
@@ -294,6 +297,7 @@ In formal grammar:
 <function-call> :: <expression> "(" [ <expression> ( "," <expression> )* ] ")"
 <accessing-function-call> :: <accessing> "(" [ <expression> ( "," <expression> )* ] ")"
 <assoc-function-call> :: <type> "::" <function-call>
+<macro-invocation> :: <expression> "!(" [ <expression> ( "," <expression> )* ] ")"
 <if-expr> :: "if" <expression> <expression> [ "else" <expression> ]
 <cast> :: <expression> "as" <type>
 ```
@@ -312,6 +316,7 @@ test.first // Accessing
 func(value, 14) // Function call
 Test::get_field(&test); // Associated function call
 test.get_field(); // Same, but using a the dot-form shorthand
+include_bytes!("./test"); // Macro invocation
 if varname {} else {} // If-expression
 value as u32 // cast
 (value + 2) // Binop within parenthesis

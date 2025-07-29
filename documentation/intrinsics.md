@@ -17,6 +17,14 @@ Allocates `size` bytes and returns a pointer of `u8` of length `size`.
 i32::malloc(40); // Reserves 40 bytes
 ```
 
+### Macro Intrinsics
+
+#### `include_bytes!(path: *char) -> &[u8; _]`
+
+Attempts to load file from `path` (relative to module) into memory and includes
+it into the compiled binary directly. Returns a borrow to an array containing
+bytes from the file. Array length varies depending on the file contents.
+
 ### Associated Intrinsics
 
 #### `<T>::sizeof() -> u64`
