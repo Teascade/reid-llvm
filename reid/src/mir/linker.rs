@@ -459,7 +459,7 @@ impl<'map> Pass for LinkerPass<'map> {
                 super::ExprKind::Indexed(.., type_kind, _) => {
                     *type_kind = type_kind.update_imported(extern_types, mod_id)
                 }
-                super::ExprKind::Accessed(.., type_kind, _) => {
+                super::ExprKind::Accessed(.., type_kind, _, _) => {
                     *type_kind = type_kind.update_imported(extern_types, mod_id)
                 }
                 super::ExprKind::BinOp(.., type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),

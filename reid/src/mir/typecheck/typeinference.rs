@@ -526,7 +526,7 @@ impl Expression {
                     }
                 }
             }
-            ExprKind::Accessed(expression, type_kind, field_name) => {
+            ExprKind::Accessed(expression, type_kind, field_name, _) => {
                 let expr_ty = expression.infer_types(state, type_refs)?;
 
                 // Check that the resolved type is at least a struct, no

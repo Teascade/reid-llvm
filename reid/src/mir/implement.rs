@@ -405,7 +405,7 @@ impl Expression {
                     TypeKind::Array(Box::new(first.1), expressions.len() as u64),
                 ))
             }
-            Accessed(_, type_kind, _) => Ok((ReturnKind::Soft, type_kind.clone())),
+            Accessed(_, type_kind, ..) => Ok((ReturnKind::Soft, type_kind.clone())),
             Struct(name, _) => Ok((
                 ReturnKind::Soft,
                 TypeKind::CustomType(CustomTypeKey(name.clone(), mod_id)),
@@ -437,7 +437,7 @@ impl Expression {
         match &self.0 {
             ExprKind::Variable(var_ref) => Some(var_ref),
             ExprKind::Indexed(lhs, _, _) => lhs.backing_var(),
-            ExprKind::Accessed(lhs, _, _) => lhs.backing_var(),
+            ExprKind::Accessed(lhs, ..) => lhs.backing_var(),
             ExprKind::Borrow(expr, _) => expr.backing_var(),
             ExprKind::Deref(expr) => expr.backing_var(),
             ExprKind::Block(block) => block.backing_var(),

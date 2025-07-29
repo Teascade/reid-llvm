@@ -375,13 +375,14 @@ impl ast::Expression {
                 struct_init
                     .fields
                     .iter()
-                    .map(|(n, e)| (n.clone(), e.process(module_id)))
+                    .map(|(n, e, r)| (n.clone(), e.process(module_id), r.as_meta(module_id)))
                     .collect(),
             ),
-            ast::ExpressionKind::Accessed(expression, name) => mir::ExprKind::Accessed(
+            ast::ExpressionKind::Accessed(expression, name, name_range) => mir::ExprKind::Accessed(
                 Box::new(expression.process(module_id)),
                 mir::TypeKind::Vague(mir::VagueType::Unknown),
                 name.clone(),
+                name_range.as_meta(module_id),
             ),
             ast::ExpressionKind::Borrow(expr, mutable) => {
                 mir::ExprKind::Borrow(Box::new(expr.process(module_id)), *mutable)

@@ -226,8 +226,8 @@ impl std::ops::Add for TokenRange {
 
     fn add(self, rhs: Self) -> Self::Output {
         TokenRange {
-            start: self.start.min(rhs.start),
-            end: self.end.min(rhs.end),
+            start: self.start.min(rhs.start).min(rhs.end),
+            end: self.end.max(rhs.end).max(rhs.start),
         }
     }
 }

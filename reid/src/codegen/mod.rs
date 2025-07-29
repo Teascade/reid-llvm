@@ -1160,7 +1160,7 @@ impl mir::Expression {
                     TypeKind::Array(Box::new(elem_ty_kind), instr_list.len() as u64),
                 ))
             }
-            mir::ExprKind::Accessed(expression, type_kind, field) => {
+            mir::ExprKind::Accessed(expression, type_kind, field, _) => {
                 let struct_val = expression.codegen(scope, &state.load(false))?.unwrap();
 
                 let TypeKind::CodegenPtr(inner) = &struct_val.1 else {
@@ -1222,7 +1222,7 @@ impl mir::Expression {
                     .unwrap()
                     .maybe_location(&mut scope.block, location.clone());
 
-                for (field_n, exp) in items {
+                for (field_n, exp, _) in items {
                     let gep_n = format!("{}.{}.gep", name, field_n);
                     let store_n = format!("{}.{}.store", name, field_n);
                     let i = indices.clone().find(|(_, f)| f.0 == *field_n).unwrap().0;

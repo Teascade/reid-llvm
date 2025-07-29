@@ -279,9 +279,9 @@ impl Display for ExprKind {
                 let mut state = Default::default();
                 let mut inner_f = PadAdapter::wrap(f, &mut state);
                 let mut iter = items.iter();
-                if let Some((name, expr)) = iter.next() {
+                if let Some((name, expr, _)) = iter.next() {
                     write!(inner_f, "\n{}: {}", name, expr)?;
-                    while let Some((name, expr)) = iter.next() {
+                    while let Some((name, expr, _)) = iter.next() {
                         writeln!(inner_f, ",")?;
                         write!(inner_f, "{}: {}", name, expr)?;
                     }
@@ -289,7 +289,7 @@ impl Display for ExprKind {
                 }
                 f.write_char('}')
             }
-            ExprKind::Accessed(expression, type_kind, name) => {
+            ExprKind::Accessed(expression, type_kind, name, _) => {
                 Display::fmt(&expression, f)?;
                 write_access(f, name)?;
                 write!(f, "<{}>", type_kind)

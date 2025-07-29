@@ -133,7 +133,7 @@ impl mir::Expression {
                 allocated.extend(expr.allocate(scope));
                 allocated.extend(idx.allocate(scope));
             }
-            mir::ExprKind::Accessed(expression, _, _) => {
+            mir::ExprKind::Accessed(expression, ..) => {
                 allocated.extend(expression.allocate(scope));
             }
             mir::ExprKind::Array(expressions) => {
@@ -159,7 +159,7 @@ impl mir::Expression {
                     .unwrap();
                 allocated.push(Allocation(self.1, ty, allocation));
 
-                for (field_name, expression) in items {
+                for (field_name, expression, _) in items {
                     allocated.extend(expression.allocate(scope));
 
                     let (_, ty) = expression.return_type(&Default::default(), scope.mod_id).unwrap();

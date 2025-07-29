@@ -1,7 +1,7 @@
 //! This is the module that contains relevant code to parsing Reid, that is to
 //! say transforming a Vec of FullTokens into a loose parsed AST that can be
 //! used for unwrapping syntax sugar, and then be transformed into Reid MIR.
-use std::path::PathBuf;
+use std::{fs::Metadata, path::PathBuf};
 
 use token_stream::TokenRange;
 
@@ -88,7 +88,7 @@ pub enum ExpressionKind {
     /// Array-indexed, e.g. <expr>[<expr>]
     Indexed(Box<Expression>, Box<Expression>),
     /// Struct-accessed, e.g. <expr>.<expr>
-    Accessed(Box<Expression>, String),
+    Accessed(Box<Expression>, String, TokenRange),
     /// Associated function call, but with a shorthand
     AccessCall(Box<Expression>, Box<FunctionCallExpression>),
     Binop(BinaryOperator, Box<Expression>, Box<Expression>),
@@ -216,7 +216,7 @@ pub enum ReturnType {
 #[derive(Debug, Clone)]
 pub struct StructExpression {
     name: String,
-    fields: Vec<(String, Expression)>,
+    fields: Vec<(String, Expression, TokenRange)>,
     range: TokenRange,
 }
 

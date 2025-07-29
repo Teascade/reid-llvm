@@ -596,7 +596,7 @@ impl Expression {
                     }
                 }
             }
-            ExprKind::Accessed(expression, type_kind, field_name) => {
+            ExprKind::Accessed(expression, type_kind, field_name, _) => {
                 // Resolve expected type
                 let expected_ty = type_kind.resolve_ref(typerefs);
 
@@ -640,7 +640,7 @@ impl Expression {
                     HashSet::new()
                 };
 
-                for (field_name, field_expr) in items {
+                for (field_name, field_expr, _) in items {
                     // Get expected type, or error if field does not exist
                     let expected_ty = state.or_else(
                         struct_def

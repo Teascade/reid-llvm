@@ -191,10 +191,11 @@ where
             ),
             expr.0 .1,
         ),
-        ExpressionKind::Accessed(value_expr, index_name) => Expression(
+        ExpressionKind::Accessed(value_expr, index_name, range) => Expression(
             ExpressionKind::Accessed(
                 Box::new(apply_inner(PrimaryExpression(*value_expr.clone()), fun)),
                 index_name.clone(),
+                *range,
             ),
             expr.0 .1,
         ),
@@ -399,9 +400,9 @@ impl Parse for PrimaryExpression {
                     );
                 }
                 ValueIndex::Dot(val) => match val {
-                    DotIndexKind::StructValueIndex(name) => {
+                    DotIndexKind::StructValueIndex(name, range) => {
                         expr = Expression(
-                            ExpressionKind::Accessed(Box::new(expr), name),
+                            ExpressionKind::Accessed(Box::new(expr), name, range),
                             stream.get_range().unwrap(),
                         );
                     }
@@ -818,9 +819,10 @@ impl Parse for StructExpression {
         let Some(Token::Identifier(name)) = stream.next() else {
             return Err(stream.expected_err("struct identifier")?);
         };
+
         stream.expect(Token::BraceOpen)?;
         let named_list = stream.parse::<NamedFieldList<Expression>>()?;
-        let fields = named_list.0.into_iter().map(|f| (f.0, f.1)).collect();
+        let fields = named_list.0.into_iter().map(|f| (f.0, f.1, f.2)).collect();
 
         stream.expect(Token::BraceClose)?;
 
@@ -897,7 +899,7 @@ impl Parse for ArrayValueIndex {
 
 #[derive(Debug, Clone)]
 pub enum DotIndexKind {
-    StructValueIndex(String),
+    StructValueIndex(String, TokenRange),
     FunctionCall(FunctionCallExpression),
 }
 
@@ -913,7 +915,7 @@ impl Parse for DotIndexKind {
                     is_macro: false,
                 }))
             } else {
-                Ok(Self::StructValueIndex(name))
+                Ok(Self::StructValueIndex(name, stream.get_range().unwrap()))
             }
         } else {
             return Err(stream.expected_err("struct index (number)")?);

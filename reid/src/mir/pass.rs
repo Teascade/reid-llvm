@@ -585,7 +585,7 @@ impl Expression {
                 }
             }
             ExprKind::Struct(_, items) => {
-                for (_, expr) in items {
+                for (_, expr, _) in items {
                     expr.pass(pass, state, scope, mod_id)?;
                 }
             }
