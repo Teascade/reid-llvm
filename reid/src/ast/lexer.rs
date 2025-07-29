@@ -114,6 +114,7 @@ pub enum Token {
 
     Unknown(char),
 
+    Whitespace(String),
     Eof,
 }
 
@@ -192,6 +193,7 @@ impl ToString for Token {
             Token::Eof => String::new(),
             Token::Slash => String::from('/'),
             Token::Percent => String::from('%'),
+            Token::Whitespace(val) => val.clone(),
             Token::Unknown(val) => val.to_string(),
         }
     }
@@ -293,7 +295,16 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
 
         let variant = match character {
             // Whitespace
-            w if w.is_whitespace() => continue,
+            w if w.is_whitespace() => {
+                let mut whitespace = String::from(*w);
+                while let Some(w) = cursor.first() {
+                    if !w.is_whitespace() {
+                        break;
+                    }
+                    whitespace.push(cursor.next().unwrap());
+                }
+                Token::Whitespace(whitespace)
+            }
             // Comments
             '/' if cursor.first() == Some('/') => {
                 while !matches!(cursor.first(), Some('\n') | None) {

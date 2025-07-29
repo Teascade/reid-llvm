@@ -53,9 +53,9 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     }
 
     pub fn expect(&mut self, token: Token) -> Result<(), Error> {
-        if let Some(peeked) = self.peek() {
-            if token == peeked {
-                self.position += 1;
+        if let (pos, Some(peeked)) = self.next_token(self.position) {
+            if token == peeked.token {
+                self.position = pos + 1;
                 Ok(())
             } else {
                 Err(self.expecting_err(token)?)
@@ -66,37 +66,25 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     }
 
     pub fn next(&mut self) -> Option<Token> {
-        let value = if self.tokens.len() < self.position {
-            None
-        } else {
-            Some(self.tokens[self.position].token.clone())
-        };
-        self.position += 1;
-        value
+        let (position, token) = self.next_token(self.position);
+        self.position = position + 1;
+        token.map(|t| t.token.clone())
     }
 
     pub fn previous(&mut self) -> Option<Token> {
-        if (self.position as i32 - 1) < 0 {
-            None
-        } else {
-            Some(self.tokens[self.position - 1].token.clone())
-        }
+        let (_, token) = self.previous_token(self.position);
+        token.map(|t| t.token.clone())
     }
 
     pub fn peek(&mut self) -> Option<Token> {
-        if self.tokens.len() < self.position {
-            None
-        } else {
-            Some(self.tokens[self.position].token.clone())
-        }
+        let (_, token) = self.next_token(self.position);
+        token.map(|t| t.token.clone())
     }
 
     pub fn peek2(&mut self) -> Option<Token> {
-        if self.tokens.len() < (self.position + 1) {
-            None
-        } else {
-            Some(self.tokens[self.position + 1].token.clone())
-        }
+        let (pos2, _) = self.next_token(self.position);
+        let (_, token) = self.next_token(pos2 + 1);
+        token.map(|t| t.token.clone())
     }
 
     /// Parse the next value of trait Parse. If the parse succeeded, the related
@@ -187,6 +175,29 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             start: **ref_pos,
             end: self.position - 1,
         })
+    }
+
+    fn previous_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
+        from -= 1;
+        while let Some(token) = self.tokens.get(from) {
+            if let Token::Whitespace(_) = token.token {
+                from -= 1;
+            } else {
+                break;
+            }
+        }
+        (from, self.tokens.get(from))
+    }
+
+    fn next_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
+        while let Some(token) = self.tokens.get(from) {
+            if let Token::Whitespace(_) = token.token {
+                from += 1;
+            } else {
+                break;
+            }
+        }
+        (from, self.tokens.get(from))
     }
 }
 
