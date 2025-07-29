@@ -82,7 +82,7 @@ pub struct ErrorModule {
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ErrorModules {
-    module_map: HashMap<mir::SourceModuleId, ErrorModule>,
+    pub(super) module_map: HashMap<mir::SourceModuleId, ErrorModule>,
     module_counter: mir::SourceModuleId,
 }
 

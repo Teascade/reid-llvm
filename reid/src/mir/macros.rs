@@ -1,12 +1,16 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, path::PathBuf};
 
-use crate::mir::{self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, TypeKind, WhileStatement};
+use crate::mir::{
+    self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, Module, SourceModuleId, TypeKind,
+    WhileStatement,
+};
 
 use super::pass::{Pass, PassResult, PassState};
 
 pub trait MacroFunction: std::fmt::Debug {
     fn generate<'ctx, 'a>(
         &self,
+        module: &MacroModule,
         params: &[mir::Literal],
         prefix: String,
     ) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind>;
@@ -28,15 +32,28 @@ pub enum ErrorKind {
     MacroExecutionError(String),
 }
 
+type MacroModuleMap = HashMap<SourceModuleId, MacroModule>;
+
 /// Struct used to implement a type-checking pass that can be performed on the
 /// MIR.
 pub struct MacroPass {
     pub(crate) macros: HashMap<String, Box<dyn MacroFunction>>,
+    pub module_map: MacroModuleMap,
 }
 
-pub struct MacroData {}
+pub struct MacroModule {
+    path: Option<PathBuf>,
+}
 
-type MacroPassState<'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+impl From<&Module> for MacroModule {
+    fn from(value: &Module) -> Self {
+        MacroModule {
+            path: value.path.clone(),
+        }
+    }
+}
+
+type MacroPassState<'map, 'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
 
 impl Pass for MacroPass {
     type Data = ();
@@ -49,7 +66,7 @@ impl Pass for MacroPass {
     fn module(&mut self, module: &mut mir::Module, mut state: PassState<Self::Data, Self::TError>) -> PassResult {
         for function in &mut module.functions {
             let globals = match &mut function.kind {
-                mir::FunctionDefinitionKind::Local(block, _) => block.gen_macros(self, &mut state),
+                mir::FunctionDefinitionKind::Local(block, _) => block.gen_macros(self, &mut state, &self.module_map),
                 _ => Vec::new(),
             };
 
@@ -60,36 +77,36 @@ impl Pass for MacroPass {
 }
 
 impl mir::Block {
-    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState) -> Vec<GlobalValue> {
+    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState, map: &MacroModuleMap) -> Vec<GlobalValue> {
         let mut globals = Vec::new();
         for statement in &mut self.statements {
-            globals.extend(statement.gen_macros(data, state));
+            globals.extend(statement.gen_macros(data, state, map));
         }
         if let Some((_, Some(return_expr))) = &mut self.return_expression {
-            globals.extend(return_expr.gen_macros(data, state));
+            globals.extend(return_expr.gen_macros(data, state, map));
         }
         globals
     }
 }
 
 impl mir::Statement {
-    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState) -> Vec<GlobalValue> {
+    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState, map: &MacroModuleMap) -> Vec<GlobalValue> {
         let mut globals = Vec::new();
         match &mut self.0 {
             mir::StmtKind::Let(.., expr) => {
-                globals.extend(expr.gen_macros(data, state));
+                globals.extend(expr.gen_macros(data, state, map));
             }
             mir::StmtKind::Set(lhs, rhs) => {
-                globals.extend(lhs.gen_macros(data, state));
-                globals.extend(rhs.gen_macros(data, state));
+                globals.extend(lhs.gen_macros(data, state, map));
+                globals.extend(rhs.gen_macros(data, state, map));
             }
             mir::StmtKind::Import(_) => {}
             mir::StmtKind::Expression(expr) => {
-                globals.extend(expr.gen_macros(data, state));
+                globals.extend(expr.gen_macros(data, state, map));
             }
             mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
-                globals.extend(condition.gen_macros(data, state));
-                globals.extend(block.gen_macros(data, state));
+                globals.extend(condition.gen_macros(data, state, map));
+                globals.extend(block.gen_macros(data, state, map));
             }
         };
         globals
@@ -97,7 +114,7 @@ impl mir::Statement {
 }
 
 impl mir::Expression {
-    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState) -> Vec<GlobalValue> {
+    fn gen_macros(&mut self, data: &MacroPass, state: &mut MacroPassState, map: &MacroModuleMap) -> Vec<GlobalValue> {
         let mut globals = Vec::new();
         match &mut self.0 {
             mir::ExprKind::FunctionCall(function_call) => {
@@ -113,6 +130,7 @@ impl mir::Expression {
                         let (generated_globals, expr) = state.or_else(
                             existing_macro
                                 .generate(
+                                    map.get(&state.scope.module_id.unwrap()).unwrap(),
                                     &literals,
                                     format!(
                                         "macro.{}.{}.{}",
@@ -135,26 +153,26 @@ impl mir::Expression {
             }
             mir::ExprKind::Variable(_) => {}
             mir::ExprKind::Indexed(expression, _, expression1) => {
-                globals.extend(expression.gen_macros(data, state));
-                globals.extend(expression1.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
+                globals.extend(expression1.gen_macros(data, state, map));
             }
             mir::ExprKind::Accessed(expression, ..) => {
-                globals.extend(expression.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
             }
             mir::ExprKind::Array(expressions) => {
                 for expression in expressions {
-                    globals.extend(expression.gen_macros(data, state));
+                    globals.extend(expression.gen_macros(data, state, map));
                 }
             }
             mir::ExprKind::Struct(_, items) => {
                 for item in items {
-                    globals.extend(item.1.gen_macros(data, state));
+                    globals.extend(item.1.gen_macros(data, state, map));
                 }
             }
             mir::ExprKind::Literal(_) => {}
             mir::ExprKind::BinOp(_, expression, expression1, _) => {
-                globals.extend(expression.gen_macros(data, state));
-                globals.extend(expression1.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
+                globals.extend(expression1.gen_macros(data, state, map));
             }
             mir::ExprKind::AssociatedFunctionCall(
                 _,
@@ -163,27 +181,27 @@ impl mir::Expression {
                 },
             ) => {
                 for expression in parameters {
-                    globals.extend(expression.gen_macros(data, state));
+                    globals.extend(expression.gen_macros(data, state, map));
                 }
             }
             mir::ExprKind::If(IfExpression(cond, lhs, rhs)) => {
-                globals.extend(cond.gen_macros(data, state));
-                globals.extend(lhs.gen_macros(data, state));
+                globals.extend(cond.gen_macros(data, state, map));
+                globals.extend(lhs.gen_macros(data, state, map));
                 if let Some(rhs) = rhs.as_mut() {
-                    globals.extend(rhs.gen_macros(data, state));
+                    globals.extend(rhs.gen_macros(data, state, map));
                 }
             }
             mir::ExprKind::Block(block) => {
-                globals.extend(block.gen_macros(data, state));
+                globals.extend(block.gen_macros(data, state, map));
             }
             mir::ExprKind::Borrow(expression, _) => {
-                globals.extend(expression.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
             }
             mir::ExprKind::Deref(expression) => {
-                globals.extend(expression.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
             }
             mir::ExprKind::CastTo(expression, _) => {
-                globals.extend(expression.gen_macros(data, state));
+                globals.extend(expression.gen_macros(data, state, map));
             }
             mir::ExprKind::GlobalRef(..) => {}
         }
@@ -204,6 +222,7 @@ pub struct TestMacro;
 impl MacroFunction for TestMacro {
     fn generate<'ctx, 'a>(
         &self,
+        module: &MacroModule,
         literals: &[mir::Literal],
         global_name: String,
     ) -> Result<(Vec<GlobalValue>, mir::ExprKind), ErrorKind> {
@@ -217,6 +236,15 @@ impl MacroFunction for TestMacro {
                 TypeKind::UserPtr(Box::new(TypeKind::Char)),
             ));
         };
+
+        let path = module
+            .path
+            .as_ref()
+            .expect("Module has no path!")
+            .parent()
+            .expect("Module path has no parent!")
+            .join(path);
+        dbg!(&path);
 
         let contents = match std::fs::read(path) {
             Ok(content) => content,

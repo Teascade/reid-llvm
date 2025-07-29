@@ -41,7 +41,7 @@
 //! - Debug Symbols
 //! ```
 
-use std::{path::PathBuf, thread, time::Duration};
+use std::{collections::HashMap, path::PathBuf, thread, time::Duration};
 
 use ast::{
     lexer::{self, FullToken, Token},
@@ -58,7 +58,7 @@ use reid_lib::{compile::CompileOutput, Context};
 
 use crate::{
     ast::TopLevelStatement,
-    mir::macros::{form_macros, MacroPass},
+    mir::macros::{form_macros, MacroModule, MacroPass},
 };
 
 mod ast;
@@ -156,7 +156,16 @@ pub fn perform_all_passes<'map>(
         ));
     }
 
-    let state = context.pass(&mut MacroPass { macros: form_macros() })?;
+    let mut macro_modules: HashMap<_, MacroModule> = HashMap::new();
+    for (k, v) in &context.modules {
+        macro_modules.insert(k.clone(), v.into());
+    }
+
+    let mut macro_pass = MacroPass {
+        macros: form_macros(),
+        module_map: macro_modules,
+    };
+    let state = context.pass(&mut macro_pass)?;
 
     #[cfg(debug_assertions)]
     println!("{:-^100}", "MACRO OUTPUT");
