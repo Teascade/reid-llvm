@@ -171,8 +171,9 @@ impl FunctionDefinition {
         let scope_refs = ScopeTypeRefs::from(type_refs);
         for param in &self.parameters {
             let param_t = state.or_else(param.ty.assert_unvague(), Vague(Unknown), self.signature());
+            let mutable = matches!(param_t, TypeKind::Borrow(_, true));
             let res = scope_refs
-                .new_var(param.name.clone(), false, &param_t)
+                .new_var(param.name.clone(), mutable, &param_t)
                 .or(Err(ErrorKind::VariableAlreadyDefined(param.name.clone())));
             state.ok(res, self.signature());
         }
@@ -605,7 +606,7 @@ impl Expression {
                             .parameters
                             .get_mut(0)
                             .expect("Unknown-type associated function NEEDS to always have at least one parameter!");
-                        let param_ty = first_param.infer_types(state, type_refs).unwrap().resolve_deep();
+                        let param_ty = first_param.infer_types(state, type_refs)?.resolve_deep();
                         *type_kind = state
                             .or_else(
                                 param_ty.ok_or(ErrorKind::CouldNotInferType(format!("{}", first_param))),

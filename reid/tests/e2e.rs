@@ -152,3 +152,8 @@ fn associated_functions() {
         Some(4),
     );
 }
+
+#[test]
+fn mutable_inner_functions() {
+    test(include_str!("../../examples/mutable_inner.reid"), "test", Some(0));
+}
