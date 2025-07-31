@@ -109,8 +109,7 @@ impl TypeKind {
             &debug.scope,
             debug.info,
             debug.types,
-            scope.type_values,
-            scope.types,
+            scope.type_map,
             scope.module_id,
             scope.tokens,
             scope.modules,
@@ -122,8 +121,7 @@ impl TypeKind {
         scope: &DebugScopeValue,
         debug_info: &DebugInformation,
         debug_types: &HashMap<TypeKind, DebugTypeValue>,
-        type_values: &HashMap<CustomTypeKey, TypeValue>,
-        types: &HashMap<TypeValue, TypeDefinition>,
+        type_map: &HashMap<CustomTypeKey, TypeDefinition>,
         local_mod: SourceModuleId,
         tokens: &Vec<FullToken>,
         modules: &HashMap<SourceModuleId, ModuleCodegen>,
@@ -142,13 +140,12 @@ impl TypeKind {
                         scope,
                         debug_info,
                         debug_types,
-                        type_values,
-                        types,
+                        type_map,
                         local_mod,
                         tokens,
                         modules,
                     ),
-                    size_bits: self.size_of(),
+                    size_bits: self.size_of(type_map),
                 })
             }
             TypeKind::Array(elem_ty, len) => {
@@ -156,21 +153,20 @@ impl TypeKind {
                     scope,
                     debug_info,
                     debug_types,
-                    type_values,
-                    types,
+                    type_map,
                     local_mod,
                     tokens,
                     modules,
                 );
                 DebugTypeData::Array(DebugArrayType {
-                    size_bits: self.size_of(),
+                    size_bits: self.size_of(type_map),
                     align_bits: self.alignment(),
                     element_type: elem_ty,
                     length: *len,
                 })
             }
             TypeKind::CustomType(key) => {
-                let typedef = types.get(type_values.get(key).unwrap()).unwrap();
+                let typedef = type_map.get(key).unwrap();
                 match &typedef.kind {
                     TypeDefinitionKind::Struct(struct_type) => {
                         let mut fields = Vec::new();
@@ -186,21 +182,20 @@ impl TypeKind {
                                 name: field.0.clone(),
                                 scope: scope.clone(),
                                 pos: location.map(|l| l.pos),
-                                size_bits: field.1.size_of(),
+                                size_bits: field.1.size_of(type_map),
                                 offset: size_bits,
                                 flags: DwarfFlags,
                                 ty: field.1.get_debug_type_hard(
                                     scope,
                                     debug_info,
                                     debug_types,
-                                    type_values,
-                                    types,
+                                    type_map,
                                     local_mod,
                                     tokens,
                                     modules,
                                 ),
                             });
-                            size_bits += field.1.size_of();
+                            size_bits += field.1.size_of(type_map);
                         }
                         {
                             let location = if typedef.source_module != local_mod {
@@ -222,7 +217,7 @@ impl TypeKind {
             }
             _ => DebugTypeData::Basic(DebugBasicType {
                 name,
-                size_bits: self.size_of(),
+                size_bits: self.size_of(type_map),
                 encoding: match self {
                     TypeKind::Bool => DwarfEncoding::Boolean,
                     TypeKind::I8 => DwarfEncoding::SignedChar,

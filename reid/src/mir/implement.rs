@@ -1,3 +1,5 @@
+use reid_lib::builder::TypeValue;
+
 use crate::util::maybe;
 
 use super::{typecheck::typerefs::TypeRefs, *};
@@ -57,7 +59,7 @@ impl TypeKind {
         }
     }
 
-    pub fn size_of(&self) -> u64 {
+    pub fn size_of(&self, map: &HashMap<CustomTypeKey, TypeDefinition>) -> u64 {
         match self {
             TypeKind::Bool => 1,
             TypeKind::I8 => 8,
@@ -72,8 +74,16 @@ impl TypeKind {
             TypeKind::U128 => 128,
             TypeKind::Void => 0,
             TypeKind::Char => 8,
-            TypeKind::Array(type_kind, len) => type_kind.size_of() * (*len as u64),
-            TypeKind::CustomType(..) => 32,
+            TypeKind::Array(type_kind, len) => type_kind.size_of(map) * (*len as u64),
+            TypeKind::CustomType(key) => match &map.get(key).unwrap().kind {
+                TypeDefinitionKind::Struct(struct_type) => {
+                    let mut size = 0;
+                    for field in &struct_type.0 {
+                        size += field.1.size_of(map)
+                    }
+                    size
+                }
+            },
             TypeKind::CodegenPtr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(..) => 64,

@@ -540,7 +540,7 @@ impl DebugTypeHolder {
                                 field.pos.map(|p| p.line).unwrap_or(1),
                                 field.size_bits,
                                 0,
-                                1,
+                                field.offset,
                                 field.flags.as_llvm(),
                                 *debug.types.get(&field.ty).unwrap(),
                             )

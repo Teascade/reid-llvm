@@ -1,4 +1,4 @@
-use reid_lib::{CmpPredicate, ConstValueKind, Instr, Type, builder::InstructionValue};
+use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValueKind, Instr, Type};
 
 use crate::{
     codegen::{ErrorKind, StackValueKind},
@@ -377,7 +377,9 @@ impl IntrinsicFunction for IntrinsicSizeOf {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let instr = scope
             .block
-            .build(Instr::Constant(reid_lib::ConstValueKind::U64(self.0.size_of() / 8)))
+            .build(Instr::Constant(reid_lib::ConstValueKind::U64(
+                self.0.size_of(&scope.type_map) / 8,
+            )))
             .unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
     }
@@ -395,7 +397,9 @@ impl IntrinsicFunction for IntrinsicMalloc {
 
         let sizeof = scope
             .block
-            .build(Instr::Constant(ConstValueKind::U64(self.0.size_of() / 8)))
+            .build(Instr::Constant(ConstValueKind::U64(
+                self.0.size_of(&scope.type_map) / 8,
+            )))
             .unwrap();
         let bytes = scope.block.build(Instr::Mul(sizeof, amount.instr())).unwrap();
         let instr = scope.block.build(Instr::FunctionCall(function, vec![bytes])).unwrap();

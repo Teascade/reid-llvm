@@ -144,6 +144,7 @@ impl mir::Module {
         let mut types = HashMap::new();
         let mut type_values = HashMap::new();
         let mut debug_types = HashMap::new();
+        let mut type_map = HashMap::new();
 
         macro_rules! insert_debug {
             ($kind:expr) => {
@@ -153,8 +154,7 @@ impl mir::Module {
                         &compile_unit,
                         &debug,
                         &debug_types,
-                        &type_values,
-                        &types,
+                        &type_map,
                         self.module_id,
                         &self.tokens,
                         &modules,
@@ -182,6 +182,8 @@ impl mir::Module {
 
         for typedef in typedefs {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
+            type_map.insert(type_key.clone(), typedef.clone());
+
             let type_value = match &typedef.kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
                     module.custom_type(CustomTypeKind::NamedStruct(NamedStruct(
@@ -198,6 +200,7 @@ impl mir::Module {
             };
             types.insert(type_value, typedef.clone());
             type_values.insert(type_key.clone(), type_value);
+
             insert_debug!(&TypeKind::CustomType(type_key.clone()));
         }
 
@@ -380,6 +383,7 @@ impl mir::Module {
                                 functions: &functions,
                                 types: &types,
                                 type_values: &type_values,
+                                type_map: &type_map,
                                 globals: &globals,
                                 stack_values: HashMap::new(),
                                 debug: Some(Debug {
@@ -457,6 +461,7 @@ impl mir::Module {
                     functions: &functions,
                     types: &types,
                     type_values: &type_values,
+                    type_map: &type_map,
                     stack_values: HashMap::new(),
                     debug: Some(Debug {
                         info: &debug,
@@ -518,6 +523,7 @@ impl mir::Module {
                     functions: &functions,
                     types: &types,
                     type_values: &type_values,
+                    type_map: &type_map,
                     stack_values: HashMap::new(),
                     debug: Some(Debug {
                         info: &debug,
@@ -1388,7 +1394,11 @@ impl mir::Expression {
                         .build(Instr::Alloca(ty.get_type(scope.type_values)))
                         .unwrap();
 
-                    scope.block.build(Instr::Store(allocated, value)).unwrap();
+                    scope
+                        .block
+                        .build(Instr::Store(allocated, value))
+                        .unwrap()
+                        .maybe_location(&mut scope.block, location.clone());
 
                     let a = Some(StackValue(
                         StackValueKind::Literal(allocated),
