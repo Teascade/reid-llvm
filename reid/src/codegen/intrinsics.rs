@@ -1,4 +1,4 @@
-use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValueKind, Instr, Type};
+use reid_lib::{CmpPredicate, ConstValueKind, Instr, Type, builder::InstructionValue};
 
 use crate::{
     codegen::{ErrorKind, StackValueKind},
@@ -74,7 +74,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
                     }],
                     kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicConst(*len))),
                     source: None,
-                })
+                });
             }
             _ => {}
         }
@@ -247,26 +247,17 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
             scope.block.build(Instr::XOr(lhs, rhs)).unwrap()
         }));
         if ty.signed() {
-            intrinsics.push(complex_binop_def(
-                BitshiftRight,
-                &ty,
-                &TypeKind::U64,
-                |scope, lhs, rhs| scope.block.build(Instr::ShiftRightArithmetic(lhs, rhs)).unwrap(),
-            ));
+            intrinsics.push(complex_binop_def(BitshiftRight, &ty, &ty, |scope, lhs, rhs| {
+                scope.block.build(Instr::ShiftRightArithmetic(lhs, rhs)).unwrap()
+            }));
         } else {
-            intrinsics.push(complex_binop_def(
-                BitshiftRight,
-                &ty,
-                &TypeKind::U64,
-                |scope, lhs, rhs| scope.block.build(Instr::ShiftRightLogical(lhs, rhs)).unwrap(),
-            ));
+            intrinsics.push(complex_binop_def(BitshiftRight, &ty, &ty, |scope, lhs, rhs| {
+                scope.block.build(Instr::ShiftRightLogical(lhs, rhs)).unwrap()
+            }));
         }
-        intrinsics.push(complex_binop_def(
-            BitshiftLeft,
-            &ty,
-            &TypeKind::U64,
-            |scope, lhs, rhs| scope.block.build(Instr::ShiftLeft(lhs, rhs)).unwrap(),
-        ));
+        intrinsics.push(complex_binop_def(BitshiftLeft, &ty, &ty, |scope, lhs, rhs| {
+            scope.block.build(Instr::ShiftLeft(lhs, rhs)).unwrap()
+        }));
     }
     for ty in INTEGERS.iter().chain(&[TypeKind::Bool, TypeKind::Char]) {
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::EQ), &ty, |scope, lhs, rhs| {

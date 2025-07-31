@@ -610,30 +610,9 @@ impl Builder {
                 Instr::PtrToInt(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::IntToPtr(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
                 Instr::BitCast(..) => Ok(()),
-                Instr::ShiftRightLogical(_, rhs) => {
-                    let rhs_ty = rhs.get_type(&self)?;
-                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
-                        Ok(())
-                    } else {
-                        Err(ErrorKind::Null)
-                    }
-                }
-                Instr::ShiftRightArithmetic(_, rhs) => {
-                    let rhs_ty = rhs.get_type(&self)?;
-                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
-                        Ok(())
-                    } else {
-                        Err(ErrorKind::Null)
-                    }
-                }
-                Instr::ShiftLeft(_, rhs) => {
-                    let rhs_ty = rhs.get_type(&self)?;
-                    if rhs_ty.category() == TypeCategory::UnsignedInteger {
-                        Ok(())
-                    } else {
-                        Err(ErrorKind::Null)
-                    }
-                }
+                Instr::ShiftRightLogical(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::ShiftRightArithmetic(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
+                Instr::ShiftLeft(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::GetGlobal(_) => Ok(()),
             }
         }
