@@ -1311,45 +1311,47 @@ impl mir::Expression {
                 if val.1 == *type_kind {
                     Some(val)
                 } else {
-                    match (&val.1, type_kind) {
-                        (TypeKind::CodegenPtr(inner), TypeKind::UserPtr(ty2)) => match *inner.clone() {
-                            TypeKind::UserPtr(_) => Some(StackValue(
-                                val.0.derive(
-                                    scope
-                                        .block
-                                        .build(Instr::BitCast(
-                                            val.instr(),
-                                            Type::Ptr(Box::new(type_kind.get_type(scope.type_values))),
-                                        ))
-                                        .unwrap(),
-                                ),
-                                TypeKind::CodegenPtr(Box::new(type_kind.clone())),
-                            )),
-                            TypeKind::Borrow(ty1, _) => match *ty1.clone() {
-                                TypeKind::Array(ty1, _) => {
-                                    if ty1 == *ty2 {
-                                        Some(StackValue(
-                                            val.0.derive(
-                                                scope
-                                                    .block
-                                                    .build(Instr::BitCast(
-                                                        val.instr(),
-                                                        Type::Ptr(Box::new(type_kind.get_type(scope.type_values))),
-                                                    ))
-                                                    .unwrap(),
-                                            ),
-                                            TypeKind::CodegenPtr(Box::new(type_kind.clone())),
-                                        ))
-                                    } else {
-                                        return Err(ErrorKind::Null);
-                                    }
+                    let (ty, other) = if !state.should_load {
+                        let TypeKind::CodegenPtr(inner) = &val.1 else {
+                            panic!();
+                        };
+                        (*inner.clone(), TypeKind::CodegenPtr(Box::new(type_kind.clone())))
+                    } else {
+                        (val.1.clone(), type_kind.clone())
+                    };
+
+                    dbg!(&ty, type_kind);
+
+                    match (&ty, type_kind) {
+                        (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Some(StackValue(
+                            val.0.derive(
+                                scope
+                                    .block
+                                    .build(Instr::BitCast(val.instr(), other.get_type(scope.type_values)))
+                                    .unwrap(),
+                            ),
+                            other.clone(),
+                        )),
+                        (TypeKind::Borrow(ty1, _), TypeKind::UserPtr(ty2)) => {
+                            if let TypeKind::Array(ty1, _) = ty1.as_ref() {
+                                if ty1 == ty2 {
+                                    Some(StackValue(
+                                        val.0.derive(
+                                            scope
+                                                .block
+                                                .build(Instr::BitCast(val.instr(), other.get_type(scope.type_values)))
+                                                .unwrap(),
+                                        ),
+                                        other,
+                                    ))
+                                } else {
+                                    return Err(ErrorKind::Null).unwrap();
                                 }
-                                _ => return Err(ErrorKind::Null),
-                            },
-                            _ => panic!(),
-                        },
-                        (TypeKind::UserPtr(_), TypeKind::UserPtr(_))
-                        | (TypeKind::Char, TypeKind::U8)
+                            } else {
+                                return Err(ErrorKind::Null).unwrap();
+                            }
+                        }
+                        (TypeKind::Char, TypeKind::U8)
                         | (TypeKind::U8, TypeKind::Char)
                         | (TypeKind::U8, TypeKind::I8) => Some(StackValue(
                             val.0.derive(
@@ -1361,8 +1363,7 @@ impl mir::Expression {
                             type_kind.clone(),
                         )),
                         _ => {
-                            let cast_instr = val
-                                .1
+                            let cast_instr = ty
                                 .get_type(scope.type_values)
                                 .cast_instruction(val.instr(), &type_kind.get_type(scope.type_values))
                                 .unwrap();
@@ -1378,11 +1379,26 @@ impl mir::Expression {
             mir::ExprKind::AssociatedFunctionCall(ty, call) => codegen_function_call(Some(ty), call, scope, state)?,
             mir::ExprKind::GlobalRef(global_name, ty) => {
                 let global_value = scope.globals.get(global_name).unwrap();
-                let a = Some(StackValue(
-                    StackValueKind::Literal(scope.block.build(Instr::GetGlobal(global_value.clone())).unwrap()),
-                    ty.clone(),
-                ));
-                a
+
+                let value = scope.block.build(Instr::GetGlobal(global_value.clone())).unwrap();
+
+                if !state.should_load {
+                    let allocated = scope
+                        .block
+                        .build(Instr::Alloca(ty.get_type(scope.type_values)))
+                        .unwrap();
+
+                    scope.block.build(Instr::Store(allocated, value)).unwrap();
+
+                    let a = Some(StackValue(
+                        StackValueKind::Literal(allocated),
+                        TypeKind::CodegenPtr(Box::new(ty.clone())),
+                    ));
+                    a
+                } else {
+                    let a = Some(StackValue(StackValueKind::Literal(value), ty.clone()));
+                    a
+                }
             }
         };
         if let Some(value) = &value {

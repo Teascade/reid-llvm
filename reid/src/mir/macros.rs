@@ -118,10 +118,13 @@ impl mir::Expression {
         let mut globals = Vec::new();
         match &mut self.0 {
             mir::ExprKind::FunctionCall(function_call) => {
+                for param in &mut function_call.parameters {
+                    globals.extend(param.gen_macros(data, state, map));
+                }
                 if function_call.is_macro {
                     if let Some(existing_macro) = data.macros.get(&function_call.name) {
                         let mut literals = Vec::new();
-                        for param in &function_call.parameters {
+                        for param in &mut function_call.parameters {
                             match &param.0 {
                                 super::ExprKind::Literal(literal) => literals.push(literal.clone()),
                                 _ => state.note_errors(&vec![ErrorKind::InvalidMacroArgs], param.1),

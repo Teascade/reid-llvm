@@ -4,5 +4,6 @@ import std::print;
 fn main() -> u8 {
     let bytes = include_bytes!("./macro_easy_file.txt");
     print(String::new() + bytes.length());
-    return (bytes as *u8)[0];
+    print(String::new() + (include_bytes!("./macro_easy_file.txt") as *u8)[1] as u64);
+    return (include_bytes!("./macro_easy_file.txt") as *u8)[0];
 }
