@@ -71,8 +71,8 @@ Currently missing big features (TODOs) are:
 Big features that I want later but are not necessary:
 - ~~User-defined binary operations~~ (DONE)
 - ~~Asymmetric binary operations (e.g. string + u32)~~ (DONE)
-- Error handling
-- Lexing & parsing of whitespace and comments as well
+- ~~Error handling~~ (Not Doing It)
+- ~~Lexing & parsing of whitespace and comments as well~~ (DONE)
 - LSP implementation
 
 Smaller features:
