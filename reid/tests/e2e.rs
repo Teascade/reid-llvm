@@ -6,12 +6,12 @@ use reid::{
     mir::{self},
     parse_module, perform_all_passes,
 };
-use reid_lib::Context;
+use reid_lib::{compile::CompileOutput, Context};
 use util::assert_err;
 
 mod util;
 
-fn test(source: &str, name: &str, expected_exit_code: Option<i32>) {
+fn test_compile(source: &str, name: &str) -> CompileOutput {
     assert_err(assert_err(std::panic::catch_unwind(|| {
         let mut map = Default::default();
         let (id, tokens) = assert_err(parse_module(source, name, &mut map));
@@ -24,7 +24,14 @@ fn test(source: &str, name: &str, expected_exit_code: Option<i32>) {
 
         let codegen = assert_err(mir_context.codegen(&context));
 
-        let output = codegen.compile(None, Vec::new()).output();
+        Ok::<_, ()>(codegen.compile(None, Vec::new()).output())
+    })))
+}
+
+fn test(source: &str, name: &str, expected_exit_code: Option<i32>) {
+    assert_err(assert_err(std::panic::catch_unwind(|| {
+        let output = test_compile(source, name);
+
         let time = SystemTime::now();
         let in_path = PathBuf::from(format!(
             "/tmp/temp-{}.o",
@@ -156,4 +163,9 @@ fn associated_functions() {
 #[test]
 fn mutable_inner_functions() {
     test(include_str!("../../examples/mutable_inner.reid"), "test", Some(0));
+}
+
+#[test]
+fn cpu_raytracer_compiles() {
+    test_compile(include_str!("../../examples/cpu_raytracer.reid"), "test");
 }
