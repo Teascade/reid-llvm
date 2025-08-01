@@ -1,12 +1,13 @@
-// Main
-fn main() -> bool {
-    return 144 == fibonacci(0xc);
-}
-
-// Fibonacci
-fn fibonacci(value: u16) -> u16 {
-    if value <= 2 {
-        return 1;
-    }
-    fibonacci(value - 1) + fibonacci(value - 2)
-}
+a
+(
+    b
+)
+x
+(
+    (
+        c
+        xyz
+    )
+)
+(
+a

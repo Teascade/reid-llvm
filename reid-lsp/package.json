@@ -43,11 +43,18 @@
           "description": "Traces the communication between VS Code and the language server."
         }
       }
-    }
+    },
+    "grammars": [
+      {
+        "language": "reid",
+        "scopeName": "source.reid",
+        "path": "./syntaxes/grammar.json"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "pnpm run package",
-    "compile": "webpack",
+    "compile": "npx js-yaml syntaxes/grammar.yaml > syntaxes/grammar.json && webpack",
     "watch": "webpack --watch",
     "package": "webpack --mode production --devtool hidden-source-map",
     "compile-tests": "tsc -p . --outDir out",
@@ -65,6 +72,7 @@
     "@vscode/test-cli": "^0.0.11",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.25.1",
+    "js-yaml": "^4.1.0",
     "ts-loader": "^9.5.2",
     "typescript": "^5.8.3",
     "webpack": "^5.99.7",
