@@ -272,6 +272,38 @@ pub fn find_type_in_context(module: &mir::Module, token_idx: usize) -> Option<Ty
         }
     }
 
+    for binop in &module.binop_defs {
+        if let Some(meta) = binop.block_meta() {
+            if !meta.contains(token_idx) {
+                continue;
+            }
+        }
+
+        return match &binop.fn_kind {
+            mir::FunctionDefinitionKind::Local(block, _) => find_type_in_block(&block, module.module_id, token_idx),
+            mir::FunctionDefinitionKind::Extern(_) => None,
+            mir::FunctionDefinitionKind::Intrinsic(_) => None,
+        };
+    }
+
+    for (_, function) in &module.associated_functions {
+        if !(function.signature() + function.block_meta()).contains(token_idx) {
+            continue;
+        }
+
+        for param in &function.parameters {
+            if param.meta.contains(token_idx) {
+                return Some(param.ty.clone());
+            }
+        }
+
+        return match &function.kind {
+            mir::FunctionDefinitionKind::Local(block, _) => find_type_in_block(&block, module.module_id, token_idx),
+            mir::FunctionDefinitionKind::Extern(_) => None,
+            mir::FunctionDefinitionKind::Intrinsic(_) => None,
+        };
+    }
+
     for function in &module.functions {
         if !(function.signature() + function.block_meta()).contains(token_idx) {
             continue;
