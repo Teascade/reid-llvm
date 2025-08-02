@@ -358,6 +358,7 @@ pub fn analyze_expr(
                     })
                     .collect::<Vec<_>>(),
             );
+            set_autocomplete(map, meta.range.start, function_autocomplete.clone());
             set_autocomplete(map, meta.range.end, function_autocomplete.clone());
         }
         mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {

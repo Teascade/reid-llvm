@@ -721,6 +721,7 @@ impl Expression {
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
             ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
+                *type_kind = type_kind.or_default().unwrap();
                 let true_function = state
                     .scope
                     .get_associated_function(&pass::AssociatedFunctionKey(
@@ -732,7 +733,7 @@ impl Expression {
                         type_kind.clone(),
                     ));
 
-                if let Some(f) = state.ok(true_function, self.1) {
+                if let Some(f) = state.ok(true_function, function_call.meta) {
                     let param_len_given = function_call.parameters.len();
                     let param_len_expected = f.params.len();
 

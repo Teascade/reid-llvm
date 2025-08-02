@@ -216,8 +216,8 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     }
 
     /// Gets range of the previous token only.
-    pub fn get_range_prev_single(&self) -> Option<TokenRange> {
-        self.ref_position.as_ref().map(|ref_pos| TokenRange {
+    pub fn get_range_prev_curr(&self) -> Option<TokenRange> {
+        Some(TokenRange {
             start: self.previous_token(self.position).0,
             end: self.previous_token(self.position).0,
         })

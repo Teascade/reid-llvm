@@ -636,10 +636,12 @@ impl Expression {
                                 }
                             }
                         } else {
-                            let ExprKind::Borrow(val, _) = &first_param.0 else {
-                                panic!()
-                            };
-                            *first_param = *val.clone();
+                            if let ExprKind::Borrow(val, _) = &first_param.0 {
+                                *first_param = *val.clone();
+                            }
+                            if let TypeKind::Borrow(inner_ty, _) = type_kind {
+                                *type_kind = *inner_ty.clone();
+                            }
                         }
 
                         if !is_mutable {

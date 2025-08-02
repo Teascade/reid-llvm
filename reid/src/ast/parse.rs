@@ -175,6 +175,20 @@ impl Parse for AssociatedFunctionCall {
         let ty = stream.parse()?;
         stream.expect(Token::Colon)?;
         stream.expect(Token::Colon)?;
+
+        if stream.next_is_whitespace() {
+            stream.expecting_err_nonfatal("associated function name");
+            return Ok(AssociatedFunctionCall(
+                ty,
+                FunctionCallExpression {
+                    name: String::new(),
+                    params: Vec::new(),
+                    range: stream.get_range_prev_curr().unwrap(),
+                    is_macro: false,
+                },
+            ));
+        }
+
         match stream.parse() {
             Ok(fn_call) => Ok(AssociatedFunctionCall(ty, fn_call)),
             _ => {
@@ -187,7 +201,7 @@ impl Parse for AssociatedFunctionCall {
                         FunctionCallExpression {
                             name: fn_name,
                             params: Vec::new(),
-                            range: stream.get_range_prev_single().unwrap(),
+                            range: stream.get_range_prev_curr().unwrap(),
                             is_macro: false,
                         },
                     ))
@@ -198,7 +212,7 @@ impl Parse for AssociatedFunctionCall {
                         FunctionCallExpression {
                             name: String::new(),
                             params: Vec::new(),
-                            range: stream.get_range_prev_single().unwrap(),
+                            range: stream.get_range_prev_curr().unwrap(),
                             is_macro: false,
                         },
                     ))
@@ -660,11 +674,11 @@ impl Parse for ImportStatement {
         let mut import_list = Vec::new();
 
         if let Some(Token::Identifier(name)) = stream.next() {
-            import_list.push((name, stream.get_range_prev_single().unwrap()));
+            import_list.push((name, stream.get_range_prev_curr().unwrap()));
             while stream.expect(Token::Colon).is_ok() && stream.expect(Token::Colon).is_ok() {
                 if let Some(Token::Identifier(name)) = stream.peek() {
                     stream.next(); // Consume identifier
-                    import_list.push((name, stream.get_range_prev_single().unwrap()));
+                    import_list.push((name, stream.get_range_prev_curr().unwrap()));
                 } else {
                     stream.expected_err_nonfatal("identifier");
                     break;
@@ -954,7 +968,7 @@ impl Parse for DotIndexKind {
                 stream.expecting_err_nonfatal("struct index");
                 Ok(Self::StructValueIndex(
                     String::new(),
-                    stream.get_range_prev_single().unwrap(),
+                    stream.get_range_prev_curr().unwrap(),
                 ))
             } else {
                 Err(stream.expecting_err("struct index")?)
