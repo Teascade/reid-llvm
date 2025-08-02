@@ -73,7 +73,7 @@ Big features that I want later but are not necessary:
 - ~~Asymmetric binary operations (e.g. string + u32)~~ (DONE)
 - ~~Error handling~~ (Not Doing It)
 - ~~Lexing & parsing of whitespace and comments as well~~ (DONE)
-- LSP implementation
+- ~~LSP implementation~~ (CRUCIAL FEATURES DONE)
 
 Smaller features:
 - ~~Hex-numbers~~ (DONE)
