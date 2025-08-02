@@ -105,7 +105,7 @@ pub fn compile_module<'map>(
     map: &'map mut ErrorModules,
     path: Option<PathBuf>,
     is_main: bool,
-) -> Result<mir::Module, ReidError> {
+) -> Result<Result<mir::Module, (ast::Module, ReidError)>, ReidError> {
     let module = map.module(&module_id).cloned().unwrap();
 
     let mut token_stream = TokenStream::from(&tokens);
@@ -117,6 +117,8 @@ pub fn compile_module<'map>(
         statements.push(statement);
     }
 
+    let errors = token_stream.errors();
+
     drop(token_stream);
 
     let ast_module = ast::Module {
@@ -127,11 +129,33 @@ pub fn compile_module<'map>(
         is_main,
     };
 
+    if errors.len() > 0 {
+        return Ok(Err((
+            ast_module,
+            ReidError::from_kind(
+                errors
+                    .into_iter()
+                    .map(|e| {
+                        error_raporting::ErrorKind::from(mir::pass::Error {
+                            metadata: mir::Metadata {
+                                source_module_id: module_id,
+                                range: *e.get_range().unwrap_or(&Default::default()),
+                                position: None,
+                            },
+                            kind: e,
+                        })
+                    })
+                    .collect(),
+                map.clone(),
+            ),
+        )));
+    }
+
     #[cfg(debug_assertions)]
     #[cfg(feature = "log_output")]
     dbg!(&ast_module);
 
-    Ok(ast_module.process(module_id))
+    Ok(Ok(ast_module.process(module_id)))
 }
 
 pub fn perform_all_passes<'map>(
@@ -293,7 +317,7 @@ pub fn compile_and_pass<'map>(
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
     let (id, tokens) = parse_module(source, name, module_map)?;
-    let module = compile_module(id, tokens, module_map, Some(path.clone()), true)?;
+    let module = compile_module(id, tokens, module_map, Some(path.clone()), true)?.map_err(|(_, e)| e)?;
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());
 

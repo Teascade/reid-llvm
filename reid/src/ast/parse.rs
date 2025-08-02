@@ -610,7 +610,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Equals)?;
 
             let expression = stream.parse()?;
-            stream.expect(Token::Semi)?;
+            stream.expect_nonfatal(Token::Semi);
             Ok(LetStatement {
                 name: variable,
                 ty,
@@ -643,7 +643,7 @@ impl Parse for ImportStatement {
             Err(stream.expected_err("identifier")?)?
         }
 
-        stream.expect(Token::Semi)?;
+        stream.expect_nonfatal(Token::Semi);
 
         Ok(ImportStatement(import_list, stream.get_range().unwrap()))
     }
@@ -788,7 +788,7 @@ impl Parse for Block {
                 // if semicolon is missing.
                 if !matches!(e, Expression(ExpressionKind::IfExpr(_), _)) {
                     // In theory could ignore the missing semicolon..
-                    return Err(stream.expected_err("semicolon to complete statement")?);
+                    stream.expected_err_nonfatal("semicolon to complete statement");
                 }
 
                 statements.push(BlockLevelStatement::Expression(e));
@@ -997,7 +997,7 @@ impl Parse for SetStatement {
         let var_ref = stream.parse()?;
         stream.expect(Token::Equals)?;
         let expr = stream.parse()?;
-        stream.expect(Token::Semi)?;
+        stream.expect_nonfatal(Token::Semi);
         Ok(SetStatement(var_ref, expr, stream.get_range().unwrap()))
     }
 }
@@ -1038,7 +1038,7 @@ impl Parse for TopLevelStatement {
                 stream.next(); // Consume Extern
                 stream.expect(Token::FnKeyword)?;
                 let extern_fn = Stmt::ExternFunction(stream.parse()?);
-                stream.expect(Token::Semi)?;
+                stream.expect_nonfatal(Token::Semi);
                 extern_fn
             }
             Some(Token::FnKeyword) | Some(Token::PubKeyword) => Stmt::FunctionDefinition(stream.parse()?),

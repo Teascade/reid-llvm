@@ -52,7 +52,7 @@ pub enum ErrorKind {
 
 pub fn compile_std(module_map: &mut ErrorModules) -> Result<Module, ReidError> {
     let (id, tokens) = parse_module(STD_SOURCE, STD_NAME, module_map)?;
-    let module = compile_module(id, tokens, module_map, None, false)?;
+    let module = compile_module(id, tokens, module_map, None, false)?.map_err(|(_, e)| e)?;
 
     let module_id = module.module_id;
     let mut mir_context = super::Context::from(vec![module], Default::default());
@@ -156,21 +156,33 @@ impl<'map> Pass for LinkerPass<'map> {
                     };
 
                     match compile_module(id, tokens, &mut self.module_map, Some(file_path), false) {
-                        Ok(imported_module) => {
-                            if imported_module.is_main {
+                        Ok(res) => match res {
+                            Ok(imported_module) => {
+                                if imported_module.is_main {
+                                    state.ok::<_, Infallible>(
+                                        Err(ErrorKind::TriedLinkingMain(module_name.clone())),
+                                        import.1,
+                                    );
+                                    continue;
+                                }
+                                let module_id = imported_module.module_id;
+                                module_ids.insert(imported_module.name.clone(), imported_module.module_id);
+                                modules.insert(module_id, Rc::new(RefCell::new(imported_module)));
+                                let imported = modules.get_mut(&module_id).unwrap();
+                                modules_to_process.push(imported.clone());
+                                imported
+                            }
+                            Err((_, err)) => {
                                 state.ok::<_, Infallible>(
-                                    Err(ErrorKind::TriedLinkingMain(module_name.clone())),
+                                    Err(ErrorKind::ModuleCompilationError(
+                                        module_name.clone(),
+                                        format!("{}", err),
+                                    )),
                                     import.1,
                                 );
                                 continue;
                             }
-                            let module_id = imported_module.module_id;
-                            module_ids.insert(imported_module.name.clone(), imported_module.module_id);
-                            modules.insert(module_id, Rc::new(RefCell::new(imported_module)));
-                            let imported = modules.get_mut(&module_id).unwrap();
-                            modules_to_process.push(imported.clone());
-                            imported
-                        }
+                        },
                         Err(err) => {
                             state.ok::<_, Infallible>(
                                 Err(ErrorKind::ModuleCompilationError(

@@ -1,6 +1,8 @@
 //! Contains relevant code for parsing tokens received from
 //! Lexing/Tokenizing-stage.
 
+use std::{cell::RefCell, rc::Rc};
+
 use crate::{
     ast::parse::Parse,
     lexer::{FullToken, Token},
@@ -12,6 +14,7 @@ use crate::{
 pub struct TokenStream<'a, 'b> {
     ref_position: Option<&'b mut usize>,
     tokens: &'a [FullToken],
+    errors: Rc<RefCell<Vec<Error>>>,
     pub position: usize,
 }
 
@@ -20,6 +23,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         TokenStream {
             ref_position: None,
             tokens,
+            errors: Rc::new(RefCell::new(Vec::new())),
             position: 0,
         }
     }
@@ -38,6 +42,16 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         ))
     }
 
+    /// Returns expected-error for the next token in-line. Useful in conjunction
+    /// with [`TokenStream::peek`]
+    pub fn expected_err_nonfatal<T: Into<String>>(&mut self, expected: T) {
+        let err = match self.expected_err(expected) {
+            Ok(e) => e,
+            Err(e) => e,
+        };
+        self.errors.borrow_mut().push(err);
+    }
+
     /// Returns expected-error for the previous token that was already consumed.
     /// Useful in conjunction with [`TokenStream::next`]
     pub fn expecting_err<T: Into<String>>(&mut self, expected: T) -> Result<Error, Error> {
@@ -50,6 +64,16 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         ))
     }
 
+    /// Returns expected-error for the previous token that was already consumed.
+    /// Useful in conjunction with [`TokenStream::next`]
+    pub fn expecting_err_nonfatal<T: Into<String>>(&mut self, expected: T) {
+        let err = match self.expecting_err(expected) {
+            Ok(e) => e,
+            Err(e) => e,
+        };
+        self.errors.borrow_mut().push(err);
+    }
+
     pub fn expect(&mut self, token: Token) -> Result<(), Error> {
         if let (pos, Some(peeked)) = self.next_token(self.position) {
             if token == peeked.token {
@@ -60,6 +84,18 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             }
         } else {
             Err(self.expecting_err(token)?)
+        }
+    }
+
+    pub fn expect_nonfatal(&mut self, token: Token) {
+        if let (pos, Some(peeked)) = self.next_token(self.position) {
+            if token == peeked.token {
+                self.position = pos + 1;
+            } else {
+                self.expecting_err_nonfatal(token);
+            }
+        } else {
+            self.expecting_err_nonfatal(token);
         }
     }
 
@@ -147,6 +183,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         let clone = TokenStream {
             ref_position: Some(&mut ref_pos),
             tokens: self.tokens,
+            errors: self.errors.clone(),
             position,
         };
 
@@ -196,6 +233,10 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             }
         }
         (from, self.tokens.get(from))
+    }
+
+    pub fn errors(&self) -> Vec<Error> {
+        self.errors.borrow().clone().clone()
     }
 }
 

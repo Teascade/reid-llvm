@@ -16,7 +16,7 @@ fn test_compile(source: &str, name: &str) -> CompileOutput {
         let mut map = Default::default();
         let (id, tokens) = assert_err(parse_module(source, name, &mut map));
 
-        let module = assert_err(compile_module(id, tokens, &mut map, None, true));
+        let module = assert_err(assert_err(compile_module(id, tokens, &mut map, None, true)).map_err(|(_, e)| e));
         let mut mir_context = mir::Context::from(vec![module], Default::default());
         assert_err(perform_all_passes(&mut mir_context, &mut map));
 

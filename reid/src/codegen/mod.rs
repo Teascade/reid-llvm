@@ -1326,8 +1326,6 @@ impl mir::Expression {
                         (val.1.clone(), type_kind.clone())
                     };
 
-                    dbg!(&ty, type_kind);
-
                     match (&ty, type_kind) {
                         (TypeKind::UserPtr(_), TypeKind::UserPtr(_)) => Some(StackValue(
                             val.0.derive(
