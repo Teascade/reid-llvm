@@ -1,10 +1,12 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, fmt::format, path::PathBuf};
 
 use reid::{
-    ast::lexer::FullToken,
+    ast::{self, FunctionDefinition, lexer::FullToken},
     compile_module,
     error_raporting::{ErrorModules, ReidError},
-    mir::{self, Context, FunctionCall, IfExpression, SourceModuleId, StructType, TypeKind, WhileStatement},
+    mir::{
+        self, Context, FunctionCall, FunctionParam, IfExpression, SourceModuleId, StructType, TypeKind, WhileStatement,
+    },
     perform_all_passes,
 };
 
@@ -20,6 +22,34 @@ pub struct StaticAnalysis {
 #[derive(Debug, Clone)]
 pub struct SemanticAnalysis {
     pub ty: Option<TypeKind>,
+    pub autocomplete: Vec<Autocomplete>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Autocomplete {
+    pub text: String,
+    pub kind: AutocompleteKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum AutocompleteKind {
+    Type,
+    Function(Vec<FunctionParam>, TypeKind),
+}
+
+impl ToString for AutocompleteKind {
+    fn to_string(&self) -> String {
+        match self {
+            AutocompleteKind::Type => String::from("type"),
+            AutocompleteKind::Function(params, ret_ty) => {
+                let params = params
+                    .iter()
+                    .map(|p| format!("{}: {}", p.name, p.ty))
+                    .collect::<Vec<_>>();
+                format!("({}) -> {}", params.join(", "), ret_ty)
+            }
+        }
+    }
 }
 
 pub fn analyze(
@@ -28,47 +58,110 @@ pub fn analyze(
     path: PathBuf,
     map: &mut ErrorModules,
 ) -> Result<Option<StaticAnalysis>, ReidError> {
-    let (module, error) = match compile_module(module_id, tokens, map, Some(path.clone()), true)? {
+    let (module, mut parse_error) = match compile_module(module_id, tokens, map, Some(path.clone()), true)? {
         Ok(module) => (module, None),
         Err((m, err)) => (m.process(module_id), Some(err)),
     };
 
     let module_id = module.module_id;
     let mut context = Context::from(vec![module], path.parent().unwrap().to_owned());
-    perform_all_passes(&mut context, map)?;
+    match perform_all_passes(&mut context, map) {
+        Ok(_) => {}
+        Err(pass_error) => {
+            if let Some(err) = &mut parse_error {
+                err.extend(pass_error);
+            } else {
+                parse_error = Some(pass_error)
+            }
+        }
+    }
 
     for module in context.modules.values() {
         if module.module_id != module_id {
             continue;
         }
-        return Ok(Some(analyze_context(&context, &module, error)));
+        return Ok(Some(analyze_context(&context, &module, parse_error)));
     }
     return Ok(None);
 }
 
-pub fn set_tokens(map: &mut TokenAnalysisMap, meta: &mir::Metadata, analysis: SemanticAnalysis) {
-    for token in meta.range.start..meta.range.end {
-        map.insert(token, analysis.clone());
+pub fn init_types(map: &mut TokenAnalysisMap, meta: &mir::Metadata, ty: Option<TypeKind>) {
+    for token in meta.range.start..=meta.range.end {
+        map.insert(
+            token,
+            SemanticAnalysis {
+                ty: ty.clone(),
+                autocomplete: Vec::new(),
+            },
+        );
+    }
+}
+
+pub fn set_autocomplete(map: &mut TokenAnalysisMap, meta: &mir::Metadata, autocomplete: Vec<Autocomplete>) {
+    for token in meta.range.start..=meta.range.end {
+        if let Some(token) = map.get_mut(&token) {
+            token.autocomplete = autocomplete.clone();
+        } else {
+            map.insert(
+                token,
+                SemanticAnalysis {
+                    ty: None,
+                    autocomplete: autocomplete.clone(),
+                },
+            );
+        }
     }
 }
 
 pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Option<ReidError>) -> StaticAnalysis {
     let mut map = HashMap::new();
     for import in &module.imports {
-        set_tokens(&mut map, &import.1, SemanticAnalysis { ty: None });
+        init_types(&mut map, &import.1, None);
+        if let Some((module_name, _)) = import.0.get(0) {
+            let (import_name, import_meta) = import.0.get(1).cloned().unwrap_or((
+                String::new(),
+                mir::Metadata {
+                    source_module_id: module.module_id,
+                    range: reid::ast::token_stream::TokenRange {
+                        start: import.1.range.end - 1,
+                        end: import.1.range.end - 1,
+                    },
+                    position: None,
+                },
+            ));
+            let mut autocompletes = Vec::new();
+
+            if let Some((_, module)) = context.modules.iter().find(|m| m.1.name == *module_name) {
+                for function in &module.functions {
+                    if !function.is_pub {
+                        continue;
+                    }
+                    if function.name.starts_with(&import_name) {
+                        autocompletes.push(Autocomplete {
+                            text: function.name.clone(),
+                            kind: AutocompleteKind::Function(function.parameters.clone(), function.return_type.clone()),
+                        });
+                    }
+                }
+                for typedef in &module.typedefs {
+                    if typedef.name.starts_with(&import_name) {
+                        autocompletes.push(Autocomplete {
+                            text: typedef.name.clone(),
+                            kind: AutocompleteKind::Type,
+                        });
+                    }
+                }
+            }
+            dbg!(import_meta, &autocompletes);
+            set_autocomplete(&mut map, &import_meta, autocompletes);
+        }
     }
 
     for typedef in &module.typedefs {
         match &typedef.kind {
             mir::TypeDefinitionKind::Struct(StructType(fields)) => {
                 for field in fields {
-                    set_tokens(
-                        &mut map,
-                        &field.2,
-                        SemanticAnalysis {
-                            ty: Some(field.1.clone()),
-                        },
-                    );
+                    init_types(&mut map, &field.2, Some(field.1.clone()));
                 }
             }
         }
@@ -84,13 +177,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     for (_, function) in &module.associated_functions {
         for param in &function.parameters {
-            set_tokens(
-                &mut map,
-                &param.meta,
-                SemanticAnalysis {
-                    ty: Some(param.ty.clone()),
-                },
-            );
+            init_types(&mut map, &param.meta, Some(param.ty.clone()));
         }
 
         match &function.kind {
@@ -102,13 +189,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     for function in &module.functions {
         for param in &function.parameters {
-            set_tokens(
-                &mut map,
-                &param.meta,
-                SemanticAnalysis {
-                    ty: Some(param.ty.clone()),
-                },
-            );
+            init_types(&mut map, &param.meta, Some(param.ty.clone()));
         }
 
         match &function.kind {
@@ -134,15 +215,13 @@ pub fn analyze_block(
     for statement in &block.statements {
         match &statement.0 {
             mir::StmtKind::Let(named_variable_ref, _, expression) => {
-                set_tokens(
+                init_types(
                     map,
                     &named_variable_ref.2,
-                    SemanticAnalysis {
-                        ty: expression
-                            .return_type(&Default::default(), source_module.module_id)
-                            .ok()
-                            .map(|(_, ty)| ty),
-                    },
+                    expression
+                        .return_type(&Default::default(), source_module.module_id)
+                        .ok()
+                        .map(|(_, ty)| ty),
                 );
                 // return analyze_in_expr(&expression, module_id, token_idx);
             }
@@ -172,15 +251,12 @@ pub fn analyze_expr(
     expr: &mir::Expression,
     map: &mut TokenAnalysisMap,
 ) {
-    set_tokens(
+    init_types(
         map,
         &expr.1,
-        SemanticAnalysis {
-            ty: expr
-                .return_type(&Default::default(), source_module.module_id)
-                .ok()
-                .map(|(_, t)| t),
-        },
+        expr.return_type(&Default::default(), source_module.module_id)
+            .ok()
+            .map(|(_, t)| t),
     );
 
     match &expr.0 {

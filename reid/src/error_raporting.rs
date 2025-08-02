@@ -181,6 +181,10 @@ impl ReidError {
     pub fn from_kind(errors: Vec<ErrorKind>, map: ErrorModules) -> ReidError {
         ReidError { map, errors }
     }
+
+    pub fn extend(&mut self, other: ReidError) {
+        self.errors.extend(other.errors);
+    }
 }
 
 impl std::error::Error for ReidError {}

@@ -124,7 +124,9 @@ impl<'map> Pass for LinkerPass<'map> {
                     state.ok::<_, Infallible>(Err(ErrorKind::InnerModulesNotYetSupported(import.clone())), import.1);
                 }
 
-                let module_name = unsafe { path.get_unchecked(0) };
+                let Some((module_name, _)) = path.get(0) else {
+                    continue;
+                };
 
                 let mut imported = if let Some(mod_id) = module_ids.get(module_name) {
                     modules.get(mod_id).unwrap()
@@ -197,7 +199,9 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
                 .borrow_mut();
 
-                let import_name = unsafe { path.get_unchecked(1) };
+                let Some((import_name, _)) = path.get(1) else {
+                    continue;
+                };
                 let import_id = imported.module_id;
 
                 let mut imported_types = Vec::new();

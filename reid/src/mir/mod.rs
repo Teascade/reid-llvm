@@ -256,7 +256,7 @@ pub enum ReturnKind {
 pub struct NamedVariableRef(pub TypeKind, pub String, pub Metadata);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Import(pub Vec<String>, pub Metadata);
+pub struct Import(pub Vec<(String, Metadata)>, pub Metadata);
 
 #[derive(Debug, Clone)]
 pub enum ExprKind {

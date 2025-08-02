@@ -84,7 +84,11 @@ impl Display for GlobalKind {
 
 impl Display for Import {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "import {}", self.0.join("::"))
+        write!(
+            f,
+            "import {}",
+            self.0.iter().map(|(s, _)| s.clone()).collect::<Vec<_>>().join("::")
+        )
     }
 }
 

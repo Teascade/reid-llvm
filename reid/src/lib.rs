@@ -130,6 +130,7 @@ pub fn compile_module<'map>(
     };
 
     if errors.len() > 0 {
+        dbg!(&ast_module);
         return Ok(Err((
             ast_module,
             ReidError::from_kind(

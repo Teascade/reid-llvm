@@ -67,10 +67,40 @@ impl LanguageServer for Backend {
     }
 
     async fn completion(&self, params: CompletionParams) -> jsonrpc::Result<Option<CompletionResponse>> {
-        Ok(Some(CompletionResponse::Array(vec![
-            CompletionItem::new_simple("Hello".to_string(), "Some detail".to_string()),
-            CompletionItem::new_simple("Bye".to_string(), "More detail".to_string()),
-        ])))
+        let path = PathBuf::from(params.text_document_position.text_document.uri.path());
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let analysis = self.analysis.get(&file_name);
+        let position = params.text_document_position.position;
+
+        let token = if let Some(analysis) = &analysis {
+            analysis.tokens.iter().enumerate().find(|(_, tok)| {
+                tok.position.1 == position.line + 1
+                    && (tok.position.0 <= position.character
+                        && (tok.position.0 + tok.token.len() as u32) > position.character)
+            })
+        } else {
+            None
+        };
+
+        dbg!(position, token);
+
+        let list = if let Some((idx, _)) = token {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.get(&idx) {
+                dbg!(&analysis);
+                analysis
+                    .autocomplete
+                    .iter()
+                    .map(|s| CompletionItem::new_simple(s.text.to_string(), s.kind.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        dbg!(&list);
+        Ok(Some(CompletionResponse::Array(list)))
     }
 
     async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {

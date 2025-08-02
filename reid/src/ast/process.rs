@@ -30,7 +30,14 @@ impl ast::Module {
         for stmt in &self.top_level_statements {
             match stmt {
                 Import(import) => {
-                    imports.push(mir::Import(import.0.clone(), import.1.as_meta(module_id)));
+                    imports.push(mir::Import(
+                        import
+                            .0
+                            .iter()
+                            .map(|(s, range)| (s.clone(), range.as_meta(module_id)))
+                            .collect(),
+                        import.1.as_meta(module_id),
+                    ));
                 }
                 FunctionDefinition(function_def) => functions.push(function_def.into_mir(module_id)),
                 ExternFunction(signature) => {

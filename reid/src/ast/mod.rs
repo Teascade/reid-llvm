@@ -184,7 +184,7 @@ pub struct LetStatement {
 }
 
 #[derive(Debug, Clone)]
-pub struct ImportStatement(pub Vec<String>, pub TokenRange);
+pub struct ImportStatement(pub Vec<(String, TokenRange)>, pub TokenRange);
 
 #[derive(Debug)]
 pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub TokenRange);

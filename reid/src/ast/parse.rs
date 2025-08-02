@@ -631,12 +631,14 @@ impl Parse for ImportStatement {
         let mut import_list = Vec::new();
 
         if let Some(Token::Identifier(name)) = stream.next() {
-            import_list.push(name);
+            import_list.push((name, stream.get_range_prev_single().unwrap()));
             while stream.expect(Token::Colon).is_ok() && stream.expect(Token::Colon).is_ok() {
-                if let Some(Token::Identifier(name)) = stream.next() {
-                    import_list.push(name);
+                if let Some(Token::Identifier(name)) = stream.peek() {
+                    stream.next(); // Consume identifier
+                    import_list.push((name, stream.get_range_prev_single().unwrap()));
                 } else {
-                    Err(stream.expected_err("identifier")?)?
+                    stream.expected_err_nonfatal("identifier");
+                    break;
                 }
             }
         } else {
