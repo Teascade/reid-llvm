@@ -18,12 +18,20 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-	const traceOutputChannel = window.createOutputChannel("Reid Language Server trace");
-	const command = process.env.SERVER_PATH || "reid-language-server";
-
+	const configuration = workspace.getConfiguration('reid-language-server');
+	let server_path: string = process.env.SERVER_PATH ?? configuration.get("language-server-path") ?? 'reid-language-server';
+	const regex = /\$(\w+)/;
+	while (regex.test(server_path)) {
+		let envVar = regex.exec(server_path)?.[1];
+		const envVal = envVar ? process.env[envVar] : undefined;
+		if (envVar === undefined || envVal === undefined) {
+			console.error(`No such environment variables as ${envVar}`);
+		}
+		server_path = server_path.replaceAll(`$${envVar}`, envVal ?? '');
+	}
 
 	const run: Executable = {
-		command,
+		command: server_path,
 		options: {
 			env: {
 				...process.env,
@@ -49,11 +57,15 @@ export function activate(context: ExtensionContext) {
 
 	// Create the language client and start the client.
 	client = new LanguageClient(
-		'reid-lsp',
+		'reid-language-server',
 		'Reid Language Server',
 		serverOptions,
 		clientOptions
 	);
+	client.info(JSON.stringify(server_path));
+
+	client.info(`Loaded Reid Language Server from ${server_path}`);
+
 
 	workspace.onDidOpenTextDocument((e) => {
 	});

@@ -1,5 +1,5 @@
 {
-  "name": "reid-lsp",
+  "name": "reid-language-server",
   "displayName": "Reid Language Server",
   "description": "Language Server Extension for Reid",
   "version": "0.1.0",
@@ -32,21 +32,11 @@
       "type": "object",
       "title": "reid-language-server",
       "properties": {
-        "nrs-language-server.trace.server": {
+        "reid-language-server.language-server-path": {
           "type": "string",
           "scope": "window",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
-          "enumDescriptions": [
-            "No traces",
-            "Error only",
-            "Full log"
-          ],
-          "default": "off",
-          "description": "Traces the communication between VS Code and the language server."
+          "default": "$HOME/.cargo/bin/reid-lsp",
+          "description": "Path to the Reid Language Server executable"
         }
       }
     },
