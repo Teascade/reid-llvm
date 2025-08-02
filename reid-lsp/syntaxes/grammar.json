@@ -2,43 +2,387 @@
   "scopeName": "source.reid",
   "patterns": [
     {
+      "include": "#import"
+    },
+    {
+      "include": "#extern"
+    },
+    {
       "include": "#expression"
     }
   ],
   "repository": {
-    "expression": {
-      "patterns": [
-        {
-          "include": "#letter"
-        },
-        {
-          "include": "#paren-expression"
-        }
-      ]
-    },
-    "letter": {
-      "match": "a|b|c",
-      "name": "keyword.letter"
-    },
-    "paren-expression": {
-      "begin": "\\(",
-      "end": "\\)",
+    "import": {
+      "begin": "(import)\\s*",
+      "end": ";",
       "beginCaptures": {
-        "0": {
-          "name": "punctuation.paren.open"
+        "1": {
+          "name": "keyword"
         }
       },
       "endCaptures": {
         "0": {
-          "name": "punctuation.paren.close"
+          "name": "punctuation.semi.reid"
         }
       },
-      "name": "expression.group",
+      "patterns": [
+        {
+          "include": "#identifier"
+        },
+        {
+          "include": "#punctiation"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "::",
+          "name": "keyword.operator.namespace.reid"
+        },
+        {
+          "match": ";",
+          "name": "punctuation.semi.reid"
+        },
+        {
+          "match": ".",
+          "name": "punctuation.dot.reid"
+        },
+        {
+          "match": ",",
+          "name": "punctuation.comma.reid"
+        }
+      ]
+    },
+    "expression": {
+      "patterns": [
+        {
+          "include": "#comment"
+        },
+        {
+          "include": "#fn-signature"
+        },
+        {
+          "include": "#binop-impl"
+        },
+        {
+          "include": "#type-impl"
+        },
+        {
+          "include": "#struct-definition"
+        },
+        {
+          "include": "#block"
+        },
+        {
+          "include": "#binop"
+        },
+        {
+          "include": "#namespace"
+        },
+        {
+          "include": "#cast"
+        },
+        {
+          "include": "#function-call"
+        },
+        {
+          "include": "#parenthesis"
+        },
+        {
+          "include": "#number-literal"
+        },
+        {
+          "include": "#string-literal"
+        },
+        {
+          "include": "#common-type"
+        },
+        {
+          "include": "#array"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#struct-expression"
+        },
+        {
+          "include": "#identifier"
+        },
+        {
+          "include": "#punctuation"
+        }
+      ]
+    },
+    "comment": {
+      "match": "\\/\\/(.|\\/)*",
+      "name": "comment.line.double-slash.reid"
+    },
+    "extern": {
+      "begin": "extern",
+      "end": "\\;",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.fn.reid"
+        }
+      },
       "patterns": [
         {
           "include": "#expression"
         }
       ]
+    },
+    "fn-signature": {
+      "begin": "(fn)\\s*(\\w+)\\(",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.fn.reid"
+        },
+        "2": {
+          "name": "entity.name.function.reid"
+        }
+      },
+      "end": "\\)",
+      "patterns": [
+        {
+          "include": "#annotated-identifier"
+        },
+        {
+          "include": "#keywords"
+        },
+        {
+          "include": "#binop"
+        }
+      ],
+      "endCaptures": {
+        "2": {
+          "name": "entity.name.type.reid"
+        }
+      }
+    },
+    "type-impl": {
+      "begin": "(impl)\\s* (\\w+)\\s* \\{\n",
+      "end": "\\}",
+      "captures": {
+        "1": {
+          "name": "keyword.impl.reid"
+        },
+        "2": {
+          "name": "entity.name.type"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "binop-impl": {
+      "begin": "(impl)\\s+(binop)\\s+\\(((.*)\\s*:\\s*(.*))\\)(.*)\\(((.*)\\s*:\\s*(.*))\\)\\s*->\\s*(\\w+)\\s*\\{",
+      "end": "\\}",
+      "beginCaptures": {
+        "1": {
+          "name": "keyword.impl.reid"
+        },
+        "2": {
+          "name": "keyword.impl.reid"
+        },
+        "4": {
+          "name": "variable.parameter.binop.reid"
+        },
+        "5": {
+          "name": "entity.name.type.parameter.binop.reid"
+        },
+        "6": {
+          "name": "keyword.operator.math.reid"
+        },
+        "8": {
+          "name": "variable.parameter.binop.reid"
+        },
+        "9": {
+          "name": "entity.name.type.parameter.binop.reid"
+        },
+        "10": {
+          "name": "entity.name.type.return.binop.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "struct-definition": {
+      "begin": "(struct)\\s*(\\w+)\\s*\\{",
+      "end": "\\}",
+      "captures": {
+        "1": {
+          "name": "keyword.struct.reid"
+        },
+        "2": {
+          "name": "entity.name.type"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#annotated-identifier"
+        }
+      ]
+    },
+    "struct-expression": {
+      "begin": "([A-Z]\\w*)\\s*\\{",
+      "end": "\\}",
+      "captures": {
+        "1": {
+          "name": "entity.name.type.struct.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "number-literal": {
+      "match": "[0-9]+(\\.[0-9]+)?",
+      "name": "constant.numeric"
+    },
+    "string-literal": {
+      "begin": "\"",
+      "end": "\"",
+      "name": "string.quoted.double",
+      "patterns": [
+        {
+          "match": "\\.",
+          "name": "constant.character.escape"
+        }
+      ]
+    },
+    "block": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "namespace": {
+      "match": "(\\w+)(\\:\\:)",
+      "captures": {
+        "1": {
+          "name": "entity.name.function.reid"
+        },
+        "2": {
+          "name": "keyword.operator.namespace.reid"
+        }
+      }
+    },
+    "cast": {
+      "match": "(as)\\s+(\\w+)",
+      "captures": {
+        "1": {
+          "name": "keyword.cast.reid"
+        },
+        "2": {
+          "name": "entity.name.type.reid"
+        }
+      }
+    },
+    "function-call": {
+      "begin": "(\\w+)?\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "1": {
+          "name": "entity.name.function.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "parenthesis": {
+      "begin": "\\(",
+      "end": "\\)",
+      "beginCaptures": {
+        "0": {
+          "name": "keyword.operator.parenthesis.reid"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "keyword.operator.parenthesis.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "annotated-identifier": {
+      "begin": "(\\w+)\\:",
+      "end": ",",
+      "beginCaptures": {
+        "1": {
+          "name": "variable.language.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "identifier": {
+      "match": "\\w+",
+      "name": "variable.language.reid"
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "let|mut|pub",
+          "name": "storage.type.reid"
+        },
+        {
+          "match": "if|return",
+          "name": "keyword.control"
+        },
+        {
+          "match": "self",
+          "name": "variable.language.self.reid"
+        }
+      ]
+    },
+    "binop": {
+      "match": "\\<\\=|\\>\\=|\\=\\=|\\<|\\>|\\*|\\+|\\-|\\^|\\&\\&|\\&",
+      "name": "keyword.operator.math.reid"
+    },
+    "array": {
+      "begin": "\\[",
+      "end": "\\]",
+      "beginCaptures": {
+        "0": {
+          "name": "entity.name.type.array.reid"
+        }
+      },
+      "endCaptures": {
+        "0": {
+          "name": "entity.name.type.array.reid"
+        }
+      },
+      "patterns": [
+        {
+          "include": "#expression"
+        }
+      ]
+    },
+    "common-type": {
+      "match": "u8|u16|u32|u64|u128|i8|i16|i32|i64|i128|bool",
+      "name": "entity.name.type.common.reid"
     }
   }
 }
