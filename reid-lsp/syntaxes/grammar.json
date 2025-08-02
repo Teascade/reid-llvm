@@ -5,9 +5,6 @@
       "include": "#import"
     },
     {
-      "include": "#extern"
-    },
-    {
       "include": "#expression"
     }
   ],
@@ -63,6 +60,9 @@
           "include": "#fn-signature"
         },
         {
+          "include": "#common-type"
+        },
+        {
           "include": "#binop-impl"
         },
         {
@@ -90,15 +90,6 @@
           "include": "#parenthesis"
         },
         {
-          "include": "#number-literal"
-        },
-        {
-          "include": "#string-literal"
-        },
-        {
-          "include": "#common-type"
-        },
-        {
           "include": "#array"
         },
         {
@@ -106,6 +97,12 @@
         },
         {
           "include": "#struct-expression"
+        },
+        {
+          "include": "#number-literal"
+        },
+        {
+          "include": "#string-literal"
         },
         {
           "include": "#identifier"
@@ -118,20 +115,6 @@
     "comment": {
       "match": "\\/\\/(.|\\/)*",
       "name": "comment.line.double-slash.reid"
-    },
-    "extern": {
-      "begin": "extern",
-      "end": "\\;",
-      "beginCaptures": {
-        "0": {
-          "name": "keyword.fn.reid"
-        }
-      },
-      "patterns": [
-        {
-          "include": "#expression"
-        }
-      ]
     },
     "fn-signature": {
       "begin": "(fn)\\s*(\\w+)\\(",
@@ -245,8 +228,24 @@
       ]
     },
     "number-literal": {
-      "match": "[0-9]+(\\.[0-9]+)?",
-      "name": "constant.numeric"
+      "patterns": [
+        {
+          "match": "0x[0-9a-fA-F]+(\\.[0-9a-fA-F]+)?",
+          "name": "constant.hexadecimal"
+        },
+        {
+          "match": "0o[0-7]+(\\.[0-7]+)?",
+          "name": "constant.octal"
+        },
+        {
+          "match": "0b[01]+(\\.[01]+)?",
+          "name": "constant.binary"
+        },
+        {
+          "match": "[0-9]+(\\.[0-9]+)?",
+          "name": "constant.numeric"
+        }
+      ]
     },
     "string-literal": {
       "begin": "\"",
@@ -338,13 +337,21 @@
       ]
     },
     "identifier": {
-      "match": "\\w+",
-      "name": "variable.language.reid"
+      "patterns": [
+        {
+          "match": "[A-Z]\\w*",
+          "name": "entity.name.type.reid"
+        },
+        {
+          "match": "\\w+",
+          "name": "variable.language.reid"
+        }
+      ]
     },
     "keywords": {
       "patterns": [
         {
-          "match": "let|mut|pub",
+          "match": "let|mut|pub|extern",
           "name": "storage.type.reid"
         },
         {

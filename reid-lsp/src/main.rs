@@ -12,9 +12,9 @@ use reid::{compile_module, parse_module, perform_all_passes};
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, MarkedString, MessageType, OneOf, Range, ServerCapabilities,
-    TextDocumentItem, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    InitializeParams, InitializeResult, InitializedParams, MarkedString, MarkupContent, MarkupKind, MessageType, OneOf,
+    Range, ServerCapabilities, TextDocumentItem, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -91,24 +91,38 @@ impl LanguageServer for Backend {
             None
         };
 
-        let ty = if let Some(token) = token {
+        let (range, ty) = if let Some(token) = token {
             if let Some(possible_ty) = self.types.get(&file_name).unwrap().get(token) {
+                let start = token.position;
+                let end = token.position.add(token.token.len() as u32);
+                let range = Range {
+                    start: lsp_types::Position {
+                        line: (start.1 as i32 - 1).max(0) as u32,
+                        character: (start.0 as i32 - 1).max(0) as u32,
+                    },
+                    end: lsp_types::Position {
+                        line: (end.1 as i32 - 1).max(0) as u32,
+                        character: (end.0 as i32 - 1).max(0) as u32,
+                    },
+                };
                 if let Some(ty) = possible_ty.clone() {
-                    format!("{}", ty)
+                    (Some(range), format!("{}", ty))
                 } else {
-                    String::from("no type")
+                    (Some(range), String::from("no type"))
                 }
             } else {
-                String::from("no token")
+                (None, String::from("no token"))
             }
         } else {
-            String::from("no token")
+            (None, String::from("no token"))
         };
 
-        Ok(Some(Hover {
-            contents: HoverContents::Scalar(MarkedString::String(format!("{}", ty))),
-            range: None,
-        }))
+        let contents = HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: format!("`{ty}`"),
+        });
+
+        Ok(Some(Hover { contents, range }))
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
@@ -277,6 +291,8 @@ pub fn find_type_in_context(module: &mir::Module, token_idx: usize) -> Option<Ty
             if !meta.contains(token_idx) {
                 continue;
             }
+        } else {
+            continue;
         }
 
         return match &binop.fn_kind {
@@ -404,7 +420,7 @@ pub fn find_type_in_expr(expr: &mir::Expression, module_id: SourceModuleId, toke
             Some(TypeKind::CustomType(mir::CustomTypeKey(name.clone(), module_id)))
         }
         mir::ExprKind::Literal(literal) => Some(literal.as_type()),
-        mir::ExprKind::BinOp(binary_operator, lhs, rhs, type_kind) => {
+        mir::ExprKind::BinOp(_, lhs, rhs, type_kind) => {
             if let Some(ty) = find_type_in_expr(lhs, module_id, token_idx) {
                 return Some(ty);
             }
