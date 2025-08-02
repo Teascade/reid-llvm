@@ -20,6 +20,8 @@ fn main() -> u32 {
     let boop: f32 = 3;
 
     let mut a = &mut value;
+    
+    *a.second[2] = 5;
 
-    return *a.second[0];
+    return *a.second[2];
 }
