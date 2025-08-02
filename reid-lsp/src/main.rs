@@ -22,7 +22,6 @@ mod analysis;
 struct Backend {
     client: Client,
     analysis: DashMap<String, StaticAnalysis>,
-    ast: DashMap<String, reid::ast::Module>,
 }
 
 #[tower_lsp::async_trait]
@@ -91,7 +90,7 @@ impl LanguageServer for Backend {
         };
 
         let (range, ty) = if let Some((idx, token)) = token {
-            if let Some(possible_ty) = self.analysis.get(&file_name).unwrap().token_analysis.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.get(&idx) {
                 let start = token.position;
                 let end = token.position.add(token.token.len() as u32);
                 let range = Range {
@@ -104,7 +103,7 @@ impl LanguageServer for Backend {
                         character: (end.0 as i32 - 1).max(0) as u32,
                     },
                 };
-                if let Some(ty) = possible_ty.ty.clone() {
+                if let Some(ty) = analysis.ty.clone() {
                     (Some(range), format!("{}", ty))
                 } else {
                     (Some(range), String::from("None type"))
@@ -220,11 +219,6 @@ fn reid_error_into_diagnostic(error: &error_raporting::ErrorKind, tokens: &Vec<F
     }
 }
 
-struct CompileResult {
-    tokens: Vec<FullToken>,
-    types: DashMap<FullToken, Option<TypeKind>>,
-}
-
 fn parse(source: &str, path: PathBuf, map: &mut ErrorModules) -> Result<(SourceModuleId, Vec<FullToken>), ReidError> {
     let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
@@ -238,7 +232,6 @@ async fn main() {
 
     let (service, socket) = LspService::new(|client| Backend {
         client,
-        ast: DashMap::new(),
         analysis: DashMap::new(),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
