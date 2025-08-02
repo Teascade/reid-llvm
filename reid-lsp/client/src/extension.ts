@@ -55,8 +55,6 @@ export function activate(context: ExtensionContext) {
 		clientOptions
 	);
 
-	client.info("hello");
-
 	workspace.onDidOpenTextDocument((e) => {
 	});
 
