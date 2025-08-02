@@ -21,7 +21,5 @@ fn main() -> u32 {
 
     let mut a = &mut value;
 
-    *a.second[2] = 5;
-
-    return *a.second[2];
+    return *a.second[0];
 }

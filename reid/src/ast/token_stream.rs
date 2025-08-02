@@ -87,15 +87,18 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn expect_nonfatal(&mut self, token: Token) {
+    pub fn expect_nonfatal(&mut self, token: Token) -> Result<(), ()> {
         if let (pos, Some(peeked)) = self.next_token(self.position) {
             if token == peeked.token {
                 self.position = pos + 1;
+                Ok(())
             } else {
                 self.expecting_err_nonfatal(token);
+                Err(())
             }
         } else {
             self.expecting_err_nonfatal(token);
+            Err(())
         }
     }
 

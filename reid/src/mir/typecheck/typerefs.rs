@@ -97,6 +97,9 @@ pub struct TypeRefs {
     /// Indirect ID-references, referring to hints-vec
     pub(super) type_refs: RefCell<Vec<TypeIdRef>>,
     pub(super) binop_types: BinopMap,
+    /// Used when the real typerefs are not available, and any TypeRefs need to
+    /// be resolved as Unknown.
+    pub unknown_typerefs: bool,
 }
 
 impl std::fmt::Display for TypeRefs {
@@ -122,6 +125,14 @@ impl TypeRefs {
             hints: Default::default(),
             type_refs: Default::default(),
             binop_types: binops,
+            unknown_typerefs: false,
+        }
+    }
+
+    pub fn unknown() -> TypeRefs {
+        TypeRefs {
+            unknown_typerefs: true,
+            ..Default::default()
         }
     }
 
@@ -177,8 +188,12 @@ impl TypeRefs {
     }
 
     pub fn retrieve_typeref(&self, idx: usize) -> Option<TypeRefKind> {
-        let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
-        self.hints.borrow().get(inner_idx).cloned()
+        if !self.unknown_typerefs {
+            let inner_idx = unsafe { *self.recurse_type_ref(idx).borrow() };
+            self.hints.borrow().get(inner_idx).cloned()
+        } else {
+            Some(TypeRefKind::Direct(TypeKind::Vague(VagueType::Unknown)))
+        }
     }
 
     pub fn retrieve_wide_type(&self, idx: usize, seen: &mut HashSet<usize>) -> Option<TypeKind> {

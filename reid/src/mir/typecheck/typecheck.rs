@@ -621,7 +621,7 @@ impl Expression {
                         // Update possibly resolved type
                         Ok(true_ty)
                     } else {
-                        Err(ErrorKind::NoSuchField(field_name.clone()))
+                        Err(ErrorKind::NoSuchField(key.0.clone()))
                     }
                 } else {
                     Err(ErrorKind::TriedAccessingNonStruct(expr_ty))

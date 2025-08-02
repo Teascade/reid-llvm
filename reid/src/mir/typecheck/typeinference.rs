@@ -14,7 +14,7 @@ use crate::{
     mir::{
         pass::{AssociatedFunctionKey, ScopeVariable},
         BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
-        IfExpression, Module, ReturnKind, StmtKind, TypeKind, WhileStatement,
+        IfExpression, Module, ReturnKind, StmtKind, TypeKind, VagueType, WhileStatement,
     },
     util::try_all,
 };
@@ -546,10 +546,10 @@ impl Expression {
                                 *type_kind = elem_ty.as_type().clone();
                                 Ok(elem_ty)
                             }
-                            None => Err(ErrorKind::NoSuchField(field_name.clone())),
+                            None => Ok(type_refs.from_type(&TypeKind::Vague(VagueType::Unknown)).unwrap()),
                         }
                     }
-                    _ => Err(ErrorKind::TriedAccessingNonStruct(kind)),
+                    _ => Ok(type_refs.from_type(&TypeKind::Vague(VagueType::Unknown)).unwrap()),
                 }
             }
             ExprKind::Struct(struct_name, fields) => {

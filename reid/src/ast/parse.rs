@@ -175,7 +175,36 @@ impl Parse for AssociatedFunctionCall {
         let ty = stream.parse()?;
         stream.expect(Token::Colon)?;
         stream.expect(Token::Colon)?;
-        Ok(AssociatedFunctionCall(ty, stream.parse()?))
+        match stream.parse() {
+            Ok(fn_call) => Ok(AssociatedFunctionCall(ty, fn_call)),
+            _ => {
+                if let Some(Token::Identifier(fn_name)) = stream.peek() {
+                    stream.next();
+                    stream.expected_err_nonfatal("associated function call");
+
+                    Ok(AssociatedFunctionCall(
+                        ty,
+                        FunctionCallExpression {
+                            name: fn_name,
+                            params: Vec::new(),
+                            range: stream.get_range_prev_single().unwrap(),
+                            is_macro: false,
+                        },
+                    ))
+                } else {
+                    stream.expected_err_nonfatal("associated function name");
+                    Ok(AssociatedFunctionCall(
+                        ty,
+                        FunctionCallExpression {
+                            name: String::new(),
+                            params: Vec::new(),
+                            range: stream.get_range_prev_single().unwrap(),
+                            is_macro: false,
+                        },
+                    ))
+                }
+            }
+        }
     }
 }
 
@@ -610,7 +639,7 @@ impl Parse for LetStatement {
             stream.expect(Token::Equals)?;
 
             let expression = stream.parse()?;
-            stream.expect_nonfatal(Token::Semi);
+            stream.expect_nonfatal(Token::Semi).ok();
             Ok(LetStatement {
                 name: variable,
                 ty,
@@ -645,7 +674,7 @@ impl Parse for ImportStatement {
             Err(stream.expected_err("identifier")?)?
         }
 
-        stream.expect_nonfatal(Token::Semi);
+        stream.expect_nonfatal(Token::Semi).ok();
 
         Ok(ImportStatement(import_list, stream.get_range().unwrap()))
     }
@@ -934,7 +963,7 @@ impl Parse for BlockLevelStatement {
             Some(Token::ReturnKeyword) => {
                 stream.next();
                 let exp = stream.parse().ok();
-                stream.expect(Token::Semi)?;
+                stream.expect_nonfatal(Token::Semi).ok();
                 Stmt::Return(ReturnType::Hard, exp)
             }
             Some(Token::For) => {
@@ -999,7 +1028,7 @@ impl Parse for SetStatement {
         let var_ref = stream.parse()?;
         stream.expect(Token::Equals)?;
         let expr = stream.parse()?;
-        stream.expect_nonfatal(Token::Semi);
+        stream.expect_nonfatal(Token::Semi).ok();
         Ok(SetStatement(var_ref, expr, stream.get_range().unwrap()))
     }
 }
@@ -1040,7 +1069,7 @@ impl Parse for TopLevelStatement {
                 stream.next(); // Consume Extern
                 stream.expect(Token::FnKeyword)?;
                 let extern_fn = Stmt::ExternFunction(stream.parse()?);
-                stream.expect_nonfatal(Token::Semi);
+                stream.expect_nonfatal(Token::Semi).ok();
                 extern_fn
             }
             Some(Token::FnKeyword) | Some(Token::PubKeyword) => Stmt::FunctionDefinition(stream.parse()?),

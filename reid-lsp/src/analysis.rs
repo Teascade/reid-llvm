@@ -1,11 +1,12 @@
 use std::{collections::HashMap, fmt::format, path::PathBuf};
 
 use reid::{
-    ast::{self, FunctionDefinition, lexer::FullToken},
+    ast::{self, FunctionDefinition, lexer::FullToken, token_stream::TokenRange},
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
         self, Context, FunctionCall, FunctionParam, IfExpression, SourceModuleId, StructType, TypeKind, WhileStatement,
+        typecheck::typerefs::TypeRefs,
     },
     perform_all_passes,
 };
@@ -34,6 +35,7 @@ pub struct Autocomplete {
 #[derive(Debug, Clone)]
 pub enum AutocompleteKind {
     Type,
+    Field(TypeKind),
     Function(Vec<FunctionParam>, TypeKind),
 }
 
@@ -48,6 +50,7 @@ impl ToString for AutocompleteKind {
                     .collect::<Vec<_>>();
                 format!("({}) -> {}", params.join(", "), ret_ty)
             }
+            AutocompleteKind::Field(type_kind) => format!("{}", type_kind),
         }
     }
 }
@@ -97,19 +100,17 @@ pub fn init_types(map: &mut TokenAnalysisMap, meta: &mir::Metadata, ty: Option<T
     }
 }
 
-pub fn set_autocomplete(map: &mut TokenAnalysisMap, meta: &mir::Metadata, autocomplete: Vec<Autocomplete>) {
-    for token in meta.range.start..=meta.range.end {
-        if let Some(token) = map.get_mut(&token) {
-            token.autocomplete = autocomplete.clone();
-        } else {
-            map.insert(
-                token,
-                SemanticAnalysis {
-                    ty: None,
-                    autocomplete: autocomplete.clone(),
-                },
-            );
-        }
+pub fn set_autocomplete(map: &mut TokenAnalysisMap, token_idx: usize, autocomplete: Vec<Autocomplete>) {
+    if let Some(token) = map.get_mut(&token_idx) {
+        token.autocomplete = autocomplete.clone();
+    } else {
+        map.insert(
+            token_idx,
+            SemanticAnalysis {
+                ty: None,
+                autocomplete: autocomplete.clone(),
+            },
+        );
     }
 }
 
@@ -152,8 +153,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                     }
                 }
             }
-            dbg!(import_meta, &autocompletes);
-            set_autocomplete(&mut map, &import_meta, autocompletes);
+            set_autocomplete(&mut map, import_meta.range.end, autocompletes);
         }
     }
 
@@ -219,7 +219,7 @@ pub fn analyze_block(
                     map,
                     &named_variable_ref.2,
                     expression
-                        .return_type(&Default::default(), source_module.module_id)
+                        .return_type(&TypeRefs::unknown(), source_module.module_id)
                         .ok()
                         .map(|(_, ty)| ty),
                 );
@@ -254,7 +254,7 @@ pub fn analyze_expr(
     init_types(
         map,
         &expr.1,
-        expr.return_type(&Default::default(), source_module.module_id)
+        expr.return_type(&TypeRefs::unknown(), source_module.module_id)
             .ok()
             .map(|(_, t)| t),
     );
@@ -265,8 +265,48 @@ pub fn analyze_expr(
             analyze_expr(context, source_module, &value, map);
             analyze_expr(context, source_module, &index_expr, map);
         }
-        mir::ExprKind::Accessed(expression, ..) => {
+        mir::ExprKind::Accessed(expression, _, name, meta) => {
             analyze_expr(context, source_module, &expression, map);
+
+            let accessed_type = expression.return_type(&TypeRefs::unknown(), source_module.module_id);
+
+            let mut autocompletes = Vec::new();
+            match accessed_type {
+                Ok((_, accessed_type)) => {
+                    autocompletes.extend(
+                        source_module
+                            .associated_functions
+                            .iter()
+                            .filter(|(t, fun)| *t == accessed_type && fun.name.starts_with(name))
+                            .map(|(_, fun)| Autocomplete {
+                                text: fun.name.clone(),
+                                kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
+                            }),
+                    );
+                    match accessed_type {
+                        TypeKind::CustomType(ty_key) => {
+                            let typedef = source_module
+                                .typedefs
+                                .iter()
+                                .find(|t| t.name == ty_key.0 && t.source_module == ty_key.1);
+                            if let Some(typedef) = typedef {
+                                autocompletes.extend(match &typedef.kind {
+                                    mir::TypeDefinitionKind::Struct(StructType(fields)) => {
+                                        fields.iter().filter(|f| f.0.starts_with(name)).map(|f| Autocomplete {
+                                            text: f.0.clone(),
+                                            kind: AutocompleteKind::Field(f.1.clone()),
+                                        })
+                                    }
+                                });
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+
+            set_autocomplete(map, meta.range.end - 1, autocompletes);
         }
         mir::ExprKind::Array(expressions) => {
             for expr in expressions {
@@ -288,10 +328,25 @@ pub fn analyze_expr(
                 analyze_expr(context, source_module, expr, map);
             }
         }
-        mir::ExprKind::AssociatedFunctionCall(_, FunctionCall { parameters, .. }) => {
+        mir::ExprKind::AssociatedFunctionCall(
+            ty,
+            FunctionCall {
+                parameters, name, meta, ..
+            },
+        ) => {
             for expr in parameters {
                 analyze_expr(context, source_module, expr, map);
             }
+            let function_autocomplete = source_module
+                .associated_functions
+                .iter()
+                .filter(|(t, fun)| t == ty && fun.name.starts_with(name))
+                .map(|(_, fun)| Autocomplete {
+                    text: fun.name.clone(),
+                    kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
+                })
+                .collect::<Vec<_>>();
+            set_autocomplete(map, meta.range.end, function_autocomplete);
         }
         mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {
             analyze_expr(context, source_module, &cond, map);
