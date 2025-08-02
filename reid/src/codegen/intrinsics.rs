@@ -1,3 +1,5 @@
+use std::{collections::HashMap, hash::Hash};
+
 use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValueKind, Instr, Type};
 
 use crate::{
@@ -55,6 +57,15 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     });
 
     intrinsics
+}
+
+pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> HashMap<String, Option<FunctionDefinition>> {
+    let mut map = HashMap::new();
+    map.insert("length".to_owned(), get_intrinsic_assoc_func(ty, "length"));
+    map.insert("sizeof".to_owned(), get_intrinsic_assoc_func(ty, "sizeof"));
+    map.insert("malloc".to_owned(), get_intrinsic_assoc_func(ty, "malloc"));
+    map.insert("null".to_owned(), get_intrinsic_assoc_func(ty, "null"));
+    map
 }
 
 pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDefinition> {

@@ -655,8 +655,12 @@ impl Expression {
                     .ok_or(ErrorKind::AssocFunctionNotDefined(
                         function_call.name.clone(),
                         type_kind.clone(),
-                    ))?
+                    ))
                     .clone();
+
+                let Ok(fn_call) = fn_call else {
+                    return Ok(type_refs.from_type(&Vague(Unknown)).unwrap());
+                };
 
                 // Infer param expression types and narrow them to the
                 // expected function parameters (or Unknown types if too

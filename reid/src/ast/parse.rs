@@ -937,7 +937,8 @@ pub enum DotIndexKind {
 impl Parse for DotIndexKind {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         stream.expect(Token::Dot)?;
-        if let Some(Token::Identifier(name)) = stream.next() {
+        if let Some(Token::Identifier(name)) = stream.peek() {
+            stream.next(); // Consume identifer
             if let Ok(args) = stream.parse::<FunctionArgs>() {
                 Ok(Self::FunctionCall(FunctionCallExpression {
                     name,
@@ -946,10 +947,18 @@ impl Parse for DotIndexKind {
                     is_macro: false,
                 }))
             } else {
-                Ok(Self::StructValueIndex(name, stream.get_range().unwrap()))
+                Ok(Self::StructValueIndex(name, stream.get_range_prev().unwrap()))
             }
         } else {
-            return Err(stream.expected_err("struct index (number)")?);
+            if stream.next_is_whitespace() {
+                stream.expecting_err_nonfatal("struct index");
+                Ok(Self::StructValueIndex(
+                    String::new(),
+                    stream.get_range_prev_single().unwrap(),
+                ))
+            } else {
+                Err(stream.expecting_err("struct index")?)
+            }
         }
     }
 }

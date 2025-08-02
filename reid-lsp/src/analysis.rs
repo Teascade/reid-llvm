@@ -2,6 +2,7 @@ use std::{collections::HashMap, fmt::format, path::PathBuf};
 
 use reid::{
     ast::{self, FunctionDefinition, lexer::FullToken, token_stream::TokenRange},
+    codegen::intrinsics::get_intrinsic_assoc_functions,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
@@ -306,7 +307,7 @@ pub fn analyze_expr(
                 _ => {}
             }
 
-            set_autocomplete(map, meta.range.end - 1, autocompletes);
+            set_autocomplete(map, meta.range.end, autocompletes);
         }
         mir::ExprKind::Array(expressions) => {
             for expr in expressions {
@@ -337,7 +338,7 @@ pub fn analyze_expr(
             for expr in parameters {
                 analyze_expr(context, source_module, expr, map);
             }
-            let function_autocomplete = source_module
+            let mut function_autocomplete = source_module
                 .associated_functions
                 .iter()
                 .filter(|(t, fun)| t == ty && fun.name.starts_with(name))
@@ -346,7 +347,20 @@ pub fn analyze_expr(
                     kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                 })
                 .collect::<Vec<_>>();
-            set_autocomplete(map, meta.range.end, function_autocomplete);
+            function_autocomplete.extend(
+                get_intrinsic_assoc_functions(ty)
+                    .iter()
+                    .filter_map(|(s, f)| f.as_ref().map(|f| (s, f)))
+                    .filter(|(_, fun)| fun.name.starts_with(name))
+                    .map(|(_, fun)| Autocomplete {
+                        text: fun.name.clone(),
+                        kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
+                    })
+                    .collect::<Vec<_>>(),
+            );
+            dbg!(ty);
+            dbg!(&source_module.associated_functions);
+            set_autocomplete(map, meta.range.end, function_autocomplete.clone());
         }
         mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {
             analyze_expr(context, source_module, &cond, map);

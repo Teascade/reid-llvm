@@ -727,7 +727,10 @@ impl Expression {
                         type_kind.clone(),
                         function_call.name.clone(),
                     ))
-                    .ok_or(ErrorKind::FunctionNotDefined(function_call.name.clone()));
+                    .ok_or(ErrorKind::AssocFunctionNotDefined(
+                        function_call.name.clone(),
+                        type_kind.clone(),
+                    ));
 
                 if let Some(f) = state.ok(true_function, self.1) {
                     let param_len_given = function_call.parameters.len();

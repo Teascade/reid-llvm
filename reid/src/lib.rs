@@ -73,7 +73,7 @@ use crate::{
 };
 
 pub mod ast;
-mod codegen;
+pub mod codegen;
 pub mod error_raporting;
 pub mod ld;
 pub mod mir;

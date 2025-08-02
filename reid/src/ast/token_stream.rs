@@ -249,6 +249,18 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     pub fn errors(&self) -> Vec<Error> {
         self.errors.borrow().clone().clone()
     }
+
+    pub fn next_is_whitespace(&self) -> bool {
+        if let Some(token) = self.tokens.get(self.position) {
+            if let Token::Whitespace(_) = token.token {
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        }
+    }
 }
 
 impl Drop for TokenStream<'_, '_> {
