@@ -228,33 +228,34 @@ impl ast::Block {
                         StmtKind::Let(counter_var.clone(), true, start.process(module_id)),
                         counter_range.as_meta(module_id),
                     );
+                    let statement_range = counter_range.clone() + start.1 + end.1 + block.2;
 
                     let set_new = mir::Statement(
                         StmtKind::Set(
                             mir::Expression(
                                 mir::ExprKind::Variable(counter_var.clone()),
-                                counter_range.as_meta(module_id),
+                                (start.1 + end.1).as_meta(module_id),
                             ),
                             mir::Expression(
                                 mir::ExprKind::BinOp(
                                     mir::BinaryOperator::Add,
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Variable(counter_var.clone()),
-                                        counter_range.as_meta(module_id),
+                                        (start.1 + end.1).as_meta(module_id),
                                     )),
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(1))),
-                                        counter_range.as_meta(module_id),
+                                        (start.1 + end.1).as_meta(module_id),
                                     )),
                                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
-                                counter_range.as_meta(module_id),
+                                (start.1 + end.1).as_meta(module_id),
                             ),
                         ),
-                        counter_range.as_meta(module_id),
+                        (start.1 + end.1).as_meta(module_id),
                     );
-                    let mut block = block.into_mir(module_id);
-                    block.statements.push(set_new);
+                    let mut mir_block = block.into_mir(module_id);
+                    mir_block.statements.push(set_new);
                     let while_statement = mir::Statement(
                         StmtKind::While(WhileStatement {
                             condition: mir::Expression(
@@ -262,28 +263,28 @@ impl ast::Block {
                                     mir::BinaryOperator::Cmp(mir::CmpOperator::LT),
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Variable(counter_var),
-                                        counter_range.as_meta(module_id),
+                                        (start.1 + end.1).as_meta(module_id),
                                     )),
                                     Box::new(end.process(module_id)),
                                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
-                                counter_range.as_meta(module_id),
+                                (start.1 + end.1).as_meta(module_id),
                             ),
-                            block,
-                            meta: self.2.as_meta(module_id),
+                            block: mir_block.clone(),
+                            meta: (start.1 + end.1 + block.2).as_meta(module_id),
                         }),
-                        self.2.as_meta(module_id),
+                        (start.1 + end.1 + block.2).as_meta(module_id),
                     );
 
                     let inner_scope = StmtKind::Expression(mir::Expression(
                         mir::ExprKind::Block(mir::Block {
                             statements: vec![let_statement, while_statement],
                             return_expression: None,
-                            meta: counter_range.as_meta(module_id) + end.1.as_meta(module_id),
+                            meta: statement_range.as_meta(module_id),
                         }),
-                        counter_range.as_meta(module_id) + end.1.as_meta(module_id),
+                        statement_range.as_meta(module_id),
                     ));
-                    (inner_scope, self.2)
+                    (inner_scope, statement_range)
                 }
                 ast::BlockLevelStatement::WhileLoop(expression, block) => (
                     StmtKind::While(WhileStatement {
@@ -291,7 +292,7 @@ impl ast::Block {
                         block: block.into_mir(module_id),
                         meta: self.2.as_meta(module_id),
                     }),
-                    self.2,
+                    expression.1 + block.2,
                 ),
             };
 

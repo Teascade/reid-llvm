@@ -108,10 +108,10 @@ impl LanguageServer for Backend {
                 if let Some(ty) = possible_ty.clone() {
                     (Some(range), format!("{}", ty))
                 } else {
-                    (Some(range), String::from("no type"))
+                    (Some(range), String::from("None type"))
                 }
             } else {
-                (None, String::from("no token"))
+                (None, String::from("no type"))
             }
         } else {
             (None, String::from("no token"))
@@ -267,7 +267,10 @@ async fn main() {
 pub fn find_type_in_context(module: &mir::Module, token_idx: usize) -> Option<TypeKind> {
     for import in &module.imports {
         if import.1.contains(token_idx) {
-            return None;
+            return Some(TypeKind::CustomType(mir::CustomTypeKey(
+                "d".to_owned(),
+                SourceModuleId(1),
+            )));
         }
     }
     for typedef in &module.typedefs {
@@ -342,7 +345,7 @@ pub fn find_type_in_context(module: &mir::Module, token_idx: usize) -> Option<Ty
 
 pub fn find_type_in_block(block: &mir::Block, module_id: SourceModuleId, token_idx: usize) -> Option<TypeKind> {
     if !block.meta.contains(token_idx) {
-        return None;
+        return Some(TypeKind::Bool);
     }
 
     for statement in &block.statements {
@@ -479,7 +482,10 @@ pub fn find_type_in_expr(expr: &mir::Expression, module_id: SourceModuleId, toke
             {
                 Some(*inner.clone())
             } else {
-                None
+                Some(TypeKind::CustomType(mir::CustomTypeKey(
+                    "ä".to_owned(),
+                    SourceModuleId(1),
+                )))
             }
         }
         mir::ExprKind::CastTo(expression, type_kind) => {

@@ -662,15 +662,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "reid-lib"
-version = "1.0.0-beta.3"
-dependencies = [
- "llvm-sys",
- "thiserror",
-]
-
-[[package]]
-name = "reid-lsp"
+name = "reid-language-server"
 version = "0.1.0"
 dependencies = [
  "dashmap 6.1.0",
@@ -678,6 +670,14 @@ dependencies = [
  "socket",
  "tokio",
  "tower-lsp",
+]
+
+[[package]]
+name = "reid-lib"
+version = "1.0.0-beta.3"
+dependencies = [
+ "llvm-sys",
+ "thiserror",
 ]
 
 [[package]]
