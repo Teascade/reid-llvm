@@ -380,11 +380,22 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                 );
 
                 for field in fields {
-                    scope.state.init_types(&field.2, Some(field.1.clone()));
-
                     let field_idx = scope
                         .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
                         .unwrap_or(field.2.range.end);
+
+                    scope.state.init_types(
+                        &Metadata {
+                            source_module_id: field.2.source_module_id,
+                            range: TokenRange {
+                                start: field_idx,
+                                end: field_idx,
+                            },
+                            position: None,
+                        },
+                        Some(field.1.clone()),
+                    );
+
                     let field_symbol = scope.state.new_symbol(field_idx, SemanticKind::Property);
                     scope.state.set_symbol(field_idx, field_symbol);
 
@@ -461,7 +472,9 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function);
         scope.state.set_symbol(idx, function_symbol);
         scope.functions.insert(function.name.clone(), function_symbol);
+    }
 
+    for function in &module.functions {
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
             if param.meta.source_module_id == module.module_id {
