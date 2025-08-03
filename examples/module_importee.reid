@@ -1,0 +1,8 @@
+
+struct Otus {
+    field: u32,
+}
+
+pub fn test() -> Otus {
+    Otus {field: 4}
+}
