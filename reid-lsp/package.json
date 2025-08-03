@@ -12,9 +12,6 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [
-    "onLanguage:reid"
-  ],
   "main": "./dist/extension.js",
   "contributes": {
     "languages": [
@@ -25,7 +22,8 @@
         ],
         "aliases": [
           "Reid"
-        ]
+        ],
+        "configuration": "./language-configuration.json"
       }
     ],
     "configuration": {
