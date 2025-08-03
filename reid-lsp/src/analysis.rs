@@ -31,7 +31,11 @@ pub const TOKEN_LEGEND: [SemanticTokenType; 9] = [
 
 const SEMANTIC_REFERENCE: SemanticTokenModifier = SemanticTokenModifier::new("reference");
 
-pub const MODIFIER_LEGEND: [SemanticTokenModifier; 2] = [SemanticTokenModifier::DEFINITION, SEMANTIC_REFERENCE];
+pub const MODIFIER_LEGEND: [SemanticTokenModifier; 3] = [
+    SemanticTokenModifier::DEFINITION,
+    SEMANTIC_REFERENCE,
+    SemanticTokenModifier::DECLARATION,
+];
 
 #[derive(Debug, Clone)]
 pub struct StaticAnalysis {
@@ -156,6 +160,7 @@ pub struct AnalysisScope<'a> {
     variables: HashMap<String, SymbolId>,
     functions: HashMap<String, SymbolId>,
     associated_functions: HashMap<(TypeKind, String), SymbolId>,
+    properties: HashMap<(TypeKind, String), SymbolId>,
     types: HashMap<TypeKind, SymbolId>,
 }
 
@@ -167,6 +172,7 @@ impl<'a> AnalysisScope<'a> {
             variables: self.variables.clone(),
             functions: self.functions.clone(),
             associated_functions: self.associated_functions.clone(),
+            properties: self.properties.clone(),
             types: self.types.clone(),
         }
     }
@@ -240,7 +246,7 @@ impl SemanticKind {
             SemanticKind::String => return None,
             SemanticKind::Number => return None,
             SemanticKind::Default => return None,
-            SemanticKind::Property => return None,
+            SemanticKind::Property => SemanticTokenModifier::DECLARATION,
             SemanticKind::Struct => SemanticTokenModifier::DEFINITION,
             SemanticKind::Comment => return None,
             SemanticKind::Operator => return None,
@@ -300,6 +306,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         variables: HashMap::new(),
         functions: HashMap::new(),
         associated_functions: HashMap::new(),
+        properties: HashMap::new(),
         types: HashMap::new(),
     };
     for import in &module.imports {
@@ -344,19 +351,37 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     }
 
     for typedef in &module.typedefs {
+        if typedef.source_module != module.module_id {
+            continue;
+        }
+
         match &typedef.kind {
             mir::TypeDefinitionKind::Struct(StructType(fields)) => {
-                let idx = scope
+                let struct_idx = scope
                     .token_idx(&typedef.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(typedef.meta.range.end);
-                let symbol = scope.state.new_symbol(idx, SemanticKind::Struct);
-                scope.state.set_symbol(idx, symbol);
+                let struct_symbol = scope.state.new_symbol(struct_idx, SemanticKind::Struct);
+                scope.state.set_symbol(struct_idx, struct_symbol);
                 scope.types.insert(
                     TypeKind::CustomType(CustomTypeKey(typedef.name.clone(), typedef.source_module)),
-                    symbol,
+                    struct_symbol,
                 );
 
                 for field in fields {
+                    let field_idx = scope
+                        .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
+                        .unwrap_or(field.2.range.end);
+                    let field_symbol = scope.state.new_symbol(field_idx, SemanticKind::Property);
+                    scope.state.set_symbol(field_idx, field_symbol);
+
+                    scope.properties.insert(
+                        (
+                            TypeKind::CustomType(CustomTypeKey(typedef.name.clone(), typedef.source_module)),
+                            field.0.clone(),
+                        ),
+                        field_symbol,
+                    );
+
                     scope.state.init_types(&field.2, Some(field.1.clone()));
                 }
             }
@@ -524,7 +549,6 @@ pub fn analyze_expr(
                 scope.state.new_symbol(idx, SemanticKind::Type)
             };
             scope.state.set_symbol(idx, symbol);
-            scope.variables.insert(var_ref.1.clone(), symbol);
         }
         mir::ExprKind::Indexed(value, _, index_expr) => {
             analyze_expr(context, source_module, &value, scope);
@@ -532,12 +556,6 @@ pub fn analyze_expr(
         }
         mir::ExprKind::Accessed(expression, _, name, meta) => {
             analyze_expr(context, source_module, &expression, scope);
-
-            let idx = scope
-                .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
-                .unwrap_or(meta.range.end);
-            let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
-            scope.state.set_symbol(idx, symbol);
 
             let accessed_type = expression.return_type(&TypeRefs::unknown(), source_module.module_id);
 
@@ -554,12 +572,24 @@ pub fn analyze_expr(
                                 kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                             }),
                     );
-                    match accessed_type {
+                    match &accessed_type {
                         TypeKind::CustomType(ty_key) => {
                             let typedef = source_module
                                 .typedefs
                                 .iter()
                                 .find(|t| t.name == ty_key.0 && t.source_module == ty_key.1);
+
+                            let field_idx = scope
+                                .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
+                                .unwrap_or(meta.range.end);
+                            let field_symbol =
+                                if let Some(symbol_id) = scope.properties.get(&(accessed_type.clone(), name.clone())) {
+                                    scope.state.new_symbol(field_idx, SemanticKind::Reference(*symbol_id))
+                                } else {
+                                    scope.state.new_symbol(field_idx, SemanticKind::Property)
+                                };
+                            scope.state.set_symbol(field_idx, field_symbol);
+
                             if let Some(typedef) = typedef {
                                 autocompletes.extend(match &typedef.kind {
                                     mir::TypeDefinitionKind::Struct(StructType(fields)) => {
@@ -643,7 +673,13 @@ pub fn analyze_expr(
             let type_idx = scope
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
-            let type_symbol = if let Some(symbol_id) = scope.types.get(&ty) {
+            let invoked_ty = if let TypeKind::Borrow(inner, _) = ty {
+                *inner.clone()
+            } else {
+                ty.clone()
+            };
+
+            let type_symbol = if let Some(symbol_id) = scope.types.get(&invoked_ty) {
                 scope.state.new_symbol(type_idx, SemanticKind::Reference(*symbol_id))
             } else {
                 scope.state.new_symbol(type_idx, SemanticKind::Type)
@@ -653,7 +689,8 @@ pub fn analyze_expr(
             let fn_idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let fn_symbol = if let Some(symbol_id) = scope.associated_functions.get(&(ty.clone(), name.clone())) {
+            let fn_symbol = if let Some(symbol_id) = scope.associated_functions.get(&(invoked_ty.clone(), name.clone()))
+            {
                 scope.state.new_symbol(fn_idx, SemanticKind::Reference(*symbol_id))
             } else {
                 scope.state.new_symbol(fn_idx, SemanticKind::Function)
@@ -666,14 +703,14 @@ pub fn analyze_expr(
             let mut function_autocomplete = source_module
                 .associated_functions
                 .iter()
-                .filter(|(t, fun)| t == ty && fun.name.starts_with(name))
+                .filter(|(t, fun)| *t == invoked_ty && fun.name.starts_with(name))
                 .map(|(_, fun)| Autocomplete {
                     text: fun.name.clone(),
                     kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                 })
                 .collect::<Vec<_>>();
             function_autocomplete.extend(
-                get_intrinsic_assoc_functions(ty)
+                get_intrinsic_assoc_functions(&invoked_ty)
                     .iter()
                     .filter_map(|(s, f)| f.as_ref().map(|f| (s, f)))
                     .filter(|(_, fun)| fun.name.starts_with(name))
