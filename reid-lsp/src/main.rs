@@ -9,13 +9,14 @@ use reid::parse_module;
 use tokio::sync::Mutex;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, GotoDefinitionParams,
-    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams,
-    InitializeResult, InitializedParams, Location, MarkupContent, MarkupKind, MessageType, OneOf, Range,
-    ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
-    SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFilter,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, Location, MarkupContent, MarkupKind, MessageType, OneOf,
+    Range, ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem,
     TextDocumentRegistrationOptions, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextEdit, Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    TextDocumentSyncSaveOptions, TextEdit, Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities,
+    WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -44,7 +45,9 @@ impl LanguageServer for Backend {
             change: Some(TextDocumentSyncKind::FULL),
             will_save: None,
             will_save_wait_until: None,
-            save: None,
+            save: Some(TextDocumentSyncSaveOptions::SaveOptions(lsp_types::SaveOptions {
+                include_text: Some(true),
+            })),
         };
 
         let capabilities = ServerCapabilities {
@@ -199,6 +202,16 @@ impl LanguageServer for Backend {
             text: params.content_changes[0].text.clone(),
             uri: params.text_document.uri,
             version: params.text_document.version,
+            language_id: String::new(),
+        })
+        .await
+    }
+
+    async fn did_save(&self, params: DidSaveTextDocumentParams) {
+        self.recompile(TextDocumentItem {
+            text: params.text.unwrap(),
+            uri: params.text_document.uri,
+            version: 0,
             language_id: String::new(),
         })
         .await
