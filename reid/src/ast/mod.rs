@@ -272,9 +272,9 @@ pub enum TopLevelStatement {
 
 #[derive(Debug)]
 pub struct BinopDefinition {
-    pub lhs: (String, Type),
+    pub lhs: (String, Type, TokenRange),
     pub op: BinaryOperator,
-    pub rhs: (String, Type),
+    pub rhs: (String, Type, TokenRange),
     pub return_ty: Type,
     pub block: Block,
     pub signature_range: TokenRange,

@@ -1126,6 +1126,7 @@ impl Parse for BinopDefinition {
         let Some(Token::Identifier(lhs_name)) = stream.next() else {
             return Err(stream.expected_err("lhs name")?);
         };
+        let lhs_range = stream.get_range_prev_curr().unwrap();
         stream.expect(Token::Colon)?;
         let lhs_type = stream.parse()?;
         stream.expect(Token::ParenClose)?;
@@ -1136,6 +1137,7 @@ impl Parse for BinopDefinition {
         let Some(Token::Identifier(rhs_name)) = stream.next() else {
             return Err(stream.expected_err("rhs name")?);
         };
+        let rhs_range = stream.get_range_prev_curr().unwrap();
         stream.expect(Token::Colon)?;
         let rhs_type = stream.parse()?;
         stream.expect(Token::ParenClose)?;
@@ -1145,9 +1147,9 @@ impl Parse for BinopDefinition {
         stream.expect(Token::Arrow)?;
 
         Ok(BinopDefinition {
-            lhs: (lhs_name, lhs_type),
+            lhs: (lhs_name, lhs_type, lhs_range),
             op: operator,
-            rhs: (rhs_name, rhs_type),
+            rhs: (rhs_name, rhs_type, rhs_range),
             return_ty: stream.parse()?,
             block: stream.parse()?,
             signature_range,

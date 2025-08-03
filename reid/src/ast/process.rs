@@ -104,13 +104,13 @@ impl ast::Module {
                         lhs: mir::FunctionParam {
                             name: lhs.0.clone(),
                             ty: lhs.1 .0.into_mir(module_id),
-                            meta: lhs.1 .1.as_meta(module_id),
+                            meta: lhs.2.as_meta(module_id),
                         },
                         op: op.mir(),
                         rhs: mir::FunctionParam {
                             name: rhs.0.clone(),
                             ty: rhs.1 .0.into_mir(module_id),
-                            meta: rhs.1 .1.as_meta(module_id),
+                            meta: rhs.2.as_meta(module_id),
                         },
                         return_type: return_ty.0.into_mir(module_id),
                         fn_kind: mir::FunctionDefinitionKind::Local(

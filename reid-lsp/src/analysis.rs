@@ -333,6 +333,20 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     }
 
     for binop in &module.binop_defs {
+        if binop.meta.source_module_id == module.module_id {
+            for param in [&binop.lhs, &binop.rhs] {
+                dbg!(param);
+                scope.state.init_types(&param.meta, Some(param.ty.clone()));
+                let idx = scope
+                    .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(param.meta.range.end);
+                dbg!(idx, scope.tokens.get(idx));
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
+                scope.state.set_symbol(idx, symbol);
+                scope.variables.insert(param.name.clone(), symbol);
+            }
+        }
+
         match &binop.fn_kind {
             mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
