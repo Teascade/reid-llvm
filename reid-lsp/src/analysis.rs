@@ -167,6 +167,7 @@ impl<'a> AnalysisScope<'a> {
     {
         for idx in meta.range.start..=meta.range.end {
             if let Some(token) = self.tokens.get(idx) {
+                // dbg!(idx, token);
                 if pred(&token.token) {
                     return idx;
                 }
@@ -360,6 +361,8 @@ pub fn analyze_block(
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
                 scope.state.set_symbol(idx, symbol);
                 scope.variables.insert(named_variable_ref.1.clone(), symbol);
+
+                analyze_expr(context, source_module, expression, scope);
             }
             mir::StmtKind::Set(lhs, rhs) => {
                 analyze_expr(context, source_module, lhs, scope);
@@ -395,7 +398,18 @@ pub fn analyze_expr(
     );
 
     match &expr.0 {
-        mir::ExprKind::Variable(_) => {}
+        mir::ExprKind::Variable(var_ref) => {
+            scope.state.init_types(&var_ref.2, Some(var_ref.0.clone()));
+
+            let idx = scope.token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)));
+            let symbol = if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
+                *symbol_id
+            } else {
+                scope.state.new_symbol(idx, SemanticKind::Variable)
+            };
+            scope.state.set_symbol(idx, symbol);
+            scope.variables.insert(var_ref.1.clone(), symbol);
+        }
         mir::ExprKind::Indexed(value, _, index_expr) => {
             analyze_expr(context, source_module, &value, scope);
             analyze_expr(context, source_module, &index_expr, scope);
