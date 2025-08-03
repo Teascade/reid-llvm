@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use dashmap::DashMap;
@@ -10,10 +11,10 @@ use tower_lsp::lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, GotoDefinitionParams,
     GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams,
     InitializeResult, InitializedParams, Location, MarkupContent, MarkupKind, MessageType, OneOf, Range,
-    ReferenceParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
+    ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem,
     TextDocumentRegistrationOptions, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    TextEdit, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -76,6 +77,7 @@ impl LanguageServer for Backend {
             )),
             definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
+            rename_provider: Some(OneOf::Left(true)),
             ..Default::default()
         };
         Ok(InitializeResult {
@@ -306,6 +308,50 @@ impl LanguageServer for Backend {
                     }
                 }
                 Ok(Some(locations))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
+        let path = PathBuf::from(params.text_document_position.text_document.uri.path());
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let analysis = self.analysis.get(&file_name);
+        let position = params.text_document_position.position;
+
+        if let Some(analysis) = &analysis {
+            let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
+                tok.position.1 == position.line + 1
+                    && (tok.position.0 <= position.character + 1
+                        && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
+            });
+            if let Some(token) = token {
+                let tokens = analysis.find_references(token.0).map(|symbols| {
+                    symbols
+                        .iter()
+                        .map(|symbol_id| analysis.state.symbol_to_token.get(&symbol_id).cloned().unwrap())
+                        .collect::<Vec<_>>()
+                });
+                let mut edits = Vec::new();
+                if let Some(tokens) = tokens {
+                    for token_idx in tokens {
+                        let token = analysis.tokens.get(token_idx).unwrap();
+                        edits.push(TextEdit {
+                            range: token_to_range(token),
+                            new_text: params.new_name.clone(),
+                        });
+                    }
+                }
+                let mut changes = HashMap::new();
+                changes.insert(params.text_document_position.text_document.uri, edits);
+                Ok(Some(WorkspaceEdit {
+                    changes: Some(changes),
+                    document_changes: None,
+                    change_annotations: None,
+                }))
             } else {
                 Ok(None)
             }
