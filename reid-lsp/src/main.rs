@@ -26,9 +26,9 @@ mod analysis;
 #[derive(Debug)]
 struct Backend {
     client: Client,
-    analysis: DashMap<String, StaticAnalysis>,
+    analysis: DashMap<PathBuf, StaticAnalysis>,
     module_to_url: DashMap<SourceModuleId, PathBuf>,
-    url_to_module: DashMap<PathBuf, SourceModuleId>,
+    path_to_module: DashMap<PathBuf, SourceModuleId>,
     module_id_counter: Mutex<SourceModuleId>,
 }
 
@@ -102,8 +102,7 @@ impl LanguageServer for Backend {
 
     async fn completion(&self, params: CompletionParams) -> jsonrpc::Result<Option<CompletionResponse>> {
         let path = PathBuf::from(params.text_document_position.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
         let position = params.text_document_position.position;
 
         let token = if let Some(analysis) = &analysis {
@@ -119,7 +118,7 @@ impl LanguageServer for Backend {
         // dbg!(position, token);
 
         let list = if let Some((idx, _)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().state.map.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&path).unwrap().state.map.get(&idx) {
                 analysis
                     .autocomplete
                     .iter()
@@ -138,8 +137,7 @@ impl LanguageServer for Backend {
 
     async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {
         let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
         let position = params.text_document_position_params.position;
 
         let token = if let Some(analysis) = &analysis {
@@ -153,7 +151,7 @@ impl LanguageServer for Backend {
         };
 
         let (range, ty) = if let Some((idx, token)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().state.map.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&path).unwrap().state.map.get(&idx) {
                 let start = token.position;
                 let end = token.position.add(token.token.len() as u32);
                 let range = Range {
@@ -211,8 +209,7 @@ impl LanguageServer for Backend {
         params: SemanticTokensParams,
     ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
         let path = PathBuf::from(params.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
 
         let mut semantic_tokens = Vec::new();
         if let Some(analysis) = analysis {
@@ -257,8 +254,7 @@ impl LanguageServer for Backend {
 
     async fn goto_definition(&self, params: GotoDefinitionParams) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
         let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
         let position = params.text_document_position_params.position;
 
         if let Some(analysis) = &analysis {
@@ -283,8 +279,7 @@ impl LanguageServer for Backend {
 
     async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
         let path = PathBuf::from(params.text_document_position.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
         let position = params.text_document_position.position;
 
         if let Some(analysis) = &analysis {
@@ -322,7 +317,7 @@ impl LanguageServer for Backend {
     async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
         let path = PathBuf::from(params.text_document_position.text_document.uri.path());
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
+        let analysis = self.analysis.get(&path);
         let position = params.text_document_position.position;
 
         if let Some(analysis) = &analysis {
@@ -379,11 +374,10 @@ fn token_to_range(token: &FullToken) -> lsp_types::Range {
 
 impl Backend {
     async fn recompile(&self, params: TextDocumentItem) {
-        let path = PathBuf::from(params.uri.clone().path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let file_path = PathBuf::from(params.uri.clone().path());
 
         let mut map: ErrorModules = Default::default();
-        for url_module in self.url_to_module.iter() {
+        for url_module in self.path_to_module.iter() {
             let (url, module) = url_module.pair();
             map.add_module(
                 url.file_name().unwrap().to_str().unwrap().to_owned(),
@@ -392,20 +386,31 @@ impl Backend {
             );
         }
 
-        let module_id = if let Some(module_id) = self.url_to_module.get(&path) {
+        let module_id = if let Some(module_id) = self.path_to_module.get(&file_path) {
             *module_id
         } else {
             let mut lock = self.module_id_counter.lock().await;
             let module_id = lock.increment();
             drop(lock);
-            self.url_to_module.insert(path.clone(), module_id);
-            self.module_to_url.insert(module_id, path.clone());
+            self.path_to_module.insert(file_path.clone(), module_id);
+            self.module_to_url.insert(module_id, file_path.clone());
             module_id
         };
 
-        let parse_res = parse(&params.text, path.clone(), &mut map, module_id);
+        let mut state_map = HashMap::new();
+        for path_state in self.analysis.iter() {
+            let (path, state) = path_state.pair();
+            if let Some(module_id) = self.path_to_module.get(path) {
+                state_map.insert(*module_id, state.state.clone());
+            }
+        }
+
+        let parse_res = parse(&params.text, file_path.clone(), &mut map, module_id);
         let (tokens, result) = match parse_res {
-            Ok((module_id, tokens)) => (tokens.clone(), analyze(module_id, tokens, path, &mut map)),
+            Ok((module_id, tokens)) => (
+                tokens.clone(),
+                analyze(module_id, tokens, file_path.clone(), &mut map, &state_map),
+            ),
             Err(e) => (Vec::new(), Err(e)),
         };
 
@@ -425,7 +430,7 @@ impl Backend {
                         self.client.log_message(MessageType::INFO, format!("{}", error)).await;
                     }
                 }
-                self.analysis.insert(file_name.clone(), analysis);
+                self.analysis.insert(file_path, analysis);
             }
             Ok(_) => {}
             Err(mut reid_error) => {
@@ -498,7 +503,7 @@ async fn main() {
         client,
         analysis: DashMap::new(),
         module_to_url: DashMap::new(),
-        url_to_module: DashMap::new(),
+        path_to_module: DashMap::new(),
         module_id_counter: Mutex::new(SourceModuleId(0)),
     });
     Server::new(stdin, stdout, socket).serve(service).await;

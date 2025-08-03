@@ -127,6 +127,8 @@ pub struct AnalysisState {
     types: HashMap<TypeKind, SymbolId>,
 }
 
+pub type StateMap = HashMap<SourceModuleId, AnalysisState>;
+
 impl AnalysisState {
     pub fn get_symbol(&self, id: SymbolId) -> &Symbol {
         self.symbol_table.get(id.0).unwrap()
@@ -208,12 +210,14 @@ pub struct AnalysisScope<'a> {
     state: &'a mut AnalysisState,
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
+    map: &'a StateMap,
 }
 
 impl<'a> AnalysisScope<'a> {
     pub fn inner(&mut self) -> AnalysisScope {
         AnalysisScope {
             state: self.state,
+            map: self.map,
             tokens: self.tokens,
             variables: self.variables.clone(),
         }
@@ -308,6 +312,7 @@ pub fn analyze(
     tokens: Vec<FullToken>,
     path: PathBuf,
     map: &mut ErrorModules,
+    state_map: &StateMap,
 ) -> Result<Option<StaticAnalysis>, ReidError> {
     let (module, mut parse_error) = match compile_module(module_id, tokens, map, Some(path.clone()), true)? {
         Ok(module) => (module, None),
@@ -331,12 +336,17 @@ pub fn analyze(
         if module.module_id != module_id {
             continue;
         }
-        return Ok(Some(analyze_context(&context, &module, parse_error)));
+        return Ok(Some(analyze_context(&context, &module, parse_error, state_map)));
     }
     return Ok(None);
 }
 
-pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Option<ReidError>) -> StaticAnalysis {
+pub fn analyze_context(
+    context: &mir::Context,
+    module: &mir::Module,
+    error: Option<ReidError>,
+    map: &StateMap,
+) -> StaticAnalysis {
     let mut state = AnalysisState {
         map: HashMap::new(),
         symbol_table: Vec::new(),
@@ -351,6 +361,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         state: &mut state,
         tokens: &module.tokens,
         variables: HashMap::new(),
+        map,
     };
 
     for (i, token) in module.tokens.iter().enumerate() {
