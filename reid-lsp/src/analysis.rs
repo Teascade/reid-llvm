@@ -45,7 +45,7 @@ pub struct StaticAnalysis {
 }
 
 #[derive(Debug, Clone)]
-pub struct TokenAnalysis {
+pub struct SemanticToken {
     pub ty: Option<TypeKind>,
     pub autocomplete: Vec<Autocomplete>,
     pub symbol: Option<SymbolId>,
@@ -80,15 +80,17 @@ impl ToString for AutocompleteKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SymbolId(usize);
 
 #[derive(Debug, Clone)]
 pub struct AnalysisState {
     /// TokenID -> Analysis map, containing SymbolIDs
-    pub map: HashMap<usize, TokenAnalysis>,
+    pub map: HashMap<usize, SemanticToken>,
     /// SymbolID -> Symbol
     symbol_table: Vec<Symbol>,
+    /// SymbolID -> Symbol
+    pub symbol_to_token: HashMap<SymbolId, usize>,
 }
 
 impl AnalysisState {
@@ -97,18 +99,12 @@ impl AnalysisState {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Symbol {
-    pub kind: SemanticKind,
-    pub definition: usize,
-}
-
 impl AnalysisState {
     pub fn init_types(&mut self, meta: &mir::Metadata, ty: Option<TypeKind>) {
         for token in meta.range.start..=meta.range.end {
             self.map.insert(
                 token,
-                TokenAnalysis {
+                SemanticToken {
                     ty: ty.clone(),
                     autocomplete: Vec::new(),
                     symbol: Default::default(),
@@ -123,7 +119,7 @@ impl AnalysisState {
         } else {
             self.map.insert(
                 token_idx,
-                TokenAnalysis {
+                SemanticToken {
                     ty: None,
                     autocomplete: autocomplete.clone(),
                     symbol: Default::default(),
@@ -133,12 +129,13 @@ impl AnalysisState {
     }
 
     pub fn set_symbol(&mut self, idx: usize, symbol: SymbolId) {
+        self.symbol_to_token.insert(symbol, idx);
         if let Some(token) = self.map.get_mut(&idx) {
             token.symbol = Some(symbol);
         } else {
             self.map.insert(
                 idx,
-                TokenAnalysis {
+                SemanticToken {
                     ty: None,
                     autocomplete: Vec::new(),
                     symbol: Some(symbol),
@@ -152,6 +149,20 @@ impl AnalysisState {
         self.symbol_table.push(Symbol { kind, definition });
         id
     }
+
+    pub fn find_definition(&self, id: &SymbolId) -> SymbolId {
+        let symbol = self.get_symbol(*id);
+        match symbol.kind {
+            SemanticKind::Reference(idx) => self.find_definition(&idx),
+            _ => *id,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Symbol {
+    pub kind: SemanticKind,
+    pub definition: usize,
 }
 
 pub struct AnalysisScope<'a> {
@@ -298,6 +309,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     let mut state = AnalysisState {
         map: HashMap::new(),
         symbol_table: Vec::new(),
+        symbol_to_token: HashMap::new(),
     };
 
     let mut scope = AnalysisScope {
@@ -615,19 +627,32 @@ pub fn analyze_expr(
                 analyze_expr(context, source_module, expr, scope);
             }
         }
-        mir::ExprKind::Struct(_, items) => {
-            let idx = scope
+        mir::ExprKind::Struct(struct_name, items) => {
+            let struct_type = TypeKind::CustomType(CustomTypeKey(struct_name.clone(), source_module.module_id));
+            let struct_idx = scope
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
-            let symbol = scope.state.new_symbol(idx, SemanticKind::Struct);
-            scope.state.set_symbol(idx, symbol);
 
-            for (_, expr, field_meta) in items {
-                let idx = scope
+            let struct_symbol = if let Some(symbol_id) = scope.types.get(&struct_type) {
+                scope.state.new_symbol(struct_idx, SemanticKind::Reference(*symbol_id))
+            } else {
+                scope.state.new_symbol(struct_idx, SemanticKind::Struct)
+            };
+            scope.state.set_symbol(struct_idx, struct_symbol);
+
+            for (field_name, expr, field_meta) in items {
+                let field_idx = scope
                     .token_idx(&field_meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(field_meta.range.end);
-                let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
-                scope.state.set_symbol(idx, symbol);
+
+                let field_symbol =
+                    if let Some(symbol_id) = scope.properties.get(&(struct_type.clone(), field_name.clone())) {
+                        scope.state.new_symbol(field_idx, SemanticKind::Reference(*symbol_id))
+                    } else {
+                        scope.state.new_symbol(field_idx, SemanticKind::Property)
+                    };
+
+                scope.state.set_symbol(field_idx, field_symbol);
 
                 analyze_expr(context, source_module, expr, scope);
             }

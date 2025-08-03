@@ -7,13 +7,12 @@ use reid::mir::SourceModuleId;
 use reid::parse_module;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, DocumentSelector, Hover, HoverContents,
-    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, MarkupContent,
-    MarkupKind, MessageType, OneOf, Range, SemanticToken, SemanticTokenModifier, SemanticTokenType,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
-    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities,
-    StaticRegistrationOptions, TextDocumentItem, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions, WorkspaceFoldersServerCapabilities,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, GotoDefinitionParams,
+    GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability, InitializeParams,
+    InitializeResult, InitializedParams, MarkupContent, MarkupKind, MessageType, OneOf, Range, SemanticToken,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, WorkspaceFoldersServerCapabilities,
     WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
@@ -75,6 +74,7 @@ impl LanguageServer for Backend {
                     static_registration_options: Default::default(),
                 },
             )),
+            definition_provider: Some(OneOf::Left(true)),
             ..Default::default()
         };
         Ok(InitializeResult {
@@ -247,6 +247,53 @@ impl LanguageServer for Backend {
             result_id: None,
             data: semantic_tokens,
         })))
+    }
+
+    async fn goto_definition(&self, params: GotoDefinitionParams) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+        let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let analysis = self.analysis.get(&file_name);
+        let position = params.text_document_position_params.position;
+
+        if let Some(analysis) = &analysis {
+            let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
+                tok.position.1 == position.line + 1
+                    && (tok.position.0 <= position.character + 1
+                        && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
+            });
+
+            if let Some(token) = token {
+                dbg!(token);
+                if let Some(semantic_token) = analysis.state.map.get(&token.0) {
+                    dbg!(semantic_token);
+                    if let Some(symbol_id) = semantic_token.symbol {
+                        dbg!(symbol_id);
+                        let definition_id = analysis.state.find_definition(&symbol_id);
+                        if let Some(def_token_idx) = analysis.state.symbol_to_token.get(&definition_id) {
+                            dbg!(def_token_idx);
+                            if let Some(def_token) = analysis.tokens.get(*def_token_idx) {
+                                dbg!(def_token);
+                                return Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+                                    uri: params.text_document_position_params.text_document.uri,
+                                    range: Range {
+                                        start: lsp_types::Position {
+                                            line: def_token.position.1.max(1) - 1,
+                                            character: def_token.position.0.max(1) - 1,
+                                        },
+                                        end: lsp_types::Position {
+                                            line: def_token.position.1.max(1) - 1,
+                                            character: def_token.position.0.max(1) - 1 + def_token.token.len() as u32,
+                                        },
+                                    },
+                                })));
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(None)
     }
 }
 
