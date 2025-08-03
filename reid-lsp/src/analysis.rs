@@ -167,7 +167,7 @@ impl<'a> AnalysisScope<'a> {
         }
     }
 
-    pub fn token_idx<T: Copy>(&self, meta: &Metadata, pred: T) -> usize
+    pub fn token_idx<T: Copy>(&self, meta: &Metadata, pred: T) -> Option<usize>
     where
         T: FnOnce(&Token) -> bool,
     {
@@ -175,11 +175,11 @@ impl<'a> AnalysisScope<'a> {
             if let Some(token) = self.tokens.get(idx) {
                 // dbg!(idx, token);
                 if pred(&token.token) {
-                    return idx;
+                    return Some(idx);
                 }
             }
         }
-        return meta.range.end;
+        return None;
     }
 }
 
@@ -188,6 +188,8 @@ pub enum SemanticKind {
     Default,
     Variable,
     Function,
+    String,
+    Number,
     Reference(SymbolId),
     Type,
 }
@@ -204,6 +206,8 @@ impl SemanticKind {
             SemanticKind::Variable => SemanticTokenType::VARIABLE,
             SemanticKind::Function => SemanticTokenType::FUNCTION,
             SemanticKind::Type => SemanticTokenType::TYPE,
+            SemanticKind::String => SemanticTokenType::STRING,
+            SemanticKind::Number => SemanticTokenType::NUMBER,
             SemanticKind::Default => return None,
             SemanticKind::Reference(symbol_id) => return state.get_symbol(*symbol_id).kind.into_token_idx(state),
         };
@@ -219,6 +223,8 @@ impl SemanticKind {
             SemanticKind::Variable => SemanticTokenModifier::DEFINITION,
             SemanticKind::Function => SemanticTokenModifier::DEFINITION,
             SemanticKind::Type => return None,
+            SemanticKind::String => return None,
+            SemanticKind::Number => return None,
             SemanticKind::Default => return None,
             SemanticKind::Reference(_) => SEMANTIC_REFERENCE,
         };
@@ -351,17 +357,24 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
             .state
             .init_types(&function.signature(), Some(function.return_type.clone()));
 
-        let idx = scope.token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)));
+        let idx = scope
+            .token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)))
+            .unwrap_or(function.signature().range.end);
         let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function);
         scope.state.set_symbol(idx, function_symbol);
         scope.functions.insert(function.name.clone(), function_symbol);
 
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
-            let idx = scope.token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)));
-            let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
-            scope.state.set_symbol(idx, symbol);
-            scope.variables.insert(param.name.clone(), symbol);
+            dbg!(param);
+            if param.meta.source_module_id == module.module_id {
+                let idx = scope
+                    .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(function.signature().range.end);
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
+                scope.state.set_symbol(idx, symbol);
+                scope.variables.insert(param.name.clone(), symbol);
+            }
         }
 
         match &function.kind {
@@ -396,7 +409,9 @@ pub fn analyze_block(
                         .ok()
                         .map(|(_, ty)| ty),
                 );
-                let idx = scope.token_idx(&named_variable_ref.2, |t| matches!(t, Token::Identifier(_)));
+                let idx = scope
+                    .token_idx(&named_variable_ref.2, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(named_variable_ref.2.range.end);
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
                 scope.state.set_symbol(idx, symbol);
                 scope.variables.insert(named_variable_ref.1.clone(), symbol);
@@ -440,14 +455,14 @@ pub fn analyze_expr(
         mir::ExprKind::Variable(var_ref) => {
             scope.state.init_types(&var_ref.2, Some(var_ref.0.clone()));
 
-            let idx = scope.token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)));
-            let symbol = if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
-                scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id))
-            } else {
-                scope.state.new_symbol(idx, SemanticKind::Variable)
-            };
-            scope.state.set_symbol(idx, symbol);
-            scope.variables.insert(var_ref.1.clone(), symbol);
+            let idx = scope
+                .token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(var_ref.2.range.end);
+            if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id));
+                scope.state.set_symbol(idx, symbol);
+                scope.variables.insert(var_ref.1.clone(), symbol);
+            }
         }
         mir::ExprKind::Indexed(value, _, index_expr) => {
             analyze_expr(context, source_module, &value, scope);
@@ -502,11 +517,25 @@ pub fn analyze_expr(
             }
         }
         mir::ExprKind::Struct(_, items) => {
-            for (_, expr, _) in items {
+            for (_, expr, field_meta) in items {
                 analyze_expr(context, source_module, expr, scope);
             }
         }
-        mir::ExprKind::Literal(_) => {}
+        mir::ExprKind::Literal(_) => {
+            // dbg!(&expr.1);
+            // if let Some(idx) = scope.token_idx(&expr.1, |t| matches!(t, Token::StringLit(_) | Token::CharLit(_))) {
+            //     dbg!(&idx, scope.tokens.get(idx));
+            //     scope.state.new_symbol(idx, SemanticKind::String);
+            // } else if let Some(idx) = scope.token_idx(&expr.1, |t| {
+            //     matches!(
+            //         t,
+            //         Token::DecimalValue(_) | Token::HexadecimalValue(_) | Token::OctalValue(_) | Token::BinaryValue(_)
+            //     )
+            // }) {
+            //     dbg!(&idx, scope.tokens.get(idx));
+            //     scope.state.new_symbol(idx, SemanticKind::Number);
+            // }
+        }
         mir::ExprKind::BinOp(_, lhs, rhs, _) => {
             analyze_expr(context, source_module, &lhs, scope);
             analyze_expr(context, source_module, &rhs, scope);
@@ -518,7 +547,9 @@ pub fn analyze_expr(
                 analyze_expr(context, source_module, expr, scope);
             }
 
-            let idx = scope.token_idx(&meta, |t| matches!(t, Token::Identifier(_)));
+            let idx = scope
+                .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(meta.range.end);
             let symbol = if let Some(symbol_id) = scope.functions.get(name) {
                 scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id))
             } else {

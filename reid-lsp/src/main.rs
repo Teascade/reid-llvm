@@ -235,7 +235,6 @@ impl LanguageServer for Backend {
                                 token_modifiers_bitset: symbol.kind.get_modifier().unwrap_or(0),
                             };
                             semantic_tokens.push(semantic_token);
-                            dbg!(semantic_token, prev_line, prev_start, token);
                             prev_line = vscode_line;
                             prev_start = vscode_col;
                         }
