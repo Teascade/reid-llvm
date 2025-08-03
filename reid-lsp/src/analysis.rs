@@ -343,6 +343,17 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     for (_, function) in &module.associated_functions {
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
+
+            if param.meta.source_module_id == module.module_id {
+                dbg!(param);
+                let idx = scope
+                    .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(function.signature().range.end);
+                dbg!(idx, scope.tokens.get(idx));
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
+                scope.state.set_symbol(idx, symbol);
+                scope.variables.insert(param.name.clone(), symbol);
+            }
         }
 
         match &function.kind {
@@ -366,7 +377,6 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
-            dbg!(param);
             if param.meta.source_module_id == module.module_id {
                 let idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))

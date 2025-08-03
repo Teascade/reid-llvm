@@ -1168,11 +1168,11 @@ impl Parse for AssociatedFunctionBlock {
             match stream.peek() {
                 Some(Token::FnKeyword) | Some(Token::PubKeyword) => {
                     let mut fun: FunctionDefinition = stream.parse()?;
-                    fun.0.self_kind = match fun.0.self_kind {
-                        SelfKind::Owned(_) => SelfKind::Owned(ty.clone()),
-                        SelfKind::Borrow(_) => SelfKind::Borrow(ty.clone()),
-                        SelfKind::MutBorrow(_) => SelfKind::MutBorrow(ty.clone()),
-                        SelfKind::None => SelfKind::None,
+                    match &mut fun.0.self_kind {
+                        SelfKind::Owned(inner_ty) => inner_ty.0 = ty.0.clone(),
+                        SelfKind::Borrow(inner_ty) => inner_ty.0 = ty.0.clone(),
+                        SelfKind::MutBorrow(inner_ty) => inner_ty.0 = ty.0.clone(),
+                        SelfKind::None => {}
                     };
                     functions.push(fun);
                 }
