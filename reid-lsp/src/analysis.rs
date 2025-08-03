@@ -350,12 +350,10 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     for binop in &module.binop_defs {
         if binop.meta.source_module_id == module.module_id {
             for param in [&binop.lhs, &binop.rhs] {
-                dbg!(param);
                 scope.state.init_types(&param.meta, Some(param.ty.clone()));
                 let idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(param.meta.range.end);
-                dbg!(idx, scope.tokens.get(idx));
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
                 scope.state.set_symbol(idx, symbol);
                 scope.variables.insert(param.name.clone(), symbol);
@@ -374,11 +372,9 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
 
             if param.meta.source_module_id == module.module_id {
-                dbg!(param);
                 let idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(function.signature().range.end);
-                dbg!(idx, scope.tokens.get(idx));
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
                 scope.state.set_symbol(idx, symbol);
                 scope.variables.insert(param.name.clone(), symbol);
@@ -513,7 +509,6 @@ pub fn analyze_expr(
             let idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            dbg!(idx, scope.tokens.get(idx));
             let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
             scope.state.set_symbol(idx, symbol);
 
@@ -563,11 +558,16 @@ pub fn analyze_expr(
             }
         }
         mir::ExprKind::Struct(_, items) => {
+            let idx = scope
+                .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(expr.1.range.end);
+            let symbol = scope.state.new_symbol(idx, SemanticKind::Struct);
+            scope.state.set_symbol(idx, symbol);
+
             for (_, expr, field_meta) in items {
                 let idx = scope
                     .token_idx(&field_meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(field_meta.range.end);
-                dbg!(idx, scope.tokens.get(idx));
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
                 scope.state.set_symbol(idx, symbol);
 
@@ -576,7 +576,6 @@ pub fn analyze_expr(
         }
         mir::ExprKind::Literal(_) => {
             if let Some(idx) = scope.token_idx(&expr.1, |t| matches!(t, Token::StringLit(_) | Token::CharLit(_))) {
-                dbg!(&idx, scope.tokens.get(idx));
                 scope.state.new_symbol(idx, SemanticKind::String);
             } else if let Some(idx) = scope.token_idx(&expr.1, |t| {
                 matches!(
@@ -584,7 +583,6 @@ pub fn analyze_expr(
                     Token::DecimalValue(_) | Token::HexadecimalValue(_) | Token::OctalValue(_) | Token::BinaryValue(_)
                 )
             }) {
-                dbg!(&idx, scope.tokens.get(idx));
                 scope.state.new_symbol(idx, SemanticKind::Number);
             }
         }
@@ -615,6 +613,12 @@ pub fn analyze_expr(
                 parameters, name, meta, ..
             },
         ) => {
+            let idx = scope
+                .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(expr.1.range.end);
+            let symbol = scope.state.new_symbol(idx, SemanticKind::Type);
+            scope.state.set_symbol(idx, symbol);
+
             for expr in parameters {
                 analyze_expr(context, source_module, expr, scope);
             }
