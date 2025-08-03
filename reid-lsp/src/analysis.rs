@@ -10,8 +10,8 @@ use reid::{
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        self, Context, FunctionCall, FunctionParam, IfExpression, Metadata, SourceModuleId, StructType, TypeKind,
-        WhileStatement, typecheck::typerefs::TypeRefs,
+        self, Context, CustomTypeKey, FunctionCall, FunctionParam, IfExpression, Metadata, SourceModuleId, StructType,
+        TypeKind, WhileStatement, typecheck::typerefs::TypeRefs,
     },
     perform_all_passes,
 };
@@ -155,6 +155,8 @@ pub struct AnalysisScope<'a> {
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
     functions: HashMap<String, SymbolId>,
+    associated_functions: HashMap<(TypeKind, String), SymbolId>,
+    types: HashMap<TypeKind, SymbolId>,
 }
 
 impl<'a> AnalysisScope<'a> {
@@ -164,6 +166,8 @@ impl<'a> AnalysisScope<'a> {
             tokens: self.tokens,
             variables: self.variables.clone(),
             functions: self.functions.clone(),
+            associated_functions: self.associated_functions.clone(),
+            types: self.types.clone(),
         }
     }
 
@@ -237,7 +241,7 @@ impl SemanticKind {
             SemanticKind::Number => return None,
             SemanticKind::Default => return None,
             SemanticKind::Property => return None,
-            SemanticKind::Struct => return None,
+            SemanticKind::Struct => SemanticTokenModifier::DEFINITION,
             SemanticKind::Comment => return None,
             SemanticKind::Operator => return None,
             SemanticKind::Keyword => return None,
@@ -295,6 +299,8 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         tokens: &module.tokens,
         variables: HashMap::new(),
         functions: HashMap::new(),
+        associated_functions: HashMap::new(),
+        types: HashMap::new(),
     };
     for import in &module.imports {
         scope.state.init_types(&import.1, None);
@@ -340,6 +346,16 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     for typedef in &module.typedefs {
         match &typedef.kind {
             mir::TypeDefinitionKind::Struct(StructType(fields)) => {
+                let idx = scope
+                    .token_idx(&typedef.meta, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(typedef.meta.range.end);
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Struct);
+                scope.state.set_symbol(idx, symbol);
+                scope.types.insert(
+                    TypeKind::CustomType(CustomTypeKey(typedef.name.clone(), typedef.source_module)),
+                    symbol,
+                );
+
                 for field in fields {
                     scope.state.init_types(&field.2, Some(field.1.clone()));
                 }
@@ -367,17 +383,26 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         };
     }
 
-    for (_, function) in &module.associated_functions {
+    for (ty, function) in &module.associated_functions {
+        let idx = scope
+            .token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)))
+            .unwrap_or(function.signature().range.end);
+        let symbol = scope.state.new_symbol(idx, SemanticKind::Function);
+        scope.state.set_symbol(idx, symbol);
+        scope
+            .associated_functions
+            .insert((ty.clone(), function.name.clone()), symbol);
+
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
 
             if param.meta.source_module_id == module.module_id {
-                let idx = scope
+                let param_idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(function.signature().range.end);
-                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
-                scope.state.set_symbol(idx, symbol);
-                scope.variables.insert(param.name.clone(), symbol);
+                let param_symbol = scope.state.new_symbol(param_idx, SemanticKind::Variable);
+                scope.state.set_symbol(param_idx, param_symbol);
+                scope.variables.insert(param.name.clone(), param_symbol);
             }
         }
 
@@ -493,11 +518,13 @@ pub fn analyze_expr(
             let idx = scope
                 .token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(var_ref.2.range.end);
-            if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
-                let symbol = scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id));
-                scope.state.set_symbol(idx, symbol);
-                scope.variables.insert(var_ref.1.clone(), symbol);
-            }
+            let symbol = if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
+                scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id))
+            } else {
+                scope.state.new_symbol(idx, SemanticKind::Type)
+            };
+            scope.state.set_symbol(idx, symbol);
+            scope.variables.insert(var_ref.1.clone(), symbol);
         }
         mir::ExprKind::Indexed(value, _, index_expr) => {
             analyze_expr(context, source_module, &value, scope);
@@ -613,11 +640,25 @@ pub fn analyze_expr(
                 parameters, name, meta, ..
             },
         ) => {
-            let idx = scope
+            let type_idx = scope
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
-            let symbol = scope.state.new_symbol(idx, SemanticKind::Type);
-            scope.state.set_symbol(idx, symbol);
+            let type_symbol = if let Some(symbol_id) = scope.types.get(&ty) {
+                scope.state.new_symbol(type_idx, SemanticKind::Reference(*symbol_id))
+            } else {
+                scope.state.new_symbol(type_idx, SemanticKind::Type)
+            };
+            scope.state.set_symbol(type_idx, type_symbol);
+
+            let fn_idx = scope
+                .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(meta.range.end);
+            let fn_symbol = if let Some(symbol_id) = scope.associated_functions.get(&(ty.clone(), name.clone())) {
+                scope.state.new_symbol(fn_idx, SemanticKind::Reference(*symbol_id))
+            } else {
+                scope.state.new_symbol(fn_idx, SemanticKind::Function)
+            };
+            scope.state.set_symbol(fn_idx, fn_symbol);
 
             for expr in parameters {
                 analyze_expr(context, source_module, expr, scope);
