@@ -181,6 +181,7 @@ impl<'a> AnalysisScope<'a> {
 pub enum SemanticKind {
     Default,
     Variable,
+    Function,
 }
 
 impl Default for SemanticKind {
@@ -193,6 +194,7 @@ impl SemanticKind {
     pub fn into_token_idx(&self) -> Option<u32> {
         let token_type = match self {
             SemanticKind::Variable => SemanticTokenType::VARIABLE,
+            SemanticKind::Function => SemanticTokenType::FUNCTION,
             SemanticKind::Default => return None,
         };
         TOKEN_LEGEND
@@ -321,8 +323,23 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
     }
 
     for function in &module.functions {
+        scope
+            .state
+            .init_types(&function.signature(), Some(function.return_type.clone()));
+
+        dbg!(&function.signature());
+        dbg!(&scope.tokens.get(function.signature().range.start));
+        let idx = scope.token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)));
+        dbg!(idx, scope.tokens.get(idx));
+        let symbol = scope.state.new_symbol(idx, SemanticKind::Function);
+        scope.state.set_symbol(idx, symbol);
+
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
+            let idx = scope.token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)));
+            let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
+            scope.state.set_symbol(idx, symbol);
+            scope.variables.insert(param.name.clone(), symbol);
         }
 
         match &function.kind {

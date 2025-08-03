@@ -208,6 +208,7 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 if let Some(func) = imported.functions.iter_mut().find(|f| f.name == *import_name) {
                     let func_name = func.name.clone();
+                    let func_signature = func.signature();
 
                     if !func.is_pub {
                         state.ok::<_, Infallible>(
@@ -252,6 +253,7 @@ impl<'map> Pass for LinkerPass<'map> {
                         parameters: param_tys,
                         kind: super::FunctionDefinitionKind::Extern(true),
                         source: Some(imported.module_id),
+                        signature_meta: func_signature,
                     });
                 } else if let Some(ty) = imported.typedefs.iter_mut().find(|f| f.name == *import_name) {
                     let external_key = CustomTypeKey(ty.name.clone(), ty.source_module);
@@ -344,6 +346,7 @@ impl<'map> Pass for LinkerPass<'map> {
                                 parameters: param_tys,
                                 kind: super::FunctionDefinitionKind::Extern(true),
                                 source: Some(import_id),
+                                signature_meta: func.signature_meta,
                             },
                         ));
                     }

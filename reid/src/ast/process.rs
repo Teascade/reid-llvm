@@ -63,6 +63,7 @@ impl ast::Module {
                             .collect(),
                         kind: mir::FunctionDefinitionKind::Extern(false),
                         source: Some(module_id),
+                        signature_meta: signature.range.as_meta(module_id),
                     };
                     functions.push(def);
                 }
@@ -186,6 +187,7 @@ impl ast::FunctionDefinition {
             parameters: params,
             kind: mir::FunctionDefinitionKind::Local(block.into_mir(module_id), (range).as_meta(module_id)),
             source: Some(module_id),
+            signature_meta: signature.range.as_meta(module_id),
         }
     }
 }

@@ -305,6 +305,7 @@ pub struct FunctionDefinition {
     pub parameters: Vec<FunctionParam>,
     pub kind: FunctionDefinitionKind,
     pub source: Option<SourceModuleId>,
+    pub signature_meta: Metadata,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -340,11 +341,7 @@ impl FunctionDefinition {
     }
 
     pub fn signature(&self) -> Metadata {
-        match &self.kind {
-            FunctionDefinitionKind::Local(_, metadata) => metadata.clone(),
-            FunctionDefinitionKind::Extern(_) => Metadata::default(),
-            FunctionDefinitionKind::Intrinsic(_) => Metadata::default(),
-        }
+        self.signature_meta
     }
 }
 

@@ -54,6 +54,7 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
         }],
         kind: FunctionDefinitionKind::Extern(false),
         source: None,
+        signature_meta: Default::default(),
     });
 
     intrinsics
@@ -85,6 +86,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
                     }],
                     kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicConst(*len))),
                     source: None,
+                    signature_meta: Default::default(),
                 });
             }
             _ => {}
@@ -101,6 +103,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             parameters: Vec::new(),
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
             source: None,
+            signature_meta: Default::default(),
         }),
         "malloc" => Some(FunctionDefinition {
             name: "malloc".to_owned(),
@@ -115,6 +118,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             }],
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMalloc(ty.clone()))),
             source: None,
+            signature_meta: Default::default(),
         }),
         "null" => Some(FunctionDefinition {
             name: "null".to_owned(),
@@ -125,6 +129,7 @@ pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDef
             parameters: Vec::new(),
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicNullPtr(ty.clone()))),
             source: None,
+            signature_meta: Default::default(),
         }),
         _ => None,
     }
