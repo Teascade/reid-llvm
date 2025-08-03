@@ -321,6 +321,54 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         properties: HashMap::new(),
         types: HashMap::new(),
     };
+
+    for (i, token) in module.tokens.iter().enumerate() {
+        let semantic_token = match &token.token {
+            Token::DecimalValue(_) => Some(SemanticKind::Number),
+            Token::HexadecimalValue(_) => Some(SemanticKind::Number),
+            Token::OctalValue(_) => Some(SemanticKind::Number),
+            Token::BinaryValue(_) => Some(SemanticKind::Number),
+            Token::CharLit(_) => Some(SemanticKind::String),
+            Token::StringLit(_) => Some(SemanticKind::String),
+            Token::LetKeyword
+            | Token::MutKeyword
+            | Token::ImportKeyword
+            | Token::ReturnKeyword
+            | Token::FnKeyword
+            | Token::PubKeyword
+            | Token::AsKeyword
+            | Token::If
+            | Token::Else
+            | Token::True
+            | Token::False
+            | Token::Extern
+            | Token::Struct
+            | Token::While
+            | Token::For
+            | Token::In
+            | Token::Impl
+            | Token::Binop => Some(SemanticKind::Keyword),
+            Token::Equals
+            | Token::Plus
+            | Token::Star
+            | Token::Minus
+            | Token::Slash
+            | Token::Percent
+            | Token::GreaterThan
+            | Token::LessThan
+            | Token::Et
+            | Token::Pipe
+            | Token::Hat
+            | Token::Exclamation
+            | Token::Comment(_) => Some(SemanticKind::Comment),
+            _ => None,
+        };
+        if let Some(semantic) = semantic_token {
+            let symbol = scope.state.new_symbol(i, semantic);
+            scope.state.set_symbol(i, symbol);
+        }
+    }
+
     for import in &module.imports {
         scope.state.init_types(&import.1, None);
         if let Some((module_name, _)) = import.0.get(0) {
