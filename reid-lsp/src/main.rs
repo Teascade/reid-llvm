@@ -15,11 +15,11 @@ use tower_lsp::lsp_types::{
     ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams,
     SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem,
     TextDocumentRegistrationOptions, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextEdit, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    TextEdit, Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
-use crate::analysis::{MODIFIER_LEGEND, StaticAnalysis, TOKEN_LEGEND, analyze};
+use crate::analysis::{MODIFIER_LEGEND, StateMap, StaticAnalysis, TOKEN_LEGEND, analyze};
 
 mod analysis;
 
@@ -79,9 +79,7 @@ impl LanguageServer for Backend {
                     static_registration_options: Default::default(),
                 },
             )),
-            definition_provider: Some(OneOf::Left(true)),
             references_provider: Some(OneOf::Left(true)),
-            rename_provider: Some(OneOf::Left(true)),
             ..Default::default()
         };
         Ok(InitializeResult {
@@ -228,8 +226,8 @@ impl LanguageServer for Backend {
 
                 if let Some(token_analysis) = analysis.state.map.get(&i) {
                     if let Some(symbol_id) = token_analysis.symbol {
-                        let symbol = analysis.state.get_symbol(symbol_id);
-                        if let Some(idx) = symbol.kind.into_token_idx(&analysis.state) {
+                        let symbol = analysis.state.get_local_symbol(symbol_id);
+                        if let Some(idx) = symbol.kind.into_token_idx(&self.state_map()) {
                             let semantic_token = SemanticToken {
                                 delta_line,
                                 delta_start,
@@ -252,30 +250,34 @@ impl LanguageServer for Backend {
         })))
     }
 
-    async fn goto_definition(&self, params: GotoDefinitionParams) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
-        let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
-        let analysis = self.analysis.get(&path);
-        let position = params.text_document_position_params.position;
+    // async fn goto_definition(&self, params: GotoDefinitionParams) -> jsonrpc::Result<Option<GotoDefinitionResponse>> {
+    //     let path = PathBuf::from(params.text_document_position_params.text_document.uri.path());
+    //     let analysis = self.analysis.get(&path);
+    //     let position = params.text_document_position_params.position;
 
-        if let Some(analysis) = &analysis {
-            let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
-                tok.position.1 == position.line + 1
-                    && (tok.position.0 <= position.character + 1
-                        && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
-            });
+    //     if let Some(analysis) = &analysis {
+    //         let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
+    //             tok.position.1 == position.line + 1
+    //                 && (tok.position.0 <= position.character + 1
+    //                     && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
+    //         });
 
-            if let Some(token) = token {
-                if let Some(def_token) = analysis.find_definition(token.0) {
-                    return Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
-                        uri: params.text_document_position_params.text_document.uri,
-                        range: token_to_range(def_token),
-                    })));
-                }
-            }
-        };
+    //         if let Some(token) = token {
+    //             if let Some((module_id, def_token)) = analysis.find_definition(token.0, &self.state_map()) {
+    //                 return if let Some(path) = self.module_to_url.get(&module_id) {
+    //                     Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+    //                         uri: Url::from_file_path(path.value()).unwrap(),
+    //                         range: token_to_range(def_token),
+    //                     })))
+    //                 } else {
+    //                     Ok(None)
+    //                 };
+    //             }
+    //         }
+    //     };
 
-        Ok(None)
-    }
+    //     Ok(None)
+    // }
 
     async fn references(&self, params: ReferenceParams) -> jsonrpc::Result<Option<Vec<Location>>> {
         let path = PathBuf::from(params.text_document_position.text_document.uri.path());
@@ -289,20 +291,24 @@ impl LanguageServer for Backend {
                         && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
             });
             if let Some(token) = token {
-                let tokens = analysis.find_references(token.0).map(|symbols| {
-                    symbols
-                        .iter()
-                        .map(|symbol_id| analysis.state.symbol_to_token.get(&symbol_id).cloned().unwrap())
-                        .collect::<Vec<_>>()
-                });
+                let reference_tokens = analysis.find_references(token.0, &self.state_map());
+                dbg!(&reference_tokens);
                 let mut locations = Vec::new();
-                if let Some(tokens) = tokens {
-                    for token_idx in tokens {
-                        let token = analysis.tokens.get(token_idx).unwrap();
-                        locations.push(Location {
-                            uri: params.text_document_position.text_document.uri.clone(),
-                            range: token_to_range(token),
-                        });
+                if let Some(reference_tokens) = reference_tokens {
+                    for (module_id, symbol_idx) in reference_tokens {
+                        if let Some(path) = self.module_to_url.get(&module_id) {
+                            let url = Url::from_file_path(path.value()).unwrap();
+                            if let Some(inner_analysis) = self.analysis.get(path.value()) {
+                                if let Some(token_idx) = inner_analysis.state.symbol_to_token.get(&symbol_idx) {
+                                    let token = inner_analysis.tokens.get(*token_idx).unwrap();
+
+                                    locations.push(lsp_types::Location {
+                                        uri: url,
+                                        range: token_to_range(token),
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
                 Ok(Some(locations))
@@ -314,49 +320,48 @@ impl LanguageServer for Backend {
         }
     }
 
-    async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
-        let path = PathBuf::from(params.text_document_position.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&path);
-        let position = params.text_document_position.position;
+    // async fn rename(&self, params: RenameParams) -> jsonrpc::Result<Option<WorkspaceEdit>> {
+    //     let path = PathBuf::from(params.text_document_position.text_document.uri.path());
+    //     let analysis = self.analysis.get(&path);
+    //     let position = params.text_document_position.position;
 
-        if let Some(analysis) = &analysis {
-            let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
-                tok.position.1 == position.line + 1
-                    && (tok.position.0 <= position.character + 1
-                        && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
-            });
-            if let Some(token) = token {
-                let tokens = analysis.find_references(token.0).map(|symbols| {
-                    symbols
-                        .iter()
-                        .map(|symbol_id| analysis.state.symbol_to_token.get(&symbol_id).cloned().unwrap())
-                        .collect::<Vec<_>>()
-                });
-                let mut edits = Vec::new();
-                if let Some(tokens) = tokens {
-                    for token_idx in tokens {
-                        let token = analysis.tokens.get(token_idx).unwrap();
-                        edits.push(TextEdit {
-                            range: token_to_range(token),
-                            new_text: params.new_name.clone(),
-                        });
-                    }
-                }
-                let mut changes = HashMap::new();
-                changes.insert(params.text_document_position.text_document.uri, edits);
-                Ok(Some(WorkspaceEdit {
-                    changes: Some(changes),
-                    document_changes: None,
-                    change_annotations: None,
-                }))
-            } else {
-                Ok(None)
-            }
-        } else {
-            Ok(None)
-        }
-    }
+    //     if let Some(analysis) = &analysis {
+    //         let token = analysis.tokens.iter().enumerate().find(|(_, tok)| {
+    //             tok.position.1 == position.line + 1
+    //                 && (tok.position.0 <= position.character + 1
+    //                     && (tok.position.0 + tok.token.len() as u32) > position.character + 1)
+    //         });
+    //         if let Some(token) = token {
+    //             let tokens = analysis.find_references(token.0, &self.state_map()).map(|symbols| {
+    //                 symbols
+    //                     .iter()
+    //                     .map(|symbol_id| analysis.state.symbol_to_token.get(&symbol_id).cloned().unwrap())
+    //                     .collect::<Vec<_>>()
+    //             });
+    //             let mut edits = Vec::new();
+    //             if let Some(tokens) = tokens {
+    //                 for token_idx in tokens {
+    //                     let token = analysis.tokens.get(token_idx).unwrap();
+    //                     edits.push(TextEdit {
+    //                         range: token_to_range(token),
+    //                         new_text: params.new_name.clone(),
+    //                     });
+    //                 }
+    //             }
+    //             let mut changes = HashMap::new();
+    //             changes.insert(params.text_document_position.text_document.uri, edits);
+    //             Ok(Some(WorkspaceEdit {
+    //                 changes: Some(changes),
+    //                 document_changes: None,
+    //                 change_annotations: None,
+    //             }))
+    //         } else {
+    //             Ok(None)
+    //         }
+    //     } else {
+    //         Ok(None)
+    //     }
+    // }
 }
 
 fn token_to_range(token: &FullToken) -> lsp_types::Range {
@@ -373,6 +378,17 @@ fn token_to_range(token: &FullToken) -> lsp_types::Range {
 }
 
 impl Backend {
+    fn state_map(&self) -> StateMap {
+        let mut state_map = HashMap::new();
+        for path_state in self.analysis.iter() {
+            let (path, state) = path_state.pair();
+            if let Some(module_id) = self.path_to_module.get(path) {
+                state_map.insert(*module_id, state.state.clone());
+            }
+        }
+        state_map
+    }
+
     async fn recompile(&self, params: TextDocumentItem) {
         let file_path = PathBuf::from(params.uri.clone().path());
 
@@ -397,19 +413,11 @@ impl Backend {
             module_id
         };
 
-        let mut state_map = HashMap::new();
-        for path_state in self.analysis.iter() {
-            let (path, state) = path_state.pair();
-            if let Some(module_id) = self.path_to_module.get(path) {
-                state_map.insert(*module_id, state.state.clone());
-            }
-        }
-
         let parse_res = parse(&params.text, file_path.clone(), &mut map, module_id);
         let (tokens, result) = match parse_res {
             Ok((module_id, tokens)) => (
                 tokens.clone(),
-                analyze(module_id, tokens, file_path.clone(), &mut map, &state_map),
+                analyze(module_id, tokens, file_path.clone(), &mut map, &self.state_map()),
             ),
             Err(e) => (Vec::new(), Err(e)),
         };
