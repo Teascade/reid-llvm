@@ -368,6 +368,8 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                 );
 
                 for field in fields {
+                    scope.state.init_types(&field.2, Some(field.1.clone()));
+
                     let field_idx = scope
                         .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
                         .unwrap_or(field.2.range.end);
@@ -381,8 +383,6 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                         ),
                         field_symbol,
                     );
-
-                    scope.state.init_types(&field.2, Some(field.1.clone()));
                 }
             }
         }
@@ -582,6 +582,7 @@ pub fn analyze_expr(
                             let field_idx = scope
                                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                                 .unwrap_or(meta.range.end);
+
                             let field_symbol =
                                 if let Some(symbol_id) = scope.properties.get(&(accessed_type.clone(), name.clone())) {
                                     scope.state.new_symbol(field_idx, SemanticKind::Reference(*symbol_id))
