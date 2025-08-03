@@ -3,18 +3,22 @@ use std::path::PathBuf;
 use dashmap::DashMap;
 use reid::ast::lexer::{FullToken, Position};
 use reid::error_raporting::{self, ErrorModules, ReidError};
-use reid::mir::{SourceModuleId, TypeKind};
+use reid::mir::SourceModuleId;
 use reid::parse_module;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, MarkupContent, MarkupKind, MessageType, OneOf, Range,
-    ServerCapabilities, TextDocumentItem, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, DocumentSelector, Hover, HoverContents,
+    HoverParams, HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, MarkupContent,
+    MarkupKind, MessageType, OneOf, Range, SemanticToken, SemanticTokenModifier, SemanticTokenType,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensRangeParams,
+    SemanticTokensRangeResult, SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities,
+    StaticRegistrationOptions, TextDocumentItem, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, WorkDoneProgressOptions, WorkspaceFoldersServerCapabilities,
+    WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
-use crate::analysis::{StaticAnalysis, analyze};
+use crate::analysis::{StaticAnalysis, TOKEN_LEGEND, analyze};
 
 mod analysis;
 
@@ -38,20 +42,43 @@ impl LanguageServer for Backend {
             will_save_wait_until: None,
             save: None,
         };
-        Ok(InitializeResult {
-            capabilities: ServerCapabilities {
-                hover_provider: Some(HoverProviderCapability::Simple(true)),
-                completion_provider: Some(CompletionOptions { ..Default::default() }),
-                text_document_sync: Some(TextDocumentSyncCapability::Options(sync)),
-                workspace: Some(WorkspaceServerCapabilities {
-                    workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                        supported: Some(true),
-                        change_notifications: Some(OneOf::Left(true)),
-                    }),
-                    file_operations: None,
+
+        let capabilities = ServerCapabilities {
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
+            completion_provider: Some(CompletionOptions { ..Default::default() }),
+            text_document_sync: Some(TextDocumentSyncCapability::Options(sync)),
+            workspace: Some(WorkspaceServerCapabilities {
+                workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+                    supported: Some(true),
+                    change_notifications: Some(OneOf::Left(true)),
                 }),
-                ..Default::default()
-            },
+                file_operations: None,
+            }),
+            semantic_tokens_provider: Some(SemanticTokensServerCapabilities::SemanticTokensRegistrationOptions(
+                lsp_types::SemanticTokensRegistrationOptions {
+                    text_document_registration_options: TextDocumentRegistrationOptions {
+                        document_selector: Some(vec![DocumentFilter {
+                            language: Some("reid".to_owned()),
+                            scheme: Some("file".to_owned()),
+                            pattern: None,
+                        }]),
+                    },
+                    semantic_tokens_options: SemanticTokensOptions {
+                        work_done_progress_options: Default::default(),
+                        legend: SemanticTokensLegend {
+                            token_types: TOKEN_LEGEND.into(),
+                            token_modifiers: vec![],
+                        },
+                        range: None,
+                        full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
+                    },
+                    static_registration_options: Default::default(),
+                },
+            )),
+            ..Default::default()
+        };
+        Ok(InitializeResult {
+            capabilities,
             ..Default::default()
         })
     }
@@ -82,7 +109,7 @@ impl LanguageServer for Backend {
             None
         };
 
-        dbg!(position, token);
+        // dbg!(position, token);
 
         let list = if let Some((idx, _)) = token {
             if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.map.get(&idx) {
@@ -99,7 +126,7 @@ impl LanguageServer for Backend {
             Vec::new()
         };
 
-        dbg!(&list);
+        // dbg!(&list);
         Ok(Some(CompletionResponse::Array(list)))
     }
 
@@ -171,6 +198,100 @@ impl LanguageServer for Backend {
             language_id: String::new(),
         })
         .await
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: SemanticTokensParams,
+    ) -> jsonrpc::Result<Option<SemanticTokensResult>> {
+        let path = PathBuf::from(params.text_document.uri.path());
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let analysis = self.analysis.get(&file_name);
+
+        let mut semantic_tokens = Vec::new();
+        if let Some(analysis) = analysis {
+            let mut prev_line = 0;
+            let mut prev_start = 0;
+            for (i, token) in analysis.tokens.iter().enumerate() {
+                let delta_line = (token.position.1.max(1) - 1).max(prev_line) - prev_line;
+                let delta_start = if delta_line == 0 {
+                    (token.position.0.max(1) - 1).max(prev_start) - prev_start
+                } else {
+                    token.position.0.max(1) - 1
+                };
+
+                if let Some(token_analysis) = analysis.token_analysis.map.get(&i) {
+                    if let Some(symbol_id) = token_analysis.symbol {
+                        let symbol = analysis.token_analysis.get_symbol(symbol_id);
+                        if let Some(idx) = symbol.kind.into_token_idx() {
+                            let semantic_token = SemanticToken {
+                                delta_line,
+                                delta_start,
+                                length: token.token.len() as u32,
+                                token_type: idx,
+                                token_modifiers_bitset: 0,
+                            };
+                            semantic_tokens.push(semantic_token);
+                            dbg!(semantic_token, prev_line, prev_start, token);
+                            prev_line = token.position.1.max(1) - 1;
+                            prev_start = token.position.0.max(1) - 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(Some(SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
+            result_id: None,
+            data: semantic_tokens,
+        })))
+    }
+
+    async fn semantic_tokens_range(
+        &self,
+        params: SemanticTokensRangeParams,
+    ) -> jsonrpc::Result<Option<SemanticTokensRangeResult>> {
+        let path = PathBuf::from(params.text_document.uri.path());
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let analysis = self.analysis.get(&file_name);
+        dbg!("semantic_token_range");
+
+        let mut semantic_tokens = Vec::new();
+        if let Some(analysis) = analysis {
+            let mut prev_line = 0;
+            let mut prev_start = 0;
+            for (i, token) in analysis.tokens.iter().enumerate() {
+                let delta_line = token.position.1 - prev_line;
+                let delta_start = if delta_line == 0 {
+                    token.position.0
+                } else {
+                    token.position.0 - prev_start
+                };
+                prev_line = token.position.1;
+                prev_start = token.position.0;
+
+                if let Some(token_analysis) = analysis.token_analysis.map.get(&i) {
+                    if let Some(symbol_id) = token_analysis.symbol {
+                        let symbol = analysis.token_analysis.get_symbol(symbol_id);
+                        if let Some(idx) = symbol.kind.into_token_idx() {
+                            semantic_tokens.push(SemanticToken {
+                                delta_line,
+                                delta_start,
+                                length: token.token.len() as u32,
+                                token_type: idx,
+                                token_modifiers_bitset: 0,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        dbg!(&semantic_tokens);
+        Ok(Some(SemanticTokensRangeResult::Tokens(lsp_types::SemanticTokens {
+            result_id: None,
+            data: semantic_tokens,
+        })))
     }
 }
 

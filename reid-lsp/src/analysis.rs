@@ -1,16 +1,33 @@
 use std::{collections::HashMap, fmt::format, path::PathBuf};
 
 use reid::{
-    ast::{self, FunctionDefinition, lexer::FullToken, token_stream::TokenRange},
+    ast::{
+        self, FunctionDefinition,
+        lexer::{FullToken, Token},
+        token_stream::TokenRange,
+    },
     codegen::intrinsics::get_intrinsic_assoc_functions,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        self, Context, FunctionCall, FunctionParam, IfExpression, SourceModuleId, StructType, TypeKind, WhileStatement,
-        typecheck::typerefs::TypeRefs,
+        self, Context, FunctionCall, FunctionParam, IfExpression, Metadata, SourceModuleId, StructType, TypeKind,
+        WhileStatement, typecheck::typerefs::TypeRefs,
     },
     perform_all_passes,
 };
+use tower_lsp::lsp_types::SemanticTokenType;
+
+pub const TOKEN_LEGEND: [SemanticTokenType; 9] = [
+    SemanticTokenType::VARIABLE,
+    SemanticTokenType::FUNCTION,
+    SemanticTokenType::STRUCT,
+    SemanticTokenType::KEYWORD,
+    SemanticTokenType::NUMBER,
+    SemanticTokenType::STRING,
+    SemanticTokenType::OPERATOR,
+    SemanticTokenType::COMMENT,
+    SemanticTokenType::PROPERTY,
+];
 
 #[derive(Debug, Clone)]
 pub struct StaticAnalysis {
@@ -60,8 +77,22 @@ pub struct SymbolId(usize);
 
 #[derive(Debug, Clone)]
 pub struct AnalysisState {
+    /// TokenID -> Analysis map, containing SymbolIDs
     pub map: HashMap<usize, TokenAnalysis>,
-    pub symbol_table: Vec<SymbolKind>,
+    /// SymbolID -> Symbol
+    symbol_table: Vec<Symbol>,
+}
+
+impl AnalysisState {
+    pub fn get_symbol(&self, id: SymbolId) -> &Symbol {
+        self.symbol_table.get(id.0).unwrap()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Symbol {
+    pub kind: SemanticKind,
+    pub definition: usize,
 }
 
 impl AnalysisState {
@@ -93,12 +124,12 @@ impl AnalysisState {
         }
     }
 
-    pub fn set_symbol(&mut self, token_idx: usize, symbol: SymbolId) {
-        if let Some(token) = self.map.get_mut(&token_idx) {
+    pub fn set_symbol(&mut self, idx: usize, symbol: SymbolId) {
+        if let Some(token) = self.map.get_mut(&idx) {
             token.symbol = Some(symbol);
         } else {
             self.map.insert(
-                token_idx,
+                idx,
                 TokenAnalysis {
                     ty: None,
                     autocomplete: Vec::new(),
@@ -108,26 +139,66 @@ impl AnalysisState {
         }
     }
 
-    pub fn new_symbol(&mut self, kind: SymbolKind) -> SymbolId {
+    pub fn new_symbol(&mut self, definition: usize, kind: SemanticKind) -> SymbolId {
         let id = SymbolId(self.symbol_table.len());
-        self.symbol_table.push(kind);
+        self.symbol_table.push(Symbol { kind, definition });
         id
     }
 }
 
 pub struct AnalysisScope<'a> {
     state: &'a mut AnalysisState,
+    tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SymbolKind {
-    Default,
+impl<'a> AnalysisScope<'a> {
+    pub fn inner(&mut self) -> AnalysisScope {
+        AnalysisScope {
+            state: self.state,
+            tokens: self.tokens,
+            variables: self.variables.clone(),
+        }
+    }
+
+    pub fn token_idx<T: Copy>(&self, meta: &Metadata, pred: T) -> usize
+    where
+        T: FnOnce(&Token) -> bool,
+    {
+        for idx in meta.range.start..=meta.range.end {
+            if let Some(token) = self.tokens.get(idx) {
+                if pred(&token.token) {
+                    return idx;
+                }
+            }
+        }
+        return meta.range.end;
+    }
 }
 
-impl Default for SymbolKind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SemanticKind {
+    Default,
+    Variable,
+}
+
+impl Default for SemanticKind {
     fn default() -> Self {
-        SymbolKind::Default
+        SemanticKind::Default
+    }
+}
+
+impl SemanticKind {
+    pub fn into_token_idx(&self) -> Option<u32> {
+        let token_type = match self {
+            SemanticKind::Variable => SemanticTokenType::VARIABLE,
+            SemanticKind::Default => return None,
+        };
+        TOKEN_LEGEND
+            .iter()
+            .enumerate()
+            .find(|(_, t)| token_type == **t)
+            .map(|(i, _)| i as u32)
     }
 }
 
@@ -174,6 +245,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     let mut scope = AnalysisScope {
         state: &mut state,
+        tokens: &module.tokens,
         variables: HashMap::new(),
     };
     for import in &module.imports {
@@ -272,6 +344,8 @@ pub fn analyze_block(
     block: &mir::Block,
     scope: &mut AnalysisScope,
 ) {
+    let scope = &mut scope.inner();
+
     for statement in &block.statements {
         match &statement.0 {
             mir::StmtKind::Let(named_variable_ref, _, expression) => {
@@ -282,7 +356,10 @@ pub fn analyze_block(
                         .ok()
                         .map(|(_, ty)| ty),
                 );
-                // return analyze_in_expr(&expression, module_id, token_idx);
+                let idx = scope.token_idx(&named_variable_ref.2, |t| matches!(t, Token::Identifier(_)));
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
+                scope.state.set_symbol(idx, symbol);
+                scope.variables.insert(named_variable_ref.1.clone(), symbol);
             }
             mir::StmtKind::Set(lhs, rhs) => {
                 analyze_expr(context, source_module, lhs, scope);

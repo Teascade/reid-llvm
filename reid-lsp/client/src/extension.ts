@@ -4,7 +4,7 @@
  * ------------------------------------------------------------------------------------------ */
 
 import * as path from 'path';
-import { workspace, ExtensionContext, window } from 'vscode';
+import { workspace, ExtensionContext, window, languages, SemanticTokensBuilder } from 'vscode';
 
 import {
 	Executable,
@@ -53,7 +53,7 @@ export function activate(context: ExtensionContext) {
 		synchronize: {
 			// Notify the server about file changes to '.clientrc files contained in the workspace
 			fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-		}
+		},
 	};
 
 	// Create the language client and start the client.
@@ -68,8 +68,22 @@ export function activate(context: ExtensionContext) {
 	client.info(`Loaded Reid Language Server from ${server_path}`);
 
 
-	workspace.onDidOpenTextDocument((e) => {
-	});
+	workspace.onDidOpenTextDocument((e) => { });
+
+	client.info("Registering semantic tokens provide");
+	context.subscriptions.push(languages.registerDocumentSemanticTokensProvider({
+		language: 'reid',
+		scheme: 'file'
+	}, {
+		provideDocumentSemanticTokens: () => {
+			client.info("hello!");
+			const builder = new SemanticTokensBuilder();
+			return builder.build();
+		}
+	}, {
+		tokenTypes: [],
+		tokenModifiers: [],
+	}));
 
 	// Start the client. This will also launch the server
 	client.start();
