@@ -120,6 +120,11 @@ pub struct AnalysisState {
     symbol_table: Vec<Symbol>,
     /// SymbolID -> Symbol
     pub symbol_to_token: HashMap<SymbolId, usize>,
+
+    functions: HashMap<String, SymbolId>,
+    associated_functions: HashMap<(TypeKind, String), SymbolId>,
+    properties: HashMap<(TypeKind, String), SymbolId>,
+    types: HashMap<TypeKind, SymbolId>,
 }
 
 impl AnalysisState {
@@ -203,10 +208,6 @@ pub struct AnalysisScope<'a> {
     state: &'a mut AnalysisState,
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
-    functions: HashMap<String, SymbolId>,
-    associated_functions: HashMap<(TypeKind, String), SymbolId>,
-    properties: HashMap<(TypeKind, String), SymbolId>,
-    types: HashMap<TypeKind, SymbolId>,
 }
 
 impl<'a> AnalysisScope<'a> {
@@ -215,10 +216,6 @@ impl<'a> AnalysisScope<'a> {
             state: self.state,
             tokens: self.tokens,
             variables: self.variables.clone(),
-            functions: self.functions.clone(),
-            associated_functions: self.associated_functions.clone(),
-            properties: self.properties.clone(),
-            types: self.types.clone(),
         }
     }
 
@@ -344,16 +341,16 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         map: HashMap::new(),
         symbol_table: Vec::new(),
         symbol_to_token: HashMap::new(),
+        functions: HashMap::new(),
+        associated_functions: HashMap::new(),
+        properties: HashMap::new(),
+        types: HashMap::new(),
     };
 
     let mut scope = AnalysisScope {
         state: &mut state,
         tokens: &module.tokens,
         variables: HashMap::new(),
-        functions: HashMap::new(),
-        associated_functions: HashMap::new(),
-        properties: HashMap::new(),
-        types: HashMap::new(),
     };
 
     for (i, token) in module.tokens.iter().enumerate() {
@@ -458,7 +455,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                     .state
                     .new_symbol(struct_idx, SemanticKind::Struct, module.module_id);
                 scope.state.set_symbol(struct_idx, struct_symbol);
-                scope.types.insert(
+                scope.state.types.insert(
                     TypeKind::CustomType(CustomTypeKey(typedef.name.clone(), typedef.source_module)),
                     struct_symbol,
                 );
@@ -485,7 +482,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                         .new_symbol(field_idx, SemanticKind::Property, module.module_id);
                     scope.state.set_symbol(field_idx, field_symbol);
 
-                    scope.properties.insert(
+                    scope.state.properties.insert(
                         (
                             TypeKind::CustomType(CustomTypeKey(typedef.name.clone(), typedef.source_module)),
                             field.0.clone(),
@@ -524,6 +521,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         let symbol = scope.state.new_symbol(idx, SemanticKind::Function, module.module_id);
         scope.state.set_symbol(idx, symbol);
         scope
+            .state
             .associated_functions
             .insert((ty.clone(), function.name.clone()), symbol);
 
@@ -559,7 +557,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
             .unwrap_or(function.signature().range.end);
         let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function, module.module_id);
         scope.state.set_symbol(idx, function_symbol);
-        scope.functions.insert(function.name.clone(), function_symbol);
+        scope.state.functions.insert(function.name.clone(), function_symbol);
     }
 
     for function in &module.functions {
@@ -700,18 +698,19 @@ pub fn analyze_expr(
                                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                                 .unwrap_or(meta.range.end);
 
-                            let field_symbol =
-                                if let Some(symbol_id) = scope.properties.get(&(accessed_type.clone(), name.clone())) {
-                                    scope.state.new_symbol(
-                                        field_idx,
-                                        SemanticKind::Reference(*symbol_id),
-                                        source_module.module_id,
-                                    )
-                                } else {
-                                    scope
-                                        .state
-                                        .new_symbol(field_idx, SemanticKind::Property, source_module.module_id)
-                                };
+                            let field_symbol = if let Some(symbol_id) =
+                                scope.state.properties.get(&(accessed_type.clone(), name.clone()))
+                            {
+                                scope.state.new_symbol(
+                                    field_idx,
+                                    SemanticKind::Reference(*symbol_id),
+                                    source_module.module_id,
+                                )
+                            } else {
+                                scope
+                                    .state
+                                    .new_symbol(field_idx, SemanticKind::Property, source_module.module_id)
+                            };
                             scope.state.set_symbol(field_idx, field_symbol);
 
                             if let Some(typedef) = typedef {
@@ -744,7 +743,7 @@ pub fn analyze_expr(
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
 
-            let struct_symbol = if let Some(symbol_id) = scope.types.get(&struct_type) {
+            let struct_symbol = if let Some(symbol_id) = scope.state.types.get(&struct_type) {
                 scope
                     .state
                     .new_symbol(struct_idx, SemanticKind::Reference(*symbol_id), source_module.module_id)
@@ -761,7 +760,7 @@ pub fn analyze_expr(
                     .unwrap_or(field_meta.range.end);
 
                 let field_symbol =
-                    if let Some(symbol_id) = scope.properties.get(&(struct_type.clone(), field_name.clone())) {
+                    if let Some(symbol_id) = scope.state.properties.get(&(struct_type.clone(), field_name.clone())) {
                         scope
                             .state
                             .new_symbol(field_idx, SemanticKind::Reference(*symbol_id), source_module.module_id)
@@ -806,7 +805,7 @@ pub fn analyze_expr(
             let idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let symbol = if let Some(symbol_id) = scope.functions.get(name) {
+            let symbol = if let Some(symbol_id) = scope.state.functions.get(name) {
                 scope
                     .state
                     .new_symbol(idx, SemanticKind::Reference(*symbol_id), source_module.module_id)
@@ -832,7 +831,7 @@ pub fn analyze_expr(
                 ty.clone()
             };
 
-            let type_symbol = if let Some(symbol_id) = scope.types.get(&invoked_ty) {
+            let type_symbol = if let Some(symbol_id) = scope.state.types.get(&invoked_ty) {
                 scope
                     .state
                     .new_symbol(type_idx, SemanticKind::Reference(*symbol_id), source_module.module_id)
@@ -846,7 +845,10 @@ pub fn analyze_expr(
             let fn_idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let fn_symbol = if let Some(symbol_id) = scope.associated_functions.get(&(invoked_ty.clone(), name.clone()))
+            let fn_symbol = if let Some(symbol_id) = scope
+                .state
+                .associated_functions
+                .get(&(invoked_ty.clone(), name.clone()))
             {
                 scope
                     .state

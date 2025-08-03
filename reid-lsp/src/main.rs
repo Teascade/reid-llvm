@@ -399,15 +399,13 @@ impl Backend {
             let module_id = lock.increment();
             drop(lock);
             self.url_to_module.insert(path.clone(), module_id);
+            self.module_to_url.insert(module_id, path.clone());
             module_id
         };
 
         let parse_res = parse(&params.text, path.clone(), &mut map, module_id);
         let (tokens, result) = match parse_res {
-            Ok((module_id, tokens)) => {
-                dbg!("compiled: ", module_id);
-                (tokens.clone(), analyze(module_id, tokens, path, &mut map))
-            }
+            Ok((module_id, tokens)) => (tokens.clone(), analyze(module_id, tokens, path, &mut map)),
             Err(e) => (Vec::new(), Err(e)),
         };
 
