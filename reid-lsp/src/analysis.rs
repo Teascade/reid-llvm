@@ -53,6 +53,22 @@ impl StaticAnalysis {
         let def_token_idx = self.state.symbol_to_token.get(&definition_id)?;
         self.tokens.get(*def_token_idx)
     }
+
+    pub fn find_references(&self, token_idx: usize) -> Option<Vec<SymbolId>> {
+        let mut references = Vec::new();
+        let semantic_token = self.state.map.get(&token_idx)?;
+        let symbol_id = semantic_token.symbol?;
+        let definition_id = self.state.find_definition(&symbol_id);
+        references.push(definition_id);
+
+        for semantic_symbol in &self.state.symbol_table {
+            if let SemanticKind::Reference(idx) = semantic_symbol.kind {
+                references.push(idx);
+            }
+        }
+
+        Some(references)
+    }
 }
 
 #[derive(Debug, Clone)]
