@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::{Debug, Write},
+    path::PathBuf,
 };
 
 use crate::{
@@ -95,21 +96,46 @@ pub struct ErrorModule {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ErrorModules {
     pub(super) module_map: HashMap<mir::SourceModuleId, ErrorModule>,
+    pub(super) source_id_map: HashMap<PathBuf, mir::SourceModuleId>,
     module_counter: mir::SourceModuleId,
 }
 
 impl ErrorModules {
-    pub fn add_module<T: Into<String>>(&mut self, name: T) -> Option<mir::SourceModuleId> {
-        let id = self.module_counter.increment();
-        self.module_map.insert(
-            id,
-            ErrorModule {
-                name: name.into(),
-                tokens: None,
-                source: None,
-            },
-        );
-        Some(id)
+    pub fn add_module<T: Into<String>>(
+        &mut self,
+        name: T,
+        path: Option<PathBuf>,
+        external_module_id: Option<SourceModuleId>,
+    ) -> Option<mir::SourceModuleId> {
+        let module_id = path.as_ref().and_then(|p| self.source_id_map.get(p));
+
+        if let Some(module_id) = module_id {
+            Some(*module_id)
+        } else {
+            let id = if let Some(module_id) = external_module_id {
+                self.module_counter = SourceModuleId(module_id.0.max(self.module_counter.0));
+                if let Some(_) = self.module_map.get(&module_id) {
+                    panic!("Can not use external module id: Module already exists!")
+                }
+                module_id
+            } else {
+                self.module_counter.increment()
+            };
+
+            if let Some(path) = path {
+                self.source_id_map.insert(path, id);
+            }
+
+            self.module_map.insert(
+                id,
+                ErrorModule {
+                    name: name.into(),
+                    tokens: None,
+                    source: None,
+                },
+            );
+            Some(id)
+        }
     }
 
     pub fn set_tokens(&mut self, id: mir::SourceModuleId, tokens: Vec<FullToken>) {

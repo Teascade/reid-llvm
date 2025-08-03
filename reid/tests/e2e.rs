@@ -14,7 +14,7 @@ mod util;
 fn test_compile(source: &str, name: &str) -> CompileOutput {
     assert_err(assert_err(std::panic::catch_unwind(|| {
         let mut map = Default::default();
-        let (id, tokens) = assert_err(parse_module(source, name, &mut map));
+        let (id, tokens) = assert_err(parse_module(source, name, None, &mut map, None));
 
         let module = assert_err(assert_err(compile_module(id, tokens, &mut map, None, true)).map_err(|(_, e)| e));
         let mut mir_context = mir::Context::from(vec![module], Default::default());

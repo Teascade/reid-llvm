@@ -69,8 +69,6 @@ impl StaticAnalysis {
             }
         }
 
-        dbg!(&references);
-
         Some(references)
     }
 }

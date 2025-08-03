@@ -6,6 +6,6 @@ import module_importee::test;
 fn main() -> u32 {
   let value = 0b110;
   let other = 0o17;
-
+  
   return value * other + test().field * -value;
 }

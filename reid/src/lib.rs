@@ -69,7 +69,10 @@ use reid_lib::{compile::CompileOutput, Context};
 
 use crate::{
     ast::TopLevelStatement,
-    mir::macros::{form_macros, MacroModule, MacroPass},
+    mir::{
+        macros::{form_macros, MacroModule, MacroPass},
+        SourceModuleId,
+    },
 };
 
 pub mod ast;
@@ -83,9 +86,11 @@ mod util;
 pub fn parse_module<'map, T: Into<String>>(
     source: &str,
     name: T,
+    path: Option<PathBuf>,
     map: &'map mut ErrorModules,
+    module_id: Option<SourceModuleId>,
 ) -> Result<(mir::SourceModuleId, Vec<FullToken>), ReidError> {
-    let id = map.add_module(name.into()).unwrap();
+    let id = map.add_module(name.into(), path, module_id).unwrap();
     map.set_source(id, source.to_owned());
 
     let tokens = ReidError::from_lexer(lexer::tokenize(source), map.clone(), id)?;
@@ -317,7 +322,7 @@ pub fn compile_and_pass<'map>(
     let path = path.canonicalize().unwrap();
     let name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-    let (id, tokens) = parse_module(source, name, module_map)?;
+    let (id, tokens) = parse_module(source, name, Some(path.clone()), module_map, None)?;
     let module = compile_module(id, tokens, module_map, Some(path.clone()), true)?.map_err(|(_, e)| e)?;
 
     let mut mir_context = mir::Context::from(vec![module], path.parent().unwrap().to_owned());

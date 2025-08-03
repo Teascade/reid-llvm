@@ -6,6 +6,7 @@ use reid::ast::lexer::{FullToken, Position};
 use reid::error_raporting::{self, ErrorModules, ReidError};
 use reid::mir::SourceModuleId;
 use reid::parse_module;
+use tokio::sync::Mutex;
 use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, DocumentFilter, GotoDefinitionParams,
@@ -26,6 +27,9 @@ mod analysis;
 struct Backend {
     client: Client,
     analysis: DashMap<String, StaticAnalysis>,
+    module_to_url: DashMap<SourceModuleId, PathBuf>,
+    url_to_module: DashMap<PathBuf, SourceModuleId>,
+    module_id_counter: Mutex<SourceModuleId>,
 }
 
 #[tower_lsp::async_trait]
@@ -116,7 +120,6 @@ impl LanguageServer for Backend {
 
         let list = if let Some((idx, _)) = token {
             if let Some(analysis) = self.analysis.get(&file_name).unwrap().state.map.get(&idx) {
-                dbg!(&analysis);
                 analysis
                     .autocomplete
                     .iter()
@@ -379,10 +382,32 @@ impl Backend {
         let path = PathBuf::from(params.uri.clone().path());
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-        let mut map = Default::default();
-        let parse_res = parse(&params.text, path.clone(), &mut map);
+        let mut map: ErrorModules = Default::default();
+        for url_module in self.url_to_module.iter() {
+            let (url, module) = url_module.pair();
+            map.add_module(
+                url.file_name().unwrap().to_str().unwrap().to_owned(),
+                Some(url.clone()),
+                Some(*module),
+            );
+        }
+
+        let module_id = if let Some(module_id) = self.url_to_module.get(&path) {
+            *module_id
+        } else {
+            let mut lock = self.module_id_counter.lock().await;
+            let module_id = lock.increment();
+            drop(lock);
+            self.url_to_module.insert(path.clone(), module_id);
+            module_id
+        };
+
+        let parse_res = parse(&params.text, path.clone(), &mut map, module_id);
         let (tokens, result) = match parse_res {
-            Ok((module_id, tokens)) => (tokens.clone(), analyze(module_id, tokens, path, &mut map)),
+            Ok((module_id, tokens)) => {
+                dbg!("compiled: ", module_id);
+                (tokens.clone(), analyze(module_id, tokens, path, &mut map))
+            }
             Err(e) => (Vec::new(), Err(e)),
         };
 
@@ -449,10 +474,21 @@ fn reid_error_into_diagnostic(error: &error_raporting::ErrorKind, tokens: &Vec<F
     }
 }
 
-fn parse(source: &str, path: PathBuf, map: &mut ErrorModules) -> Result<(SourceModuleId, Vec<FullToken>), ReidError> {
+fn parse(
+    source: &str,
+    path: PathBuf,
+    map: &mut ErrorModules,
+    module_id: SourceModuleId,
+) -> Result<(SourceModuleId, Vec<FullToken>), ReidError> {
     let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
 
-    Ok(parse_module(source, file_name.clone(), map)?)
+    Ok(parse_module(
+        source,
+        file_name.clone(),
+        Some(path),
+        map,
+        Some(module_id),
+    )?)
 }
 
 #[tokio::main]
@@ -463,6 +499,9 @@ async fn main() {
     let (service, socket) = LspService::new(|client| Backend {
         client,
         analysis: DashMap::new(),
+        module_to_url: DashMap::new(),
+        url_to_module: DashMap::new(),
+        module_id_counter: Mutex::new(SourceModuleId(0)),
     });
     Server::new(stdin, stdout, socket).serve(service).await;
 }

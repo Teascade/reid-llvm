@@ -51,7 +51,7 @@ pub enum ErrorKind {
 }
 
 pub fn compile_std(module_map: &mut ErrorModules) -> Result<Module, ReidError> {
-    let (id, tokens) = parse_module(STD_SOURCE, STD_NAME, module_map)?;
+    let (id, tokens) = parse_module(STD_SOURCE, STD_NAME, None, module_map, None)?;
     let module = compile_module(id, tokens, module_map, None, false)?.map_err(|(_, e)| e)?;
 
     let module_id = module.module_id;
@@ -143,7 +143,13 @@ impl<'map> Pass for LinkerPass<'map> {
                         continue;
                     };
 
-                    let (id, tokens) = match parse_module(&source, module_name.clone(), &mut self.module_map) {
+                    let (id, tokens) = match parse_module(
+                        &source,
+                        module_name.clone(),
+                        Some(file_path.clone()),
+                        &mut self.module_map,
+                        None,
+                    ) {
                         Ok(val) => val,
                         Err(err) => {
                             state.ok::<_, Infallible>(
