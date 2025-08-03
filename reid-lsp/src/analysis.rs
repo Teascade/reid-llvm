@@ -44,6 +44,17 @@ pub struct StaticAnalysis {
     pub error: Option<ReidError>,
 }
 
+impl StaticAnalysis {
+    pub fn find_definition(&self, token_idx: usize) -> Option<&FullToken> {
+        let semantic_token = self.state.map.get(&token_idx)?;
+        let symbol_id = semantic_token.symbol?;
+        let definition_id = self.state.find_definition(&symbol_id);
+
+        let def_token_idx = self.state.symbol_to_token.get(&definition_id)?;
+        self.tokens.get(*def_token_idx)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SemanticToken {
     pub ty: Option<TypeKind>,

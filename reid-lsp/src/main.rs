@@ -263,32 +263,20 @@ impl LanguageServer for Backend {
             });
 
             if let Some(token) = token {
-                dbg!(token);
-                if let Some(semantic_token) = analysis.state.map.get(&token.0) {
-                    dbg!(semantic_token);
-                    if let Some(symbol_id) = semantic_token.symbol {
-                        dbg!(symbol_id);
-                        let definition_id = analysis.state.find_definition(&symbol_id);
-                        if let Some(def_token_idx) = analysis.state.symbol_to_token.get(&definition_id) {
-                            dbg!(def_token_idx);
-                            if let Some(def_token) = analysis.tokens.get(*def_token_idx) {
-                                dbg!(def_token);
-                                return Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
-                                    uri: params.text_document_position_params.text_document.uri,
-                                    range: Range {
-                                        start: lsp_types::Position {
-                                            line: def_token.position.1.max(1) - 1,
-                                            character: def_token.position.0.max(1) - 1,
-                                        },
-                                        end: lsp_types::Position {
-                                            line: def_token.position.1.max(1) - 1,
-                                            character: def_token.position.0.max(1) - 1 + def_token.token.len() as u32,
-                                        },
-                                    },
-                                })));
-                            }
-                        }
-                    }
+                if let Some(def_token) = analysis.find_definition(token.0) {
+                    return Ok(Some(GotoDefinitionResponse::Scalar(lsp_types::Location {
+                        uri: params.text_document_position_params.text_document.uri,
+                        range: Range {
+                            start: lsp_types::Position {
+                                line: def_token.position.1.max(1) - 1,
+                                character: def_token.position.0.max(1) - 1,
+                            },
+                            end: lsp_types::Position {
+                                line: def_token.position.1.max(1) - 1,
+                                character: def_token.position.0.max(1) - 1 + def_token.token.len() as u32,
+                            },
+                        },
+                    })));
                 }
             }
         };
