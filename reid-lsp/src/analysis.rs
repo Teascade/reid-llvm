@@ -190,8 +190,13 @@ pub enum SemanticKind {
     Function,
     String,
     Number,
-    Reference(SymbolId),
+    Property,
     Type,
+    Struct,
+    Comment,
+    Operator,
+    Keyword,
+    Reference(SymbolId),
 }
 
 impl Default for SemanticKind {
@@ -208,6 +213,11 @@ impl SemanticKind {
             SemanticKind::Type => SemanticTokenType::TYPE,
             SemanticKind::String => SemanticTokenType::STRING,
             SemanticKind::Number => SemanticTokenType::NUMBER,
+            SemanticKind::Property => SemanticTokenType::PROPERTY,
+            SemanticKind::Struct => SemanticTokenType::STRUCT,
+            SemanticKind::Comment => SemanticTokenType::COMMENT,
+            SemanticKind::Operator => SemanticTokenType::OPERATOR,
+            SemanticKind::Keyword => SemanticTokenType::KEYWORD,
             SemanticKind::Default => return None,
             SemanticKind::Reference(symbol_id) => return state.get_symbol(*symbol_id).kind.into_token_idx(state),
         };
@@ -226,6 +236,11 @@ impl SemanticKind {
             SemanticKind::String => return None,
             SemanticKind::Number => return None,
             SemanticKind::Default => return None,
+            SemanticKind::Property => return None,
+            SemanticKind::Struct => return None,
+            SemanticKind::Comment => return None,
+            SemanticKind::Operator => return None,
+            SemanticKind::Keyword => return None,
             SemanticKind::Reference(_) => SEMANTIC_REFERENCE,
         };
         MODIFIER_LEGEND
@@ -495,6 +510,13 @@ pub fn analyze_expr(
         mir::ExprKind::Accessed(expression, _, name, meta) => {
             analyze_expr(context, source_module, &expression, scope);
 
+            let idx = scope
+                .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(meta.range.end);
+            dbg!(idx, scope.tokens.get(idx));
+            let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
+            scope.state.set_symbol(idx, symbol);
+
             let accessed_type = expression.return_type(&TypeRefs::unknown(), source_module.module_id);
 
             let mut autocompletes = Vec::new();
@@ -542,23 +564,29 @@ pub fn analyze_expr(
         }
         mir::ExprKind::Struct(_, items) => {
             for (_, expr, field_meta) in items {
+                let idx = scope
+                    .token_idx(&field_meta, |t| matches!(t, Token::Identifier(_)))
+                    .unwrap_or(field_meta.range.end);
+                dbg!(idx, scope.tokens.get(idx));
+                let symbol = scope.state.new_symbol(idx, SemanticKind::Property);
+                scope.state.set_symbol(idx, symbol);
+
                 analyze_expr(context, source_module, expr, scope);
             }
         }
         mir::ExprKind::Literal(_) => {
-            // dbg!(&expr.1);
-            // if let Some(idx) = scope.token_idx(&expr.1, |t| matches!(t, Token::StringLit(_) | Token::CharLit(_))) {
-            //     dbg!(&idx, scope.tokens.get(idx));
-            //     scope.state.new_symbol(idx, SemanticKind::String);
-            // } else if let Some(idx) = scope.token_idx(&expr.1, |t| {
-            //     matches!(
-            //         t,
-            //         Token::DecimalValue(_) | Token::HexadecimalValue(_) | Token::OctalValue(_) | Token::BinaryValue(_)
-            //     )
-            // }) {
-            //     dbg!(&idx, scope.tokens.get(idx));
-            //     scope.state.new_symbol(idx, SemanticKind::Number);
-            // }
+            if let Some(idx) = scope.token_idx(&expr.1, |t| matches!(t, Token::StringLit(_) | Token::CharLit(_))) {
+                dbg!(&idx, scope.tokens.get(idx));
+                scope.state.new_symbol(idx, SemanticKind::String);
+            } else if let Some(idx) = scope.token_idx(&expr.1, |t| {
+                matches!(
+                    t,
+                    Token::DecimalValue(_) | Token::HexadecimalValue(_) | Token::OctalValue(_) | Token::BinaryValue(_)
+                )
+            }) {
+                dbg!(&idx, scope.tokens.get(idx));
+                scope.state.new_symbol(idx, SemanticKind::Number);
+            }
         }
         mir::ExprKind::BinOp(_, lhs, rhs, _) => {
             analyze_expr(context, source_module, &lhs, scope);
