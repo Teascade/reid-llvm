@@ -61,11 +61,15 @@ impl StaticAnalysis {
         let definition_id = self.state.find_definition(&symbol_id);
         references.push(definition_id);
 
-        for semantic_symbol in &self.state.symbol_table {
-            if let SemanticKind::Reference(idx) = semantic_symbol.kind {
-                references.push(idx);
+        for (symbol_idx, semantic_symbol) in self.state.symbol_table.iter().enumerate() {
+            if let SemanticKind::Reference(ref_idx) = semantic_symbol.kind {
+                if ref_idx == definition_id {
+                    references.push(SymbolId(symbol_idx));
+                }
             }
         }
+
+        dbg!(&references);
 
         Some(references)
     }
