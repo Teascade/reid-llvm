@@ -12,19 +12,18 @@ use reid::{
     perform_all_passes,
 };
 
-type TokenAnalysisMap = HashMap<usize, SemanticAnalysis>;
-
 #[derive(Debug, Clone)]
 pub struct StaticAnalysis {
     pub tokens: Vec<FullToken>,
-    pub token_analysis: TokenAnalysisMap,
+    pub token_analysis: AnalysisState,
     pub error: Option<ReidError>,
 }
 
 #[derive(Debug, Clone)]
-pub struct SemanticAnalysis {
+pub struct TokenAnalysis {
     pub ty: Option<TypeKind>,
     pub autocomplete: Vec<Autocomplete>,
+    pub symbol: Option<SymbolId>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +54,84 @@ impl ToString for AutocompleteKind {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SymbolId(usize);
+
+#[derive(Debug, Clone)]
+pub struct AnalysisState {
+    pub map: HashMap<usize, TokenAnalysis>,
+    pub symbol_table: Vec<SymbolKind>,
+}
+
+impl AnalysisState {
+    pub fn init_types(&mut self, meta: &mir::Metadata, ty: Option<TypeKind>) {
+        for token in meta.range.start..=meta.range.end {
+            self.map.insert(
+                token,
+                TokenAnalysis {
+                    ty: ty.clone(),
+                    autocomplete: Vec::new(),
+                    symbol: Default::default(),
+                },
+            );
+        }
+    }
+
+    pub fn set_autocomplete(&mut self, token_idx: usize, autocomplete: Vec<Autocomplete>) {
+        if let Some(token) = self.map.get_mut(&token_idx) {
+            token.autocomplete = autocomplete.clone();
+        } else {
+            self.map.insert(
+                token_idx,
+                TokenAnalysis {
+                    ty: None,
+                    autocomplete: autocomplete.clone(),
+                    symbol: Default::default(),
+                },
+            );
+        }
+    }
+
+    pub fn set_symbol(&mut self, token_idx: usize, symbol: SymbolId) {
+        if let Some(token) = self.map.get_mut(&token_idx) {
+            token.symbol = Some(symbol);
+        } else {
+            self.map.insert(
+                token_idx,
+                TokenAnalysis {
+                    ty: None,
+                    autocomplete: Vec::new(),
+                    symbol: Some(symbol),
+                },
+            );
+        }
+    }
+
+    pub fn new_symbol(&mut self, kind: SymbolKind) -> SymbolId {
+        let id = SymbolId(self.symbol_table.len());
+        self.symbol_table.push(kind);
+        id
+    }
+}
+
+pub struct AnalysisScope<'a> {
+    state: &'a mut AnalysisState,
+    variables: HashMap<String, SymbolId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SymbolKind {
+    Default,
+}
+
+impl Default for SymbolKind {
+    fn default() -> Self {
+        SymbolKind::Default
+    }
+}
+
+type TokenAnalysisMap = HashMap<usize, TokenAnalysis>;
 
 pub fn analyze(
     module_id: SourceModuleId,
@@ -89,36 +166,18 @@ pub fn analyze(
     return Ok(None);
 }
 
-pub fn init_types(map: &mut TokenAnalysisMap, meta: &mir::Metadata, ty: Option<TypeKind>) {
-    for token in meta.range.start..=meta.range.end {
-        map.insert(
-            token,
-            SemanticAnalysis {
-                ty: ty.clone(),
-                autocomplete: Vec::new(),
-            },
-        );
-    }
-}
-
-pub fn set_autocomplete(map: &mut TokenAnalysisMap, token_idx: usize, autocomplete: Vec<Autocomplete>) {
-    if let Some(token) = map.get_mut(&token_idx) {
-        token.autocomplete = autocomplete.clone();
-    } else {
-        map.insert(
-            token_idx,
-            SemanticAnalysis {
-                ty: None,
-                autocomplete: autocomplete.clone(),
-            },
-        );
-    }
-}
-
 pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Option<ReidError>) -> StaticAnalysis {
-    let mut map = HashMap::new();
+    let mut state = AnalysisState {
+        map: HashMap::new(),
+        symbol_table: Vec::new(),
+    };
+
+    let mut scope = AnalysisScope {
+        state: &mut state,
+        variables: HashMap::new(),
+    };
     for import in &module.imports {
-        init_types(&mut map, &import.1, None);
+        scope.state.init_types(&import.1, None);
         if let Some((module_name, _)) = import.0.get(0) {
             let (import_name, import_meta) = import.0.get(1).cloned().unwrap_or((
                 String::new(),
@@ -154,7 +213,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
                     }
                 }
             }
-            set_autocomplete(&mut map, import_meta.range.end, autocompletes);
+            scope.state.set_autocomplete(import_meta.range.end, autocompletes);
         }
     }
 
@@ -162,7 +221,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         match &typedef.kind {
             mir::TypeDefinitionKind::Struct(StructType(fields)) => {
                 for field in fields {
-                    init_types(&mut map, &field.2, Some(field.1.clone()));
+                    scope.state.init_types(&field.2, Some(field.1.clone()));
                 }
             }
         }
@@ -170,7 +229,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     for binop in &module.binop_defs {
         match &binop.fn_kind {
-            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut map),
+            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };
@@ -178,11 +237,11 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     for (_, function) in &module.associated_functions {
         for param in &function.parameters {
-            init_types(&mut map, &param.meta, Some(param.ty.clone()));
+            scope.state.init_types(&param.meta, Some(param.ty.clone()));
         }
 
         match &function.kind {
-            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut map),
+            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };
@@ -190,11 +249,11 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     for function in &module.functions {
         for param in &function.parameters {
-            init_types(&mut map, &param.meta, Some(param.ty.clone()));
+            scope.state.init_types(&param.meta, Some(param.ty.clone()));
         }
 
         match &function.kind {
-            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut map),
+            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };
@@ -202,7 +261,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     StaticAnalysis {
         tokens: module.tokens.clone(),
-        token_analysis: map,
+        token_analysis: state,
         error,
     }
 }
@@ -211,13 +270,12 @@ pub fn analyze_block(
     context: &mir::Context,
     source_module: &mir::Module,
     block: &mir::Block,
-    map: &mut TokenAnalysisMap,
+    scope: &mut AnalysisScope,
 ) {
     for statement in &block.statements {
         match &statement.0 {
             mir::StmtKind::Let(named_variable_ref, _, expression) => {
-                init_types(
-                    map,
+                scope.state.init_types(
                     &named_variable_ref.2,
                     expression
                         .return_type(&TypeRefs::unknown(), source_module.module_id)
@@ -227,22 +285,22 @@ pub fn analyze_block(
                 // return analyze_in_expr(&expression, module_id, token_idx);
             }
             mir::StmtKind::Set(lhs, rhs) => {
-                analyze_expr(context, source_module, lhs, map);
-                analyze_expr(context, source_module, rhs, map);
+                analyze_expr(context, source_module, lhs, scope);
+                analyze_expr(context, source_module, rhs, scope);
             }
             mir::StmtKind::Import(_) => {}
             mir::StmtKind::Expression(expression) => {
-                analyze_expr(context, source_module, expression, map);
+                analyze_expr(context, source_module, expression, scope);
             }
             mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
-                analyze_expr(context, source_module, condition, map);
-                analyze_block(context, source_module, block, map);
+                analyze_expr(context, source_module, condition, scope);
+                analyze_block(context, source_module, block, scope);
             }
         }
     }
 
     if let Some((_, Some(return_exp))) = &block.return_expression {
-        analyze_expr(context, source_module, return_exp, map)
+        analyze_expr(context, source_module, return_exp, scope)
     }
 }
 
@@ -250,10 +308,9 @@ pub fn analyze_expr(
     context: &mir::Context,
     source_module: &mir::Module,
     expr: &mir::Expression,
-    map: &mut TokenAnalysisMap,
+    scope: &mut AnalysisScope,
 ) {
-    init_types(
-        map,
+    scope.state.init_types(
         &expr.1,
         expr.return_type(&TypeRefs::unknown(), source_module.module_id)
             .ok()
@@ -263,11 +320,11 @@ pub fn analyze_expr(
     match &expr.0 {
         mir::ExprKind::Variable(_) => {}
         mir::ExprKind::Indexed(value, _, index_expr) => {
-            analyze_expr(context, source_module, &value, map);
-            analyze_expr(context, source_module, &index_expr, map);
+            analyze_expr(context, source_module, &value, scope);
+            analyze_expr(context, source_module, &index_expr, scope);
         }
         mir::ExprKind::Accessed(expression, _, name, meta) => {
-            analyze_expr(context, source_module, &expression, map);
+            analyze_expr(context, source_module, &expression, scope);
 
             let accessed_type = expression.return_type(&TypeRefs::unknown(), source_module.module_id);
 
@@ -307,26 +364,26 @@ pub fn analyze_expr(
                 _ => {}
             }
 
-            set_autocomplete(map, meta.range.end, autocompletes);
+            scope.state.set_autocomplete(meta.range.end, autocompletes);
         }
         mir::ExprKind::Array(expressions) => {
             for expr in expressions {
-                analyze_expr(context, source_module, expr, map);
+                analyze_expr(context, source_module, expr, scope);
             }
         }
         mir::ExprKind::Struct(_, items) => {
             for (_, expr, _) in items {
-                analyze_expr(context, source_module, expr, map);
+                analyze_expr(context, source_module, expr, scope);
             }
         }
         mir::ExprKind::Literal(_) => {}
         mir::ExprKind::BinOp(_, lhs, rhs, _) => {
-            analyze_expr(context, source_module, &lhs, map);
-            analyze_expr(context, source_module, &rhs, map);
+            analyze_expr(context, source_module, &lhs, scope);
+            analyze_expr(context, source_module, &rhs, scope);
         }
         mir::ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
             for expr in parameters {
-                analyze_expr(context, source_module, expr, map);
+                analyze_expr(context, source_module, expr, scope);
             }
         }
         mir::ExprKind::AssociatedFunctionCall(
@@ -336,7 +393,7 @@ pub fn analyze_expr(
             },
         ) => {
             for expr in parameters {
-                analyze_expr(context, source_module, expr, map);
+                analyze_expr(context, source_module, expr, scope);
             }
             let mut function_autocomplete = source_module
                 .associated_functions
@@ -358,25 +415,29 @@ pub fn analyze_expr(
                     })
                     .collect::<Vec<_>>(),
             );
-            set_autocomplete(map, meta.range.start, function_autocomplete.clone());
-            set_autocomplete(map, meta.range.end, function_autocomplete.clone());
+            scope
+                .state
+                .set_autocomplete(meta.range.start, function_autocomplete.clone());
+            scope
+                .state
+                .set_autocomplete(meta.range.end, function_autocomplete.clone());
         }
         mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {
-            analyze_expr(context, source_module, &cond, map);
-            analyze_expr(context, source_module, &then_e, map);
+            analyze_expr(context, source_module, &cond, scope);
+            analyze_expr(context, source_module, &then_e, scope);
             if let Some(else_e) = else_e.as_ref() {
-                analyze_expr(context, source_module, &else_e, map);
+                analyze_expr(context, source_module, &else_e, scope);
             }
         }
-        mir::ExprKind::Block(block) => analyze_block(context, source_module, block, map),
+        mir::ExprKind::Block(block) => analyze_block(context, source_module, block, scope),
         mir::ExprKind::Borrow(expression, _) => {
-            analyze_expr(context, source_module, &expression, map);
+            analyze_expr(context, source_module, &expression, scope);
         }
         mir::ExprKind::Deref(expression) => {
-            analyze_expr(context, source_module, &expression, map);
+            analyze_expr(context, source_module, &expression, scope);
         }
         mir::ExprKind::CastTo(expression, _) => {
-            analyze_expr(context, source_module, &expression, map);
+            analyze_expr(context, source_module, &expression, scope);
         }
         mir::ExprKind::GlobalRef(_, _) => {}
     }

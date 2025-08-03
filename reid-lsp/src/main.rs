@@ -85,7 +85,7 @@ impl LanguageServer for Backend {
         dbg!(position, token);
 
         let list = if let Some((idx, _)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.map.get(&idx) {
                 dbg!(&analysis);
                 analysis
                     .autocomplete
@@ -120,7 +120,7 @@ impl LanguageServer for Backend {
         };
 
         let (range, ty) = if let Some((idx, token)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.map.get(&idx) {
                 let start = token.position;
                 let end = token.position.add(token.token.len() as u32);
                 let range = Range {
