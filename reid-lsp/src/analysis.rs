@@ -15,7 +15,7 @@ use reid::{
     },
     perform_all_passes,
 };
-use tower_lsp::lsp_types::SemanticTokenType;
+use tower_lsp::lsp_types::{SemanticTokenModifier, SemanticTokenType};
 
 pub const TOKEN_LEGEND: [SemanticTokenType; 9] = [
     SemanticTokenType::VARIABLE,
@@ -29,10 +29,14 @@ pub const TOKEN_LEGEND: [SemanticTokenType; 9] = [
     SemanticTokenType::PROPERTY,
 ];
 
+const SEMANTIC_REFERENCE: SemanticTokenModifier = SemanticTokenModifier::new("reference");
+
+pub const MODIFIER_LEGEND: [SemanticTokenModifier; 2] = [SemanticTokenModifier::DEFINITION, SEMANTIC_REFERENCE];
+
 #[derive(Debug, Clone)]
 pub struct StaticAnalysis {
     pub tokens: Vec<FullToken>,
-    pub token_analysis: AnalysisState,
+    pub state: AnalysisState,
     pub error: Option<ReidError>,
 }
 
@@ -150,6 +154,7 @@ pub struct AnalysisScope<'a> {
     state: &'a mut AnalysisState,
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
+    functions: HashMap<String, SymbolId>,
 }
 
 impl<'a> AnalysisScope<'a> {
@@ -158,6 +163,7 @@ impl<'a> AnalysisScope<'a> {
             state: self.state,
             tokens: self.tokens,
             variables: self.variables.clone(),
+            functions: self.functions.clone(),
         }
     }
 
@@ -182,6 +188,8 @@ pub enum SemanticKind {
     Default,
     Variable,
     Function,
+    Reference(SymbolId),
+    Type,
 }
 
 impl Default for SemanticKind {
@@ -191,11 +199,13 @@ impl Default for SemanticKind {
 }
 
 impl SemanticKind {
-    pub fn into_token_idx(&self) -> Option<u32> {
+    pub fn into_token_idx(&self, state: &AnalysisState) -> Option<u32> {
         let token_type = match self {
             SemanticKind::Variable => SemanticTokenType::VARIABLE,
             SemanticKind::Function => SemanticTokenType::FUNCTION,
+            SemanticKind::Type => SemanticTokenType::TYPE,
             SemanticKind::Default => return None,
+            SemanticKind::Reference(symbol_id) => return state.get_symbol(*symbol_id).kind.into_token_idx(state),
         };
         TOKEN_LEGEND
             .iter()
@@ -203,9 +213,22 @@ impl SemanticKind {
             .find(|(_, t)| token_type == **t)
             .map(|(i, _)| i as u32)
     }
-}
 
-type TokenAnalysisMap = HashMap<usize, TokenAnalysis>;
+    pub fn get_modifier(&self) -> Option<u32> {
+        let token_type = match self {
+            SemanticKind::Variable => SemanticTokenModifier::DEFINITION,
+            SemanticKind::Function => SemanticTokenModifier::DEFINITION,
+            SemanticKind::Type => return None,
+            SemanticKind::Default => return None,
+            SemanticKind::Reference(_) => SEMANTIC_REFERENCE,
+        };
+        MODIFIER_LEGEND
+            .iter()
+            .enumerate()
+            .find(|(_, t)| token_type == **t)
+            .map(|(i, _)| 1 << i)
+    }
+}
 
 pub fn analyze(
     module_id: SourceModuleId,
@@ -250,6 +273,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
         state: &mut state,
         tokens: &module.tokens,
         variables: HashMap::new(),
+        functions: HashMap::new(),
     };
     for import in &module.imports {
         scope.state.init_types(&import.1, None);
@@ -327,12 +351,10 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
             .state
             .init_types(&function.signature(), Some(function.return_type.clone()));
 
-        dbg!(&function.signature());
-        dbg!(&scope.tokens.get(function.signature().range.start));
         let idx = scope.token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)));
-        dbg!(idx, scope.tokens.get(idx));
-        let symbol = scope.state.new_symbol(idx, SemanticKind::Function);
-        scope.state.set_symbol(idx, symbol);
+        let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function);
+        scope.state.set_symbol(idx, function_symbol);
+        scope.functions.insert(function.name.clone(), function_symbol);
 
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
@@ -351,7 +373,7 @@ pub fn analyze_context(context: &mir::Context, module: &mir::Module, error: Opti
 
     StaticAnalysis {
         tokens: module.tokens.clone(),
-        token_analysis: state,
+        state,
         error,
     }
 }
@@ -420,7 +442,7 @@ pub fn analyze_expr(
 
             let idx = scope.token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)));
             let symbol = if let Some(symbol_id) = scope.variables.get(&var_ref.1) {
-                *symbol_id
+                scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id))
             } else {
                 scope.state.new_symbol(idx, SemanticKind::Variable)
             };
@@ -489,10 +511,20 @@ pub fn analyze_expr(
             analyze_expr(context, source_module, &lhs, scope);
             analyze_expr(context, source_module, &rhs, scope);
         }
-        mir::ExprKind::FunctionCall(FunctionCall { parameters, .. }) => {
+        mir::ExprKind::FunctionCall(FunctionCall {
+            parameters, meta, name, ..
+        }) => {
             for expr in parameters {
                 analyze_expr(context, source_module, expr, scope);
             }
+
+            let idx = scope.token_idx(&meta, |t| matches!(t, Token::Identifier(_)));
+            let symbol = if let Some(symbol_id) = scope.functions.get(name) {
+                scope.state.new_symbol(idx, SemanticKind::Reference(*symbol_id))
+            } else {
+                scope.state.new_symbol(idx, SemanticKind::Function)
+            };
+            scope.state.set_symbol(idx, symbol);
         }
         mir::ExprKind::AssociatedFunctionCall(
             ty,

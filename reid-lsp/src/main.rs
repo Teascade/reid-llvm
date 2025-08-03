@@ -18,7 +18,7 @@ use tower_lsp::lsp_types::{
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
-use crate::analysis::{StaticAnalysis, TOKEN_LEGEND, analyze};
+use crate::analysis::{MODIFIER_LEGEND, StaticAnalysis, TOKEN_LEGEND, analyze};
 
 mod analysis;
 
@@ -67,7 +67,7 @@ impl LanguageServer for Backend {
                         work_done_progress_options: Default::default(),
                         legend: SemanticTokensLegend {
                             token_types: TOKEN_LEGEND.into(),
-                            token_modifiers: vec![],
+                            token_modifiers: MODIFIER_LEGEND.into(),
                         },
                         range: None,
                         full: Some(lsp_types::SemanticTokensFullOptions::Bool(true)),
@@ -112,7 +112,7 @@ impl LanguageServer for Backend {
         // dbg!(position, token);
 
         let list = if let Some((idx, _)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.map.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().state.map.get(&idx) {
                 dbg!(&analysis);
                 analysis
                     .autocomplete
@@ -147,7 +147,7 @@ impl LanguageServer for Backend {
         };
 
         let (range, ty) = if let Some((idx, token)) = token {
-            if let Some(analysis) = self.analysis.get(&file_name).unwrap().token_analysis.map.get(&idx) {
+            if let Some(analysis) = self.analysis.get(&file_name).unwrap().state.map.get(&idx) {
                 let start = token.position;
                 let end = token.position.add(token.token.len() as u32);
                 let range = Range {
@@ -223,16 +223,16 @@ impl LanguageServer for Backend {
                     vscode_col
                 };
 
-                if let Some(token_analysis) = analysis.token_analysis.map.get(&i) {
+                if let Some(token_analysis) = analysis.state.map.get(&i) {
                     if let Some(symbol_id) = token_analysis.symbol {
-                        let symbol = analysis.token_analysis.get_symbol(symbol_id);
-                        if let Some(idx) = symbol.kind.into_token_idx() {
+                        let symbol = analysis.state.get_symbol(symbol_id);
+                        if let Some(idx) = symbol.kind.into_token_idx(&analysis.state) {
                             let semantic_token = SemanticToken {
                                 delta_line,
                                 delta_start,
                                 length: token.token.len() as u32,
                                 token_type: idx,
-                                token_modifiers_bitset: 0,
+                                token_modifiers_bitset: symbol.kind.get_modifier().unwrap_or(0),
                             };
                             semantic_tokens.push(semantic_token);
                             dbg!(semantic_token, prev_line, prev_start, token);
@@ -245,53 +245,6 @@ impl LanguageServer for Backend {
         }
 
         Ok(Some(SemanticTokensResult::Tokens(lsp_types::SemanticTokens {
-            result_id: None,
-            data: semantic_tokens,
-        })))
-    }
-
-    async fn semantic_tokens_range(
-        &self,
-        params: SemanticTokensRangeParams,
-    ) -> jsonrpc::Result<Option<SemanticTokensRangeResult>> {
-        let path = PathBuf::from(params.text_document.uri.path());
-        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        let analysis = self.analysis.get(&file_name);
-        dbg!("semantic_token_range");
-
-        let mut semantic_tokens = Vec::new();
-        if let Some(analysis) = analysis {
-            let mut prev_line = 0;
-            let mut prev_start = 0;
-            for (i, token) in analysis.tokens.iter().enumerate() {
-                let delta_line = token.position.1 - prev_line;
-                let delta_start = if delta_line == 0 {
-                    token.position.0
-                } else {
-                    token.position.0 - prev_start
-                };
-                prev_line = token.position.1;
-                prev_start = token.position.0;
-
-                if let Some(token_analysis) = analysis.token_analysis.map.get(&i) {
-                    if let Some(symbol_id) = token_analysis.symbol {
-                        let symbol = analysis.token_analysis.get_symbol(symbol_id);
-                        if let Some(idx) = symbol.kind.into_token_idx() {
-                            semantic_tokens.push(SemanticToken {
-                                delta_line,
-                                delta_start,
-                                length: token.token.len() as u32,
-                                token_type: idx,
-                                token_modifiers_bitset: 0,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        dbg!(&semantic_tokens);
-        Ok(Some(SemanticTokensRangeResult::Tokens(lsp_types::SemanticTokens {
             result_id: None,
             data: semantic_tokens,
         })))
