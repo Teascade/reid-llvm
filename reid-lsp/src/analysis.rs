@@ -602,14 +602,16 @@ pub fn analyze_context(
 
     for (ty, function) in &module.associated_functions {
         if let Some(source_id) = function.source {
-            if let Some(state) = map.get(&source_id) {
-                if let Some(symbol) = state.associated_functions.get(&(ty.clone(), function.name.clone())) {
-                    scope
-                        .associated_functions
-                        .insert((ty.clone(), function.name.clone()), (source_id, *symbol));
+            if source_id != module.module_id {
+                if let Some(state) = map.get(&source_id) {
+                    if let Some(symbol) = state.associated_functions.get(&(ty.clone(), function.name.clone())) {
+                        scope
+                            .associated_functions
+                            .insert((ty.clone(), function.name.clone()), (source_id, *symbol));
+                    }
                 }
+                continue;
             }
-            continue;
         }
 
         let idx = scope
@@ -621,6 +623,9 @@ pub fn analyze_context(
             .state
             .associated_functions
             .insert((ty.clone(), function.name.clone()), symbol);
+        scope
+            .associated_functions
+            .insert((ty.clone(), function.name.clone()), (module.module_id, symbol));
 
         for param in &function.parameters {
             scope.state.init_types(&param.meta, Some(param.ty.clone()));
@@ -647,7 +652,6 @@ pub fn analyze_context(
     for function in &module.functions {
         if let Some(source_id) = function.source {
             if source_id != module.module_id {
-                dbg!(source_id, &function.name);
                 if let Some(state) = map.get(&source_id) {
                     if let Some(symbol) = state.functions.get(&function.name) {
                         scope.functions.insert(function.name.clone(), (source_id, *symbol));
@@ -667,6 +671,9 @@ pub fn analyze_context(
         let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function, module.module_id);
         scope.state.set_symbol(idx, function_symbol);
         scope.state.functions.insert(function.name.clone(), function_symbol);
+        scope
+            .functions
+            .insert(function.name.clone(), (module.module_id, function_symbol));
     }
 
     for function in &module.functions {

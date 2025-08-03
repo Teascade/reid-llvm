@@ -307,7 +307,6 @@ impl LanguageServer for Backend {
             });
             if let Some(token) = token {
                 let reference_tokens = analysis.find_references(token.0, &self.state_map());
-                dbg!(&reference_tokens);
                 let mut locations = Vec::new();
                 if let Some(reference_tokens) = reference_tokens {
                     for (module_id, symbol_idx) in reference_tokens {
