@@ -213,11 +213,14 @@ impl LanguageServer for Backend {
             let mut prev_line = 0;
             let mut prev_start = 0;
             for (i, token) in analysis.tokens.iter().enumerate() {
-                let delta_line = (token.position.1.max(1) - 1).max(prev_line) - prev_line;
+                let vscode_line = token.position.1.max(1) - 1;
+                let vscode_col = token.position.0.max(1) - 1;
+
+                let delta_line = vscode_line - prev_line;
                 let delta_start = if delta_line == 0 {
-                    (token.position.0.max(1) - 1).max(prev_start) - prev_start
+                    vscode_col - prev_start
                 } else {
-                    token.position.0.max(1) - 1
+                    vscode_col
                 };
 
                 if let Some(token_analysis) = analysis.token_analysis.map.get(&i) {
@@ -233,8 +236,8 @@ impl LanguageServer for Backend {
                             };
                             semantic_tokens.push(semantic_token);
                             dbg!(semantic_token, prev_line, prev_start, token);
-                            prev_line = token.position.1.max(1) - 1;
-                            prev_start = token.position.0.max(1) - 1;
+                            prev_line = vscode_line;
+                            prev_start = vscode_col;
                         }
                     }
                 }
