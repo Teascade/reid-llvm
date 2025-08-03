@@ -73,7 +73,12 @@ Big features that I want later but are not necessary:
 - ~~Asymmetric binary operations (e.g. string + u32)~~ (DONE)
 - ~~Error handling~~ (Not Doing It)
 - ~~Lexing & parsing of whitespace and comments as well~~ (DONE)
-- ~~LSP implementation~~ (CRUCIAL FEATURES DONE)
+- ~~LSP implementation~~ (DONE) 
+  - ~~Syntax Highlighting~~ (DONE)
+  - ~~Semantic Highlighting~~ (DONE)
+  - ~~Go-To-Definition~~ (DONE)
+  - ~~Find-All-References~~ (DONE)
+  - ~~Refactoring~~ (DONE)
 
 Smaller features:
 - ~~Hex-numbers~~ (DONE)
