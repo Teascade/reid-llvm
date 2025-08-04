@@ -626,24 +626,34 @@ pub fn analyze_context(
         scope
             .associated_functions
             .insert((ty.clone(), function.name.clone()), (module.module_id, symbol));
+    }
+
+    for (_, function) in &module.associated_functions {
+        if let Some(source_id) = function.source {
+            if source_id != module.module_id {
+                continue;
+            }
+        }
+
+        let mut inner_scope = scope.inner();
 
         for param in &function.parameters {
-            scope.state.init_types(&param.meta, Some(param.ty.clone()));
+            inner_scope.state.init_types(&param.meta, Some(param.ty.clone()));
 
             if param.meta.source_module_id == module.module_id {
-                let param_idx = scope
+                let param_idx = inner_scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(function.signature().range.end);
-                let param_symbol = scope
+                let param_symbol = inner_scope
                     .state
                     .new_symbol(param_idx, SemanticKind::Variable, module.module_id);
-                scope.state.set_symbol(param_idx, param_symbol);
-                scope.variables.insert(param.name.clone(), param_symbol);
+                inner_scope.state.set_symbol(param_idx, param_symbol);
+                inner_scope.variables.insert(param.name.clone(), param_symbol);
             }
         }
 
         match &function.kind {
-            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
+            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };
@@ -677,20 +687,30 @@ pub fn analyze_context(
     }
 
     for function in &module.functions {
+        if let Some(source_id) = function.source {
+            if source_id != module.module_id {
+                continue;
+            }
+        }
+
+        let mut inner_scope = scope.inner();
+
         for param in &function.parameters {
-            scope.state.init_types(&param.meta, Some(param.ty.clone()));
+            inner_scope.state.init_types(&param.meta, Some(param.ty.clone()));
             if param.meta.source_module_id == module.module_id {
-                let idx = scope
+                let idx = inner_scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(function.signature().range.end);
-                let symbol = scope.state.new_symbol(idx, SemanticKind::Variable, module.module_id);
-                scope.state.set_symbol(idx, symbol);
-                scope.variables.insert(param.name.clone(), symbol);
+                let symbol = inner_scope
+                    .state
+                    .new_symbol(idx, SemanticKind::Variable, module.module_id);
+                inner_scope.state.set_symbol(idx, symbol);
+                inner_scope.variables.insert(param.name.clone(), symbol);
             }
         }
 
         match &function.kind {
-            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut scope),
+            mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
             mir::FunctionDefinitionKind::Extern(_) => {}
             mir::FunctionDefinitionKind::Intrinsic(_) => {}
         };

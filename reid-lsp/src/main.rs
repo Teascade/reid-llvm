@@ -95,7 +95,7 @@ impl LanguageServer for Backend {
 
     async fn initialized(&self, _: InitializedParams) {
         self.client
-            .log_message(MessageType::INFO, "Reid Language Server initialized hello!")
+            .log_message(MessageType::INFO, "Reid Language Server initialized!")
             .await;
     }
 

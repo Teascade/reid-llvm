@@ -287,9 +287,9 @@ impl Parse for PrimaryExpression {
                 stream.get_range().unwrap(),
             )
         } else if let Some(Token::Star) = stream.peek() {
-            stream.next(); // Consume Et
+            stream.next(); // Consume Star
             apply_inner(stream.parse()?, |e| {
-                Expression(Kind::Deref(Box::new(e.0)), stream.get_range().unwrap())
+                Expression(Kind::Deref(Box::new(e.0.clone())), e.0 .1)
             })
         } else if let Ok(unary) = stream.parse() {
             Expression(
@@ -510,7 +510,7 @@ fn parse_binop_rhs(
             if curr_token_prec < next_prec {
                 // Operator on the right of rhs has more precedence, turn
                 // rhs into lhs for new binop
-                rhs = parse_binop_rhs(stream, rhs, Some(op))?;
+                rhs = stream.parse_with(|mut st| parse_binop_rhs(&mut st, rhs, Some(op)))?;
             } else {
                 let _ = prev_operator.insert(next_op);
             }

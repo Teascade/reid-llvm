@@ -76,7 +76,6 @@ export function activate(context: ExtensionContext) {
 		scheme: 'file'
 	}, {
 		provideDocumentSemanticTokens: () => {
-			client.info("hello!");
 			const builder = new SemanticTokensBuilder();
 			return builder.build();
 		}

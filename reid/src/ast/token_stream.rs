@@ -199,6 +199,23 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
+    pub fn parse_with<T, U>(&mut self, fun: T) -> U
+    where
+        T: FnOnce(TokenStream) -> U,
+    {
+        let mut ref_pos = self.position;
+
+        let position = self.position;
+        let clone = TokenStream {
+            ref_position: Some(&mut ref_pos),
+            tokens: self.tokens,
+            errors: self.errors.clone(),
+            position,
+        };
+
+        fun(clone)
+    }
+
     pub fn get_range(&self) -> Option<TokenRange> {
         self.ref_position.as_ref().map(|ref_pos| TokenRange {
             start: **ref_pos,
