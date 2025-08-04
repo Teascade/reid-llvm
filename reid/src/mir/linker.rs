@@ -111,11 +111,12 @@ impl<'map> Pass for LinkerPass<'map> {
 
         let mut modules_to_process: Vec<Rc<RefCell<_>>> = modules.values().cloned().collect();
 
-        let mut already_imported_types = HashSet::<CustomTypeKey>::new();
-        let mut already_imported_binops = HashSet::<BinopKey>::new();
+        let mut still_required_types = HashSet::<CustomTypeKey>::new();
 
         while let Some(module) = modules_to_process.pop() {
             let mut extern_types = HashMap::new();
+            let mut already_imported_binops = HashSet::<BinopKey>::new();
+            let mut already_imported_types = HashSet::<CustomTypeKey>::new();
             let mut importer_module = module.borrow_mut();
 
             for import in importer_module.imports.clone() {
@@ -208,7 +209,7 @@ impl<'map> Pass for LinkerPass<'map> {
                 let Some((import_name, _)) = path.get(1) else {
                     continue;
                 };
-                let import_id = imported.module_id;
+                let imported_id = imported.module_id;
 
                 let mut imported_types = Vec::new();
 
@@ -351,7 +352,7 @@ impl<'map> Pass for LinkerPass<'map> {
                                 return_type,
                                 parameters: param_tys,
                                 kind: super::FunctionDefinitionKind::Extern(true),
-                                source: Some(import_id),
+                                source: Some(imported_id),
                                 signature_meta: func.signature_meta,
                             },
                         ));
@@ -367,6 +368,13 @@ impl<'map> Pass for LinkerPass<'map> {
                 let mut seen = HashSet::new();
                 let mut current_extern_types = HashSet::new();
                 seen.extend(imported_types.clone().iter().map(|t| t.0.clone()));
+
+                for ty in still_required_types.clone() {
+                    if ty.1 == imported_id && !seen.contains(&ty) {
+                        imported_types.push((ty, false));
+                    }
+                }
+
                 current_extern_types.extend(imported_types.clone().iter().filter(|t| t.1).map(|t| t.0.clone()));
                 for extern_type in &current_extern_types {
                     extern_types.insert(extern_type.0.clone(), extern_type.1);
@@ -378,10 +386,16 @@ impl<'map> Pass for LinkerPass<'map> {
                 for typekey in imported_types.clone() {
                     let typedef = imported_mod_typedefs
                         .iter()
-                        .find(|ty| CustomTypeKey(ty.name.clone(), imported_mod_id) == typekey.0)
+                        .find(|ty| CustomTypeKey(ty.name.clone(), ty.source_module) == typekey.0)
                         .unwrap();
-                    let inner = find_inner_types(typedef, seen.clone(), imported_mod_id);
-                    seen.extend(inner.iter().cloned());
+                    let inner = find_inner_types(typedef, seen.clone(), imported_mod_typedefs);
+                    for ty in inner {
+                        if ty.1 == imported_id && imported_mod_typedefs.iter().find(|t| t.name == ty.0).is_some() {
+                            seen.insert(ty);
+                        } else {
+                            still_required_types.insert(ty);
+                        }
+                    }
                 }
 
                 // TODO: Unable to import same-named type from multiple places..
@@ -573,28 +587,31 @@ fn import_type(ty: &TypeKind, usable_import: bool) -> Vec<(CustomTypeKey, bool)>
 fn find_inner_types(
     typedef: &TypeDefinition,
     mut seen: HashSet<CustomTypeKey>,
-    mod_id: SourceModuleId,
+    typedefs: &Vec<TypeDefinition>,
 ) -> Vec<CustomTypeKey> {
     match &typedef.kind {
         crate::mir::TypeDefinitionKind::Struct(struct_type) => {
-            let typenames = struct_type
+            let typekeys = struct_type
                 .0
                 .iter()
-                .filter(|t| matches!(t.1, TypeKind::CustomType(..)))
-                .map(|t| match &t.1 {
-                    TypeKind::CustomType(CustomTypeKey(t, _)) => t,
-                    _ => panic!(),
+                .filter_map(|t| match &t.1 {
+                    TypeKind::CustomType(key) => Some(key),
+                    _ => None,
                 })
                 .cloned()
                 .collect::<Vec<_>>();
 
-            for typename in typenames {
-                if seen.contains(&CustomTypeKey(typename.clone(), mod_id)) {
+            for typekey in typekeys {
+                if seen.contains(&typekey) {
                     continue;
                 }
-                let inner = find_inner_types(typedef, seen.clone(), mod_id);
-                seen.insert(CustomTypeKey(typename, mod_id));
-                seen.extend(inner);
+                seen.insert(typekey.clone());
+                if typekey.1 == typedef.source_module {
+                    if let Some(inner) = typedefs.iter().find(|t| t.name == typekey.0) {
+                        let ret = find_inner_types(inner, seen.clone(), typedefs);
+                        seen.extend(ret);
+                    }
+                }
             }
 
             seen.into_iter().collect()

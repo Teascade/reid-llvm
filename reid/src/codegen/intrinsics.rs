@@ -703,7 +703,6 @@ impl IntrinsicFunction for IntrinsicMemcpy {
             .unwrap();
         let bytes = scope.block.build(Instr::Mul(sizeof, length.instr())).unwrap();
 
-        dbg!(self.0.size_of(&scope.type_map) / 8);
         let params = vec![
             dest.instr(),
             src.instr(),

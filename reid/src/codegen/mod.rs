@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use allocator::{Allocator, AllocatorScope};
 use intrinsics::*;
@@ -180,7 +184,40 @@ impl mir::Module {
         let mut typedefs = self.typedefs.clone();
         typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
 
-        for typedef in typedefs {
+        // Since we know by this point that no types are recursive, we can
+        // somewhat easily sort the type-definitions such that we can process
+        // the ones with no depencencies first, and later the ones that depend
+        // on the earlier ones.
+        let mut typekeys_seen = HashSet::new();
+        let mut typedefs_sorted = Vec::new();
+        let mut typedefs_left = typedefs.clone();
+        typedefs_left.reverse();
+        while let Some(typedef) = typedefs_left.pop() {
+            match &typedef.kind {
+                TypeDefinitionKind::Struct(StructType(fields)) => {
+                    let mut is_ok = true;
+                    for field in fields {
+                        match &field.1 {
+                            TypeKind::CustomType(type_key) => {
+                                if !typekeys_seen.contains(type_key) {
+                                    is_ok = false;
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    if is_ok {
+                        typekeys_seen.insert(CustomTypeKey(typedef.name.clone(), typedef.source_module));
+                        typedefs_sorted.push(typedef);
+                    } else {
+                        typedefs_left.insert(0, typedef.clone());
+                    }
+                }
+            };
+        }
+
+        for typedef in typedefs_sorted {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
             type_map.insert(type_key.clone(), typedef.clone());
 
@@ -190,9 +227,6 @@ impl mir::Module {
                         typedef.name.clone(),
                         fields
                             .iter()
-                            // TODO: Reorder custom-type definitions such that
-                            // inner types get evaluated first. Otherwise this
-                            // will cause a panic!
                             .map(|StructField(_, t, _)| t.get_type(&type_values))
                             .collect(),
                     )))

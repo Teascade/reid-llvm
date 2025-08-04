@@ -743,7 +743,6 @@ pub fn analyze_block(
                 analyze_expr(context, source_module, expression, scope);
             }
             mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
-                dbg!(condition);
                 analyze_expr(context, source_module, condition, scope);
                 analyze_block(context, source_module, block, scope);
             }
@@ -852,8 +851,8 @@ pub fn analyze_expr(
                 analyze_expr(context, source_module, expr, scope);
             }
         }
-        mir::ExprKind::Struct(struct_name, items) => {
-            let struct_type = TypeKind::CustomType(CustomTypeKey(struct_name.clone(), source_module.module_id));
+        mir::ExprKind::Struct(key, items) => {
+            let struct_type = TypeKind::CustomType(key.clone());
             let struct_idx = scope
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
