@@ -450,6 +450,10 @@ impl Module {
         for function in &mut self.functions {
             function.pass(pass, state, &mut scope.inner(), self.module_id)?;
         }
+
+        for (_, function) in &mut self.associated_functions {
+            function.pass(pass, state, &mut scope.inner(), self.module_id)?;
+        }
         Ok(())
     }
 }
