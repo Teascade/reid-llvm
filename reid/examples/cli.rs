@@ -66,7 +66,7 @@ fn main() -> Result<(), std::io::Error> {
                 }
 
                 let linker = std::env::var("LD").unwrap_or("ld".to_owned());
-                let mut linker = LDRunner::from_command(&linker).with_library("c");
+                let mut linker = LDRunner::from_command(&linker).with_library("c").with_library("m");
                 for library in libraries {
                     linker = linker.with_library(&library);
                 }

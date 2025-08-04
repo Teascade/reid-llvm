@@ -1,5 +1,14 @@
 
+extern fn printf(message: *char, num: f64);
+
 fn main() -> i32 {
     let b = 5;
-    return i32::abs(-7);
+    let mut otus = i32::malloc(1);
+    otus[0] = 10500300;
+    let potus = i32::malloc(1);
+    i32::memcpy(potus, otus, 1);
+
+    printf("log10 %f\n", f64::round(123.3) as f64);
+    printf("log10 %f\n", potus[0] as f64);
+    return potus[0];
 }

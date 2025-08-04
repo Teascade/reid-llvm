@@ -37,7 +37,7 @@ impl LLVMIntrinsic {
                 let name = match ty.category() {
                     TypeCategory::SignedInteger => format!("llvm.smax.{}", ty.llvm_ty_str(builder)),
                     TypeCategory::UnsignedInteger => format!("llvm.umax.{}", ty.llvm_ty_str(builder)),
-                    TypeCategory::Real => format!("llvm.max.{}", ty.llvm_ty_str(builder)),
+                    TypeCategory::Real => format!("llvm.maximum.{}", ty.llvm_ty_str(builder)),
                     _ => return Err(crate::ErrorKind::Null),
                 };
                 Ok((name, vec![ty.clone(), ty.clone()], ty.clone()))
@@ -46,7 +46,7 @@ impl LLVMIntrinsic {
                 let name = match ty.category() {
                     TypeCategory::SignedInteger => format!("llvm.smin.{}", ty.llvm_ty_str(builder)),
                     TypeCategory::UnsignedInteger => format!("llvm.umin.{}", ty.llvm_ty_str(builder)),
-                    TypeCategory::Real => format!("llvm.min.{}", ty.llvm_ty_str(builder)),
+                    TypeCategory::Real => format!("llvm.minimum.{}", ty.llvm_ty_str(builder)),
                     _ => return Err(crate::ErrorKind::Null),
                 };
                 Ok((name, vec![ty.clone(), ty.clone()], ty.clone()))
@@ -65,7 +65,7 @@ impl LLVMIntrinsic {
                     TypeCategory::Ptr => String::from("llvm.memcpy"),
                     _ => return Err(crate::ErrorKind::Null),
                 };
-                Ok((name, vec![ty.clone(), ty.clone()], Type::Void))
+                Ok((name, vec![ty.clone(), ty.clone(), Type::U64, Type::Bool], Type::Void))
             }
             LLVMIntrinsic::Sqrt(ty) => {
                 let name = match ty.category() {
@@ -221,7 +221,7 @@ impl LLVMIntrinsic {
             }
             LLVMIntrinsic::Round(ty) => {
                 let name = match ty.category() {
-                    TypeCategory::Real => format!("llvm.round.{}", ty.llvm_ty_str(builder)),
+                    TypeCategory::Real => format!("llvm.rint.{}", ty.llvm_ty_str(builder)),
                     _ => return Err(crate::ErrorKind::Null),
                 };
                 Ok((name, vec![ty.clone()], ty.clone()))
@@ -243,10 +243,10 @@ impl Type {
             Type::U32 => String::from("i32"),
             Type::U64 => String::from("i64"),
             Type::U128 => String::from("i128"),
-            Type::F16 => String::from("half"),
-            Type::F32B => String::from("bfloat"),
-            Type::F32 => String::from("float"),
-            Type::F64 => String::from("double"),
+            Type::F16 => String::from("f16"),
+            Type::F32B => String::from("f32b"),
+            Type::F32 => String::from("f32"),
+            Type::F64 => String::from("f64"),
             Type::F80 => String::from("x86_fp80"),
             Type::F128 => String::from("fp128"),
             Type::F128PPC => String::from("ppc_fp128"),

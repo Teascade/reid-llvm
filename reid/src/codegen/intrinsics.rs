@@ -118,7 +118,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             linkage_name: None,
             is_pub: true,
             is_imported: false,
-            return_type: TypeKind::U64,
+            return_type: TypeKind::Void,
             parameters: vec![FunctionParam {
                 name: String::from("self"),
                 ty: TypeKind::Borrow(Box::new(ty.clone()), false),
@@ -249,7 +249,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             linkage_name: None,
             is_pub: true,
             is_imported: false,
-            return_type: TypeKind::U64,
+            return_type: ty.clone(),
             parameters: vec![
                 FunctionParam {
                     name: String::from("self"),
@@ -258,12 +258,12 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
                 },
                 FunctionParam {
                     name: String::from("exponent"),
-                    ty: TypeKind::U64,
+                    ty: TypeKind::U32,
                     meta: Default::default(),
                 },
             ],
             kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
-                LLVMIntrinsicKind::PowI(ty.clone(), TypeKind::U64),
+                LLVMIntrinsicKind::PowI(ty.clone(), TypeKind::U32),
                 ty.clone(),
             ))),
             source: None,
@@ -338,6 +338,34 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             meta: Default::default(),
         }],
         kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMalloc(ty.clone()))),
+        source: None,
+        signature_meta: Default::default(),
+    });
+
+    intrinsics.push(FunctionDefinition {
+        name: "memcpy".to_owned(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: TypeKind::Void,
+        parameters: vec![
+            FunctionParam {
+                name: String::from("destination"),
+                ty: TypeKind::UserPtr(Box::new(ty.clone())),
+                meta: Default::default(),
+            },
+            FunctionParam {
+                name: String::from("source"),
+                ty: TypeKind::UserPtr(Box::new(ty.clone())),
+                meta: Default::default(),
+            },
+            FunctionParam {
+                name: String::from("length"),
+                ty: TypeKind::U64,
+                meta: Default::default(),
+            },
+        ],
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMemcpy(ty.clone()))),
         source: None,
         signature_meta: Default::default(),
     });
@@ -649,6 +677,35 @@ impl IntrinsicFunction for IntrinsicSizeOf {
             )))
             .unwrap();
         Ok(StackValue(StackValueKind::Literal(instr), self.0.clone()))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicMemcpy(TypeKind);
+impl IntrinsicFunction for IntrinsicMemcpy {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let dest = params.get(0).unwrap();
+        let src = params.get(1).unwrap();
+        let length = params.get(2).unwrap();
+        let intrinsic = scope.get_intrinsic(LLVMIntrinsicKind::Memcpy(TypeKind::UserPtr(Box::new(self.0.clone()))));
+
+        let sizeof = scope
+            .block
+            .build(Instr::Constant(ConstValueKind::U64(
+                self.0.size_of(&scope.type_map) / 8,
+            )))
+            .unwrap();
+        let bytes = scope.block.build(Instr::Mul(sizeof, length.instr())).unwrap();
+
+        dbg!(self.0.size_of(&scope.type_map) / 8);
+        let params = vec![
+            dest.instr(),
+            src.instr(),
+            bytes,
+            scope.block.build(Instr::Constant(ConstValueKind::Bool(false))).unwrap(),
+        ];
+        let value = scope.block.build(Instr::FunctionCall(intrinsic, params)).unwrap();
+        Ok(StackValue(StackValueKind::Literal(value), TypeKind::Void))
     }
 }
 
