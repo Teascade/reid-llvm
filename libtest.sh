@@ -16,7 +16,7 @@ BINARY="$(echo $1 | cut -d'.' -f1)"".out"
 
 echo $1
 
-cargo run --example cli $@ && \
+cargo run --features log_output --example cli $@ && \
 ./$BINARY ; echo "Return value: ""$?"
 
 ## Command from: clang -v hello.o -o test

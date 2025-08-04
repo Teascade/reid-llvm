@@ -235,7 +235,7 @@ impl ast::Block {
                     );
                     let let_statement = mir::Statement(
                         StmtKind::Let(counter_var.clone(), true, start.process(module_id)),
-                        counter_range.as_meta(module_id),
+                        start.1.as_meta(module_id),
                     );
                     let statement_range = counter_range.clone() + start.1 + end.1 + block.2;
 
@@ -243,25 +243,25 @@ impl ast::Block {
                         StmtKind::Set(
                             mir::Expression(
                                 mir::ExprKind::Variable(counter_var.clone()),
-                                (start.1 + end.1).as_meta(module_id),
+                                counter_range.as_meta(module_id),
                             ),
                             mir::Expression(
                                 mir::ExprKind::BinOp(
                                     mir::BinaryOperator::Add,
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Variable(counter_var.clone()),
-                                        (start.1 + end.1).as_meta(module_id),
+                                        counter_range.as_meta(module_id),
                                     )),
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Literal(mir::Literal::Vague(mir::VagueLiteral::Number(1))),
-                                        (start.1 + end.1).as_meta(module_id),
+                                        counter_range.as_meta(module_id),
                                     )),
                                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
-                                (start.1 + end.1).as_meta(module_id),
+                                counter_range.as_meta(module_id),
                             ),
                         ),
-                        (start.1 + end.1).as_meta(module_id),
+                        counter_range.as_meta(module_id),
                     );
                     let mut mir_block = block.into_mir(module_id);
                     mir_block.statements.push(set_new);
@@ -272,17 +272,17 @@ impl ast::Block {
                                     mir::BinaryOperator::Cmp(mir::CmpOperator::LT),
                                     Box::new(mir::Expression(
                                         mir::ExprKind::Variable(counter_var),
-                                        (start.1 + end.1).as_meta(module_id),
+                                        counter_range.as_meta(module_id),
                                     )),
                                     Box::new(end.process(module_id)),
                                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                                 ),
-                                (start.1 + end.1).as_meta(module_id),
+                                end.1.as_meta(module_id),
                             ),
                             block: mir_block.clone(),
-                            meta: (start.1 + end.1 + block.2).as_meta(module_id),
+                            meta: (*counter_range + end.1 + block.2).as_meta(module_id),
                         }),
-                        (start.1 + end.1 + block.2).as_meta(module_id),
+                        (*counter_range + end.1 + block.2).as_meta(module_id),
                     );
 
                     let inner_scope = StmtKind::Expression(mir::Expression(

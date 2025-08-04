@@ -761,6 +761,7 @@ pub fn analyze_block(
                 analyze_expr(context, source_module, expression, scope);
             }
             mir::StmtKind::While(WhileStatement { condition, block, .. }) => {
+                dbg!(condition);
                 analyze_expr(context, source_module, condition, scope);
                 analyze_block(context, source_module, block, scope);
             }
