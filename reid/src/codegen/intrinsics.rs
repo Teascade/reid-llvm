@@ -1,7 +1,7 @@
 use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValueKind, Instr, Type};
 
 use crate::{
-    codegen::{scope::IntrinsicKind, ErrorKind, StackValueKind},
+    codegen::{ErrorKind, StackValueKind},
     mir::{
         implement::TypeCategory, BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition,
         FunctionDefinitionKind, FunctionParam, TypeKind,
@@ -33,6 +33,36 @@ const FLOATS: [TypeKind; 7] = [
     TypeKind::F128PPC,
 ];
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum LLVMIntrinsicKind {
+    Max(TypeKind),
+    Min(TypeKind),
+    Abs(TypeKind),
+    Memcpy(TypeKind),
+    Sqrt(TypeKind),
+    PowI(TypeKind, TypeKind),
+    Pow(TypeKind),
+    Sin(TypeKind),
+    Cos(TypeKind),
+    Tan(TypeKind),
+    ASin(TypeKind),
+    ACos(TypeKind),
+    ATan(TypeKind),
+    ATan2(TypeKind),
+    SinH(TypeKind),
+    CosH(TypeKind),
+    TanH(TypeKind),
+    Log(TypeKind),
+    Log2(TypeKind),
+    Log10(TypeKind),
+    Copysign(TypeKind),
+    Floor(TypeKind),
+    Ceil(TypeKind),
+    Trunc(TypeKind),
+    RoundEven(TypeKind),
+    Round(TypeKind),
+}
+
 const INTRINSIC_IDENT: &str = "reid.intrinsic";
 const MALLOC_IDENT: &str = "malloc";
 
@@ -58,6 +88,28 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     intrinsics
 }
 
+pub fn simple_intrinsic<T: Into<String> + Clone>(
+    name: T,
+    params: Vec<T>,
+    ret: TypeKind,
+    intrisic: LLVMIntrinsicKind,
+) -> FunctionDefinition {
+    FunctionDefinition {
+        name: name.into(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: ret.clone(),
+        parameters: params
+            .iter()
+            .map(|p| FunctionParam::from(p.clone(), ret.clone()))
+            .collect(),
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(intrisic, ret.clone()))),
+        source: None,
+        signature_meta: Default::default(),
+    }
+}
+
 pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     let mut intrinsics = Vec::new();
     if let TypeKind::Array(_, len) = ty {
@@ -77,42 +129,189 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             signature_meta: Default::default(),
         });
     }
+    if ty.category() == TypeCategory::Real {
+        intrinsics.push(simple_intrinsic(
+            "sin",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Sin(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "cos",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Cos(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "tan",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Tan(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "sinh",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::SinH(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "cosh",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::CosH(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "tanh",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::TanH(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "asin",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::ASin(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "acos",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::ACos(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "atan",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::ATan(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "atan2",
+            vec!["self", "other"],
+            ty.clone(),
+            LLVMIntrinsicKind::ATan2(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "log",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Log(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "log2",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Log2(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "log10",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Log10(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "floor",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Floor(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "ceil",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Ceil(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "trunc",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Trunc(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "round",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Round(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "even",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::RoundEven(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
+            "pow",
+            vec!["self", "exponent"],
+            ty.clone(),
+            LLVMIntrinsicKind::Pow(ty.clone()),
+        ));
+        intrinsics.push(FunctionDefinition {
+            name: "powi".to_owned(),
+            linkage_name: None,
+            is_pub: true,
+            is_imported: false,
+            return_type: TypeKind::U64,
+            parameters: vec![
+                FunctionParam {
+                    name: String::from("self"),
+                    ty: ty.clone(),
+                    meta: Default::default(),
+                },
+                FunctionParam {
+                    name: String::from("exponent"),
+                    ty: TypeKind::U64,
+                    meta: Default::default(),
+                },
+            ],
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
+                LLVMIntrinsicKind::PowI(ty.clone(), TypeKind::U64),
+                ty.clone(),
+            ))),
+            source: None,
+            signature_meta: Default::default(),
+        });
+    }
     match ty.category() {
         TypeCategory::Integer | TypeCategory::Real | TypeCategory::Bool => {
-            intrinsics.push(FunctionDefinition {
-                name: "max".to_owned(),
-                linkage_name: None,
-                is_pub: true,
-                is_imported: false,
-                return_type: ty.clone(),
-                parameters: vec![
-                    FunctionParam::from("self", ty.clone()),
-                    FunctionParam::from("other", ty.clone()),
-                ],
-                kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
-                    IntrinsicKind::Max(ty.clone()),
-                    ty.clone(),
-                ))),
-                source: None,
-                signature_meta: Default::default(),
-            });
-            intrinsics.push(FunctionDefinition {
-                name: "min".to_owned(),
-                linkage_name: None,
-                is_pub: true,
-                is_imported: false,
-                return_type: ty.clone(),
-                parameters: vec![
-                    FunctionParam::from("self", ty.clone()),
-                    FunctionParam::from("other", ty.clone()),
-                ],
-                kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
-                    IntrinsicKind::Min(ty.clone()),
-                    ty.clone(),
-                ))),
-                source: None,
-                signature_meta: Default::default(),
-            });
+            intrinsics.push(simple_intrinsic(
+                "max",
+                vec!["self", "other"],
+                ty.clone(),
+                LLVMIntrinsicKind::Max(ty.clone()),
+            ));
+            intrinsics.push(simple_intrinsic(
+                "min",
+                vec!["self", "other"],
+                ty.clone(),
+                LLVMIntrinsicKind::Min(ty.clone()),
+            ));
+            if ty.signed() {
+                intrinsics.push(FunctionDefinition {
+                    name: "abs".to_owned(),
+                    linkage_name: None,
+                    is_pub: true,
+                    is_imported: false,
+                    return_type: ty.clone(),
+                    parameters: vec![FunctionParam {
+                        name: String::from("self"),
+                        ty: ty.clone(),
+                        meta: Default::default(),
+                    }],
+                    kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleUnaryInstr({
+                        let ty = ty.clone();
+                        |scope, param| {
+                            let intrinsic = scope.get_intrinsic(LLVMIntrinsicKind::Abs(ty));
+                            let constant = scope.block.build(Instr::Constant(ConstValueKind::Bool(false))).unwrap();
+                            let value = scope
+                                .block
+                                .build(Instr::FunctionCall(intrinsic, vec![param, constant]))
+                                .unwrap();
+                            value
+                        }
+                    }))),
+                    source: None,
+                    signature_meta: Default::default(),
+                });
+            }
         }
         _ => {}
     }
@@ -179,7 +378,7 @@ where
             meta: Default::default(),
         },
         return_type: ty.clone(),
-        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
+        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleBinaryInstr(fun))),
         meta: Default::default(),
         exported: false,
     }
@@ -202,7 +401,7 @@ where
             meta: Default::default(),
         },
         return_type: lhs.clone(),
-        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleInstr(fun))),
+        fn_kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSimpleBinaryInstr(fun))),
         meta: Default::default(),
         exported: false,
     }
@@ -379,12 +578,37 @@ macro_rules! intrinsic_debug {
 }
 
 #[derive(Clone)]
-pub struct IntrinsicSimpleInstr<T>(T)
+pub struct IntrinsicSimpleUnaryInstr<T>(T)
+where
+    T: FnOnce(&mut Scope, InstructionValue) -> InstructionValue;
+
+impl<T> std::fmt::Debug for IntrinsicSimpleUnaryInstr<T>
+where
+    T: FnOnce(&mut Scope, InstructionValue) -> InstructionValue,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("IntrinsicSimpleUnaryInstr").finish()
+    }
+}
+
+impl<T: Clone> IntrinsicFunction for IntrinsicSimpleUnaryInstr<T>
+where
+    T: FnOnce(&mut Scope, InstructionValue) -> InstructionValue,
+{
+    fn codegen<'b, 'c>(&self, scope: &mut Scope<'b, 'c>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let param = params.get(0).unwrap();
+        let instr = self.clone().0(scope, param.instr());
+        Ok(StackValue(StackValueKind::Literal(instr), param.1.clone()))
+    }
+}
+
+#[derive(Clone)]
+pub struct IntrinsicSimpleBinaryInstr<T>(T)
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue;
-intrinsic_debug!(IntrinsicSimpleInstr<T>, "IntrinsicSimpleInstr");
+intrinsic_debug!(IntrinsicSimpleBinaryInstr<T>, "IntrinsicSimpleBinaryInstr");
 
-impl<T: Clone> IntrinsicFunction for IntrinsicSimpleInstr<T>
+impl<T: Clone> IntrinsicFunction for IntrinsicSimpleBinaryInstr<T>
 where
     T: FnOnce(&mut Scope, InstructionValue, InstructionValue) -> InstructionValue,
 {
@@ -479,7 +703,7 @@ impl IntrinsicFunction for IntrinsicConst {
 }
 
 #[derive(Clone, Debug)]
-pub struct IntrinsicLLVM(IntrinsicKind, TypeKind);
+pub struct IntrinsicLLVM(LLVMIntrinsicKind, TypeKind);
 impl IntrinsicFunction for IntrinsicLLVM {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let intrinsic = scope.get_intrinsic(self.0.clone());

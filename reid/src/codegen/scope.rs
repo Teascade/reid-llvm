@@ -8,6 +8,7 @@ use reid_lib::{
 };
 
 use crate::{
+    codegen::intrinsics::LLVMIntrinsicKind,
     lexer::FullToken,
     mir::{
         pass::{AssociatedFunctionKey, BinopKey},
@@ -16,12 +17,6 @@ use crate::{
 };
 
 use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub enum IntrinsicKind {
-    Max(TypeKind),
-    Min(TypeKind),
-}
 
 pub struct Scope<'ctx, 'scope> {
     pub(super) context: &'ctx Context,
@@ -41,7 +36,7 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) globals: &'scope HashMap<String, GlobalValue>,
     pub(super) debug: Option<Debug<'ctx>>,
     pub(super) allocator: Rc<RefCell<Allocator>>,
-    pub(super) llvm_intrinsics: Rc<RefCell<HashMap<IntrinsicKind, FunctionValue>>>,
+    pub(super) llvm_intrinsics: Rc<RefCell<HashMap<LLVMIntrinsicKind, FunctionValue>>>,
 }
 
 impl<'ctx, 'a> Scope<'ctx, 'a> {
@@ -84,7 +79,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
         self.allocator.borrow_mut().allocate(meta, ty)
     }
 
-    pub fn get_intrinsic(&self, kind: IntrinsicKind) -> FunctionValue {
+    pub fn get_intrinsic(&self, kind: LLVMIntrinsicKind) -> FunctionValue {
         let mut intrinsics = self.llvm_intrinsics.borrow_mut();
         if let Some(fun) = intrinsics.get(&kind) {
             *fun
@@ -92,8 +87,34 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             let intrinsic = self
                 .module
                 .intrinsic(match &kind {
-                    IntrinsicKind::Max(ty) => LLVMIntrinsic::Max(ty.get_type(self.type_values)),
-                    IntrinsicKind::Min(ty) => LLVMIntrinsic::Min(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Max(ty) => LLVMIntrinsic::Max(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Min(ty) => LLVMIntrinsic::Min(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Abs(ty) => LLVMIntrinsic::Abs(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Memcpy(ty) => LLVMIntrinsic::Memcpy(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Sqrt(ty) => LLVMIntrinsic::Sqrt(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::PowI(lhs, rhs) => {
+                        LLVMIntrinsic::PowI(lhs.get_type(self.type_values), rhs.get_type(self.type_values))
+                    }
+                    LLVMIntrinsicKind::Pow(ty) => LLVMIntrinsic::Pow(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Sin(ty) => LLVMIntrinsic::Sin(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Cos(ty) => LLVMIntrinsic::Cos(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Tan(ty) => LLVMIntrinsic::Tan(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::ASin(ty) => LLVMIntrinsic::ASin(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::ACos(ty) => LLVMIntrinsic::ACos(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::ATan(ty) => LLVMIntrinsic::ATan(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::ATan2(ty) => LLVMIntrinsic::ATan2(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::SinH(ty) => LLVMIntrinsic::SinH(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::CosH(ty) => LLVMIntrinsic::CosH(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::TanH(ty) => LLVMIntrinsic::TanH(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Log(ty) => LLVMIntrinsic::Log(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Log2(ty) => LLVMIntrinsic::Log2(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Log10(ty) => LLVMIntrinsic::Log10(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Copysign(ty) => LLVMIntrinsic::Copysign(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Floor(ty) => LLVMIntrinsic::Floor(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Ceil(ty) => LLVMIntrinsic::Ceil(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Trunc(ty) => LLVMIntrinsic::Trunc(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::RoundEven(ty) => LLVMIntrinsic::RoundEven(ty.get_type(self.type_values)),
+                    LLVMIntrinsicKind::Round(ty) => LLVMIntrinsic::Round(ty.get_type(self.type_values)),
                 })
                 .unwrap();
             intrinsics.insert(kind, intrinsic.clone());
