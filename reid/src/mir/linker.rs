@@ -441,7 +441,7 @@ impl<'map> Pass for LinkerPass<'map> {
         Ok(())
     }
 
-    fn module(&mut self, module: &mut Module, mut state: PassState<Self::Data, Self::TError>) -> PassResult {
+    fn module(&mut self, module: &mut Module, state: PassState<Self::Data, Self::TError>) -> PassResult {
         let extern_types = &state.scope.data.extern_imported_types.get(&module.module_id);
         if let Some(extern_types) = extern_types {
             for ty in &mut module.typedefs {
@@ -510,6 +510,13 @@ impl<'map> Pass for LinkerPass<'map> {
                 super::ExprKind::CastTo(_, type_kind) => *type_kind = type_kind.update_imported(extern_types, mod_id),
                 super::ExprKind::AssociatedFunctionCall(type_kind, _) => {
                     *type_kind = type_kind.update_imported(extern_types, mod_id)
+                }
+                super::ExprKind::Struct(key, _) => {
+                    *key = if let Some(mod_id) = extern_types.get(&key.0) {
+                        CustomTypeKey(key.0.clone(), *mod_id)
+                    } else {
+                        key.clone()
+                    }
                 }
                 _ => {}
             }

@@ -627,15 +627,14 @@ impl Expression {
                     Err(ErrorKind::TriedAccessingNonStruct(expr_ty))
                 }
             }
-            ExprKind::Struct(struct_name, items) => {
-                let type_key = CustomTypeKey(struct_name.clone(), state.module_id.unwrap());
+            ExprKind::Struct(struct_key, items) => {
                 let struct_def = state
                     .scope
-                    .get_struct_type(&type_key)
-                    .ok_or(ErrorKind::NoSuchType(struct_name.clone(), type_key.1))?
+                    .get_struct_type(&struct_key)
+                    .ok_or(ErrorKind::NoSuchType(struct_key.0.clone(), struct_key.1))?
                     .clone();
 
-                let mut expected_fields = if let Some(struct_ty) = state.scope.get_struct_type(&type_key) {
+                let mut expected_fields = if let Some(struct_ty) = state.scope.get_struct_type(&struct_key) {
                     struct_ty.0.iter().map(|f| f.0.clone()).collect()
                 } else {
                     HashSet::new()
@@ -646,7 +645,7 @@ impl Expression {
                     let expected_ty = state.or_else(
                         struct_def
                             .get_field_ty(field_name)
-                            .ok_or(ErrorKind::NoSuchField(format!("{}.{}", struct_name, field_name))),
+                            .ok_or(ErrorKind::NoSuchField(format!("{:?}.{}", struct_key, field_name))),
                         &TypeKind::Vague(VagueType::Unknown),
                         field_expr.1,
                     );
@@ -668,7 +667,7 @@ impl Expression {
                     self.1,
                 );
 
-                Ok(TypeKind::CustomType(type_key))
+                Ok(TypeKind::CustomType(struct_key.clone()))
             }
             ExprKind::Borrow(expr, mutable) => {
                 let hint_t = if let HintKind::Coerce(hint_t) = hint_t {

@@ -553,12 +553,11 @@ impl Expression {
                     _ => Ok(type_refs.from_type(&TypeKind::Vague(VagueType::Unknown)).unwrap()),
                 }
             }
-            ExprKind::Struct(struct_name, fields) => {
-                let type_key = CustomTypeKey(struct_name.clone(), state.module_id.unwrap());
+            ExprKind::Struct(struct_key, fields) => {
                 let expected_struct_ty = state
                     .scope
-                    .get_struct_type(&type_key)
-                    .ok_or(ErrorKind::NoSuchType(struct_name.clone(), state.module_id.unwrap()))?
+                    .get_struct_type(&struct_key)
+                    .ok_or(ErrorKind::NoSuchType(struct_key.0.clone(), state.module_id.unwrap()))?
                     .clone();
                 for field in fields {
                     if let Some(expected_field_ty) = expected_struct_ty.get_field_ty(&field.0) {
@@ -568,12 +567,12 @@ impl Expression {
                         }
                     } else {
                         state.ok::<_, Infallible>(
-                            Err(ErrorKind::NoSuchField(format!("{}.{}", struct_name, field.0))),
+                            Err(ErrorKind::NoSuchField(format!("{:?}.{}", struct_key, field.0))),
                             field.1 .1,
                         );
                     }
                 }
-                Ok(type_refs.from_type(&TypeKind::CustomType(type_key.clone())).unwrap())
+                Ok(type_refs.from_type(&TypeKind::CustomType(struct_key.clone())).unwrap())
             }
             ExprKind::Borrow(expr, mutable) => {
                 // Find variable type

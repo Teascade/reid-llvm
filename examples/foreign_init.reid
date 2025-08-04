@@ -1,0 +1,6 @@
+import foreign_struct::Vec2;
+
+fn main() -> u32 {
+    let a = Vec2 {x: 16, y: 32};
+    return a.x;
+}

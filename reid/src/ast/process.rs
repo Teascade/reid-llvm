@@ -381,7 +381,7 @@ impl ast::Expression {
                 Box::new(idx_expr.process(module_id)),
             ),
             ast::ExpressionKind::StructExpression(struct_init) => mir::ExprKind::Struct(
-                struct_init.name.clone(),
+                CustomTypeKey(struct_init.name.clone(), module_id),
                 struct_init
                     .fields
                     .iter()

@@ -276,8 +276,8 @@ impl Display for ExprKind {
                 }
                 f.write_char(']')
             }
-            ExprKind::Struct(name, items) => {
-                write!(f, "{} ", name)?;
+            ExprKind::Struct(key, items) => {
+                write!(f, "{:?} ", key)?;
 
                 f.write_char('{')?;
                 let mut state = Default::default();

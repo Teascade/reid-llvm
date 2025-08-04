@@ -264,7 +264,7 @@ pub enum ExprKind {
     Indexed(Box<Expression>, TypeKind, Box<Expression>),
     Accessed(Box<Expression>, TypeKind, String, Metadata),
     Array(Vec<Expression>),
-    Struct(String, Vec<(String, Expression, Metadata)>),
+    Struct(CustomTypeKey, Vec<(String, Expression, Metadata)>),
     Literal(Literal),
     BinOp(BinaryOperator, Box<Expression>, Box<Expression>, TypeKind),
     FunctionCall(FunctionCall),

@@ -151,11 +151,11 @@ impl mir::Expression {
                     allocated.extend(expression.allocate(scope));
                 }
             }
-            mir::ExprKind::Struct(name, items) => {
+            mir::ExprKind::Struct(key, items) => {
                 let (_, ty) = self.return_type(&Default::default(), scope.mod_id).unwrap();
                 let allocation = scope
                     .block
-                    .build_named(name, Instr::Alloca(ty.get_type(scope.type_values)))
+                    .build_named(key.0.clone(), Instr::Alloca(ty.get_type(scope.type_values)))
                     .unwrap();
                 allocated.push(Allocation(self.1, ty, allocation));
 

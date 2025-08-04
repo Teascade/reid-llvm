@@ -416,10 +416,7 @@ impl Expression {
                 ))
             }
             Accessed(_, type_kind, ..) => Ok((ReturnKind::Soft, type_kind.clone())),
-            Struct(name, _) => Ok((
-                ReturnKind::Soft,
-                TypeKind::CustomType(CustomTypeKey(name.clone(), mod_id)),
-            )),
+            Struct(key, _) => Ok((ReturnKind::Soft, TypeKind::CustomType(key.clone()))),
             Borrow(expr, mutable) => {
                 let ret_type = expr.return_type(refs, mod_id)?;
                 Ok((ret_type.0, TypeKind::Borrow(Box::new(ret_type.1), *mutable)))

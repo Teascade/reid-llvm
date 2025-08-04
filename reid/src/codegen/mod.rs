@@ -1208,10 +1208,9 @@ impl mir::Expression {
                     ))
                 }
             }
-            mir::ExprKind::Struct(name, items) => {
-                let type_key = CustomTypeKey(name.clone(), scope.module_id);
+            mir::ExprKind::Struct(key, items) => {
                 let ty = Type::CustomType({
-                    let Some(a) = scope.type_values.get(&type_key) else {
+                    let Some(a) = scope.type_values.get(&key) else {
                         return Ok(None);
                     };
                     *a
@@ -1220,20 +1219,20 @@ impl mir::Expression {
                 let TypeDefinition {
                     kind: TypeDefinitionKind::Struct(struct_ty),
                     ..
-                } = scope.types.get(scope.type_values.get(&type_key).unwrap()).unwrap();
+                } = scope.types.get(scope.type_values.get(&key).unwrap()).unwrap();
 
                 let indices = struct_ty.0.iter().enumerate();
 
-                let load_n = format!("{}.load", name);
+                let load_n = format!("{:?}.load", key);
 
                 let struct_ptr = scope
-                    .allocate(&self.1, &TypeKind::CustomType(type_key.clone()))
+                    .allocate(&self.1, &TypeKind::CustomType(key.clone()))
                     .unwrap()
                     .maybe_location(&mut scope.block, location.clone());
 
                 for (field_n, exp, _) in items {
-                    let gep_n = format!("{}.{}.gep", name, field_n);
-                    let store_n = format!("{}.{}.store", name, field_n);
+                    let gep_n = format!("{:?}.{}.gep", key, field_n);
+                    let store_n = format!("{:?}.{}.store", key, field_n);
                     let i = indices.clone().find(|(_, f)| f.0 == *field_n).unwrap().0;
 
                     let elem_ptr = scope
@@ -1254,7 +1253,7 @@ impl mir::Expression {
 
                 Some(StackValue(
                     StackValueKind::Literal(struct_val),
-                    TypeKind::CustomType(type_key),
+                    TypeKind::CustomType(key.clone()),
                 ))
             }
             mir::ExprKind::Borrow(expr, mutable) => {
