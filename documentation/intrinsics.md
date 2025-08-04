@@ -56,3 +56,114 @@ let b = i32::malloc(30);
 // Copies the contents from b to a
 i32::memcpy(a, b, 30);
 ```
+
+
+#### `<T>::min(a: T, b: T) -> T`
+*Note: (only on integer- and floating-point values)*
+
+Returns the smaller of `a` and `b`.
+
+#### `<T>::max(a: T, b: T) -> T`
+*Note: (only on integer- and floating-point values)*
+
+Returns the larger of `a` and `b`.
+
+#### `<T>::abs(value: T) -> T`
+*Note: (only on signed integer and floating-point values)*
+
+Returns the absolute value of `value`.
+
+#### `<T>::pow(value: T, exponent: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Returns `value` raised to the exponent of `exponent`.
+
+#### `<T>::powi(value: T, exponent: u64) -> T`
+*Note: (only on floating-point numbers)*
+
+Returns `value` raised to the exponent of `exponent`.
+
+#### `<T>::sin(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates sine of `value`
+
+#### `<T>::cos(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates cosine of `value`
+
+#### `<T>::tan(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates tangent of `value`
+
+#### `<T>::asin(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates arcsine of `value`
+
+#### `<T>::acos(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates arccosine of `value`
+
+#### `<T>::atan(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates arctangent of `value`
+
+#### `<T>::sinh(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates hyperbolic sine of `value`
+
+#### `<T>::cosh(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates hyperbolic cosine of `value`
+
+#### `<T>::tanh(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates hyperbolic tangent of `value`
+
+#### `<T>::log(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Returns logₑ of `value`
+
+#### `<T>::log2(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Returns log₂ of `value`
+
+#### `<T>::log10(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Returns log₁₀ of `value`
+
+#### `<T>::round(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Rounds `value` to the nearest integer
+
+#### `<T>::trunc(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Truncates `value` to the integer nearest to `0`.
+
+#### `<T>::ceil(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Rounds `value` towards positive infinity.
+
+#### `<T>::floor(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Rounds `value` towards negative infinity.
+
+#### `<T>::even(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Rounds `value` to the closest even integer.
