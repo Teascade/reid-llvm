@@ -134,6 +134,8 @@ pub fn compile_module<'map>(
         is_main,
     };
 
+    dbg!(&ast_module);
+
     if errors.len() > 0 {
         // dbg!(&ast_module);
         return Ok(Err((

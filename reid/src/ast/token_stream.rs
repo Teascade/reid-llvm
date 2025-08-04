@@ -199,9 +199,9 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
-    pub fn parse_with<T, U>(&mut self, fun: T) -> U
+    pub fn parse_with<T, U>(&mut self, fun: T) -> Result<U, Error>
     where
-        T: FnOnce(TokenStream) -> U,
+        T: FnOnce(TokenStream) -> Result<U, Error>,
     {
         let mut ref_pos = self.position;
 
@@ -213,7 +213,13 @@ impl<'a, 'b> TokenStream<'a, 'b> {
             position,
         };
 
-        fun(clone)
+        match fun(clone) {
+            Ok(res) => {
+                self.position = ref_pos.max(self.position);
+                Ok(res)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn get_range(&self) -> Option<TokenRange> {
