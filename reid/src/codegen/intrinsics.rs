@@ -118,7 +118,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             linkage_name: None,
             is_pub: true,
             is_imported: false,
-            return_type: TypeKind::Void,
+            return_type: TypeKind::U64,
             parameters: vec![FunctionParam {
                 name: String::from("self"),
                 ty: TypeKind::Borrow(Box::new(ty.clone()), false),
