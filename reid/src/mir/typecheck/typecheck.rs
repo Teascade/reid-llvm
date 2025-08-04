@@ -721,7 +721,7 @@ impl Expression {
                 expr.resolve_ref(typerefs).cast_into(type_kind)
             }
             ExprKind::AssociatedFunctionCall(type_kind, function_call) => {
-                *type_kind = type_kind.or_default().unwrap();
+                *type_kind = type_kind.or_default()?;
                 let true_function = state
                     .scope
                     .get_associated_function(&pass::AssociatedFunctionKey(
