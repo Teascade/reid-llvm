@@ -1,8 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, mem, rc::Rc};
 
 use reid_lib::{
-    builder::{GlobalValue, InstructionValue, TypeValue},
+    builder::{FunctionValue, GlobalValue, InstructionValue, TypeValue},
     debug_information::{DebugInformation, DebugLocation, DebugScopeValue, DebugTypeValue},
+    intrinsics::LLVMIntrinsic,
     Block, Context, Function, Instr, Module,
 };
 
@@ -15,6 +16,12 @@ use crate::{
 };
 
 use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum IntrinsicKind {
+    Max(TypeKind),
+    Min(TypeKind),
+}
 
 pub struct Scope<'ctx, 'scope> {
     pub(super) context: &'ctx Context,
@@ -34,6 +41,7 @@ pub struct Scope<'ctx, 'scope> {
     pub(super) globals: &'scope HashMap<String, GlobalValue>,
     pub(super) debug: Option<Debug<'ctx>>,
     pub(super) allocator: Rc<RefCell<Allocator>>,
+    pub(super) llvm_intrinsics: Rc<RefCell<HashMap<IntrinsicKind, FunctionValue>>>,
 }
 
 impl<'ctx, 'a> Scope<'ctx, 'a> {
@@ -56,6 +64,7 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
             allocator: self.allocator.clone(),
             globals: self.globals,
             binops: self.binops,
+            llvm_intrinsics: self.llvm_intrinsics.clone(),
         }
     }
 
@@ -73,6 +82,23 @@ impl<'ctx, 'a> Scope<'ctx, 'a> {
 
     pub fn allocate(&self, meta: &Metadata, ty: &TypeKind) -> Option<InstructionValue> {
         self.allocator.borrow_mut().allocate(meta, ty)
+    }
+
+    pub fn get_intrinsic(&self, kind: IntrinsicKind) -> FunctionValue {
+        let mut intrinsics = self.llvm_intrinsics.borrow_mut();
+        if let Some(fun) = intrinsics.get(&kind) {
+            *fun
+        } else {
+            let intrinsic = self
+                .module
+                .intrinsic(match &kind {
+                    IntrinsicKind::Max(ty) => LLVMIntrinsic::Max(ty.get_type(self.type_values)),
+                    IntrinsicKind::Min(ty) => LLVMIntrinsic::Min(ty.get_type(self.type_values)),
+                })
+                .unwrap();
+            intrinsics.insert(kind, intrinsic.clone());
+            intrinsic
+        }
     }
 }
 

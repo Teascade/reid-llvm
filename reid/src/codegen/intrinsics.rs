@@ -1,12 +1,10 @@
-use std::{collections::HashMap, hash::Hash};
-
 use reid_lib::{builder::InstructionValue, CmpPredicate, ConstValueKind, Instr, Type};
 
 use crate::{
-    codegen::{ErrorKind, StackValueKind},
+    codegen::{scope::IntrinsicKind, ErrorKind, StackValueKind},
     mir::{
-        BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition, FunctionDefinitionKind, FunctionParam,
-        TypeKind,
+        implement::TypeCategory, BinaryOperator, BinopDefinition, CmpOperator, FunctionDefinition,
+        FunctionDefinitionKind, FunctionParam, TypeKind,
     },
 };
 
@@ -60,79 +58,108 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     intrinsics
 }
 
-pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> HashMap<String, Option<FunctionDefinition>> {
-    let mut map = HashMap::new();
-    map.insert("length".to_owned(), get_intrinsic_assoc_func(ty, "length"));
-    map.insert("sizeof".to_owned(), get_intrinsic_assoc_func(ty, "sizeof"));
-    map.insert("malloc".to_owned(), get_intrinsic_assoc_func(ty, "malloc"));
-    map.insert("null".to_owned(), get_intrinsic_assoc_func(ty, "null"));
-    map
-}
-
-pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDefinition> {
+pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
+    let mut intrinsics = Vec::new();
     if let TypeKind::Array(_, len) = ty {
-        match name {
-            "length" => {
-                return Some(FunctionDefinition {
-                    name: "length".to_owned(),
-                    linkage_name: None,
-                    is_pub: true,
-                    is_imported: false,
-                    return_type: TypeKind::U64,
-                    parameters: vec![FunctionParam {
-                        name: String::from("self"),
-                        ty: TypeKind::Borrow(Box::new(ty.clone()), false),
-                        meta: Default::default(),
-                    }],
-                    kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicConst(*len))),
-                    source: None,
-                    signature_meta: Default::default(),
-                });
-            }
-            _ => {}
-        }
-    }
-
-    match name {
-        "sizeof" => Some(FunctionDefinition {
-            name: "sizeof".to_owned(),
+        intrinsics.push(FunctionDefinition {
+            name: "length".to_owned(),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
             return_type: TypeKind::U64,
-            parameters: Vec::new(),
-            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
-            source: None,
-            signature_meta: Default::default(),
-        }),
-        "malloc" => Some(FunctionDefinition {
-            name: "malloc".to_owned(),
-            linkage_name: None,
-            is_pub: true,
-            is_imported: false,
-            return_type: TypeKind::UserPtr(Box::new(ty.clone())),
             parameters: vec![FunctionParam {
-                name: String::from("size"),
-                ty: TypeKind::U64,
+                name: String::from("self"),
+                ty: TypeKind::Borrow(Box::new(ty.clone()), false),
                 meta: Default::default(),
             }],
-            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMalloc(ty.clone()))),
+            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicConst(*len))),
             source: None,
             signature_meta: Default::default(),
-        }),
-        "null" => Some(FunctionDefinition {
-            name: "null".to_owned(),
-            linkage_name: None,
-            is_pub: true,
-            is_imported: false,
-            return_type: TypeKind::UserPtr(Box::new(ty.clone())),
-            parameters: Vec::new(),
-            kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicNullPtr(ty.clone()))),
-            source: None,
-            signature_meta: Default::default(),
-        }),
-        _ => None,
+        });
     }
+    match ty.category() {
+        TypeCategory::Integer | TypeCategory::Real | TypeCategory::Bool => {
+            intrinsics.push(FunctionDefinition {
+                name: "max".to_owned(),
+                linkage_name: None,
+                is_pub: true,
+                is_imported: false,
+                return_type: ty.clone(),
+                parameters: vec![
+                    FunctionParam::from("self", ty.clone()),
+                    FunctionParam::from("other", ty.clone()),
+                ],
+                kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
+                    IntrinsicKind::Max(ty.clone()),
+                    ty.clone(),
+                ))),
+                source: None,
+                signature_meta: Default::default(),
+            });
+            intrinsics.push(FunctionDefinition {
+                name: "min".to_owned(),
+                linkage_name: None,
+                is_pub: true,
+                is_imported: false,
+                return_type: ty.clone(),
+                parameters: vec![
+                    FunctionParam::from("self", ty.clone()),
+                    FunctionParam::from("other", ty.clone()),
+                ],
+                kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicLLVM(
+                    IntrinsicKind::Min(ty.clone()),
+                    ty.clone(),
+                ))),
+                source: None,
+                signature_meta: Default::default(),
+            });
+        }
+        _ => {}
+    }
+    intrinsics.push(FunctionDefinition {
+        name: "sizeof".to_owned(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: TypeKind::U64,
+        parameters: Vec::new(),
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicSizeOf(ty.clone()))),
+        source: None,
+        signature_meta: Default::default(),
+    });
+    intrinsics.push(FunctionDefinition {
+        name: "malloc".to_owned(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: TypeKind::UserPtr(Box::new(ty.clone())),
+        parameters: vec![FunctionParam {
+            name: String::from("size"),
+            ty: TypeKind::U64,
+            meta: Default::default(),
+        }],
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicMalloc(ty.clone()))),
+        source: None,
+        signature_meta: Default::default(),
+    });
+
+    intrinsics.push(FunctionDefinition {
+        name: "null".to_owned(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: TypeKind::UserPtr(Box::new(ty.clone())),
+        parameters: Vec::new(),
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicNullPtr(ty.clone()))),
+        source: None,
+        signature_meta: Default::default(),
+    });
+
+    intrinsics
+}
+
+pub fn get_intrinsic_assoc_func(ty: &TypeKind, name: &str) -> Option<FunctionDefinition> {
+    get_intrinsic_assoc_functions(ty).into_iter().find(|f| f.name == name)
 }
 
 fn simple_binop_def<T: Clone + 'static>(op: BinaryOperator, ty: &TypeKind, fun: T) -> BinopDefinition
@@ -441,12 +468,30 @@ impl IntrinsicFunction for IntrinsicNullPtr {
         ))
     }
 }
+
 #[derive(Clone, Debug)]
 pub struct IntrinsicConst(u64);
 impl IntrinsicFunction for IntrinsicConst {
     fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, _: &[StackValue]) -> Result<StackValue, ErrorKind> {
         let zero = scope.block.build(Instr::Constant(ConstValueKind::U64(self.0))).unwrap();
         Ok(StackValue(StackValueKind::Literal(zero), TypeKind::U64))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicLLVM(IntrinsicKind, TypeKind);
+impl IntrinsicFunction for IntrinsicLLVM {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let intrinsic = scope.get_intrinsic(self.0.clone());
+        let value = scope
+            .block
+            .build(Instr::FunctionCall(
+                intrinsic,
+                params.iter().map(|p| p.instr()).collect(),
+            ))
+            .unwrap();
+
+        Ok(StackValue(StackValueKind::Literal(value), self.1))
     }
 }
 

@@ -11,12 +11,14 @@ use fmt::PrintableModule;
 use crate::{
     builder::{ConstantValue, GlobalValue},
     debug_information::DebugScopeValue,
+    intrinsics::LLVMIntrinsic,
 };
 
 pub mod builder;
 pub mod compile;
 pub mod debug_information;
 mod fmt;
+pub mod intrinsics;
 mod pad_adapter;
 mod util;
 
@@ -92,6 +94,25 @@ impl<'ctx> Module<'ctx> {
                     },
                 ),
             }
+        }
+    }
+
+    pub fn intrinsic(&self, intrinsic: LLVMIntrinsic) -> CompileResult<FunctionValue> {
+        unsafe {
+            let (name, params, ret) = intrinsic.signature(&self.builder)?;
+            Ok(self.builder.add_function(
+                &self.value,
+                FunctionData {
+                    name: name.to_owned(),
+                    linkage_name: Some(name.to_owned()),
+                    ret,
+                    params,
+                    flags: FunctionFlags {
+                        is_extern: true,
+                        ..Default::default()
+                    },
+                },
+            ))
         }
     }
 

@@ -1021,9 +1021,8 @@ pub fn analyze_expr(
             function_autocomplete.extend(
                 get_intrinsic_assoc_functions(&invoked_ty)
                     .iter()
-                    .filter_map(|(s, f)| f.as_ref().map(|f| (s, f)))
-                    .filter(|(_, fun)| fun.name.starts_with(name))
-                    .map(|(_, fun)| Autocomplete {
+                    .filter(|fun| fun.name.starts_with(name))
+                    .map(|fun| Autocomplete {
                         text: fun.name.clone(),
                         kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                     })

@@ -315,6 +315,16 @@ pub struct FunctionParam {
     pub meta: Metadata,
 }
 
+impl FunctionParam {
+    pub fn from<T: Into<String>>(name: T, ty: TypeKind) -> FunctionParam {
+        FunctionParam {
+            name: name.into(),
+            ty: ty,
+            meta: Default::default(),
+        }
+    }
+}
+
 pub enum SelfKind {
     Borrow,
     MutBorrow,

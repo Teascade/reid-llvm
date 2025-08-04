@@ -393,6 +393,7 @@ impl mir::Module {
                                 }),
                                 binops: &binops,
                                 allocator: Rc::new(RefCell::new(allocator)),
+                                llvm_intrinsics: Rc::new(RefCell::new(HashMap::new())),
                             };
 
                             binop
@@ -471,6 +472,7 @@ impl mir::Module {
                     globals: &globals,
                     binops: &binops,
                     allocator: Rc::new(RefCell::new(allocator)),
+                    llvm_intrinsics: Rc::new(RefCell::new(HashMap::new())),
                 };
 
                 mir_function
@@ -533,6 +535,7 @@ impl mir::Module {
                     globals: &globals,
                     binops: &binops,
                     allocator: Rc::new(RefCell::new(allocator)),
+                    llvm_intrinsics: Rc::new(RefCell::new(HashMap::new())),
                 };
 
                 mir_function
