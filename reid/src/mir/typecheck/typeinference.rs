@@ -12,6 +12,7 @@ use std::{
 
 use crate::{
     mir::{
+        implement::TypeCategory,
         pass::{AssociatedFunctionKey, ScopeVariable},
         BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
         IfExpression, Module, ReturnKind, StmtKind, TypeKind, VagueType, WhileStatement,
@@ -627,12 +628,18 @@ impl Expression {
 
                         if backing_var.is_some() {
                             if let TypeKind::Borrow(inner, _) = type_kind {
+                                let ty_cat = inner.category();
                                 if let TypeKind::Borrow(..) = *inner.clone() {
                                     *type_kind = type_kind.unroll_borrow();
                                     let ExprKind::Borrow(val, _) = &first_param.0 else {
                                         panic!()
                                     };
                                     *first_param = *val.clone();
+                                } else if ty_cat == TypeCategory::Integer || ty_cat == TypeCategory::Real {
+                                    if let ExprKind::Borrow(val, _) = &first_param.0 {
+                                        *first_param = *val.clone();
+                                    }
+                                    *type_kind = *inner.clone();
                                 }
                             }
                         } else {

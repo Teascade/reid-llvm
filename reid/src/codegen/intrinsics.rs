@@ -491,7 +491,7 @@ impl IntrinsicFunction for IntrinsicLLVM {
             ))
             .unwrap();
 
-        Ok(StackValue(StackValueKind::Literal(value), self.1))
+        Ok(StackValue(StackValueKind::Literal(value), self.1.clone()))
     }
 }
 
