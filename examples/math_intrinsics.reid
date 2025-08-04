@@ -9,6 +9,7 @@ fn main() -> i32 {
     i32::memcpy(potus, otus, 1);
 
     printf("log10 %f\n", f64::round(123.3) as f64);
+    printf("sqrt %f\n", f64::sqrt(2) as f64);
     printf("log10 %f\n", potus[0] as f64);
     return potus[0];
 }

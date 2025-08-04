@@ -20,7 +20,6 @@ fn main() -> Result<(), std::io::Error> {
         let mir_path = parent.with_extension("mir");
         let asm_path = parent.with_extension("asm");
 
-        #[cfg(feature = "log_output")]
         let before = std::time::SystemTime::now();
 
         let text = fs::read_to_string(&path)?;
@@ -54,16 +53,13 @@ fn main() -> Result<(), std::io::Error> {
                 fs::write(&object_path, &obj_buffer).expect("Could not write Object-file!");
                 fs::write(&llir_path, &llir).expect("Could not write LLIR-file!");
                 fs::write(&mir_path, &mir).expect("Could not write MIR-file!");
-                #[cfg(feature = "log_output")]
-                {
-                    let after = std::time::SystemTime::now();
-                    println!(
-                        "Compilation took: {:.2}ms\n",
-                        (after.duration_since(before).unwrap().as_micros() as f32) / 1000.
-                    );
+                let after = std::time::SystemTime::now();
+                println!(
+                    "Compilation took: {:.2}ms\n",
+                    (after.duration_since(before).unwrap().as_micros() as f32) / 1000.
+                );
 
-                    println!("Linking {:?}", &object_path);
-                }
+                println!("Linking {:?}", &object_path);
 
                 let linker = std::env::var("LD").unwrap_or("ld".to_owned());
                 let mut linker = LDRunner::from_command(&linker).with_library("c").with_library("m");
