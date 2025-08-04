@@ -7,16 +7,6 @@ pre-existing binary-operators, but also some regular functions and associated
 functions (that every type has by-default). This document lists them all (except
 for the binary operators, because there are hundreds of those).
 
-### Global Intrinsics
-
-#### `malloc(size: u64) -> *u8`
-
-Allocates `size` bytes and returns a pointer of `u8` of length `size`.
-
-```rust
-i32::malloc(40); // Reserves 40 bytes
-```
-
 ### Macro Intrinsics
 
 #### `include_bytes!(path: *char) -> &[u8; _]`
@@ -47,11 +37,22 @@ i32::null(); // Returns *i32 (null-ptr)
 
 Allocates `T::sizeof() * size` bytes and returns a pointer to `T`.
 
-**Note:** This does not seem to work correctly currently.
-
 ```rust
 i32::malloc(30); // Returns *i32
 
  // Equivalent to
 malloc(i32::sizeof() * 30) as *i32
+```
+
+#### `<T>::memcpy(destination: *T, source: *T, size: u64)`
+
+Copies `T::sizeof() * size` bytes from pointer `source` to pointer
+`destination`.
+
+```rust
+let a = i32::malloc(30);
+let b = i32::malloc(30);
+
+// Copies the contents from b to a
+i32::memcpy(a, b, 30);
 ```
