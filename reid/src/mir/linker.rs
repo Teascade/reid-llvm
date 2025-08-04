@@ -12,7 +12,7 @@ use crate::{
     error_raporting::{ErrorModules, ReidError},
     mir::{
         pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, FunctionParam, SourceModuleId,
-        TypeDefinition, TypeKind,
+        StructType, TypeDefinition, TypeDefinitionKind, TypeKind,
     },
     parse_module,
 };
@@ -438,6 +438,22 @@ impl<'map> Pass for LinkerPass<'map> {
             context.modules.insert(module.module_id, module);
         }
 
+        Ok(())
+    }
+
+    fn module(&mut self, module: &mut Module, mut state: PassState<Self::Data, Self::TError>) -> PassResult {
+        let extern_types = &state.scope.data.extern_imported_types.get(&module.module_id);
+        if let Some(extern_types) = extern_types {
+            for ty in &mut module.typedefs {
+                match &mut ty.kind {
+                    TypeDefinitionKind::Struct(StructType(fields)) => {
+                        for field in fields {
+                            field.1 = field.1.update_imported(extern_types, module.module_id);
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
