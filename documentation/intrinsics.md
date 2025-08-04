@@ -73,6 +73,11 @@ Returns the larger of `a` and `b`.
 
 Returns the absolute value of `value`.
 
+#### `<T>::sqrt(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates the square-root of `value`
+
 #### `<T>::pow(value: T, exponent: T) -> T`
 *Note: (only on floating-point numbers)*
 
@@ -112,6 +117,11 @@ Calculates arccosine of `value`
 *Note: (only on floating-point numbers)*
 
 Calculates arctangent of `value`
+
+#### `<T>::atan2(value: T) -> T`
+*Note: (only on floating-point numbers)*
+
+Calculates 2-argument arctangent of `value`
 
 #### `<T>::sinh(value: T) -> T`
 *Note: (only on floating-point numbers)*

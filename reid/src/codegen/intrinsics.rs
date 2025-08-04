@@ -131,6 +131,12 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     }
     if ty.category() == TypeCategory::Real {
         intrinsics.push(simple_intrinsic(
+            "sqrt",
+            vec!["self"],
+            ty.clone(),
+            LLVMIntrinsicKind::Sqrt(ty.clone()),
+        ));
+        intrinsics.push(simple_intrinsic(
             "sin",
             vec!["self"],
             ty.clone(),
