@@ -1260,7 +1260,7 @@ impl mir::Expression {
 
                 let indices = struct_ty.0.iter().enumerate();
 
-                let load_n = format!("{:?}.load", key);
+                let load_n = format!("{}@{}.load", key.0, key.1);
 
                 let struct_ptr = scope
                     .allocate(&self.1, &TypeKind::CustomType(key.clone()))
@@ -1268,8 +1268,8 @@ impl mir::Expression {
                     .maybe_location(&mut scope.block, location.clone());
 
                 for (field_n, exp, _) in items {
-                    let gep_n = format!("{:?}.{}.gep", key, field_n);
-                    let store_n = format!("{:?}.{}.store", key, field_n);
+                    let gep_n = format!("{}@{}.{}.gep", key.0, key.1, field_n);
+                    let store_n = format!("{}@{}.{}.store", key.0, key.1, field_n);
                     let i = indices.clone().find(|(_, f)| f.0 == *field_n).unwrap().0;
 
                     let elem_ptr = scope
