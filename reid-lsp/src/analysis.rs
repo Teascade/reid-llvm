@@ -193,7 +193,10 @@ impl AnalysisState {
 
     pub fn new_symbol(&mut self, definition: usize, kind: SemanticKind) -> SymbolId {
         let id = SymbolId(self.symbol_table.len());
-        self.symbol_table.push(Symbol { kind, definition });
+        self.symbol_table.push(Symbol {
+            kind,
+            _definition: definition,
+        });
         id
     }
 
