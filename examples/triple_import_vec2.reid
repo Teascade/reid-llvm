@@ -1,2 +1,2 @@
 
-struct Vec2 { x: f32, y: f32 }
+struct Vec2 { x: u32, y: u32 }
