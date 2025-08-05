@@ -11,6 +11,7 @@ use crate::{
     codegen::intrinsics::LLVMIntrinsicKind,
     lexer::FullToken,
     mir::{
+        self,
         pass::{AssociatedFunctionKey, BinopKey},
         CustomTypeKey, FunctionParam, Metadata, SourceModuleId, TypeDefinition, TypeKind,
     },
@@ -20,7 +21,7 @@ use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
 
 pub struct Scope<'ctx, 'scope> {
     pub(super) context: &'ctx Context,
-    pub(super) modules: &'scope HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
+    pub(super) modules: &'scope HashMap<SourceModuleId, &'ctx mir::Module>,
     pub(super) tokens: &'ctx Vec<FullToken>,
     pub(super) module: &'ctx Module<'ctx>,
     pub(super) module_id: SourceModuleId,

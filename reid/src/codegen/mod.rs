@@ -62,10 +62,12 @@ impl mir::Context {
         let mut modules = HashMap::new();
         let mut modules_sorted = self.modules.iter().map(|(_, m)| m).collect::<Vec<_>>();
         modules_sorted.sort_by(|m1, m2| m2.module_id.cmp(&m1.module_id));
+        for module in &modules_sorted {
+            modules.insert(module.module_id, *module);
+        }
 
         for module in &modules_sorted {
             let codegen = module.codegen(context, modules.clone())?;
-            modules.insert(module.module_id, codegen);
         }
         Ok(CodegenContext { context })
     }
@@ -128,7 +130,7 @@ impl mir::Module {
     fn codegen<'ctx>(
         &'ctx self,
         context: &'ctx Context,
-        modules: HashMap<SourceModuleId, ModuleCodegen<'ctx>>,
+        modules: HashMap<SourceModuleId, &mir::Module>,
     ) -> Result<ModuleCodegen<'ctx>, ErrorKind> {
         let mut module = context.module(&self.name, self.is_main);
         let tokens = &self.tokens;
@@ -321,11 +323,12 @@ impl mir::Module {
                 .collect();
 
             let is_main = self.is_main && function.name == "main";
-            let module_prefix = if let Some(module) = function.source {
-                if module == self.module_id {
+            let module_prefix = if let Some(module_id) = function.source {
+                if module_id == self.module_id {
                     format!("reid.{}.", self.name)
                 } else {
-                    format!("reid.{}.", modules.get(&module).unwrap().name)
+                    dbg!(self.module_id, module_id);
+                    format!("reid.{}.", modules.get(&module_id).unwrap().name)
                 }
             } else {
                 format!("reid.intrinsic.")

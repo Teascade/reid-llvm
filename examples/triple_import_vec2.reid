@@ -1,2 +1,6 @@
 
-struct Vec2 { x: u32, y: u32 }
+struct Vec2 { x: f32, y: f32 }
+
+impl Vec2 {
+    pub fn zero() -> Vec2 { Vec2 { x: 0.0, y: 0.0 } }
+}

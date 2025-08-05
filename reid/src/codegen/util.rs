@@ -124,7 +124,7 @@ impl TypeKind {
         type_map: &HashMap<CustomTypeKey, TypeDefinition>,
         local_mod: SourceModuleId,
         tokens: &Vec<FullToken>,
-        modules: &HashMap<SourceModuleId, ModuleCodegen>,
+        modules: &HashMap<SourceModuleId, &mir::Module>,
     ) -> DebugTypeValue {
         if let Some(ty) = debug_types.get(self) {
             return *ty;
