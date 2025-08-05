@@ -1,7 +1,4 @@
-
+import triple_import_vec2::Vec2;
 import triple_import_ship::Ship;
 
-fn main() -> u32 {
-    let a = Ship::new();
-    return a.position.x;
-}
+fn main() -> i32 { return 0; }

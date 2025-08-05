@@ -60,13 +60,11 @@ pub enum ErrorKind {
 pub fn compile_std(module_map: &mut ErrorModules) -> Result<Module, ReidError> {
     let (id, tokens) = parse_module(STD_SOURCE, STD_NAME, None, module_map, None)?;
     let module = compile_module(id, tokens, module_map, None, false)?.map_err(|(_, e)| e)?;
-    dbg!(id, module.module_id);
 
     let module_id = module.module_id;
     let mut mir_context = super::Context::from(vec![module], Default::default());
 
     let std_compiled = mir_context.modules.remove(&module_id).unwrap();
-    dbg!(std_compiled.module_id);
     Ok(std_compiled)
 }
 
@@ -79,7 +77,7 @@ pub struct LinkerPass<'map> {
 
 #[derive(Default, Clone)]
 pub struct LinkerState {
-    foreign_types: HashMap<SourceModuleId, HashMap<String, SourceModuleId>>,
+    foreign_types: HashMap<SourceModuleId, HashMap<CustomTypeKey, SourceModuleId>>,
 }
 
 type LinkerPassState<'st, 'sc> = PassState<'st, 'sc, LinkerState, ErrorKind>;
@@ -276,7 +274,6 @@ impl<'map> Pass for LinkerPass<'map> {
             // 1. Import functions and find all types that are dependencies of
             //    functions
             for (name, (function_source, import_meta)) in &linker_module.function_imports {
-                dbg!(&name, &function_source, &modules.keys());
                 let mut function_module = modules.get(&function_source).unwrap().module.borrow_mut();
                 let func_module_name = function_module.name.clone();
                 let func_module_id = function_module.module_id;
@@ -338,7 +335,7 @@ impl<'map> Pass for LinkerPass<'map> {
             // 3. Recurse these types to find their true sources, find their
             //    dependencies, and list them all. Store manually imported types
             //    in a separate mapping for later.
-            let mut imported_types = HashSet::new();
+            let mut imported_types = HashMap::new();
             let mut foreign_keys = HashSet::new();
 
             let mut already_imported_binops = HashSet::new();
@@ -446,10 +443,13 @@ impl<'map> Pass for LinkerPass<'map> {
                         }
 
                         for inner_ty in assoc_function_types {
-                            dbg!(&inner_ty, &imported_module_id);
                             if inner_ty.1 != imported_module_id {
-                                let resolved = match resolve_types_recursively(&inner_ty, &modules, &mut HashSet::new())
-                                {
+                                let resolved = match resolve_types_recursively(
+                                    &inner_ty,
+                                    importer_module.module_id,
+                                    &modules,
+                                    &mut HashSet::new(),
+                                ) {
                                     Ok(ty) => ty,
                                     Err(e) => {
                                         state.note_errors(&vec![e], meta);
@@ -476,47 +476,39 @@ impl<'map> Pass for LinkerPass<'map> {
                         ));
                     }
                 }
-                let resolved = match resolve_types_recursively(&ty, &modules, &mut HashSet::new()) {
-                    Ok(ty) => ty,
-                    Err(e) => {
-                        state.note_errors(&vec![e], meta);
-                        return Ok(());
-                    }
-                };
+                let resolved =
+                    match resolve_types_recursively(&ty, importer_module.module_id, &modules, &mut HashSet::new()) {
+                        Ok(ty) => ty,
+                        Err(e) => {
+                            state.note_errors(&vec![e], meta);
+                            return Ok(());
+                        }
+                    };
                 imported_types.extend(resolved);
             }
 
             // 4. Import all listed types.
-            for typekey in &imported_types {
-                let imported_ty_module = modules.get(&typekey.1).unwrap().module.borrow();
-                if let Some(mut typedef) = imported_ty_module
+            for (importer_typekey, imported_module_id) in &imported_types {
+                let imported_ty_module = modules.get(&imported_module_id).unwrap().module.borrow();
+                let importee_typekey = CustomTypeKey(importer_typekey.0.clone(), *imported_module_id);
+                if let Some(typedef) = imported_ty_module
                     .typedefs
                     .iter()
-                    .find(|ty| CustomTypeKey(ty.name.clone(), ty.source_module) == *typekey)
+                    .find(|ty| CustomTypeKey(ty.name.clone(), ty.source_module) == importee_typekey)
                     .cloned()
                 {
-                    if foreign_keys.contains(&typekey) {
-                        typedef = TypeDefinition {
-                            importer: Some(importer_module.module_id),
-                            ..typedef
-                        };
-                    }
-
-                    importer_module.typedefs.push(typedef);
+                    importer_module.typedefs.push(TypeDefinition {
+                        importer: Some(importer_typekey.1),
+                        ..typedef
+                    });
                 }
-            }
-
-            // Set foreign types
-            let mut foreign_types = HashMap::new();
-            for key in imported_types {
-                foreign_types.insert(key.0.clone(), key.1);
             }
 
             state
                 .scope
                 .data
                 .foreign_types
-                .insert(importer_module.module_id, foreign_types);
+                .insert(importer_module.module_id, imported_types);
         }
 
         let mut modules: Vec<Module> = modules
@@ -598,7 +590,7 @@ impl<'map> Pass for LinkerPass<'map> {
                     *type_kind = type_kind.update_imported(foreign_types)
                 }
                 super::ExprKind::Struct(key, _) => {
-                    *key = if let Some(mod_id) = foreign_types.get(&key.0) {
+                    *key = if let Some(mod_id) = foreign_types.get(&key) {
                         CustomTypeKey(key.0.clone(), *mod_id)
                     } else {
                         key.clone()
@@ -612,14 +604,13 @@ impl<'map> Pass for LinkerPass<'map> {
 }
 
 impl TypeKind {
-    fn update_imported(&self, foreign_types: &HashMap<String, SourceModuleId>) -> TypeKind {
+    fn update_imported(&self, foreign_types: &HashMap<CustomTypeKey, SourceModuleId>) -> TypeKind {
         match &self {
             TypeKind::Array(type_kind, len) => {
                 TypeKind::Array(Box::new(type_kind.update_imported(foreign_types)), *len)
             }
             TypeKind::CustomType(custom_type_key) => {
-                dbg!(foreign_types, &custom_type_key);
-                if let Some(mod_id) = foreign_types.get(&custom_type_key.0) {
+                if let Some(mod_id) = foreign_types.get(&custom_type_key) {
                     TypeKind::CustomType(CustomTypeKey(custom_type_key.0.clone(), *mod_id))
                 } else {
                     self.clone()
@@ -672,17 +663,18 @@ fn resolve_type(
 
 fn resolve_types_recursively(
     ty: &CustomTypeKey,
+    resolver: SourceModuleId,
     modules: &HashMap<SourceModuleId, LinkerModule>,
     seen: &mut HashSet<CustomTypeKey>,
-) -> Result<Vec<CustomTypeKey>, ErrorKind> {
+) -> Result<HashMap<CustomTypeKey, SourceModuleId>, ErrorKind> {
     let resolved_ty = resolve_type(ty, modules)?;
 
     if seen.contains(&resolved_ty) {
         return Err(ErrorKind::CyclicalType(ty.0.clone()));
     }
-    let mut types = Vec::new();
+    let mut types = HashMap::new();
 
-    types.push(resolved_ty.clone());
+    types.insert(CustomTypeKey(ty.0.clone(), resolver), resolved_ty.1);
     seen.insert(resolved_ty.clone());
 
     let resolved = modules
@@ -700,7 +692,7 @@ fn resolve_types_recursively(
             for field in fields {
                 match &field.1 {
                     TypeKind::CustomType(ty_key) => {
-                        types.extend(resolve_types_recursively(ty_key, modules, seen)?);
+                        types.extend(resolve_types_recursively(ty_key, resolved_ty.1, modules, seen)?);
                     }
                     _ => {}
                 }
