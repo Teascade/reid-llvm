@@ -67,7 +67,7 @@ impl mir::Context {
         }
 
         for module in &modules_sorted {
-            let codegen = module.codegen(context, modules.clone())?;
+            module.codegen(context, modules.clone())?;
         }
         Ok(CodegenContext { context })
     }
@@ -75,7 +75,6 @@ impl mir::Context {
 
 #[derive(Clone)]
 struct ModuleCodegen<'ctx> {
-    name: String,
     module: Module<'ctx>,
 }
 
@@ -596,10 +595,7 @@ impl mir::Module {
             }
         }
 
-        Ok(ModuleCodegen {
-            name: self.name.clone(),
-            module,
-        })
+        Ok(ModuleCodegen { module })
     }
 }
 

@@ -1,8 +1,7 @@
-use std::{collections::HashMap, fmt::format, hash::Hash, path::PathBuf};
+use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
 use reid::{
     ast::{
-        self, FunctionDefinition,
         lexer::{FullToken, Token},
         token_stream::TokenRange,
     },

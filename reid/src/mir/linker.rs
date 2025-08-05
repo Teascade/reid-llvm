@@ -1,9 +1,8 @@
 use std::{
-    cell::{RefCell, RefMut},
+    cell::RefCell,
     collections::{HashMap, HashSet},
     convert::Infallible,
     fs::{self},
-    hash::Hash,
     path::PathBuf,
     rc::Rc,
 };
@@ -12,8 +11,8 @@ use crate::{
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, FunctionParam, SourceModuleId,
-        StructType, TypeDefinition, TypeDefinitionKind, TypeKind,
+        pass::BinopKey, BinopDefinition, CustomTypeKey, FunctionDefinitionKind, SourceModuleId, StructType,
+        TypeDefinition, TypeDefinitionKind, TypeKind,
     },
     parse_module,
 };

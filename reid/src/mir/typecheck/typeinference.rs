@@ -14,8 +14,8 @@ use crate::{
     mir::{
         implement::TypeCategory,
         pass::{AssociatedFunctionKey, ScopeVariable},
-        BinopDefinition, Block, CustomTypeKey, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind,
-        IfExpression, Module, ReturnKind, StmtKind, TypeKind, VagueType, WhileStatement,
+        BinopDefinition, Block, ExprKind, Expression, FunctionDefinition, FunctionDefinitionKind, IfExpression, Module,
+        ReturnKind, StmtKind, TypeKind, VagueType, WhileStatement,
     },
     util::try_all,
 };
@@ -685,7 +685,7 @@ impl Expression {
                 // Provide function return type
                 Ok(type_refs.from_type(&fn_call.ret).unwrap())
             }
-            ExprKind::GlobalRef(global_value, type_kind) => Ok(self
+            ExprKind::GlobalRef(..) => Ok(self
                 .return_type(type_refs.types, state.scope.module_id.unwrap())
                 .map(|r| type_refs.from_type(&r.1).unwrap())
                 .unwrap()),

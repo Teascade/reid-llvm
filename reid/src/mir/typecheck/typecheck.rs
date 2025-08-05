@@ -84,7 +84,7 @@ impl<'t> Pass for TypeCheck<'t> {
 fn check_typedefs_for_recursion<'a, 'b>(
     defmap: &'b HashMap<&'a String, &'b TypeDefinition>,
     typedef: &'b TypeDefinition,
-    mut seen: HashSet<String>,
+    seen: HashSet<String>,
     state: &mut TypecheckPassState,
 ) {
     match &typedef.kind {
@@ -194,7 +194,7 @@ impl FunctionDefinitionKind {
                 block.typecheck(&mut state.inner(), &typerefs, hint.into())
             }
             FunctionDefinitionKind::Extern(_) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
-            FunctionDefinitionKind::Intrinsic(intrinsic) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
+            FunctionDefinitionKind::Intrinsic(_) => Ok((ReturnKind::Soft, TypeKind::Vague(Vague::Unknown))),
         }
     }
 }
@@ -771,7 +771,7 @@ impl Expression {
                     Ok(function_call.return_type.clone().resolve_ref(typerefs))
                 }
             }
-            ExprKind::GlobalRef(global_value, type_kind) => Ok(self
+            ExprKind::GlobalRef(..) => Ok(self
                 .return_type(typerefs, state.scope.module_id.unwrap())
                 .map(|r| r.1)
                 .unwrap()),

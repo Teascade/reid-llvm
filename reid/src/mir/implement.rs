@@ -1,5 +1,3 @@
-use reid_lib::builder::TypeValue;
-
 use crate::util::maybe;
 
 use super::{typecheck::typerefs::TypeRefs, *};

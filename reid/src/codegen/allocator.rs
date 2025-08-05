@@ -5,7 +5,7 @@ use reid_lib::{
     Block, Instr,
 };
 
-use mir::{CustomTypeKey, FunctionCall, FunctionDefinitionKind, IfExpression, TypeKind, WhileStatement};
+use mir::{CustomTypeKey, FunctionDefinitionKind, IfExpression, TypeKind, WhileStatement};
 
 use crate::mir::{self, FunctionParam, Metadata, SourceModuleId};
 

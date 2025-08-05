@@ -17,7 +17,7 @@ use crate::{
     },
 };
 
-use super::{allocator::Allocator, ErrorKind, IntrinsicFunction, ModuleCodegen};
+use super::{allocator::Allocator, ErrorKind, IntrinsicFunction};
 
 pub struct Scope<'ctx, 'scope> {
     pub(super) context: &'ctx Context,

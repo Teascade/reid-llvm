@@ -14,10 +14,7 @@ use crate::{
     mir::{self, CustomTypeKey, Metadata, SourceModuleId, TypeDefinition, TypeDefinitionKind, TypeKind, VagueLiteral},
 };
 
-use super::{
-    scope::{Debug, Scope},
-    ModuleCodegen,
-};
+use super::scope::{Debug, Scope};
 
 impl mir::CmpOperator {
     pub(super) fn predicate(&self) -> CmpPredicate {

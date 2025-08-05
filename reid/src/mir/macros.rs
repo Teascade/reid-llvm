@@ -177,12 +177,7 @@ impl mir::Expression {
                 globals.extend(expression.gen_macros(data, state, map));
                 globals.extend(expression1.gen_macros(data, state, map));
             }
-            mir::ExprKind::AssociatedFunctionCall(
-                _,
-                FunctionCall {
-                    parameters, is_macro, ..
-                },
-            ) => {
+            mir::ExprKind::AssociatedFunctionCall(_, FunctionCall { parameters, .. }) => {
                 for expression in parameters {
                     globals.extend(expression.gen_macros(data, state, map));
                 }
