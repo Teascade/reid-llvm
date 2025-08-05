@@ -217,7 +217,7 @@ impl AnalysisState {
 #[derive(Debug, Clone)]
 pub struct Symbol {
     pub kind: SemanticKind,
-    pub definition: usize,
+    pub _definition: usize,
 }
 
 pub struct AnalysisScope<'a> {

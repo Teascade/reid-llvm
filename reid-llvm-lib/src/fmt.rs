@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    CmpPredicate, Context, Instr, InstructionData, TerminatorKind, Type,
+    CmpPredicate, Context, Instr, InstructionData, TerminatorKind,
     builder::*,
     debug_information::{
         DebugArrayType, DebugBasicType, DebugFieldType, DebugInformation, DebugLocalVariable, DebugLocation,
