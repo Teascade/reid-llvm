@@ -546,11 +546,9 @@ impl<'map> Pass for LinkerPass<'map> {
         let mod_id = state.scope.module_id.unwrap();
         let foreign_types = &state.scope.data.foreign_types.get(&mod_id);
         if let Some(foreign_types) = foreign_types {
-            dbg!(state.scope.module_id, foreign_types, &function.parameters);
             function.return_type = function.return_type.update_imported(*foreign_types);
             for param in function.parameters.iter_mut() {
                 param.ty = param.ty.update_imported(foreign_types);
-                dbg!(&param.ty);
             }
         }
         Ok(())

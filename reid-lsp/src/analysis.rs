@@ -9,8 +9,8 @@ use reid::{
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        self, Context, CustomTypeKey, FunctionCall, FunctionParam, IfExpression, Metadata, SourceModuleId, StructType,
-        TypeKind, WhileStatement, typecheck::typerefs::TypeRefs,
+        self, Context, CustomTypeKey, FunctionCall, FunctionDefinitionKind, FunctionParam, IfExpression, Metadata,
+        SourceModuleId, StructType, TypeKind, WhileStatement, typecheck::typerefs::TypeRefs,
     },
     perform_all_passes,
 };
@@ -131,6 +131,7 @@ pub struct AnalysisState {
     pub symbol_to_token: HashMap<SymbolId, usize>,
 
     module_id: SourceModuleId,
+    module_name: String,
 
     functions: HashMap<String, SymbolId>,
     associated_functions: HashMap<(TypeKind, String), SymbolId>,
@@ -415,6 +416,7 @@ pub fn analyze_context(
         properties: HashMap::new(),
         types: HashMap::new(),
         module_id: module.module_id,
+        module_name: module.name.clone().replace(".reid", ""),
     };
 
     let mut scope = AnalysisScope {
@@ -474,47 +476,7 @@ pub fn analyze_context(
         }
     }
 
-    for import in &module.imports {
-        scope.state.init_types(&import.1, None);
-        if let Some((module_name, _)) = import.0.get(0) {
-            let (import_name, import_meta) = import.0.get(1).cloned().unwrap_or((
-                String::new(),
-                mir::Metadata {
-                    source_module_id: module.module_id,
-                    range: reid::ast::token_stream::TokenRange {
-                        start: import.1.range.end - 1,
-                        end: import.1.range.end - 1,
-                    },
-                    position: None,
-                },
-            ));
-            let mut autocompletes = Vec::new();
-
-            if let Some((_, module)) = context.modules.iter().find(|m| m.1.name == *module_name) {
-                for function in &module.functions {
-                    if !function.is_pub {
-                        continue;
-                    }
-                    if function.name.starts_with(&import_name) {
-                        autocompletes.push(Autocomplete {
-                            text: function.name.clone(),
-                            kind: AutocompleteKind::Function(function.parameters.clone(), function.return_type.clone()),
-                        });
-                    }
-                }
-                for typedef in &module.typedefs {
-                    if typedef.name.starts_with(&import_name) {
-                        autocompletes.push(Autocomplete {
-                            text: typedef.name.clone(),
-                            kind: AutocompleteKind::Type,
-                        });
-                    }
-                }
-            }
-            scope.state.set_autocomplete(import_meta.range.end, autocompletes);
-        }
-    }
-
+    // First we need to initialize symbols for all types themselves correctly
     for typedef in &module.typedefs {
         if typedef.source_module != module.module_id {
             if let Some(state) = map.get(&typedef.source_module) {
@@ -565,6 +527,47 @@ pub fn analyze_context(
                         ),
                         field_symbol,
                     );
+                }
+            }
+        }
+    }
+
+    // Afterwards we can try to assign types correctly to the fields of structs
+    for typedef in &module.typedefs {
+        if typedef.source_module != module.module_id {
+            continue;
+        }
+
+        match &typedef.kind {
+            mir::TypeDefinitionKind::Struct(StructType(fields)) => {
+                for field in fields {
+                    let field_idx = scope
+                        .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
+                        .unwrap_or(field.2.range.end);
+
+                    let field_ty_idx = scope
+                        .token_idx(&field.2.after(field_idx + 1), |t| matches!(t, Token::Identifier(_)))
+                        .unwrap_or(field.2.range.end);
+                    let field_ty_symbol = if let Some((source_id, symbol_id)) = scope.types.get(&field.1) {
+                        scope
+                            .state
+                            .new_symbol(field_ty_idx, SemanticKind::Reference(*source_id, *symbol_id))
+                    } else {
+                        scope.state.new_symbol(field_ty_idx, SemanticKind::Type)
+                    };
+
+                    scope.state.init_types(
+                        &Metadata {
+                            source_module_id: field.2.source_module_id,
+                            range: TokenRange {
+                                start: field_ty_idx,
+                                end: field_ty_idx,
+                            },
+                            position: None,
+                        },
+                        Some(field.1.clone()),
+                    );
+                    scope.state.set_symbol(field_ty_idx, field_ty_symbol);
                 }
             }
         }
@@ -627,18 +630,7 @@ pub fn analyze_context(
 
         let mut inner_scope = scope.inner();
 
-        for param in &function.parameters {
-            inner_scope.state.init_types(&param.meta, Some(param.ty.clone()));
-
-            if param.meta.source_module_id == module.module_id {
-                let param_idx = inner_scope
-                    .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
-                    .unwrap_or(function.signature().range.end);
-                let param_symbol = inner_scope.state.new_symbol(param_idx, SemanticKind::Variable);
-                inner_scope.state.set_symbol(param_idx, param_symbol);
-                inner_scope.variables.insert(param.name.clone(), param_symbol);
-            }
-        }
+        analyze_function_parameters(context, module, function, &mut inner_scope);
 
         match &function.kind {
             mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
@@ -683,17 +675,7 @@ pub fn analyze_context(
 
         let mut inner_scope = scope.inner();
 
-        for param in &function.parameters {
-            inner_scope.state.init_types(&param.meta, Some(param.ty.clone()));
-            if param.meta.source_module_id == module.module_id {
-                let idx = inner_scope
-                    .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
-                    .unwrap_or(function.signature().range.end);
-                let symbol = inner_scope.state.new_symbol(idx, SemanticKind::Variable);
-                inner_scope.state.set_symbol(idx, symbol);
-                inner_scope.variables.insert(param.name.clone(), symbol);
-            }
-        }
+        analyze_function_parameters(context, module, function, &mut inner_scope);
 
         match &function.kind {
             mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
@@ -702,10 +684,114 @@ pub fn analyze_context(
         };
     }
 
+    for import in &module.imports {
+        scope.state.init_types(&import.1, None);
+        if let Some((module_name, _)) = import.0.get(0) {
+            let module_idx = scope
+                .token_idx(&import.1, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(import.1.range.end - 1);
+            let import_idx = scope
+                .token_idx(&import.1.after(module_idx + 1), |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(import.1.range.end - 1);
+
+            let (import_name, import_meta) = import.0.get(1).cloned().unwrap_or((
+                String::new(),
+                mir::Metadata {
+                    source_module_id: module.module_id,
+                    range: reid::ast::token_stream::TokenRange {
+                        start: import_idx,
+                        end: import_idx,
+                    },
+                    position: None,
+                },
+            ));
+            let mut autocompletes = Vec::new();
+
+            if let Some((_, module)) = context.modules.iter().find(|m| m.1.name == *module_name) {
+                for function in &module.functions {
+                    if !function.is_pub {
+                        continue;
+                    }
+                    if function.name.starts_with(&import_name) {
+                        autocompletes.push(Autocomplete {
+                            text: function.name.clone(),
+                            kind: AutocompleteKind::Function(function.parameters.clone(), function.return_type.clone()),
+                        });
+                    }
+                }
+                for typedef in &module.typedefs {
+                    if typedef.name.starts_with(&import_name) {
+                        autocompletes.push(Autocomplete {
+                            text: typedef.name.clone(),
+                            kind: AutocompleteKind::Type,
+                        });
+                    }
+                }
+            }
+
+            let symbol = if let Some((source_id, symbol_id)) = scope.functions.get(&import_name) {
+                scope
+                    .state
+                    .new_symbol(import_idx, SemanticKind::Reference(*source_id, *symbol_id))
+            } else if let Some(module_source) = scope.map.values().find(|s| s.module_name == *module_name) {
+                if let Some((source_id, symbol_id)) = scope.types.get(&TypeKind::CustomType(CustomTypeKey(
+                    import_name.clone(),
+                    module_source.module_id,
+                ))) {
+                    scope
+                        .state
+                        .new_symbol(import_idx, SemanticKind::Reference(*source_id, *symbol_id))
+                } else {
+                    scope.state.new_symbol(import_idx, SemanticKind::Default)
+                }
+            } else {
+                scope.state.new_symbol(import_idx, SemanticKind::Default)
+            };
+            scope.state.set_symbol(import_idx, symbol);
+
+            scope.state.set_autocomplete(import_meta.range.end, autocompletes);
+        }
+    }
+
     StaticAnalysis {
         tokens: module.tokens.clone(),
         state,
         error,
+    }
+}
+
+pub fn analyze_function_parameters(
+    context: &mir::Context,
+    module: &mir::Module,
+    function: &mir::FunctionDefinition,
+    scope: &mut AnalysisScope,
+) {
+    for param in &function.parameters {
+        scope.state.init_types(&param.meta, Some(param.ty.clone()));
+
+        if param.meta.source_module_id == module.module_id {
+            let param_var_idx = scope
+                .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
+                .unwrap_or(function.signature().range.end);
+            let param_var_symbol = scope.state.new_symbol(param_var_idx, SemanticKind::Variable);
+            scope.state.set_symbol(param_var_idx, param_var_symbol);
+            scope.variables.insert(param.name.clone(), param_var_symbol);
+
+            let param_ty_idx = scope
+                .token_idx(&param.meta.after(param_var_idx + 1), |t| {
+                    matches!(t, Token::Identifier(_))
+                })
+                .unwrap_or(function.signature().range.end);
+
+            let param_ty_symbol = scope.state.new_symbol(
+                param_ty_idx,
+                match scope.types.get(&param.ty) {
+                    Some((source_id, symbol_id)) => SemanticKind::Reference(*source_id, *symbol_id),
+                    None => SemanticKind::Type,
+                },
+            );
+            scope.state.set_symbol(param_ty_idx, param_ty_symbol);
+        }
     }
 }
 
@@ -733,6 +819,21 @@ pub fn analyze_block(
                 let symbol = scope.state.new_symbol(idx, SemanticKind::Variable);
                 scope.state.set_symbol(idx, symbol);
                 scope.variables.insert(named_variable_ref.1.clone(), symbol);
+
+                let ty_idx = scope.token_idx(&named_variable_ref.2.after(idx + 1), |t| {
+                    matches!(t, Token::Identifier(_))
+                });
+                dbg!(ty_idx);
+                if let Some(ty_idx) = ty_idx {
+                    let ty_symbol = if let Some((source_id, symbol_id)) = scope.types.get(&named_variable_ref.0) {
+                        scope
+                            .state
+                            .new_symbol(ty_idx, SemanticKind::Reference(*source_id, *symbol_id))
+                    } else {
+                        scope.state.new_symbol(ty_idx, SemanticKind::Type)
+                    };
+                    scope.state.set_symbol(ty_idx, ty_symbol);
+                }
 
                 analyze_expr(context, source_module, expression, scope);
             }
@@ -859,10 +960,10 @@ pub fn analyze_expr(
                 .token_idx(&expr.1, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(expr.1.range.end);
 
-            let struct_symbol = if let Some(symbol_id) = scope.state.types.get(&struct_type) {
+            let struct_symbol = if let Some((source_id, symbol_id)) = scope.types.get(&struct_type) {
                 scope
                     .state
-                    .new_symbol(struct_idx, SemanticKind::Reference(source_module.module_id, *symbol_id))
+                    .new_symbol(struct_idx, SemanticKind::Reference(*source_id, *symbol_id))
             } else {
                 scope.state.new_symbol(struct_idx, SemanticKind::Struct)
             };

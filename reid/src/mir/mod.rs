@@ -55,6 +55,28 @@ impl Metadata {
     pub fn contains(&self, token_idx: usize) -> bool {
         return token_idx >= self.range.start && token_idx <= self.range.end;
     }
+
+    pub fn after(&self, cutoff: usize) -> Metadata {
+        Metadata {
+            source_module_id: self.source_module_id,
+            range: TokenRange {
+                start: cutoff.max(self.range.start),
+                end: cutoff.max(self.range.end),
+            },
+            position: None,
+        }
+    }
+
+    pub fn before(&self, cutoff: usize) -> Metadata {
+        Metadata {
+            source_module_id: self.source_module_id,
+            range: TokenRange {
+                start: cutoff.min(self.range.start),
+                end: cutoff.min(self.range.end),
+            },
+            position: None,
+        }
+    }
 }
 
 impl std::ops::Add for Metadata {
