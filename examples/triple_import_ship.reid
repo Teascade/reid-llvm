@@ -1,3 +1,6 @@
 import triple_import_vec2::Vec2;
 
-struct Ship { position: Vec2 }
+struct Ship {
+    position: Vec2,
+    velocity: Vec2,
+ }

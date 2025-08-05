@@ -447,7 +447,7 @@ impl<'map> Pass for LinkerPass<'map> {
                                     &inner_ty,
                                     importer_module.module_id,
                                     &modules,
-                                    &mut HashSet::new(),
+                                    HashSet::new(),
                                 ) {
                                     Ok(ty) => ty,
                                     Err(e) => {
@@ -475,14 +475,14 @@ impl<'map> Pass for LinkerPass<'map> {
                         ));
                     }
                 }
-                let resolved =
-                    match resolve_types_recursively(&ty, importer_module.module_id, &modules, &mut HashSet::new()) {
-                        Ok(ty) => ty,
-                        Err(e) => {
-                            state.note_errors(&vec![e], meta);
-                            return Ok(());
-                        }
-                    };
+                let resolved = match resolve_types_recursively(&ty, importer_module.module_id, &modules, HashSet::new())
+                {
+                    Ok(ty) => ty,
+                    Err(e) => {
+                        state.note_errors(&vec![e], meta);
+                        return Ok(());
+                    }
+                };
                 imported_types.extend(resolved);
             }
 
@@ -664,7 +664,7 @@ fn resolve_types_recursively(
     ty: &CustomTypeKey,
     resolver: SourceModuleId,
     modules: &HashMap<SourceModuleId, LinkerModule>,
-    seen: &mut HashSet<CustomTypeKey>,
+    mut seen: HashSet<CustomTypeKey>,
 ) -> Result<HashMap<CustomTypeKey, SourceModuleId>, ErrorKind> {
     let resolved_ty = resolve_type(ty, modules)?;
 
@@ -691,7 +691,7 @@ fn resolve_types_recursively(
             for field in fields {
                 match &field.1 {
                     TypeKind::CustomType(ty_key) => {
-                        types.extend(resolve_types_recursively(ty_key, resolved_ty.1, modules, seen)?);
+                        types.extend(resolve_types_recursively(ty_key, resolved_ty.1, modules, seen.clone())?);
                     }
                     _ => {}
                 }
