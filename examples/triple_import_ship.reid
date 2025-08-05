@@ -2,5 +2,8 @@ import triple_import_vec2::Vec2;
 
 struct Ship {
     position: Vec2,
-    velocity: Vec2,
- }
+}
+
+impl Ship {
+    pub fn foo(&self, vec: Vec2) {}
+}

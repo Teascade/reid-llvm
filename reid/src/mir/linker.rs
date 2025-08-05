@@ -543,14 +543,14 @@ impl<'map> Pass for LinkerPass<'map> {
         function: &mut FunctionDefinition,
         state: PassState<Self::Data, Self::TError>,
     ) -> PassResult {
-        if matches!(function.kind, FunctionDefinitionKind::Local(_, _)) {
-            let mod_id = state.scope.module_id.unwrap();
-            let foreign_types = &state.scope.data.foreign_types.get(&mod_id);
-            if let Some(foreign_types) = foreign_types {
-                function.return_type = function.return_type.update_imported(*foreign_types);
-                for param in function.parameters.iter_mut() {
-                    param.ty = param.ty.update_imported(foreign_types);
-                }
+        let mod_id = state.scope.module_id.unwrap();
+        let foreign_types = &state.scope.data.foreign_types.get(&mod_id);
+        if let Some(foreign_types) = foreign_types {
+            dbg!(state.scope.module_id, foreign_types, &function.parameters);
+            function.return_type = function.return_type.update_imported(*foreign_types);
+            for param in function.parameters.iter_mut() {
+                param.ty = param.ty.update_imported(foreign_types);
+                dbg!(&param.ty);
             }
         }
         Ok(())
@@ -585,8 +585,9 @@ impl<'map> Pass for LinkerPass<'map> {
                 super::ExprKind::Borrow(..) => {}
                 super::ExprKind::Deref(..) => {}
                 super::ExprKind::CastTo(_, type_kind) => *type_kind = type_kind.update_imported(foreign_types),
-                super::ExprKind::AssociatedFunctionCall(type_kind, _) => {
-                    *type_kind = type_kind.update_imported(foreign_types)
+                super::ExprKind::AssociatedFunctionCall(type_kind, fn_call) => {
+                    *type_kind = type_kind.update_imported(foreign_types);
+                    fn_call.return_type = fn_call.return_type.update_imported(foreign_types);
                 }
                 super::ExprKind::Struct(key, _) => {
                     *key = if let Some(mod_id) = foreign_types.get(&key) {
