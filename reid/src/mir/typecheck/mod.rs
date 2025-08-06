@@ -333,7 +333,7 @@ impl TypeKind {
                     .map(|_| ())
                     .ok_or(ErrorKind::NoSuchType(
                         custom_type_key.0.clone(),
-                        state.module_id.unwrap(),
+                        custom_type_key.1.clone(),
                     ))
             }
             TypeKind::Borrow(type_kind, _) => type_kind.is_known(state),

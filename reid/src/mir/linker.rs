@@ -325,11 +325,30 @@ impl<'map> Pass for LinkerPass<'map> {
             // 2. Add all manually imported types to the list of types that need
             //    to be resolved and recursed
             for (name, (source_module, meta)) in &linker_module.type_imports {
-                unresolved_types.insert(
-                    CustomTypeKey(name.clone(), source_module.clone()),
-                    (meta.clone(), false),
-                );
+                let imported_ty_key = CustomTypeKey(name.clone(), source_module.clone());
+
+                let imported_ty = TypeKind::CustomType(imported_ty_key.clone());
+                let imported = modules.get(&imported_ty_key.1).unwrap().module.borrow();
+
+                for (ty, func) in &imported.associated_functions {
+                    if *ty != imported_ty {
+                        continue;
+                    }
+
+                    for ty in import_type(&func.return_type) {
+                        unresolved_types.insert(ty, (meta.clone(), true));
+                    }
+                    for param in &func.parameters {
+                        for ty in import_type(&param.ty) {
+                            unresolved_types.insert(ty, (meta.clone(), true));
+                        }
+                    }
+                }
+
+                unresolved_types.insert(imported_ty_key.clone(), (meta.clone(), false));
             }
+
+            dbg!(&importer_module.module_id, &unresolved_types);
 
             // 3. Recurse these types to find their true sources, find their
             //    dependencies, and list them all. Store manually imported types
@@ -429,36 +448,6 @@ impl<'map> Pass for LinkerPass<'map> {
                             }
                         }
 
-                        let mut assoc_function_types = HashSet::new();
-                        let types = import_type(&func.return_type);
-                        let return_type = func.return_type.clone();
-                        assoc_function_types.extend(types);
-
-                        let mut param_tys = Vec::new();
-                        for param in &func.parameters {
-                            let types = import_type(&param.ty);
-                            assoc_function_types.extend(types);
-                            param_tys.push(param.clone());
-                        }
-
-                        for inner_ty in assoc_function_types {
-                            if inner_ty.1 != imported_module_id {
-                                let resolved = match resolve_types_recursively(
-                                    &inner_ty,
-                                    importer_module.module_id,
-                                    &modules,
-                                    HashSet::new(),
-                                ) {
-                                    Ok(ty) => ty,
-                                    Err(e) => {
-                                        state.note_errors(&vec![e], meta);
-                                        return Ok(());
-                                    }
-                                };
-                                imported_types.extend(resolved);
-                            }
-                        }
-
                         importer_module.associated_functions.push((
                             ty.clone(),
                             FunctionDefinition {
@@ -466,8 +455,8 @@ impl<'map> Pass for LinkerPass<'map> {
                                 linkage_name: Some(format!("{}::{}", ty, func_name)),
                                 is_pub: false,
                                 is_imported: false,
-                                return_type,
-                                parameters: param_tys,
+                                return_type: func.return_type.clone(),
+                                parameters: func.parameters.clone(),
                                 kind: super::FunctionDefinitionKind::Extern(true),
                                 source: Some(imported_module_id),
                                 signature_meta: func.signature_meta,
@@ -475,16 +464,20 @@ impl<'map> Pass for LinkerPass<'map> {
                         ));
                     }
                 }
-                let resolved = match resolve_types_recursively(&ty, importer_module.module_id, &modules, HashSet::new())
-                {
-                    Ok(ty) => ty,
+
+                let resolved = match resolve_type(&ty, &modules) {
+                    Ok(ty) => ty.clone(),
                     Err(e) => {
                         state.note_errors(&vec![e], meta);
                         return Ok(());
                     }
                 };
-                imported_types.extend(resolved);
+
+                imported_types.insert(CustomTypeKey(ty.0.clone(), importer_module.module_id), resolved.1);
+                imported_types.insert(ty, resolved.1);
             }
+
+            dbg!(&imported_types);
 
             // 4. Import all listed types.
             for (importer_typekey, imported_module_id) in &imported_types {
