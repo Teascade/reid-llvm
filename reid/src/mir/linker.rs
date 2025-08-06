@@ -686,7 +686,9 @@ fn resolve_types_recursively(
                 return Err(ErrorKind::CyclicalType(type_key.0.clone()));
             }
 
-            types.insert(type_key.clone(), resolved_ty.1);
+            if type_key.1 != resolved_ty.1 {
+                types.insert(type_key.clone(), resolved_ty.1);
+            }
             seen.insert(resolved_ty.clone());
 
             let resolved = modules

@@ -125,6 +125,17 @@ impl mir::GlobalKind {
     }
 }
 
+fn get_typekey(ty: &TypeKind) -> Option<CustomTypeKey> {
+    match ty {
+        TypeKind::Array(type_kind, _) => get_typekey(type_kind.as_ref()),
+        TypeKind::CustomType(custom_type_key) => Some(custom_type_key.clone()),
+        TypeKind::Borrow(type_kind, _) => get_typekey(type_kind.as_ref()),
+        TypeKind::UserPtr(type_kind) => get_typekey(type_kind.as_ref()),
+        TypeKind::CodegenPtr(type_kind) => get_typekey(type_kind.as_ref()),
+        _ => None,
+    }
+}
+
 impl mir::Module {
     fn codegen<'ctx>(
         &'ctx self,
@@ -186,33 +197,35 @@ impl mir::Module {
         // somewhat easily sort the type-definitions such that we can process
         // the ones with no depencencies first, and later the ones that depend
         // on the earlier ones.
-        let mut typekeys_seen = HashSet::new();
-        let mut typedefs_sorted = Vec::new();
+        let mut typekeys_seen: HashSet<CustomTypeKey> = HashSet::new();
+        let mut typedefs_sorted: Vec<TypeDefinition> = Vec::new();
         let mut typedefs_left = self.typedefs.clone();
-        typedefs_left.reverse();
         while let Some(typedef) = typedefs_left.pop() {
-            match &typedef.kind {
+            let is_ok = match &typedef.kind {
                 TypeDefinitionKind::Struct(StructType(fields)) => {
-                    let mut is_ok = true;
-                    for field in fields {
-                        match &field.1 {
-                            TypeKind::CustomType(type_key) => {
-                                if !typekeys_seen.contains(type_key) {
-                                    is_ok = false;
-                                    break;
+                    let mut field_iter = fields.iter();
+                    loop {
+                        if let Some(field) = field_iter.next() {
+                            if let Some(key) = get_typekey(&field.1) {
+                                if typekeys_seen.contains(&key) {
+                                    break true;
+                                } else {
+                                    break false;
                                 }
                             }
-                            _ => {}
+                        } else {
+                            break true;
                         }
-                    }
-                    if is_ok {
-                        typekeys_seen.insert(CustomTypeKey(typedef.name.clone(), typedef.source_module));
-                        typedefs_sorted.push(typedef);
-                    } else {
-                        typedefs_left.insert(0, typedef.clone());
                     }
                 }
             };
+
+            if is_ok {
+                typekeys_seen.insert(CustomTypeKey(typedef.name.clone(), typedef.source_module));
+                typedefs_sorted.push(typedef);
+            } else {
+                typedefs_left.insert(0, typedef.clone());
+            }
         }
 
         for typedef in typedefs_sorted {
