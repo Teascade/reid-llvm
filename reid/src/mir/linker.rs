@@ -373,6 +373,10 @@ impl<'map> Pass for LinkerPass<'map> {
                             return Ok(());
                         }
                     };
+                    imported_types.insert(
+                        CustomTypeKey(ty.0.clone(), importer_module.module_id),
+                        imported_ty_key.1,
+                    );
 
                     let mut imported = modules.get(&imported_ty_key.1).unwrap().module.borrow_mut();
                     let imported_module_name = imported.name.clone();
@@ -473,7 +477,6 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 };
 
-                imported_types.insert(CustomTypeKey(ty.0.clone(), importer_module.module_id), resolved.1);
                 imported_types.insert(ty, resolved.1);
             }
 
