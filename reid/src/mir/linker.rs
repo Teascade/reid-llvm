@@ -373,10 +373,20 @@ impl<'map> Pass for LinkerPass<'map> {
                             return Ok(());
                         }
                     };
-                    imported_types.insert(
-                        CustomTypeKey(ty.0.clone(), importer_module.module_id),
-                        imported_ty_key.1,
-                    );
+
+                    match resolve_types_recursively(
+                        &TypeKind::CustomType(CustomTypeKey(ty.0.clone(), importer_module.module_id)),
+                        &modules,
+                        HashSet::new(),
+                    ) {
+                        Ok(resolved) => {
+                            imported_types.extend(resolved);
+                        }
+                        Err(e) => {
+                            state.note_errors(&vec![e], meta);
+                            return Ok(());
+                        }
+                    }
 
                     let mut imported = modules.get(&imported_ty_key.1).unwrap().module.borrow_mut();
                     let imported_module_name = imported.name.clone();
@@ -469,15 +479,22 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
 
-                let resolved = match resolve_type(&ty, &modules) {
-                    Ok(ty) => ty.clone(),
+                match resolve_types_recursively(&TypeKind::CustomType(ty.clone()), &modules, HashSet::new()) {
+                    Ok(resolved) => {
+                        imported_types.extend(resolved);
+                    }
                     Err(e) => {
                         state.note_errors(&vec![e], meta);
                         return Ok(());
                     }
-                };
-
-                imported_types.insert(ty, resolved.1);
+                }
+                // let resolved = match resolve_type(&ty, &modules) {
+                //     Ok(ty) => ty.clone(),
+                //     Err(e) => {
+                //         state.note_errors(&vec![e], meta);
+                //         return Ok(());
+                //     }
+                // };
             }
 
             dbg!(&imported_types);
@@ -656,43 +673,45 @@ fn resolve_type(
 }
 
 fn resolve_types_recursively(
-    ty: &CustomTypeKey,
-    resolver: SourceModuleId,
+    ty: &TypeKind,
     modules: &HashMap<SourceModuleId, LinkerModule>,
     mut seen: HashSet<CustomTypeKey>,
 ) -> Result<HashMap<CustomTypeKey, SourceModuleId>, ErrorKind> {
-    let resolved_ty = resolve_type(ty, modules)?;
-
-    if seen.contains(&resolved_ty) {
-        return Err(ErrorKind::CyclicalType(ty.0.clone()));
-    }
     let mut types = HashMap::new();
+    match ty {
+        TypeKind::CustomType(type_key) => {
+            let resolved_ty = resolve_type(type_key, modules)?;
 
-    types.insert(CustomTypeKey(ty.0.clone(), resolver), resolved_ty.1);
-    seen.insert(resolved_ty.clone());
+            if seen.contains(&resolved_ty) {
+                return Err(ErrorKind::CyclicalType(type_key.0.clone()));
+            }
 
-    let resolved = modules
-        .get(&resolved_ty.1)
-        .unwrap()
-        .module
-        .borrow()
-        .typedefs
-        .iter()
-        .find(|t| t.name == resolved_ty.0)
-        .ok_or(ErrorKind::NoSuchTypeInModule(ty.clone()))
-        .cloned()?;
-    match resolved.kind {
-        TypeDefinitionKind::Struct(StructType(fields)) => {
-            for field in fields {
-                match &field.1 {
-                    TypeKind::CustomType(ty_key) => {
-                        types.extend(resolve_types_recursively(ty_key, resolved_ty.1, modules, seen.clone())?);
+            types.insert(type_key.clone(), resolved_ty.1);
+            seen.insert(resolved_ty.clone());
+
+            let resolved = modules
+                .get(&resolved_ty.1)
+                .unwrap()
+                .module
+                .borrow()
+                .typedefs
+                .iter()
+                .find(|t| t.name == resolved_ty.0)
+                .ok_or(ErrorKind::NoSuchTypeInModule(type_key.clone()))
+                .cloned()?;
+            match resolved.kind {
+                TypeDefinitionKind::Struct(StructType(fields)) => {
+                    for field in fields {
+                        types.extend(resolve_types_recursively(&field.1, modules, seen.clone())?);
                     }
-                    _ => {}
                 }
             }
         }
+        TypeKind::Array(type_kind, _) => types.extend(resolve_types_recursively(&type_kind, modules, seen.clone())?),
+        TypeKind::Borrow(type_kind, _) => types.extend(resolve_types_recursively(&type_kind, modules, seen.clone())?),
+        TypeKind::UserPtr(type_kind) => types.extend(resolve_types_recursively(&type_kind, modules, seen.clone())?),
+        TypeKind::CodegenPtr(type_kind) => types.extend(resolve_types_recursively(&type_kind, modules, seen.clone())?),
+        _ => {}
     }
-
     Ok(types)
 }

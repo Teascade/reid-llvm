@@ -182,16 +182,13 @@ impl mir::Module {
         insert_debug!(&TypeKind::Void);
         insert_debug!(&TypeKind::Char);
 
-        let mut typedefs = self.typedefs.clone();
-        typedefs.sort_by(|a, b| b.source_module.cmp(&a.source_module));
-
         // Since we know by this point that no types are recursive, we can
         // somewhat easily sort the type-definitions such that we can process
         // the ones with no depencencies first, and later the ones that depend
         // on the earlier ones.
         let mut typekeys_seen = HashSet::new();
         let mut typedefs_sorted = Vec::new();
-        let mut typedefs_left = typedefs.clone();
+        let mut typedefs_left = self.typedefs.clone();
         typedefs_left.reverse();
         while let Some(typedef) = typedefs_left.pop() {
             match &typedef.kind {
