@@ -33,6 +33,14 @@ Returns a null-pointer of type `T`.
 i32::null(); // Returns *i32 (null-ptr)
 ```
 
+#### `<T>::is_null(val: T) -> bool`
+
+Returns a boolean representing if `val` is a nullptr or not.
+
+```rust
+i32::is_null(i32::null()); // Returns true
+```
+
 #### `<T>::malloc(size: u64) -> *T`
 
 Allocates `T::sizeof() * size` bytes and returns a pointer to `T`.
