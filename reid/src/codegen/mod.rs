@@ -207,9 +207,7 @@ impl mir::Module {
                     loop {
                         if let Some(field) = field_iter.next() {
                             if let Some(key) = get_typekey(&field.1) {
-                                if typekeys_seen.contains(&key) {
-                                    break true;
-                                } else {
+                                if !typekeys_seen.contains(&key) {
                                     break false;
                                 }
                             }
@@ -227,6 +225,8 @@ impl mir::Module {
                 typedefs_left.insert(0, typedef.clone());
             }
         }
+
+        dbg!(&typedefs_sorted);
 
         for typedef in typedefs_sorted {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
