@@ -1,0 +1,12 @@
+struct A {}
+struct AResult { a: A }
+impl A {
+    pub fn new() -> AResult {
+        AResult { a: A {} }
+    }
+}
+
+struct Foo {}
+impl Foo {
+    pub fn foo(&self, a: &A) {}
+}
