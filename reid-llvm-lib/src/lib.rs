@@ -298,6 +298,7 @@ impl Instr {
             Instr::ShiftRightArithmetic(..) => "ashr",
             Instr::ShiftLeft(..) => "shl",
             Instr::GetGlobal(..) => "global",
+            Instr::IsNull(..) => "is_null",
         }
     }
 }
@@ -490,6 +491,9 @@ pub enum Instr {
     /// The `bitcast` instruction converts value to type ty2. It is always a
     /// no-op cast because no bits change with this conversion.
     BitCast(InstructionValue, Type),
+
+    /// Check if the given instruction value is a null pointer
+    IsNull(InstructionValue),
 
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }

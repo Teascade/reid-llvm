@@ -388,6 +388,22 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
         signature_meta: Default::default(),
     });
 
+    intrinsics.push(FunctionDefinition {
+        name: "is_null".to_owned(),
+        linkage_name: None,
+        is_pub: true,
+        is_imported: false,
+        return_type: TypeKind::Bool,
+        parameters: vec![FunctionParam {
+            name: "value".to_string(),
+            ty: TypeKind::UserPtr(Box::new(ty.clone())),
+            meta: Default::default(),
+        }],
+        kind: FunctionDefinitionKind::Intrinsic(Box::new(IntrinsicIsNull)),
+        source: None,
+        signature_meta: Default::default(),
+    });
+
     intrinsics
 }
 
@@ -752,6 +768,16 @@ impl IntrinsicFunction for IntrinsicNullPtr {
             StackValueKind::Literal(instr),
             TypeKind::UserPtr(Box::new(self.0.clone())),
         ))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct IntrinsicIsNull;
+impl IntrinsicFunction for IntrinsicIsNull {
+    fn codegen<'ctx, 'a>(&self, scope: &mut Scope<'ctx, 'a>, params: &[StackValue]) -> Result<StackValue, ErrorKind> {
+        let val = params.get(0).unwrap().instr();
+        let instr = scope.block.build(Instr::IsNull(val)).unwrap();
+        Ok(StackValue(StackValueKind::Literal(instr), TypeKind::Bool))
     }
 }
 

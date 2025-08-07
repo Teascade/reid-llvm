@@ -1,0 +1,4 @@
+fn main() -> bool {
+    let ptr = i32::null();
+    return i32::is_null(ptr);
+}

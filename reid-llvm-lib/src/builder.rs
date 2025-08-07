@@ -3,6 +3,8 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+use llvm_sys::core::LLVMBuildIsNull;
+
 use crate::{
     Block, BlockData, CompileResult, ConstValueKind, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData,
     ModuleData, NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,
@@ -614,6 +616,14 @@ impl Builder {
                 Instr::ShiftRightArithmetic(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::ShiftLeft(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
                 Instr::GetGlobal(_) => Ok(()),
+                Instr::IsNull(val) => {
+                    let val_ty = val.get_type(&self)?;
+                    if let Type::Ptr(_) = val_ty {
+                        Ok(())
+                    } else {
+                        Err(ErrorKind::Null)
+                    }
+                }
             }
         }
     }
@@ -770,6 +780,7 @@ impl InstructionValue {
                     let kind = builder.get_const_kind(constant);
                     Ok(kind.get_type())
                 }
+                IsNull(_) => Ok(Type::Bool),
             }
         }
     }

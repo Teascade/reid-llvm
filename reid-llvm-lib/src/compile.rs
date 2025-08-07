@@ -1051,6 +1051,10 @@ impl InstructionHolder {
                     LLVMBuildShl(module.builder_ref, lhs_val, rhs_val, name.as_ptr())
                 }
                 GetGlobal(global_value) => module.globals.get(global_value).unwrap().clone(),
+                IsNull(instruction_value) => {
+                    let val = module.values.get(&*instruction_value).unwrap().value_ref;
+                    LLVMBuildIsNull(module.builder_ref, val, name.as_ptr())
+                }
             }
         };
         if let Some(record) = &self.record {
