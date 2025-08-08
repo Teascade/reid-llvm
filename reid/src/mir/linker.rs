@@ -365,7 +365,7 @@ impl<'map> Pass for LinkerPass<'map> {
                     // later replaced in-source by name)
                     let imported_ty_key = match resolve_type(&ty, &modules) {
                         Ok(ty) => {
-                            foreign_keys.insert(ty.clone());
+                            foreign_keys.insert(CustomTypeKey(ty.0.clone(), importer_module.module_id));
                             ty
                         }
                         Err(e) => {
@@ -488,13 +488,6 @@ impl<'map> Pass for LinkerPass<'map> {
                         return Ok(());
                     }
                 }
-                // let resolved = match resolve_type(&ty, &modules) {
-                //     Ok(ty) => ty.clone(),
-                //     Err(e) => {
-                //         state.note_errors(&vec![e], meta);
-                //         return Ok(());
-                //     }
-                // };
             }
 
             dbg!(&imported_types);
