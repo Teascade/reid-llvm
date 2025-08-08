@@ -26,6 +26,11 @@
         "configuration": "./language-configuration.json"
       }
     ],
+    "breakpoints": [
+      {
+        "language": "reid"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "reid-language-server",
