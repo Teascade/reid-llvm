@@ -336,10 +336,16 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
 
                     for ty in import_type(&func.return_type) {
+                        if unresolved_types.contains_key(&ty) {
+                            continue;
+                        }
                         unresolved_types.insert(ty, (meta.clone(), true));
                     }
                     for param in &func.parameters {
                         for ty in import_type(&param.ty) {
+                            if unresolved_types.contains_key(&ty) {
+                                continue;
+                            }
                             unresolved_types.insert(ty, (meta.clone(), true));
                         }
                     }
@@ -372,19 +378,7 @@ impl<'map> Pass for LinkerPass<'map> {
                         }
                     };
 
-                    match resolve_types_recursively(
-                        &TypeKind::CustomType(CustomTypeKey(ty.0.clone(), importer_module.module_id)),
-                        &modules,
-                        HashSet::new(),
-                    ) {
-                        Ok(resolved) => {
-                            imported_types.extend(resolved);
-                        }
-                        Err(e) => {
-                            state.note_errors(&vec![e], meta);
-                            return Ok(());
-                        }
-                    }
+                    imported_types.insert(CustomTypeKey(ty.0.clone(), importer_module.module_id), ty.1);
 
                     let mut imported = modules.get(&imported_ty_key.1).unwrap().module.borrow_mut();
                     let imported_module_name = imported.name.clone();
