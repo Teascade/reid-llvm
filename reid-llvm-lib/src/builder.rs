@@ -20,13 +20,13 @@ pub struct ModuleValue(pub(crate) usize);
 #[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct TypeValue(pub(crate) ModuleValue, pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct FunctionValue(pub(crate) ModuleValue, pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct BlockValue(pub(crate) FunctionValue, pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct InstructionValue(pub(crate) BlockValue, pub(crate) usize);
 
 #[derive(Debug, Clone, Hash, Copy, PartialEq, Eq)]
@@ -278,7 +278,7 @@ impl Builder {
             let function = module.functions.get_unchecked_mut(block.0.1);
             let block = function.blocks.get_unchecked_mut(block.1);
             if let Some(_) = &block.data.terminator {
-                Err(ErrorKind::Null)
+                Err(ErrorKind::BlockAlreadyTerminated)
             } else {
                 block.data.terminator = Some(value);
                 Ok(())
@@ -297,7 +297,7 @@ impl Builder {
             let function = module.functions.get_unchecked_mut(block.0.1);
             let block = function.blocks.get_unchecked_mut(block.1);
             if let Some(_) = &block.data.terminator_location {
-                Err(ErrorKind::Null)
+                Err(ErrorKind::BlockTerminatorLocated)
             } else {
                 block.data.terminator_location = Some(location);
                 Ok(())
@@ -411,84 +411,120 @@ impl Builder {
                     if match_types(&lhs, &rhs, &self)?.category().integer() {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeNotInteger(lhs, lhs.get_type(&self)?))
                     }
                 }
                 Instr::FAdd(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::Real,
+                        ))
                     }
                 }
                 Instr::Sub(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category().integer() {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeNotInteger(lhs, lhs.get_type(&self)?))
                     }
                 }
                 Instr::FSub(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::Real,
+                        ))
                     }
                 }
                 Instr::Mul(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category().integer() {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeNotInteger(lhs, lhs.get_type(&self)?))
                     }
                 }
                 Instr::FMul(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::Real,
+                        ))
                     }
                 }
                 Instr::UDiv(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::UnsignedInteger {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::UnsignedInteger,
+                        ))
                     }
                 }
                 Instr::SDiv(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::SignedInteger {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::SignedInteger,
+                        ))
                     }
                 }
                 Instr::FDiv(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::Real,
+                        ))
                     }
                 }
                 Instr::URem(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::UnsignedInteger {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::UnsignedInteger,
+                        ))
                     }
                 }
                 Instr::SRem(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::SignedInteger {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::SignedInteger,
+                        ))
                     }
                 }
                 Instr::FRem(lhs, rhs) => {
                     if match_types(&lhs, &rhs, &self)?.category() == TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::TypeWrongCategory(
+                            lhs,
+                            lhs.get_type(&self)?,
+                            TypeCategory::Real,
+                        ))
                     }
                 }
                 Instr::And(lhs, rhs) => match_types(&lhs, &rhs, &self).map(|_| ()),
@@ -499,7 +535,7 @@ impl Builder {
                     if t.category().comparable() || !t.category().integer() {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null) // TODO error: Types not comparable
+                        Err(ErrorKind::TypeNotComparable(lhs, t))
                     }
                 }
                 Instr::FCmp(_, lhs, rhs) => {
@@ -507,17 +543,17 @@ impl Builder {
                     if t.category().comparable() || t.category() != TypeCategory::Real {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null) // TODO error: Types not comparable
+                        Err(ErrorKind::TypeNotComparable(lhs, t))
                     }
                 }
                 Instr::FunctionCall(fun, params) => {
                     let param_types = self.function_data(&fun).params;
                     if param_types.len() != params.len() {
-                        return Err(ErrorKind::Null); // TODO error: invalid amount of params
+                        return Err(ErrorKind::InvalidLenParams(params.len(), param_types.len()));
                     }
                     for (a, b) in param_types.iter().zip(params) {
                         if *a != b.get_type(&self)? {
-                            return Err(ErrorKind::TypesIncompatible(a.clone(), b.get_type(&self)?)); // TODO error: params do not match
+                            return Err(ErrorKind::TypesIncompatible(a.clone(), b.get_type(&self)?));
                         }
                     }
                     Ok(())
@@ -530,7 +566,7 @@ impl Builder {
                     // incoming values come from blocks that are added later
                     // than the one where this one exists.
 
-                    let first = iter.next().ok_or(ErrorKind::Null)?;
+                    let first = iter.next().ok_or(ErrorKind::EmptyPhiList)?;
                     for item in iter {
                         match_types(first, item, &self)?;
                     }
@@ -543,10 +579,10 @@ impl Builder {
                         if *ptr_ty_inner == load_ty {
                             Ok(())
                         } else {
-                            Err(ErrorKind::Null) // TODO error: inner type mismatch
+                            Err(ErrorKind::TypesIncompatible(*ptr_ty_inner, load_ty))
                         }
                     } else {
-                        Err(ErrorKind::Null) // TODO error: not a pointer
+                        Err(ErrorKind::NotPointer(ptr, ptr_ty))
                     }
                 }
                 Instr::Store(ptr, _) => {
@@ -554,21 +590,25 @@ impl Builder {
                     if let Type::Ptr(_) = ty {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null) // TODO error: not a pointer
+                        Err(ErrorKind::NotPointer(ptr, ty))
                     }
                 }
                 Instr::ArrayAlloca(_, val) => {
                     if val.get_type(self)?.category() == TypeCategory::UnsignedInteger {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null) // TODO error: not a pointer
+                        Err(ErrorKind::TypeWrongCategory(
+                            val,
+                            val.get_type(self)?,
+                            TypeCategory::UnsignedInteger,
+                        ))
                     }
                 }
                 Instr::GetElemPtr(ptr_val, _) => {
                     let ptr_ty = ptr_val.get_type(&self)?;
                     match ptr_ty {
                         Type::Ptr(_) => Ok(()),
-                        _ => Err(ErrorKind::Null),
+                        _ => Err(ErrorKind::NotPointer(ptr_val, ptr_ty)),
                     }
                 }
                 Instr::GetStructElemPtr(ptr_val, idx) => {
@@ -578,16 +618,16 @@ impl Builder {
                             match self.type_data(&val).kind {
                                 CustomTypeKind::NamedStruct(NamedStruct(_, fields)) => {
                                     if fields.len() <= idx as usize {
-                                        return Err(ErrorKind::Null); // TODO error: no such field
+                                        return Err(ErrorKind::NoSuchField(*ty, idx));
                                     }
                                 }
                             }
                             Ok(())
                         } else {
-                            Err(ErrorKind::Null) // TODO error: not a struct
+                            Err(ErrorKind::NotStruct(ptr_val, *ty))
                         }
                     } else {
-                        Err(ErrorKind::Null) // TODO error: not a pointer
+                        Err(ErrorKind::NotPointer(ptr_val, ptr_ty))
                     }
                 }
                 Instr::ExtractValue(val, _) => {
@@ -597,7 +637,7 @@ impl Builder {
                             CustomTypeKind::NamedStruct(_) => Ok(()),
                         },
                         Type::Array(_, _) => Ok(()),
-                        _ => Err(ErrorKind::Null),
+                        _ => Err(ErrorKind::NotExtractable(val, val_ty)),
                     }
                 }
                 Instr::Trunc(instr, ty) => instr.cast_to(self, &ty).map(|_| ()),
@@ -621,7 +661,7 @@ impl Builder {
                     if let Type::Ptr(_) = val_ty {
                         Ok(())
                     } else {
-                        Err(ErrorKind::Null)
+                        Err(ErrorKind::NotPointer(val, val_ty))
                     }
                 }
             }
@@ -695,7 +735,7 @@ impl InstructionValue {
                     .params
                     .get(*nth)
                     .cloned()
-                    .ok_or(ErrorKind::Null),
+                    .ok_or(ErrorKind::NoSuchParam(self.0.0, *nth)),
                 Constant(c) => Ok(c.get_type()),
                 Add(lhs, rhs) => match_types(lhs, rhs, &builder),
                 FAdd(lhs, rhs) => match_types(lhs, rhs, &builder),
@@ -715,7 +755,10 @@ impl InstructionValue {
                 ICmp(_, _, _) => Ok(Type::Bool),
                 FCmp(_, _, _) => Ok(Type::Bool),
                 FunctionCall(function_value, _) => Ok(builder.function_data(function_value).ret),
-                Phi(values) => values.first().ok_or(ErrorKind::Null).and_then(|v| v.get_type(&builder)),
+                Phi(values) => values
+                    .first()
+                    .ok_or(ErrorKind::EmptyPhiList)
+                    .and_then(|v| v.get_type(&builder)),
                 Alloca(ty) => Ok(Type::Ptr(Box::new(ty.clone()))),
                 Load(_, ty) => Ok(ty.clone()),
                 Store(_, value) => value.get_type(builder),
@@ -757,7 +800,7 @@ impl InstructionValue {
                             }
                         }
                         Type::Array(elem_ty, _) => *elem_ty.clone(),
-                        _ => return Err(ErrorKind::Null),
+                        _ => return Err(ErrorKind::NotExtractable(*instr, instr_ty)),
                     })
                 }
                 Trunc(instr, ty) => instr.cast_to(builder, ty).map(|_| ty.clone()),
@@ -786,8 +829,9 @@ impl InstructionValue {
     }
 
     fn cast_to(&self, builder: &Builder, ty: &Type) -> CompileResult<Instr> {
-        self.get_type(builder)?
+        let own_type = self.get_type(builder)?;
+        own_type
             .cast_instruction(*self, &ty)
-            .ok_or(ErrorKind::Null)
+            .ok_or(ErrorKind::ImpossibleCast(own_type, ty.clone()))
     }
 }

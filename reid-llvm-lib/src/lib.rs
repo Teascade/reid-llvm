@@ -28,6 +28,32 @@ pub enum ErrorKind {
     Null,
     #[error("Types {0:?} and {1:?} incompatible")]
     TypesIncompatible(Type, Type),
+    #[error("Phi list of values is empty")]
+    EmptyPhiList,
+    #[error("Type {1:?} of value {0:?} is not extractable")]
+    NotExtractable(InstructionValue, Type),
+    #[error("Type {0:?} is not castable to {1:?}")]
+    ImpossibleCast(Type, Type),
+    #[error("Block is already terminated")]
+    BlockAlreadyTerminated,
+    #[error("Block terminator already has a location")]
+    BlockTerminatorLocated,
+    #[error("Value {0:?} must be an integer type. Is {1:?}")]
+    TypeNotInteger(InstructionValue, Type),
+    #[error("Value {0:?} must be a {2:?} type. Is {1:?}")]
+    TypeWrongCategory(InstructionValue, Type, TypeCategory),
+    #[error("Value {0:?} must be comparable, was {1:?}")]
+    TypeNotComparable(InstructionValue, Type),
+    #[error("Got {0:?} parameters, expected {1:?}")]
+    InvalidLenParams(usize, usize),
+    #[error("Value {0:?} is not a pointer, is {1:?}")]
+    NotPointer(InstructionValue, Type),
+    #[error("Value {0:?} is not a struct, is {1:?}")]
+    NotStruct(InstructionValue, Type),
+    #[error("Struct {0:?} has no such field as {1:?}")]
+    NoSuchField(Type, u32),
+    #[error("Function {0:?} has no such parameter as {1:?}")]
+    NoSuchParam(FunctionValue, usize),
 }
 
 pub type CompileResult<T> = Result<T, ErrorKind>;
@@ -600,7 +626,7 @@ impl ConstValueKind {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub enum TypeCategory {
     SignedInteger,
     UnsignedInteger,

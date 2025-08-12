@@ -5,10 +5,7 @@ use std::{
 };
 
 use llvm_sys::{
-    core::{
-        LLVMCreateMemoryBufferWithMemoryRange, LLVMDisposeMemoryBuffer, LLVMGetBufferSize,
-        LLVMGetBufferStart,
-    },
+    core::{LLVMCreateMemoryBufferWithMemoryRange, LLVMDisposeMemoryBuffer, LLVMGetBufferSize, LLVMGetBufferStart},
     error::LLVMDisposeErrorMessage,
     prelude::LLVMMemoryBufferRef,
 };
@@ -32,9 +29,7 @@ pub fn from_cstring(pointer: *mut c_char) -> Option<String> {
 }
 
 fn cstring_to_err(value: *mut c_char) -> Result<(), String> {
-    from_cstring(value)
-        .filter(|s| !s.is_empty())
-        .map_or(Ok(()), |s| Err(s))
+    from_cstring(value).filter(|s| !s.is_empty()).map_or(Ok(()), |s| Err(s))
 }
 
 /// Utility struct for LLVM's Error Messages, which need to be disposed
@@ -75,12 +70,8 @@ impl MemoryBufferHolder {
     pub fn empty(name: &str) -> MemoryBufferHolder {
         let array = [0i8; 0];
         unsafe {
-            let buffer = LLVMCreateMemoryBufferWithMemoryRange(
-                array.as_ptr(),
-                array.len(),
-                into_cstring(name).as_ptr(),
-                0,
-            );
+            let buffer =
+                LLVMCreateMemoryBufferWithMemoryRange(array.as_ptr(), array.len(), into_cstring(name).as_ptr(), 0);
             MemoryBufferHolder { buffer }
         }
     }
@@ -113,20 +104,12 @@ impl Drop for MemoryBufferHolder {
 
 /// Make sure types for given instructions match. Return Ok(type) if they do,
 /// and error otherwise.
-pub fn match_types(
-    lhs: &InstructionValue,
-    rhs: &InstructionValue,
-    builder: &Builder,
-) -> CompileResult<Type> {
-    let lhs_type = lhs.get_type(&builder);
-    let rhs_type = rhs.get_type(&builder);
-    if let (Ok(lhs_t), Ok(rhs_t)) = (lhs_type, rhs_type) {
-        if lhs_t == rhs_t {
-            Ok(lhs_t)
-        } else {
-            Err(ErrorKind::Null)
-        }
+pub fn match_types(lhs: &InstructionValue, rhs: &InstructionValue, builder: &Builder) -> CompileResult<Type> {
+    let lhs_t = lhs.get_type(&builder)?;
+    let rhs_t = rhs.get_type(&builder)?;
+    if lhs_t == rhs_t {
+        Ok(lhs_t)
     } else {
-        Err(ErrorKind::Null)
+        Err(ErrorKind::TypesIncompatible(lhs_t, rhs_t))
     }
 }
