@@ -117,7 +117,7 @@ impl Display for TypeDefinition {
             self.name,
             self.source_module,
             if let Some(mod_id) = self.importer {
-                format!("; imported to {}", mod_id)
+                format!("; imported by {}", mod_id)
             } else {
                 String::new()
             }

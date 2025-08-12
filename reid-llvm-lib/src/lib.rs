@@ -26,6 +26,8 @@ mod util;
 pub enum ErrorKind {
     #[error("NULL error, should never occur!")]
     Null,
+    #[error("Types {0:?} and {1:?} incompatible")]
+    TypesIncompatible(Type, Type),
 }
 
 pub type CompileResult<T> = Result<T, ErrorKind>;
@@ -498,7 +500,7 @@ pub enum Instr {
     FunctionCall(FunctionValue, Vec<InstructionValue>),
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd)]
 pub enum Type {
     I8,
     I16,

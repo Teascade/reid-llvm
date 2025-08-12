@@ -481,18 +481,29 @@ impl<'map> Pass for LinkerPass<'map> {
                 }
             }
 
+            let mut typedef_keys = HashMap::new();
             // 4. Import all listed types.
             for (importer_typekey, imported_module_id) in &imported_types {
-                let imported_ty_module = modules.get(&imported_module_id).unwrap().module.borrow();
                 let importee_typekey = CustomTypeKey(importer_typekey.0.clone(), *imported_module_id);
+                if let Some(module_id) = typedef_keys.get(&importee_typekey) {
+                    if *module_id != importer_module.module_id {
+                        typedef_keys.insert(importee_typekey.clone(), importer_typekey.1);
+                    }
+                } else {
+                    typedef_keys.insert(importee_typekey.clone(), importer_typekey.1);
+                }
+            }
+
+            for (typedef_key, importer_module_id) in &typedef_keys {
+                let imported_ty_module = modules.get(&typedef_key.1).unwrap().module.borrow();
                 if let Some(typedef) = imported_ty_module
                     .typedefs
                     .iter()
-                    .find(|ty| CustomTypeKey(ty.name.clone(), ty.source_module) == importee_typekey)
+                    .find(|ty| CustomTypeKey(ty.name.clone(), ty.source_module) == *typedef_key)
                     .cloned()
                 {
                     importer_module.typedefs.push(TypeDefinition {
-                        importer: Some(importer_typekey.1),
+                        importer: Some(*importer_module_id),
                         ..typedef
                     });
                 }

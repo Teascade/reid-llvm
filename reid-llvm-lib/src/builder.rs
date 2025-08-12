@@ -14,10 +14,10 @@ use crate::{
     util::match_types,
 };
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct ModuleValue(pub(crate) usize);
 
-#[derive(Clone, Hash, Copy, PartialEq, Eq)]
+#[derive(Clone, Hash, Copy, PartialEq, Eq, PartialOrd)]
 pub struct TypeValue(pub(crate) ModuleValue, pub(crate) usize);
 
 #[derive(Clone, Hash, Copy, PartialEq, Eq)]
@@ -517,7 +517,7 @@ impl Builder {
                     }
                     for (a, b) in param_types.iter().zip(params) {
                         if *a != b.get_type(&self)? {
-                            return Err(ErrorKind::Null); // TODO error: params do not match
+                            return Err(ErrorKind::TypesIncompatible(a.clone(), b.get_type(&self)?)); // TODO error: params do not match
                         }
                     }
                     Ok(())
