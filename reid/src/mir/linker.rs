@@ -348,8 +348,6 @@ impl<'map> Pass for LinkerPass<'map> {
                 unresolved_types.insert(imported_ty_key.clone(), (meta.clone(), false));
             }
 
-            dbg!(&importer_module.module_id, &unresolved_types);
-
             // 3. Recurse these types to find their true sources, find their
             //    dependencies, and list them all. Store manually imported types
             //    in a separate mapping for later.
@@ -478,7 +476,6 @@ impl<'map> Pass for LinkerPass<'map> {
                         ));
                     }
                 }
-
                 match resolve_types_recursively(&TypeKind::CustomType(ty.clone()), &modules, HashSet::new()) {
                     Ok(resolved) => {
                         imported_types.extend(resolved);
@@ -489,8 +486,6 @@ impl<'map> Pass for LinkerPass<'map> {
                     }
                 }
             }
-
-            dbg!(&imported_types);
 
             // 4. Import all listed types.
             for (importer_typekey, imported_module_id) in &imported_types {
