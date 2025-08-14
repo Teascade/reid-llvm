@@ -213,10 +213,29 @@ impl LanguageServer for Backend {
                         character: (end.0 as i32 - 1).max(0) as u32,
                     },
                 };
-                if let Some(ty) = analysis.ty.clone() {
-                    (Some(range), format!("{}", ty))
+                if let Some(hover) = analysis.hover.clone() {
+                    if let Some(kind) = hover.kind {
+                        match kind {
+                            analysis::HoverKind::Type(type_kind) => (Some(range), format!("{}", type_kind)),
+                            analysis::HoverKind::Function(name, function_params, return_type) => (
+                                Some(range),
+                                format!(
+                                    "{}({}) -> {}",
+                                    name,
+                                    function_params
+                                        .iter()
+                                        .map(|p| format!("{}: {}", p.name, p.ty))
+                                        .collect::<Vec<_>>()
+                                        .join(", "),
+                                    return_type
+                                ),
+                            ),
+                        }
+                    } else {
+                        (Some(range), String::from("No type"))
+                    }
                 } else {
-                    (Some(range), String::from("None type"))
+                    (Some(range), String::from("No hover"))
                 }
             } else {
                 (None, String::from("no type"))

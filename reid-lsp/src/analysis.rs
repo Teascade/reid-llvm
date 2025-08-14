@@ -2,6 +2,7 @@ use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
 use reid::{
     ast::{
+        ReturnType,
         lexer::{FullToken, Token},
         token_stream::TokenRange,
     },
@@ -84,7 +85,7 @@ impl StaticAnalysis {
 
 #[derive(Debug, Clone)]
 pub struct SemanticToken {
-    pub ty: Option<TypeKind>,
+    pub hover: Option<Hover>,
     pub autocomplete: Vec<Autocomplete>,
     pub symbol: Option<SymbolId>,
 }
@@ -101,6 +102,18 @@ pub enum AutocompleteKind {
     Type,
     Field(TypeKind),
     Function(Vec<FunctionParam>, TypeKind),
+}
+
+#[derive(Debug, Clone)]
+pub struct Hover {
+    pub documentation: Option<String>,
+    pub kind: Option<HoverKind>,
+}
+
+#[derive(Debug, Clone)]
+pub enum HoverKind {
+    Type(TypeKind),
+    Function(String, Vec<FunctionParam>, TypeKind),
 }
 
 impl ToString for AutocompleteKind {
@@ -149,12 +162,15 @@ impl AnalysisState {
 }
 
 impl AnalysisState {
-    pub fn init_types(&mut self, meta: &mir::Metadata, ty: Option<TypeKind>) {
+    pub fn init_hover(&mut self, meta: &mir::Metadata, kind: Option<HoverKind>, documentation: Option<String>) {
         for token in meta.range.start..=meta.range.end {
             self.map.insert(
                 token,
                 SemanticToken {
-                    ty: ty.clone(),
+                    hover: Some(Hover {
+                        documentation: documentation.clone(),
+                        kind: kind.clone(),
+                    }),
                     autocomplete: Vec::new(),
                     symbol: Default::default(),
                 },
@@ -169,7 +185,7 @@ impl AnalysisState {
             self.map.insert(
                 token_idx,
                 SemanticToken {
-                    ty: None,
+                    hover: None,
                     autocomplete: autocomplete.clone(),
                     symbol: Default::default(),
                 },
@@ -185,7 +201,7 @@ impl AnalysisState {
             self.map.insert(
                 idx,
                 SemanticToken {
-                    ty: None,
+                    hover: None,
                     autocomplete: Vec::new(),
                     symbol: Some(symbol),
                 },
@@ -533,7 +549,7 @@ pub fn analyze_context(
                         .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
                         .unwrap_or(field.2.range.end);
 
-                    scope.state.init_types(
+                    scope.state.init_hover(
                         &Metadata {
                             source_module_id: field.2.source_module_id,
                             range: TokenRange {
@@ -542,7 +558,8 @@ pub fn analyze_context(
                             },
                             position: None,
                         },
-                        Some(field.1.clone()),
+                        Some(HoverKind::Type(field.1.clone())),
+                        None,
                     );
 
                     let field_symbol = scope.state.new_symbol(field_idx, SemanticKind::Property);
@@ -584,7 +601,7 @@ pub fn analyze_context(
                         scope.state.new_symbol(field_ty_idx, SemanticKind::Type)
                     };
 
-                    scope.state.init_types(
+                    scope.state.init_hover(
                         &Metadata {
                             source_module_id: field.2.source_module_id,
                             range: TokenRange {
@@ -593,7 +610,8 @@ pub fn analyze_context(
                             },
                             position: None,
                         },
-                        Some(field.1.clone()),
+                        Some(HoverKind::Type(field.1.clone())),
+                        None,
                     );
                     scope.state.set_symbol(field_ty_idx, field_ty_symbol);
                 }
@@ -604,7 +622,9 @@ pub fn analyze_context(
     for binop in &module.binop_defs {
         if binop.meta.source_module_id == module.module_id {
             for param in [&binop.lhs, &binop.rhs] {
-                scope.state.init_types(&param.meta, Some(param.ty.clone()));
+                scope
+                    .state
+                    .init_hover(&param.meta, Some(HoverKind::Type(param.ty.clone())), None);
                 let idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(param.meta.range.end);
@@ -679,9 +699,11 @@ pub fn analyze_context(
             }
         }
 
-        scope
-            .state
-            .init_types(&function.signature(), Some(function.return_type.clone()));
+        scope.state.init_hover(
+            &function.signature(),
+            Some(HoverKind::Type(function.return_type.clone())),
+            None,
+        );
 
         let idx = scope
             .token_idx(&function.signature(), |t| matches!(t, Token::Identifier(_)))
@@ -713,7 +735,7 @@ pub fn analyze_context(
     }
 
     for import in &module.imports {
-        scope.state.init_types(&import.1, None);
+        scope.state.init_hover(&import.1, None, None);
         if let Some((module_name, _)) = import.0.get(0) {
             let module_idx = scope
                 .token_idx(&import.1, |t| matches!(t, Token::Identifier(_)))
@@ -793,7 +815,9 @@ pub fn analyze_function_parameters(
     scope: &mut AnalysisScope,
 ) {
     for param in &function.parameters {
-        scope.state.init_types(&param.meta, Some(param.ty.clone()));
+        scope
+            .state
+            .init_hover(&param.meta, Some(HoverKind::Type(param.ty.clone())), None);
 
         if param.meta.source_module_id == module.module_id {
             let param_var_idx = scope
@@ -832,12 +856,14 @@ pub fn analyze_block(
     for statement in &block.statements {
         match &statement.0 {
             mir::StmtKind::Let(named_variable_ref, _, expression) => {
-                scope.state.init_types(
+                scope.state.init_hover(
                     &named_variable_ref.2,
                     expression
                         .return_type(&TypeRefs::unknown(), source_module.module_id)
                         .ok()
-                        .map(|(_, ty)| ty),
+                        .map(|(_, ty)| ty)
+                        .map(|t| HoverKind::Type(t)),
+                    None,
                 );
                 let idx = scope
                     .token_idx(&named_variable_ref.2, |t| matches!(t, Token::Identifier(_)))
@@ -888,16 +914,19 @@ pub fn analyze_expr(
     expr: &mir::Expression,
     scope: &mut AnalysisScope,
 ) {
-    scope.state.init_types(
+    scope.state.init_hover(
         &expr.1,
         expr.return_type(&TypeRefs::unknown(), source_module.module_id)
             .ok()
-            .map(|(_, t)| t),
+            .map(|(_, t)| HoverKind::Type(t)),
+        None,
     );
 
     match &expr.0 {
         mir::ExprKind::Variable(var_ref) => {
-            scope.state.init_types(&var_ref.2, Some(var_ref.0.clone()));
+            scope
+                .state
+                .init_hover(&var_ref.2, Some(HoverKind::Type(var_ref.0.clone())), None);
 
             let idx = scope
                 .token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)))

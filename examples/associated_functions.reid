@@ -8,9 +8,8 @@ struct Otus {
 }
 
 impl Otus {
-    /// Some test documentation
-    /// Here
-    /// qwe
+    /// Some test documentation here.
+    /// On a second line
     fn test(&self) -> u32 {
         *self.field
     }
