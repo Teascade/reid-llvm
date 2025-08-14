@@ -12,12 +12,12 @@ use tower_lsp::lsp_types::{
     self, CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
     DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
     DocumentFilter, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkupContent,
-    MarkupKind, MessageType, OneOf, Range, ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
-    ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit, Url, WorkspaceEdit,
-    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkedString,
+    MarkupContent, MarkupKind, MessageType, OneOf, Range, ReferenceParams, RenameParams, SemanticToken,
+    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
+    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
+    Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -199,7 +199,7 @@ impl LanguageServer for Backend {
             None
         };
 
-        let (range, ty) = if let Some((idx, token)) = token {
+        let (range, ty, documentation) = if let Some((idx, token)) = token {
             if let Some(analysis) = self.analysis.get(&path).unwrap().state.map.get(&idx) {
                 let start = token.position;
                 let end = token.position.add(token.token.len() as u32);
@@ -216,7 +216,9 @@ impl LanguageServer for Backend {
                 if let Some(hover) = analysis.hover.clone() {
                     if let Some(kind) = hover.kind {
                         match kind {
-                            analysis::HoverKind::Type(type_kind) => (Some(range), format!("{}", type_kind)),
+                            analysis::HoverKind::Type(type_kind) => {
+                                (Some(range), format!("{}", type_kind), hover.documentation)
+                            }
                             analysis::HoverKind::Function(name, function_params, return_type) => (
                                 Some(range),
                                 format!(
@@ -229,25 +231,30 @@ impl LanguageServer for Backend {
                                         .join(", "),
                                     return_type
                                 ),
+                                hover.documentation,
                             ),
                         }
                     } else {
-                        (Some(range), String::from("No type"))
+                        (Some(range), String::from("No type"), hover.documentation)
                     }
                 } else {
-                    (Some(range), String::from("No hover"))
+                    (Some(range), String::from("No hover"), None)
                 }
             } else {
-                (None, String::from("no type"))
+                (None, String::from("no type"), None)
             }
         } else {
-            (None, String::from("no token"))
+            (None, String::from("no token"), None)
         };
 
-        let contents = HoverContents::Markup(MarkupContent {
-            kind: MarkupKind::Markdown,
-            value: format!("`{ty}`"),
-        });
+        let contents = if let Some(doc) = documentation {
+            HoverContents::Array(vec![MarkedString::String(doc), MarkedString::String(format!("`{ty}`"))])
+        } else {
+            HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: format!("`{ty}`"),
+            })
+        };
 
         Ok(Some(Hover { contents, range }))
     }
