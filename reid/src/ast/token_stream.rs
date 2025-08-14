@@ -87,6 +87,28 @@ impl<'a, 'b> TokenStream<'a, 'b> {
         }
     }
 
+    pub fn find_documentation(&mut self) -> Option<String> {
+        let mut from = self.position;
+        let mut documentation = None;
+        while let Some(token) = self.tokens.get(from) {
+            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_) | Token::Doc(_)) {
+                from += 1;
+                if let Token::Doc(doctext) = &token.token {
+                    documentation = Some(
+                        match documentation {
+                            Some(t) => t + " ",
+                            None => String::new(),
+                        } + doctext.trim(),
+                    );
+                }
+            } else {
+                break;
+            }
+        }
+        dbg!(self.position, from, &documentation);
+        documentation
+    }
+
     pub fn expect_nonfatal(&mut self, token: Token) -> Result<(), ()> {
         if let (pos, Some(peeked)) = self.next_token(self.position) {
             if token == peeked.token {
@@ -249,7 +271,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
     fn previous_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
         from -= 1;
         while let Some(token) = self.tokens.get(from) {
-            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_)) {
+            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_) | Token::Doc(_)) {
                 from -= 1;
             } else {
                 break;
@@ -260,7 +282,7 @@ impl<'a, 'b> TokenStream<'a, 'b> {
 
     fn next_token(&self, mut from: usize) -> (usize, Option<&'a FullToken>) {
         while let Some(token) = self.tokens.get(from) {
-            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_)) {
+            if matches!(token.token, Token::Whitespace(_) | Token::Comment(_) | Token::Doc(_)) {
                 from += 1;
             } else {
                 break;

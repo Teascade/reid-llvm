@@ -92,6 +92,7 @@ pub struct SemanticToken {
 #[derive(Debug, Clone)]
 pub struct Autocomplete {
     pub text: String,
+    pub documentation: Option<String>,
     pub kind: AutocompleteKind,
 }
 
@@ -400,6 +401,33 @@ pub fn analyze(
     }
     return Ok(None);
 }
+
+// pub fn find_documentation(meta: &Metadata, tokens: &Vec<FullToken>) -> Option<String> {
+//     let mut documentation = None;
+//     for idx in meta.range.start..=meta.range.end {
+//         if let Some(token) = tokens.get(idx) {
+//             dbg!(&token);
+//             if matches!(token.token, Token::Whitespace(_) | Token::Doc(_) | Token::Comment(_)) {
+//                 if let Token::Doc(doctext) = &token.token {
+//                     documentation = Some(
+//                         match documentation {
+//                             Some(t) => t + " ",
+//                             None => String::new(),
+//                         } + doctext.trim(),
+//                     );
+//                 }
+//             } else {
+//                 dbg!(&token);
+//                 break;
+//             }
+//         } else {
+//             dbg!(&idx);
+//             break;
+//         }
+//     }
+//     dbg!(&documentation);
+//     documentation
+// }
 
 pub fn analyze_context(
     context: &mir::Context,
@@ -712,20 +740,18 @@ pub fn analyze_context(
                     if !function.is_pub {
                         continue;
                     }
-                    if function.name.starts_with(&import_name) {
-                        autocompletes.push(Autocomplete {
-                            text: function.name.clone(),
-                            kind: AutocompleteKind::Function(function.parameters.clone(), function.return_type.clone()),
-                        });
-                    }
+                    autocompletes.push(Autocomplete {
+                        text: function.name.clone(),
+                        documentation: function.documentation.clone(),
+                        kind: AutocompleteKind::Function(function.parameters.clone(), function.return_type.clone()),
+                    });
                 }
                 for typedef in &module.typedefs {
-                    if typedef.name.starts_with(&import_name) {
-                        autocompletes.push(Autocomplete {
-                            text: typedef.name.clone(),
-                            kind: AutocompleteKind::Type,
-                        });
-                    }
+                    autocompletes.push(Autocomplete {
+                        text: typedef.name.clone(),
+                        documentation: None,
+                        kind: AutocompleteKind::Type,
+                    });
                 }
             }
 
@@ -823,7 +849,6 @@ pub fn analyze_block(
                 let ty_idx = scope.token_idx(&named_variable_ref.2.after(idx + 1), |t| {
                     matches!(t, Token::Identifier(_))
                 });
-                dbg!(ty_idx);
                 if let Some(ty_idx) = ty_idx {
                     let ty_symbol = if let Some((source_id, symbol_id)) = scope.types.get(&named_variable_ref.0) {
                         scope
@@ -902,9 +927,10 @@ pub fn analyze_expr(
                         source_module
                             .associated_functions
                             .iter()
-                            .filter(|(t, fun)| *t == accessed_type && fun.name.starts_with(name))
+                            .filter(|(t, _)| *t == accessed_type)
                             .map(|(_, fun)| Autocomplete {
                                 text: fun.name.clone(),
+                                documentation: fun.documentation.clone(),
                                 kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                             }),
                     );
@@ -933,8 +959,9 @@ pub fn analyze_expr(
                             if let Some(typedef) = typedef {
                                 autocompletes.extend(match &typedef.kind {
                                     mir::TypeDefinitionKind::Struct(StructType(fields)) => {
-                                        fields.iter().filter(|f| f.0.starts_with(name)).map(|f| Autocomplete {
+                                        fields.iter().map(|f| Autocomplete {
                                             text: f.0.clone(),
+                                            documentation: None,
                                             kind: AutocompleteKind::Field(f.1.clone()),
                                         })
                                     }
@@ -1067,18 +1094,19 @@ pub fn analyze_expr(
             let mut function_autocomplete = source_module
                 .associated_functions
                 .iter()
-                .filter(|(t, fun)| *t == invoked_ty && fun.name.starts_with(name))
+                .filter(|(t, _)| *t == invoked_ty)
                 .map(|(_, fun)| Autocomplete {
                     text: fun.name.clone(),
+                    documentation: fun.documentation.clone(),
                     kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                 })
                 .collect::<Vec<_>>();
             function_autocomplete.extend(
                 get_intrinsic_assoc_functions(&invoked_ty)
                     .iter()
-                    .filter(|fun| fun.name.starts_with(name))
                     .map(|fun| Autocomplete {
                         text: fun.name.clone(),
+                        documentation: Some("intrinsic function documentation".to_string()),
                         kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                     })
                     .collect::<Vec<_>>(),

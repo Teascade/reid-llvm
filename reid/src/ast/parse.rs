@@ -696,6 +696,10 @@ impl Parse for ImportStatement {
 
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let documentation = stream.find_documentation();
+        dbg!(&stream.get_range());
+        dbg!(&documentation);
+
         let is_pub = if let Some(Token::PubKeyword) = stream.peek() {
             stream.next(); // Consume pub
             true
@@ -704,8 +708,10 @@ impl Parse for FunctionDefinition {
         };
 
         stream.expect(Token::FnKeyword)?;
+        let mut signature: FunctionSignature = stream.parse()?;
+        signature.documentation = documentation;
         Ok(FunctionDefinition(
-            stream.parse()?,
+            signature,
             is_pub,
             stream.parse()?,
             stream.get_range().unwrap(),
@@ -810,6 +816,7 @@ impl Parse for FunctionSignature {
 
             Ok(FunctionSignature {
                 name,
+                documentation: None,
                 params,
                 self_kind,
                 return_type,
@@ -1089,9 +1096,12 @@ impl Parse for TopLevelStatement {
         Ok(match stream.peek() {
             Some(Token::ImportKeyword) => Stmt::Import(stream.parse()?),
             Some(Token::Extern) => {
+                let documentation = stream.find_documentation();
                 stream.next(); // Consume Extern
                 stream.expect(Token::FnKeyword)?;
-                let extern_fn = Stmt::ExternFunction(stream.parse()?);
+                let mut signature: FunctionSignature = stream.parse()?;
+                signature.documentation = documentation;
+                let extern_fn = Stmt::ExternFunction(signature);
                 stream.expect_nonfatal(Token::Semi).ok();
                 extern_fn
             }

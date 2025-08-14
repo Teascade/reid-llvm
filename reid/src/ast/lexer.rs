@@ -116,6 +116,7 @@ pub enum Token {
 
     Whitespace(String),
     Comment(String),
+    Doc(String),
     Eof,
 }
 
@@ -196,6 +197,7 @@ impl ToString for Token {
             Token::Percent => String::from('%'),
             Token::Whitespace(val) => val.clone(),
             Token::Comment(val) => format!("//{}", val.clone()),
+            Token::Doc(val) => format!("///{}", val.clone()),
             Token::Unknown(val) => val.to_string(),
         }
     }
@@ -309,13 +311,25 @@ pub fn tokenize<T: Into<String>>(to_tokenize: T) -> Result<Vec<FullToken>, Error
             }
             // Comments
             '/' if cursor.first() == Some('/') => {
+                cursor.next();
+                let doc = if cursor.first() == Some('/') {
+                    cursor.next();
+                    true
+                } else {
+                    false
+                };
+
                 let mut comment = String::new();
                 while !matches!(cursor.first(), Some('\n') | None) {
                     if let Some(c) = cursor.next() {
                         comment.push(c);
                     }
                 }
-                Token::Comment(comment)
+                if doc {
+                    Token::Doc(comment)
+                } else {
+                    Token::Comment(comment)
+                }
             }
             '\"' | '\'' => {
                 let mut value = String::new();

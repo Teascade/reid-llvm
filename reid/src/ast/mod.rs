@@ -192,6 +192,7 @@ pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub To
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: String,
+    pub documentation: Option<String>,
     pub self_kind: SelfKind,
     pub params: Vec<(String, Type, TokenRange)>,
     pub return_type: Option<Type>,

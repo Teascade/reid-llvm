@@ -226,8 +226,6 @@ impl mir::Module {
             }
         }
 
-        dbg!(&typedefs_sorted);
-
         for typedef in typedefs_sorted {
             let type_key = CustomTypeKey(typedef.name.clone(), typedef.source_module);
             type_map.insert(type_key.clone(), typedef.clone());
@@ -336,7 +334,6 @@ impl mir::Module {
                 if module_id == self.module_id {
                     format!("reid.{}.", self.name)
                 } else {
-                    dbg!(self.module_id, module_id);
                     format!("reid.{}.", modules.get(&module_id).unwrap().name)
                 }
             } else {

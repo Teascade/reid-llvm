@@ -311,6 +311,7 @@ impl<'map> Pass for LinkerPass<'map> {
 
                 importer_module.functions.push(FunctionDefinition {
                     name: function.name.clone(),
+                    documentation: function.documentation.clone(),
                     linkage_name: None,
                     is_pub: false,
                     is_imported: false,
@@ -458,6 +459,7 @@ impl<'map> Pass for LinkerPass<'map> {
                             ty.clone(),
                             FunctionDefinition {
                                 name: func_name.clone(),
+                                documentation: func.documentation.clone(),
                                 linkage_name: Some(format!("{}::{}", ty, func_name)),
                                 is_pub: false,
                                 is_imported: false,

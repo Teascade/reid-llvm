@@ -1,5 +1,6 @@
 // Arithmetic, function calls and imports!
 
+/// Test stuff
 fn changer(param: &mut u32) {
   *param = 17;
 }

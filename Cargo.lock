@@ -667,6 +667,8 @@ version = "1.0.0-beta.1"
 dependencies = [
  "dashmap 6.1.0",
  "reid",
+ "serde",
+ "serde_json",
  "socket",
  "tokio",
  "tower-lsp",

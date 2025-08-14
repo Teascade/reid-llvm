@@ -71,6 +71,7 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: MALLOC_IDENT.to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: Some("malloc".to_owned()),
         is_pub: false,
         is_imported: true,
@@ -96,6 +97,7 @@ pub fn simple_intrinsic<T: Into<String> + Clone>(
 ) -> FunctionDefinition {
     FunctionDefinition {
         name: name.into(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -115,6 +117,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     if let TypeKind::Array(_, len) = ty {
         intrinsics.push(FunctionDefinition {
             name: "length".to_owned(),
+            documentation: Some("temp".to_string()),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
@@ -252,6 +255,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
         ));
         intrinsics.push(FunctionDefinition {
             name: "powi".to_owned(),
+            documentation: Some("temp".to_string()),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
@@ -293,6 +297,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             if ty.signed() {
                 intrinsics.push(FunctionDefinition {
                     name: "abs".to_owned(),
+                    documentation: Some("temp".to_string()),
                     linkage_name: None,
                     is_pub: true,
                     is_imported: false,
@@ -323,6 +328,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     }
     intrinsics.push(FunctionDefinition {
         name: "sizeof".to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -334,6 +340,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     });
     intrinsics.push(FunctionDefinition {
         name: "malloc".to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -350,6 +357,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "memcpy".to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -378,6 +386,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "null".to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -390,6 +399,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "is_null".to_owned(),
+        documentation: Some("temp".to_string()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,

@@ -2,11 +2,15 @@ import std::print;
 import std::from_str;
 import std::String;
 
+/// Asd
 struct Otus {
     field: u32,
 }
 
 impl Otus {
+    /// Some test documentation
+    /// Here
+    /// qwe
     fn test(&self) -> u32 {
         *self.field
     }
@@ -27,7 +31,6 @@ fn main() -> u32 {
     let nullptr = i32::null();
     let mut list = u64::malloc(15);
     list[4] = 17;
-
 
     print(from_str("value: ") + list[4]);
 

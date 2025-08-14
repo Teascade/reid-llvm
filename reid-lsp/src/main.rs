@@ -6,17 +6,18 @@ use reid::ast::lexer::{FullToken, Position};
 use reid::error_raporting::{self, ErrorModules, ReidError};
 use reid::mir::SourceModuleId;
 use reid::parse_module;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tower_lsp::lsp_types::{
-    self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
-    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFilter,
-    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
-    InitializeParams, InitializeResult, InitializedParams, Location, MarkupContent, MarkupKind, MessageType, OneOf,
-    Range, ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend, SemanticTokensOptions,
-    SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem,
-    TextDocumentRegistrationOptions, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TextDocumentSyncSaveOptions, TextEdit, Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities,
-    WorkspaceServerCapabilities,
+    self, CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
+    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    DocumentFilter, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
+    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkupContent,
+    MarkupKind, MessageType, OneOf, Range, ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit, Url, WorkspaceEdit,
+    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -31,6 +32,12 @@ struct Backend {
     module_to_path: DashMap<SourceModuleId, PathBuf>,
     path_to_module: DashMap<PathBuf, SourceModuleId>,
     module_id_counter: Mutex<SourceModuleId>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct CompletionData {
+    token_idx: usize,
+    path: PathBuf,
 }
 
 #[tower_lsp::async_trait]
@@ -52,7 +59,17 @@ impl LanguageServer for Backend {
 
         let capabilities = ServerCapabilities {
             hover_provider: Some(HoverProviderCapability::Simple(true)),
-            completion_provider: Some(CompletionOptions { ..Default::default() }),
+            completion_provider: Some(CompletionOptions {
+                trigger_characters: Some(vec![".".to_string(), "::".to_string()]),
+                all_commit_characters: None,
+                completion_item: Some(lsp_types::CompletionOptionsCompletionItem {
+                    label_details_support: Some(true),
+                }),
+                resolve_provider: Some(true),
+                work_done_progress_options: lsp_types::WorkDoneProgressOptions {
+                    work_done_progress: Some(true),
+                },
+            }),
             text_document_sync: Some(TextDocumentSyncCapability::Options(sync)),
             workspace: Some(WorkspaceServerCapabilities {
                 workspace_folders: Some(WorkspaceFoldersServerCapabilities {
@@ -121,11 +138,26 @@ impl LanguageServer for Backend {
         // dbg!(position, token);
 
         let list = if let Some((idx, _)) = token {
-            if let Some(analysis) = self.analysis.get(&path).unwrap().state.map.get(&idx) {
-                analysis
+            if let Some(token_analysis) = self.analysis.get(&path).unwrap().state.map.get(&idx) {
+                token_analysis
                     .autocomplete
                     .iter()
-                    .map(|s| CompletionItem::new_simple(s.text.to_string(), s.kind.to_string()))
+                    .map(|autocomplete| {
+                        let mut item =
+                            CompletionItem::new_simple(autocomplete.text.to_string(), autocomplete.kind.to_string());
+                        item.data = Some(
+                            serde_json::to_value(CompletionData {
+                                token_idx: idx,
+                                path: path.clone(),
+                            })
+                            .unwrap(),
+                        );
+                        item.documentation = autocomplete
+                            .documentation
+                            .as_ref()
+                            .and_then(|d| Some(lsp_types::Documentation::String(d.clone())));
+                        item
+                    })
                     .collect()
             } else {
                 Vec::new()
@@ -136,6 +168,20 @@ impl LanguageServer for Backend {
 
         // dbg!(&list);
         Ok(Some(CompletionResponse::Array(list)))
+    }
+
+    async fn completion_resolve(&self, params: CompletionItem) -> jsonrpc::Result<CompletionItem> {
+        let data: Option<CompletionData> = if let Some(data) = &params.data {
+            serde_json::from_value(data.clone()).ok()
+        } else {
+            None
+        };
+        if let Some(data) = data {
+            let analysis = self.analysis.get(&data.path).unwrap();
+            let token = analysis.tokens.get(data.token_idx).unwrap();
+            if let Some(token_analysis) = analysis.state.map.get(&data.token_idx) {}
+        }
+        Ok(params)
     }
 
     async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {
