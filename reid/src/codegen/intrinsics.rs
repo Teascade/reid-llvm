@@ -66,12 +66,18 @@ pub enum LLVMIntrinsicKind {
 const INTRINSIC_IDENT: &str = "reid.intrinsic";
 const MALLOC_IDENT: &str = "malloc";
 
+macro_rules! doc {
+    ($str:expr) => {
+        Some($str.to_string())
+    };
+}
+
 pub fn form_intrinsics() -> Vec<FunctionDefinition> {
     let mut intrinsics = Vec::new();
 
     intrinsics.push(FunctionDefinition {
         name: MALLOC_IDENT.to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!("Allocates `size` bytes and returns a `u8`-pointer."),
         linkage_name: Some("malloc".to_owned()),
         is_pub: false,
         is_imported: true,
@@ -91,13 +97,14 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
 
 pub fn simple_intrinsic<T: Into<String> + Clone>(
     name: T,
+    doc: T,
     params: Vec<T>,
     ret: TypeKind,
     intrisic: LLVMIntrinsicKind,
 ) -> FunctionDefinition {
     FunctionDefinition {
         name: name.into(),
-        documentation: Some("temp".to_string()),
+        documentation: Some(doc.into()),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -117,7 +124,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     if let TypeKind::Array(_, len) = ty {
         intrinsics.push(FunctionDefinition {
             name: "length".to_owned(),
-            documentation: Some("temp".to_string()),
+            documentation: doc!("Returns the length of this given array"),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
@@ -135,127 +142,147 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     if ty.category() == TypeCategory::Real {
         intrinsics.push(simple_intrinsic(
             "sqrt",
+            "Calculates the square-root of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Sqrt(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "sin",
+            "Calculates sine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Sin(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "cos",
+            "Calculates cosine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Cos(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "tan",
+            "Calculates tangent of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Tan(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "sinh",
+            "Calculates hyperbolic sine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::SinH(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "cosh",
+            "Calculates hyperbolic cosine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::CosH(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "tanh",
+            "Calculates hyperbolic tangent of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::TanH(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "asin",
+            "Calculates arcsine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::ASin(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "acos",
+            "Calculates arccosine of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::ACos(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "atan",
+            "Calculates arctangent of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::ATan(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "atan2",
+            "Calculates 2-argument arctangent of `value`",
             vec!["self", "other"],
             ty.clone(),
             LLVMIntrinsicKind::ATan2(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "log",
+            "Returns logₑ of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Log(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "log2",
+            "Returns log₂ of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Log2(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "log10",
+            "Returns log₁₀ of `value`",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Log10(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "floor",
+            "Rounds `value` towards negative infinity.",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Floor(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "ceil",
+            "Rounds `value` towards positive infinity.",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Ceil(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "trunc",
+            "Truncates `value` to the integer nearest to `0`.",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Trunc(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "round",
+            "Rounds `value` to the closest even integer.",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::Round(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "even",
+            "Rounds `value` to the closest even integer.",
             vec!["self"],
             ty.clone(),
             LLVMIntrinsicKind::RoundEven(ty.clone()),
         ));
         intrinsics.push(simple_intrinsic(
             "pow",
+            "Returns `value` raised to the exponent of `exponent`.",
             vec!["self", "exponent"],
             ty.clone(),
             LLVMIntrinsicKind::Pow(ty.clone()),
         ));
         intrinsics.push(FunctionDefinition {
             name: "powi".to_owned(),
-            documentation: Some("temp".to_string()),
+            documentation: doc!("Returns `value` raised to the exponent of `exponent`."),
             linkage_name: None,
             is_pub: true,
             is_imported: false,
@@ -284,12 +311,14 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
         TypeCategory::Integer | TypeCategory::Real | TypeCategory::Bool => {
             intrinsics.push(simple_intrinsic(
                 "max",
+                "Returns the larger of `a` and `b`.",
                 vec!["self", "other"],
                 ty.clone(),
                 LLVMIntrinsicKind::Max(ty.clone()),
             ));
             intrinsics.push(simple_intrinsic(
                 "min",
+                "Returns the smaller of `a` and `b`.",
                 vec!["self", "other"],
                 ty.clone(),
                 LLVMIntrinsicKind::Min(ty.clone()),
@@ -297,7 +326,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             if ty.signed() {
                 intrinsics.push(FunctionDefinition {
                     name: "abs".to_owned(),
-                    documentation: Some("temp".to_string()),
+                    documentation: doc!("Returns the absolute value of `value`."),
                     linkage_name: None,
                     is_pub: true,
                     is_imported: false,
@@ -328,7 +357,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     }
     intrinsics.push(FunctionDefinition {
         name: "sizeof".to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!("Simply returns the size of type `T` in bytes."),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -340,7 +369,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     });
     intrinsics.push(FunctionDefinition {
         name: "malloc".to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!("Allocates `T::sizeof() * size` bytes and returns a pointer to `T`."),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -357,7 +386,10 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "memcpy".to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!(
+            "Copies `T::sizeof() * size` bytes from pointer `source` to pointer
+`destination`."
+        ),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -386,7 +418,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "null".to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!("Returns a null-pointer of type `T`."),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
@@ -399,7 +431,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "is_null".to_owned(),
-        documentation: Some("temp".to_string()),
+        documentation: doc!("Returns a boolean representing if `val` is a nullptr or not."),
         linkage_name: None,
         is_pub: true,
         is_imported: false,
