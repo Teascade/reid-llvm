@@ -152,10 +152,12 @@ impl LanguageServer for Backend {
                             })
                             .unwrap(),
                         );
-                        item.documentation = autocomplete
-                            .documentation
-                            .as_ref()
-                            .and_then(|d| Some(lsp_types::Documentation::String(d.clone())));
+                        item.documentation = autocomplete.documentation.as_ref().and_then(|d| {
+                            Some(lsp_types::Documentation::MarkupContent(MarkupContent {
+                                kind: MarkupKind::Markdown,
+                                value: d.clone(),
+                            }))
+                        });
                         item
                     })
                     .collect()

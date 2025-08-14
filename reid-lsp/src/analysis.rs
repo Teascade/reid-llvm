@@ -1243,7 +1243,7 @@ pub fn analyze_expr(
                     .iter()
                     .map(|fun| Autocomplete {
                         text: fun.name.clone(),
-                        documentation: Some("intrinsic function documentation".to_string()),
+                        documentation: fun.documentation.clone(),
                         kind: AutocompleteKind::Function(fun.parameters.clone(), fun.return_type.clone()),
                     })
                     .collect::<Vec<_>>(),
