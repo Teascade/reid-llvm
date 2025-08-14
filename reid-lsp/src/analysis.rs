@@ -85,7 +85,7 @@ impl StaticAnalysis {
 
 #[derive(Debug, Clone)]
 pub struct SemanticToken {
-    pub hover: Option<Hover>,
+    pub hover: Hover,
     pub autocomplete: Vec<Autocomplete>,
     pub symbol: Option<SymbolId>,
 }
@@ -162,15 +162,19 @@ impl AnalysisState {
 }
 
 impl AnalysisState {
-    pub fn init_hover(&mut self, meta: &mir::Metadata, kind: Option<HoverKind>, documentation: Option<String>) {
+    pub fn set_hover_meta(&mut self, meta: &mir::Metadata, hover: Hover) {
         for token in meta.range.start..=meta.range.end {
+            self.set_hover(token, hover.clone());
+        }
+    }
+    pub fn set_hover(&mut self, token_idx: usize, hover: Hover) {
+        if let Some(token) = self.map.get_mut(&token_idx) {
+            token.hover = hover.clone();
+        } else {
             self.map.insert(
-                token,
+                token_idx,
                 SemanticToken {
-                    hover: Some(Hover {
-                        documentation: documentation.clone(),
-                        kind: kind.clone(),
-                    }),
+                    hover: hover.clone(),
                     autocomplete: Vec::new(),
                     symbol: Default::default(),
                 },
@@ -185,7 +189,10 @@ impl AnalysisState {
             self.map.insert(
                 token_idx,
                 SemanticToken {
-                    hover: None,
+                    hover: Hover {
+                        documentation: None,
+                        kind: None,
+                    },
                     autocomplete: autocomplete.clone(),
                     symbol: Default::default(),
                 },
@@ -196,22 +203,15 @@ impl AnalysisState {
     pub fn set_documentation(&mut self, token_idx: usize, documentation: Option<String>) {
         if let Some(documentation) = documentation {
             if let Some(token) = self.map.get_mut(&token_idx) {
-                if let Some(hover) = &mut token.hover {
-                    hover.documentation = Some(documentation);
-                } else {
-                    token.hover = Some(Hover {
-                        documentation: Some(documentation),
-                        kind: None,
-                    });
-                }
+                token.hover.documentation = Some(documentation);
             } else {
                 self.map.insert(
                     token_idx,
                     SemanticToken {
-                        hover: Some(Hover {
+                        hover: Hover {
                             documentation: Some(documentation),
                             kind: None,
-                        }),
+                        },
                         autocomplete: Vec::new(),
                         symbol: Default::default(),
                     },
@@ -228,7 +228,10 @@ impl AnalysisState {
             self.map.insert(
                 idx,
                 SemanticToken {
-                    hover: None,
+                    hover: Hover {
+                        documentation: None,
+                        kind: None,
+                    },
                     autocomplete: Vec::new(),
                     symbol: Some(symbol),
                 },
@@ -273,8 +276,8 @@ pub struct AnalysisScope<'a> {
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
     types: HashMap<TypeKind, (SourceModuleId, SymbolId)>,
-    functions: HashMap<String, (SourceModuleId, SymbolId, Option<String>)>,
-    associated_functions: HashMap<(TypeKind, String), (SourceModuleId, SymbolId, Option<String>)>,
+    functions: HashMap<String, (SourceModuleId, SymbolId, Hover)>,
+    associated_functions: HashMap<(TypeKind, String), (SourceModuleId, SymbolId, Hover)>,
     map: &'a StateMap,
 }
 
@@ -576,7 +579,7 @@ pub fn analyze_context(
                         .token_idx(&field.2, |t| matches!(t, Token::Identifier(_)))
                         .unwrap_or(field.2.range.end);
 
-                    scope.state.init_hover(
+                    scope.state.set_hover_meta(
                         &Metadata {
                             source_module_id: field.2.source_module_id,
                             range: TokenRange {
@@ -585,8 +588,10 @@ pub fn analyze_context(
                             },
                             position: None,
                         },
-                        Some(HoverKind::Type(field.1.clone())),
-                        None,
+                        Hover {
+                            kind: Some(HoverKind::Type(field.1.clone())),
+                            documentation: None,
+                        },
                     );
 
                     let field_symbol = scope.state.new_symbol(field_idx, SemanticKind::Property);
@@ -628,7 +633,7 @@ pub fn analyze_context(
                         scope.state.new_symbol(field_ty_idx, SemanticKind::Type)
                     };
 
-                    scope.state.init_hover(
+                    scope.state.set_hover_meta(
                         &Metadata {
                             source_module_id: field.2.source_module_id,
                             range: TokenRange {
@@ -637,8 +642,10 @@ pub fn analyze_context(
                             },
                             position: None,
                         },
-                        Some(HoverKind::Type(field.1.clone())),
-                        None,
+                        Hover {
+                            kind: Some(HoverKind::Type(field.1.clone())),
+                            documentation: None,
+                        },
                     );
                     scope.state.set_symbol(field_ty_idx, field_ty_symbol);
                 }
@@ -649,9 +656,13 @@ pub fn analyze_context(
     for binop in &module.binop_defs {
         if binop.meta.source_module_id == module.module_id {
             for param in [&binop.lhs, &binop.rhs] {
-                scope
-                    .state
-                    .init_hover(&param.meta, Some(HoverKind::Type(param.ty.clone())), None);
+                scope.state.set_hover_meta(
+                    &param.meta,
+                    Hover {
+                        kind: Some(HoverKind::Type(param.ty.clone())),
+                        documentation: None,
+                    },
+                );
                 let idx = scope
                     .token_idx(&param.meta, |t| matches!(t, Token::Identifier(_)))
                     .unwrap_or(param.meta.range.end);
@@ -675,7 +686,18 @@ pub fn analyze_context(
                     if let Some(symbol) = state.associated_functions.get(&(ty.clone(), function.name.clone())) {
                         scope.associated_functions.insert(
                             (ty.clone(), function.name.clone()),
-                            (source_id, *symbol, function.documentation.clone()),
+                            (
+                                source_id,
+                                *symbol,
+                                Hover {
+                                    documentation: function.documentation.clone(),
+                                    kind: Some(HoverKind::Function(
+                                        function.name.clone(),
+                                        function.parameters.clone(),
+                                        function.return_type.clone(),
+                                    )),
+                                },
+                            ),
                         );
                     }
                 }
@@ -694,7 +716,18 @@ pub fn analyze_context(
             .insert((ty.clone(), function.name.clone()), symbol);
         scope.associated_functions.insert(
             (ty.clone(), function.name.clone()),
-            (module.module_id, symbol, function.documentation.clone()),
+            (
+                module.module_id,
+                symbol,
+                Hover {
+                    documentation: function.documentation.clone(),
+                    kind: Some(HoverKind::Function(
+                        function.name.clone(),
+                        function.parameters.clone(),
+                        function.return_type.clone(),
+                    )),
+                },
+            ),
         );
     }
 
@@ -723,7 +756,18 @@ pub fn analyze_context(
                     if let Some(symbol) = state.functions.get(&function.name) {
                         scope.functions.insert(
                             function.name.clone(),
-                            (source_id, *symbol, function.documentation.clone()),
+                            (
+                                source_id,
+                                *symbol,
+                                Hover {
+                                    documentation: function.documentation.clone(),
+                                    kind: Some(HoverKind::Function(
+                                        function.name.clone(),
+                                        function.parameters.clone(),
+                                        function.return_type.clone(),
+                                    )),
+                                },
+                            ),
                         );
                     }
                 }
@@ -731,10 +775,12 @@ pub fn analyze_context(
             }
         }
 
-        scope.state.init_hover(
+        scope.state.set_hover_meta(
             &function.signature(),
-            Some(HoverKind::Type(function.return_type.clone())),
-            function.documentation.clone(),
+            Hover {
+                kind: Some(HoverKind::Type(function.return_type.clone())),
+                documentation: None,
+            },
         );
 
         let idx = scope
@@ -745,7 +791,18 @@ pub fn analyze_context(
         scope.state.functions.insert(function.name.clone(), function_symbol);
         scope.functions.insert(
             function.name.clone(),
-            (module.module_id, function_symbol, function.documentation.clone()),
+            (
+                module.module_id,
+                function_symbol,
+                Hover {
+                    documentation: function.documentation.clone(),
+                    kind: Some(HoverKind::Function(
+                        function.name.clone(),
+                        function.parameters.clone(),
+                        function.return_type.clone(),
+                    )),
+                },
+            ),
         );
     }
 
@@ -768,7 +825,13 @@ pub fn analyze_context(
     }
 
     for import in &module.imports {
-        scope.state.init_hover(&import.1, None, None);
+        scope.state.set_hover_meta(
+            &import.1,
+            Hover {
+                kind: None,
+                documentation: None,
+            },
+        );
         if let Some((module_name, _)) = import.0.get(0) {
             let module_idx = scope
                 .token_idx(&import.1, |t| matches!(t, Token::Identifier(_)))
@@ -810,11 +873,11 @@ pub fn analyze_context(
                 }
             }
 
-            let symbol = if let Some((source_id, symbol_id, doc)) = scope.functions.get(&import_name) {
+            let symbol = if let Some((source_id, symbol_id, hover)) = scope.functions.get(&import_name) {
                 let symbol_id = scope
                     .state
                     .new_symbol(import_idx, SemanticKind::Reference(*source_id, *symbol_id));
-                scope.state.set_documentation(import_idx, doc.clone());
+                scope.state.set_hover(import_idx, hover.clone());
                 symbol_id
             } else if let Some(module_source) = scope.map.values().find(|s| s.module_name == *module_name) {
                 if let Some((source_id, symbol_id)) = scope.types.get(&TypeKind::CustomType(CustomTypeKey(
@@ -850,9 +913,13 @@ pub fn analyze_function_parameters(
     scope: &mut AnalysisScope,
 ) {
     for param in &function.parameters {
-        scope
-            .state
-            .init_hover(&param.meta, Some(HoverKind::Type(param.ty.clone())), None);
+        scope.state.set_hover_meta(
+            &param.meta,
+            Hover {
+                kind: Some(HoverKind::Type(param.ty.clone())),
+                documentation: None,
+            },
+        );
 
         if param.meta.source_module_id == module.module_id {
             let param_var_idx = scope
@@ -891,14 +958,16 @@ pub fn analyze_block(
     for statement in &block.statements {
         match &statement.0 {
             mir::StmtKind::Let(named_variable_ref, _, expression) => {
-                scope.state.init_hover(
+                scope.state.set_hover_meta(
                     &named_variable_ref.2,
-                    expression
-                        .return_type(&TypeRefs::unknown(), source_module.module_id)
-                        .ok()
-                        .map(|(_, ty)| ty)
-                        .map(|t| HoverKind::Type(t)),
-                    None,
+                    Hover {
+                        documentation: None,
+                        kind: expression
+                            .return_type(&TypeRefs::unknown(), source_module.module_id)
+                            .ok()
+                            .map(|(_, ty)| ty)
+                            .map(|t| HoverKind::Type(t)),
+                    },
                 );
                 let idx = scope
                     .token_idx(&named_variable_ref.2, |t| matches!(t, Token::Identifier(_)))
@@ -949,19 +1018,26 @@ pub fn analyze_expr(
     expr: &mir::Expression,
     scope: &mut AnalysisScope,
 ) {
-    scope.state.init_hover(
+    scope.state.set_hover_meta(
         &expr.1,
-        expr.return_type(&TypeRefs::unknown(), source_module.module_id)
-            .ok()
-            .map(|(_, t)| HoverKind::Type(t)),
-        None,
+        Hover {
+            documentation: None,
+            kind: expr
+                .return_type(&TypeRefs::unknown(), source_module.module_id)
+                .ok()
+                .map(|(_, t)| HoverKind::Type(t)),
+        },
     );
 
     match &expr.0 {
         mir::ExprKind::Variable(var_ref) => {
-            scope
-                .state
-                .init_hover(&var_ref.2, Some(HoverKind::Type(var_ref.0.clone())), None);
+            scope.state.set_hover_meta(
+                &var_ref.2,
+                Hover {
+                    documentation: None,
+                    kind: Some(HoverKind::Type(var_ref.0.clone())),
+                },
+            );
 
             let idx = scope
                 .token_idx(&var_ref.2, |t| matches!(t, Token::Identifier(_)))
@@ -1105,11 +1181,11 @@ pub fn analyze_expr(
             let idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let symbol = if let Some((module_id, symbol_id, doc)) = scope.functions.get(name) {
+            let symbol = if let Some((module_id, symbol_id, hover)) = scope.functions.get(name) {
                 let symbol = scope
                     .state
                     .new_symbol(idx, SemanticKind::Reference(*module_id, *symbol_id));
-                scope.state.set_documentation(idx, doc.clone());
+                scope.state.set_hover(idx, hover.clone());
                 symbol
             } else {
                 scope.state.new_symbol(idx, SemanticKind::Function)
@@ -1143,13 +1219,13 @@ pub fn analyze_expr(
             let fn_idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let fn_symbol = if let Some((module_id, symbol_id, doc)) =
+            let fn_symbol = if let Some((module_id, symbol_id, hover)) =
                 scope.associated_functions.get(&(invoked_ty.clone(), name.clone()))
             {
                 let symbol = scope
                     .state
                     .new_symbol(fn_idx, SemanticKind::Reference(*module_id, *symbol_id));
-                scope.state.set_documentation(fn_idx, doc.clone());
+                scope.state.set_hover(fn_idx, hover.clone());
                 symbol
             } else {
                 scope.state.new_symbol(fn_idx, SemanticKind::Function)
