@@ -6,7 +6,7 @@ use reid::{
         lexer::{FullToken, Token},
         token_stream::TokenRange,
     },
-    codegen::intrinsics::get_intrinsic_assoc_functions,
+    codegen::intrinsics::{self, get_intrinsic_assoc_functions},
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
@@ -1215,10 +1215,21 @@ pub fn analyze_expr(
                 scope.state.new_symbol(type_idx, SemanticKind::Type)
             };
             scope.state.set_symbol(type_idx, type_symbol);
+            scope.state.set_hover(
+                type_idx,
+                Hover {
+                    documentation: None,
+                    kind: Some(HoverKind::Type(invoked_ty.clone())),
+                },
+            );
 
             let fn_idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
+
+            let intrinsics = get_intrinsic_assoc_functions(&invoked_ty);
+            let intrinsic_fn = intrinsics.iter().find(|i| i.name == *name);
+
             let fn_symbol = if let Some((module_id, symbol_id, hover)) =
                 scope.associated_functions.get(&(invoked_ty.clone(), name.clone()))
             {
@@ -1226,6 +1237,20 @@ pub fn analyze_expr(
                     .state
                     .new_symbol(fn_idx, SemanticKind::Reference(*module_id, *symbol_id));
                 scope.state.set_hover(fn_idx, hover.clone());
+                symbol
+            } else if let Some(intrinsic) = intrinsic_fn {
+                let symbol = scope.state.new_symbol(fn_idx, SemanticKind::Function);
+                scope.state.set_hover(
+                    fn_idx,
+                    Hover {
+                        documentation: intrinsic.documentation.clone(),
+                        kind: Some(HoverKind::Function(
+                            intrinsic.name.clone(),
+                            intrinsic.parameters.clone(),
+                            intrinsic.return_type.clone(),
+                        )),
+                    },
+                );
                 symbol
             } else {
                 scope.state.new_symbol(fn_idx, SemanticKind::Function)
