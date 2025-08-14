@@ -585,6 +585,9 @@ pub fn form_intrinsic_binops() -> Vec<BinopDefinition> {
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::NE), &ty, |scope, lhs, rhs| {
             scope.block.build(Instr::FCmp(CmpPredicate::NE, lhs, rhs)).unwrap()
         }));
+        intrinsics.push(boolean_binop_def(Cmp(CmpOperator::EQ), &ty, |scope, lhs, rhs| {
+            scope.block.build(Instr::FCmp(CmpPredicate::EQ, lhs, rhs)).unwrap()
+        }));
         intrinsics.push(boolean_binop_def(Cmp(CmpOperator::GT), &ty, |scope, lhs, rhs| {
             scope.block.build(Instr::FCmp(CmpPredicate::GT, lhs, rhs)).unwrap()
         }));
