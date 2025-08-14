@@ -21,6 +21,11 @@ impl i32 {
     }
 }
 
+/// Hello there!
+fn test() {
+
+}
+
 fn main() -> u32 {
     let otus = Otus { field: 17 };
     print(from_str("otus: ") + Otus::test(&otus) as u64);

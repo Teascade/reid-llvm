@@ -64,10 +64,6 @@ _deprecated: Use `String::concat()`_
 
 ## General
 
-#### `pub fn allocate(size: u64) -> *u8`
-
-Unsafely allocates `size` bytes of memory from the stack, and returns a pointer to it, which must be manually freed.
-
 ## Maths
 
 #### `pub fn clamp(min: f32, max: f32, value: f32) -> f32`

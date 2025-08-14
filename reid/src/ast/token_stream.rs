@@ -105,7 +105,6 @@ impl<'a, 'b> TokenStream<'a, 'b> {
                 break;
             }
         }
-        dbg!(self.position, from, &documentation);
         documentation
     }
 

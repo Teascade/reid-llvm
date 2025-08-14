@@ -697,8 +697,6 @@ impl Parse for ImportStatement {
 impl Parse for FunctionDefinition {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         let documentation = stream.find_documentation();
-        dbg!(&stream.get_range());
-        dbg!(&documentation);
 
         let is_pub = if let Some(Token::PubKeyword) = stream.peek() {
             stream.next(); // Consume pub

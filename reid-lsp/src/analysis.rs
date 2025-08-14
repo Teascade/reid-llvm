@@ -276,8 +276,10 @@ pub struct AnalysisScope<'a> {
     tokens: &'a Vec<FullToken>,
     variables: HashMap<String, SymbolId>,
     types: HashMap<TypeKind, (SourceModuleId, SymbolId)>,
-    functions: HashMap<String, (SourceModuleId, SymbolId, Hover)>,
-    associated_functions: HashMap<(TypeKind, String), (SourceModuleId, SymbolId, Hover)>,
+    functions: HashMap<String, (SourceModuleId, SymbolId)>,
+    associated_functions: HashMap<(TypeKind, String), (SourceModuleId, SymbolId)>,
+    function_hovers: HashMap<String, Hover>,
+    assoc_function_hovers: HashMap<(TypeKind, String), Hover>,
     map: &'a StateMap,
 }
 
@@ -290,7 +292,9 @@ impl<'a> AnalysisScope<'a> {
             variables: self.variables.clone(),
             types: self.types.clone(),
             functions: self.functions.clone(),
+            function_hovers: self.function_hovers.clone(),
             associated_functions: self.associated_functions.clone(),
+            assoc_function_hovers: self.assoc_function_hovers.clone(),
         }
     }
 
@@ -448,33 +452,6 @@ pub fn analyze(
     return Ok(None);
 }
 
-// pub fn find_documentation(meta: &Metadata, tokens: &Vec<FullToken>) -> Option<String> {
-//     let mut documentation = None;
-//     for idx in meta.range.start..=meta.range.end {
-//         if let Some(token) = tokens.get(idx) {
-//             dbg!(&token);
-//             if matches!(token.token, Token::Whitespace(_) | Token::Doc(_) | Token::Comment(_)) {
-//                 if let Token::Doc(doctext) = &token.token {
-//                     documentation = Some(
-//                         match documentation {
-//                             Some(t) => t + " ",
-//                             None => String::new(),
-//                         } + doctext.trim(),
-//                     );
-//                 }
-//             } else {
-//                 dbg!(&token);
-//                 break;
-//             }
-//         } else {
-//             dbg!(&idx);
-//             break;
-//         }
-//     }
-//     dbg!(&documentation);
-//     documentation
-// }
-
 pub fn analyze_context(
     context: &mir::Context,
     module: &mir::Module,
@@ -500,7 +477,9 @@ pub fn analyze_context(
         map,
         types: HashMap::new(),
         functions: HashMap::new(),
+        function_hovers: HashMap::new(),
         associated_functions: HashMap::new(),
+        assoc_function_hovers: HashMap::new(),
     };
 
     for (i, token) in module.tokens.iter().enumerate() {
@@ -684,20 +663,19 @@ pub fn analyze_context(
             if source_id != module.module_id {
                 if let Some(state) = map.get(&source_id) {
                     if let Some(symbol) = state.associated_functions.get(&(ty.clone(), function.name.clone())) {
-                        scope.associated_functions.insert(
+                        scope
+                            .associated_functions
+                            .insert((ty.clone(), function.name.clone()), (source_id, *symbol));
+                        scope.assoc_function_hovers.insert(
                             (ty.clone(), function.name.clone()),
-                            (
-                                source_id,
-                                *symbol,
-                                Hover {
-                                    documentation: function.documentation.clone(),
-                                    kind: Some(HoverKind::Function(
-                                        function.name.clone(),
-                                        function.parameters.clone(),
-                                        function.return_type.clone(),
-                                    )),
-                                },
-                            ),
+                            Hover {
+                                documentation: function.documentation.clone(),
+                                kind: Some(HoverKind::Function(
+                                    function.name.clone(),
+                                    function.parameters.clone(),
+                                    function.return_type.clone(),
+                                )),
+                            },
                         );
                     }
                 }
@@ -714,20 +692,19 @@ pub fn analyze_context(
             .state
             .associated_functions
             .insert((ty.clone(), function.name.clone()), symbol);
-        scope.associated_functions.insert(
+        scope
+            .associated_functions
+            .insert((ty.clone(), function.name.clone()), (module.module_id, symbol));
+        scope.assoc_function_hovers.insert(
             (ty.clone(), function.name.clone()),
-            (
-                module.module_id,
-                symbol,
-                Hover {
-                    documentation: function.documentation.clone(),
-                    kind: Some(HoverKind::Function(
-                        function.name.clone(),
-                        function.parameters.clone(),
-                        function.return_type.clone(),
-                    )),
-                },
-            ),
+            Hover {
+                documentation: function.documentation.clone(),
+                kind: Some(HoverKind::Function(
+                    function.name.clone(),
+                    function.parameters.clone(),
+                    function.return_type.clone(),
+                )),
+            },
         );
     }
 
@@ -750,27 +727,26 @@ pub fn analyze_context(
     }
 
     for function in &module.functions {
+        dbg!(&function.name);
+        scope.function_hovers.insert(
+            function.name.clone(),
+            Hover {
+                documentation: function.documentation.clone(),
+                kind: Some(HoverKind::Function(
+                    function.name.clone(),
+                    function.parameters.clone(),
+                    function.return_type.clone(),
+                )),
+            },
+        );
+
         if let Some(source_id) = function.source {
-            if source_id != module.module_id {
-                if let Some(state) = map.get(&source_id) {
-                    if let Some(symbol) = state.functions.get(&function.name) {
-                        scope.functions.insert(
-                            function.name.clone(),
-                            (
-                                source_id,
-                                *symbol,
-                                Hover {
-                                    documentation: function.documentation.clone(),
-                                    kind: Some(HoverKind::Function(
-                                        function.name.clone(),
-                                        function.parameters.clone(),
-                                        function.return_type.clone(),
-                                    )),
-                                },
-                            ),
-                        );
-                    }
+            if let Some(state) = map.get(&source_id) {
+                if let Some(symbol) = state.functions.get(&function.name) {
+                    scope.functions.insert(function.name.clone(), (source_id, *symbol));
                 }
+            }
+            if source_id != module.module_id {
                 continue;
             }
         }
@@ -789,21 +765,9 @@ pub fn analyze_context(
         let function_symbol = scope.state.new_symbol(idx, SemanticKind::Function);
         scope.state.set_symbol(idx, function_symbol);
         scope.state.functions.insert(function.name.clone(), function_symbol);
-        scope.functions.insert(
-            function.name.clone(),
-            (
-                module.module_id,
-                function_symbol,
-                Hover {
-                    documentation: function.documentation.clone(),
-                    kind: Some(HoverKind::Function(
-                        function.name.clone(),
-                        function.parameters.clone(),
-                        function.return_type.clone(),
-                    )),
-                },
-            ),
-        );
+        scope
+            .functions
+            .insert(function.name.clone(), (module.module_id, function_symbol));
     }
 
     for function in &module.functions {
@@ -873,12 +837,10 @@ pub fn analyze_context(
                 }
             }
 
-            let symbol = if let Some((source_id, symbol_id, hover)) = scope.functions.get(&import_name) {
-                let symbol_id = scope
+            let symbol = if let Some((source_id, symbol_id)) = scope.functions.get(&import_name) {
+                scope
                     .state
-                    .new_symbol(import_idx, SemanticKind::Reference(*source_id, *symbol_id));
-                scope.state.set_hover(import_idx, hover.clone());
-                symbol_id
+                    .new_symbol(import_idx, SemanticKind::Reference(*source_id, *symbol_id))
             } else if let Some(module_source) = scope.map.values().find(|s| s.module_name == *module_name) {
                 if let Some((source_id, symbol_id)) = scope.types.get(&TypeKind::CustomType(CustomTypeKey(
                     import_name.clone(),
@@ -894,6 +856,9 @@ pub fn analyze_context(
                 scope.state.new_symbol(import_idx, SemanticKind::Default)
             };
             scope.state.set_symbol(import_idx, symbol);
+            if let Some(hover) = scope.function_hovers.get(&import_name) {
+                scope.state.set_hover(import_idx, hover.clone());
+            }
 
             scope.state.set_autocomplete(import_meta.range.end, autocompletes);
         }
@@ -1181,16 +1146,18 @@ pub fn analyze_expr(
             let idx = scope
                 .token_idx(&meta, |t| matches!(t, Token::Identifier(_)))
                 .unwrap_or(meta.range.end);
-            let symbol = if let Some((module_id, symbol_id, hover)) = scope.functions.get(name) {
-                let symbol = scope
+            let symbol = if let Some((module_id, symbol_id)) = scope.functions.get(name) {
+                scope
                     .state
-                    .new_symbol(idx, SemanticKind::Reference(*module_id, *symbol_id));
-                scope.state.set_hover(idx, hover.clone());
-                symbol
+                    .new_symbol(idx, SemanticKind::Reference(*module_id, *symbol_id))
             } else {
                 scope.state.new_symbol(idx, SemanticKind::Function)
             };
+
             scope.state.set_symbol(idx, symbol);
+            if let Some(hover) = scope.function_hovers.get(name) {
+                scope.state.set_hover(idx, hover.clone());
+            }
         }
         mir::ExprKind::AssociatedFunctionCall(
             ty,
@@ -1230,14 +1197,12 @@ pub fn analyze_expr(
             let intrinsics = get_intrinsic_assoc_functions(&invoked_ty);
             let intrinsic_fn = intrinsics.iter().find(|i| i.name == *name);
 
-            let fn_symbol = if let Some((module_id, symbol_id, hover)) =
+            let fn_symbol = if let Some((module_id, symbol_id)) =
                 scope.associated_functions.get(&(invoked_ty.clone(), name.clone()))
             {
-                let symbol = scope
+                scope
                     .state
-                    .new_symbol(fn_idx, SemanticKind::Reference(*module_id, *symbol_id));
-                scope.state.set_hover(fn_idx, hover.clone());
-                symbol
+                    .new_symbol(fn_idx, SemanticKind::Reference(*module_id, *symbol_id))
             } else if let Some(intrinsic) = intrinsic_fn {
                 let symbol = scope.state.new_symbol(fn_idx, SemanticKind::Function);
                 scope.state.set_hover(
@@ -1256,6 +1221,9 @@ pub fn analyze_expr(
                 scope.state.new_symbol(fn_idx, SemanticKind::Function)
             };
             scope.state.set_symbol(fn_idx, fn_symbol);
+            if let Some(hover) = scope.function_hovers.get(name) {
+                scope.state.set_hover(fn_idx, hover.clone());
+            }
 
             for expr in parameters {
                 analyze_expr(context, source_module, expr, scope);
