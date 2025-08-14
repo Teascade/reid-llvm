@@ -1221,7 +1221,7 @@ pub fn analyze_expr(
                 scope.state.new_symbol(fn_idx, SemanticKind::Function)
             };
             scope.state.set_symbol(fn_idx, fn_symbol);
-            if let Some(hover) = scope.function_hovers.get(name) {
+            if let Some(hover) = scope.assoc_function_hovers.get(&(invoked_ty.clone(), name.clone())) {
                 scope.state.set_hover(fn_idx, hover.clone());
             }
 
