@@ -308,12 +308,23 @@ impl<'outer> ScopeTypeRefs<'outer> {
                     let lhs_resolved = lhs.resolve_ref(self.types);
                     let rhs_resolved = rhs.resolve_ref(self.types);
 
-                    let binops = self
+                    let mut binops = self
                         .types
                         .binop_types
                         .iter()
                         .filter(|b| b.1.operator == op && b.1.return_ty == *ty)
                         .collect::<Vec<_>>();
+
+                    // Sort binops by lhs and then rhs
+                    binops.sort_by(|a, b| {
+                        let lhs = a.1.hands.0.cmp(&b.1.hands.0);
+                        let rhs = a.1.hands.1.cmp(&b.1.hands.1);
+                        match lhs {
+                            std::cmp::Ordering::Equal => rhs,
+                            _ => lhs,
+                        }
+                    });
+
                     for binop in binops {
                         if let (Ok(lhs_narrow), Ok(rhs_narrow)) = (
                             lhs_resolved.narrow_into(&binop.1.hands.0),
@@ -374,6 +385,9 @@ impl<'outer> ScopeTypeRefs<'outer> {
             self.narrow_to_type(&hint1, &ty)?;
             let hint1_typeref = self.types.retrieve_typeref(*hint1.0.borrow()).unwrap();
             let hint2_typeref = self.types.retrieve_typeref(*hint2.0.borrow()).unwrap();
+
+            dbg!(&hint1_typeref);
+            dbg!(&hint2_typeref);
 
             match (&hint1_typeref, &hint2_typeref) {
                 (TypeRefKind::Direct(ret_ty), TypeRefKind::BinOp(op, lhs, rhs)) => {
@@ -487,6 +501,17 @@ impl<'outer> ScopeTypeRefs<'outer> {
                 }
             }
         }
+
+        // Sort binops by lhs and then rhs
+        applying_binops.sort_by(|a, b| {
+            let lhs = a.hands.0.cmp(&b.hands.0);
+            let rhs = a.hands.1.cmp(&b.hands.1);
+            match lhs {
+                std::cmp::Ordering::Equal => rhs,
+                _ => lhs,
+            }
+        });
+
         applying_binops
     }
 }

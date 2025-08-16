@@ -48,7 +48,7 @@ impl TypeKind {
             TypeKind::Borrow(..) => false,
             TypeKind::UserPtr(..) => false,
             TypeKind::F16 => true,
-            TypeKind::F32B => true,
+            TypeKind::F16B => true,
             TypeKind::F32 => true,
             TypeKind::F64 => true,
             TypeKind::F128 => true,
@@ -73,21 +73,26 @@ impl TypeKind {
             TypeKind::Void => 0,
             TypeKind::Char => 8,
             TypeKind::Array(type_kind, len) => type_kind.size_of(map) * (*len as u64),
-            TypeKind::CustomType(key) => match &map.get(key).unwrap().kind {
-                TypeDefinitionKind::Struct(struct_type) => {
-                    let mut size = 0;
-                    for field in &struct_type.0 {
-                        size += field.1.size_of(map)
+            TypeKind::CustomType(key) => match &map.get(key) {
+                Some(def) => match &def.kind {
+                    TypeDefinitionKind::Struct(struct_type) => {
+                        let mut size = 0;
+                        for field in &struct_type.0 {
+                            size += field.1.size_of(map)
+                        }
+                        size
                     }
-                    size
-                }
+                },
+                // Easy to recognize default number. Used e.g. when sorting
+                // types by size
+                None => 404,
             },
             TypeKind::CodegenPtr(_) => 64,
             TypeKind::Vague(_) => panic!("Tried to sizeof a vague type!"),
             TypeKind::Borrow(..) => 64,
             TypeKind::UserPtr(_) => 64,
             TypeKind::F16 => 16,
-            TypeKind::F32B => 16,
+            TypeKind::F16B => 16,
             TypeKind::F32 => 32,
             TypeKind::F64 => 64,
             TypeKind::F128 => 128,
@@ -118,7 +123,7 @@ impl TypeKind {
             TypeKind::Borrow(_, _) => 64,
             TypeKind::UserPtr(_) => 64,
             TypeKind::F16 => 16,
-            TypeKind::F32B => 16,
+            TypeKind::F16B => 16,
             TypeKind::F32 => 32,
             TypeKind::F64 => 64,
             TypeKind::F128 => 128,
@@ -148,7 +153,7 @@ impl TypeKind {
             | TypeKind::U128
             | TypeKind::Char => TypeCategory::Integer,
             TypeKind::F16
-            | TypeKind::F32B
+            | TypeKind::F16B
             | TypeKind::F32
             | TypeKind::F64
             | TypeKind::F128
@@ -197,6 +202,36 @@ impl TypeKind {
     }
 }
 
+impl Ord for TypeKind {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::*;
+
+        let category_ord = self.category().partial_cmp(&other.category());
+
+        match category_ord {
+            Some(Ordering::Equal) | None => {
+                if !self.signed() && other.signed() {
+                    return Ordering::Less;
+                }
+                if self.signed() && !other.signed() {
+                    return Ordering::Greater;
+                }
+
+                let self_size = self.size_of(&HashMap::new());
+                let other_size = other.size_of(&HashMap::new());
+                if self_size == 32 && other_size != 32 {
+                    return Ordering::Less;
+                } else if self_size != 32 && other_size == 32 {
+                    return Ordering::Greater;
+                }
+
+                self_size.cmp(&self_size)
+            }
+            Some(ord) => ord,
+        }
+    }
+}
+
 impl BinaryOperator {
     pub fn is_commutative(&self) -> bool {
         match self {
@@ -224,7 +259,28 @@ impl BinaryOperator {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+const TYPE_CATEGORY_ORDER: [TypeCategory; 5] = [
+    TypeCategory::Integer,
+    TypeCategory::Bool,
+    TypeCategory::Real,
+    TypeCategory::Other,
+    TypeCategory::TypeRef,
+];
+
+impl PartialOrd for TypeCategory {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        use std::cmp::*;
+        let self_idx = TYPE_CATEGORY_ORDER.iter().enumerate().find(|s| s.1 == self);
+        let other_idx = TYPE_CATEGORY_ORDER.iter().enumerate().find(|s| s.1 == other);
+        if let (Some(self_idx), Some(other_idx)) = (self_idx, other_idx) {
+            Some(self_idx.cmp(&other_idx))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Ord)]
 pub enum TypeCategory {
     Integer,
     Real,

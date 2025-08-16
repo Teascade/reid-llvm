@@ -583,7 +583,7 @@ impl ast::TypeKind {
             }
             ast::TypeKind::Ptr(type_kind) => mir::TypeKind::UserPtr(Box::new(type_kind.clone().into_mir(source_mod))),
             ast::TypeKind::F16 => mir::TypeKind::F16,
-            ast::TypeKind::F32B => mir::TypeKind::F32B,
+            ast::TypeKind::F32B => mir::TypeKind::F16B,
             ast::TypeKind::F32 => mir::TypeKind::F32,
             ast::TypeKind::F64 => mir::TypeKind::F64,
             ast::TypeKind::F80 => mir::TypeKind::F80,

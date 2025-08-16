@@ -26,7 +26,7 @@ const INTEGERS: [TypeKind; 10] = [
 const FLOATS: [TypeKind; 7] = [
     TypeKind::F16,
     TypeKind::F32,
-    TypeKind::F32B,
+    TypeKind::F16B,
     TypeKind::F64,
     TypeKind::F80,
     TypeKind::F128,

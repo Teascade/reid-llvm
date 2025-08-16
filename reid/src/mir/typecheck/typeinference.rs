@@ -362,6 +362,8 @@ impl Expression {
                 let mut lhs_ref = lhs.infer_types(state, type_refs)?;
                 let mut rhs_ref = rhs.infer_types(state, type_refs)?;
 
+                dbg!(&lhs_ref, &rhs_ref);
+
                 let binops = if let (Some(lhs_ty), Some(rhs_ty)) = (lhs_ref.resolve_deep(), rhs_ref.resolve_deep()) {
                     let mut applying_binops = Vec::new();
                     for (_, binop) in state.scope.binops.iter() {
@@ -383,6 +385,7 @@ impl Expression {
                 } else {
                     Vec::new()
                 };
+
                 if binops.len() > 0 {
                     let binop = unsafe { binops.get_unchecked(0) };
                     let mut widened_lhs = binop.hands.0.clone();
@@ -394,10 +397,10 @@ impl Expression {
                     let binop_res = type_refs.from_binop(*op, &lhs_ref, &rhs_ref);
                     // dbg!(&return_ty);
                     // dbg!(&binop_res);
-                    // dbg!(&lhs_ref, &rhs_ref, &binops, &widened_lhs, &widened_rhs);
                     lhs_ref.narrow(&type_refs.from_type(&widened_lhs).unwrap());
                     rhs_ref.narrow(&type_refs.from_type(&widened_rhs).unwrap());
                     *return_ty = binop_res.as_type();
+                    dbg!(&lhs_ref, &rhs_ref);
                     Ok(binop_res)
                 } else {
                     Err(ErrorKind::InvalidBinop(
@@ -438,7 +441,10 @@ impl Expression {
 
                 // Try to narrow condition type to boolean
                 if let Some(mut cond_hints) = cond_hints {
+                    println!("before: {}", type_refs.types);
+                    dbg!(&cond_hints);
                     cond_hints.narrow(&mut type_refs.from_type(&Bool).unwrap());
+                    println!("after: {}", type_refs.types);
                 }
 
                 // Infer LHS return type

@@ -105,7 +105,7 @@ impl TokenRange {
 #[derive(Hash, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct CustomTypeKey(pub String, pub SourceModuleId);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Hash)]
 pub enum TypeKind {
     Bool,
     I8,
@@ -120,7 +120,7 @@ pub enum TypeKind {
     U128,
     Void,
     F16,
-    F32B,
+    F16B,
     F32,
     F64,
     F128,
@@ -220,7 +220,7 @@ impl Literal {
             Literal::Vague(VagueLiteral::Number(_)) => TypeKind::Vague(VagueType::Integer),
             Literal::Vague(VagueLiteral::Decimal(_)) => TypeKind::Vague(VagueType::Decimal),
             Literal::F16(_) => TypeKind::F16,
-            Literal::F32B(_) => TypeKind::F32B,
+            Literal::F32B(_) => TypeKind::F16B,
             Literal::F32(_) => TypeKind::F32,
             Literal::F64(_) => TypeKind::F64,
             Literal::F80(_) => TypeKind::F80,

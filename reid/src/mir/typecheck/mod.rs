@@ -141,7 +141,7 @@ impl TypeKind {
                 | TypeKind::U64
                 | TypeKind::U128
                 | TypeKind::F16
-                | TypeKind::F32B
+                | TypeKind::F16B
                 | TypeKind::F32
                 | TypeKind::F64
                 | TypeKind::F80
@@ -153,7 +153,7 @@ impl TypeKind {
                 TypeKind::Vague(Vague::Unknown) => Ok(TypeKind::Vague(Vague::Decimal)),
                 TypeKind::Vague(Vague::Decimal) => Ok(TypeKind::Vague(Vague::Decimal)),
                 TypeKind::F16
-                | TypeKind::F32B
+                | TypeKind::F16B
                 | TypeKind::F32
                 | TypeKind::F64
                 | TypeKind::F80
@@ -207,7 +207,7 @@ impl TypeKind {
             },
             (TypeKind::Vague(Vague::Decimal), other) | (other, TypeKind::Vague(Vague::Decimal)) => match other {
                 TypeKind::F16
-                | TypeKind::F32B
+                | TypeKind::F16B
                 | TypeKind::F32
                 | TypeKind::F64
                 | TypeKind::F80

@@ -79,7 +79,7 @@ impl TypeKind {
             TypeKind::U128 => Type::U128,
             TypeKind::Bool => Type::Bool,
             TypeKind::F16 => Type::F16,
-            TypeKind::F32B => Type::F32B,
+            TypeKind::F16B => Type::F32B,
             TypeKind::F32 => Type::F32,
             TypeKind::F64 => Type::F64,
             TypeKind::F128 => Type::F128,
@@ -223,7 +223,7 @@ impl TypeKind {
                     TypeKind::U16 | TypeKind::U32 | TypeKind::U64 | TypeKind::U128 => DwarfEncoding::Unsigned,
                     TypeKind::F16
                     | TypeKind::F32
-                    | TypeKind::F32B
+                    | TypeKind::F16B
                     | TypeKind::F64
                     | TypeKind::F80
                     | TypeKind::F128

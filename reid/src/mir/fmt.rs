@@ -471,7 +471,7 @@ impl Display for TypeKind {
             }
             TypeKind::Vague(vague_type) => Display::fmt(vague_type, f),
             TypeKind::F16 => write!(f, "f16"),
-            TypeKind::F32B => write!(f, "f16b"),
+            TypeKind::F16B => write!(f, "f16b"),
             TypeKind::F32 => write!(f, "f32"),
             TypeKind::F64 => write!(f, "f64"),
             TypeKind::F128 => write!(f, "f128"),
