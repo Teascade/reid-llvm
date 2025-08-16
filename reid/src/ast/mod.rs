@@ -208,7 +208,7 @@ pub enum SelfKind {
     None,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ReturnType {
     Soft,
     Hard,

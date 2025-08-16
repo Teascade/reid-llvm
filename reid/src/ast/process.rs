@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    ast::{self},
+    ast::{self, ReturnType},
     mir::{
         self, CustomTypeKey, FunctionParam, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind,
         StructField, StructType, WhileStatement,
@@ -265,8 +265,33 @@ impl ast::Block {
                         ),
                         counter_range.as_meta(module_id),
                     );
-                    let mut mir_block = block.into_mir(module_id);
-                    mir_block.statements.push(set_new);
+
+                    let mir_block = if let Some((ret_kind, ret_expr)) = &block.1 {
+                        if *ret_kind == ReturnType::Soft {
+                            if let Some(ret_expr) = ret_expr {
+                                let mir_ret = ret_expr.process(module_id);
+                                let mut clone = block.clone();
+                                clone.1 = None;
+                                let mut mir_block = clone.into_mir(module_id);
+                                mir_block
+                                    .statements
+                                    .push(mir::Statement(StmtKind::Expression(mir_ret.clone()), mir_ret.1));
+                                mir_block.statements.push(set_new);
+                                mir_block
+                            } else {
+                                let mut mir_block = block.into_mir(module_id);
+                                mir_block.statements.push(set_new);
+                                mir_block
+                            }
+                        } else {
+                            block.into_mir(module_id)
+                        }
+                    } else {
+                        let mut mir_block = block.into_mir(module_id);
+                        mir_block.statements.push(set_new);
+                        mir_block
+                    };
+
                     let while_statement = mir::Statement(
                         StmtKind::While(WhileStatement {
                             condition: mir::Expression(
