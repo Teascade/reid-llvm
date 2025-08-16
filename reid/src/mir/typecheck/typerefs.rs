@@ -386,9 +386,6 @@ impl<'outer> ScopeTypeRefs<'outer> {
             let hint1_typeref = self.types.retrieve_typeref(*hint1.0.borrow()).unwrap();
             let hint2_typeref = self.types.retrieve_typeref(*hint2.0.borrow()).unwrap();
 
-            dbg!(&hint1_typeref);
-            dbg!(&hint2_typeref);
-
             match (&hint1_typeref, &hint2_typeref) {
                 (TypeRefKind::Direct(ret_ty), TypeRefKind::BinOp(op, lhs, rhs)) => {
                     let mut lhs_ref = self.from_type(&lhs).unwrap();
