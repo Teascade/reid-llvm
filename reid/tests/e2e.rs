@@ -169,3 +169,8 @@ fn mutable_inner_functions() {
 fn cpu_raytracer_compiles() {
     test_compile(include_str!("../../examples/cpu_raytracer.reid"), "test");
 }
+
+#[test]
+fn loop_edge_case_functions() {
+    test(include_str!("../../examples/loop_edge_case.reid"), "test", Some(0));
+}

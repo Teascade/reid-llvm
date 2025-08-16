@@ -1,0 +1,10 @@
+import complicated_imported::Foo;
+import complicated_imported::A;
+import complicated_imported::AResult;
+
+fn main() -> i32 {
+    let foo = Foo {};
+    let a = A::new();
+    foo.foo(&a.a);
+    return 0;
+}

@@ -60,7 +60,7 @@ impl LanguageServer for Backend {
         let capabilities = ServerCapabilities {
             hover_provider: Some(HoverProviderCapability::Simple(true)),
             completion_provider: Some(CompletionOptions {
-                trigger_characters: Some(vec![".".to_string(), "::".to_string()]),
+                trigger_characters: None,
                 all_commit_characters: None,
                 completion_item: Some(lsp_types::CompletionOptionsCompletionItem {
                     label_details_support: Some(true),
