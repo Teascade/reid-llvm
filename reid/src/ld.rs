@@ -105,13 +105,14 @@ fn find_objectfile(name: &str) -> String {
         .to_owned()
 }
 
-pub fn execute(path: &PathBuf) {
+pub fn execute(path: &PathBuf) -> Option<i32> {
     let output = Command::new(path.clone()).output().expect("Unable to execute {path}");
 
     if !output.status.success() {
         let code = output.status.code().unwrap_or(255);
         log::error!("{path:?} exited with code {code}");
         println!("{}", unsafe { String::from_utf8_unchecked(output.stderr) });
-        return;
     }
+
+    output.status.code()
 }

@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, process};
 
 use argh::FromArgs;
 use log::*;
@@ -139,7 +139,9 @@ fn main() {
             match &options.command {
                 Command::Build(_) => {}
                 Command::Run(_) => {
-                    execute(&out_path);
+                    if let Some(code) = execute(&out_path) {
+                        process::exit(code);
+                    }
                 }
             }
         }
