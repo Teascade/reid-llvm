@@ -1,4 +1,9 @@
-use std::{path::PathBuf, process::Command, thread, time::Duration};
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+    thread,
+    time::Duration,
+};
 
 pub struct LDRunner {
     command: String,
@@ -26,8 +31,7 @@ impl LDRunner {
         let dyn_linker_path = find_objectfile(&self.dynamic_linker);
         let crt1_path = find_objectfile("crt1.o");
 
-        #[cfg(feature = "log_output")]
-        println!("LDRunner: Using dynamic linker at: {:?}", dyn_linker_path);
+        log::debug!("LDRunner: Using dynamic linker at: {:?}", dyn_linker_path);
 
         let mut ld = Command::new(&self.command);
         ld.arg("-dynamic-linker").arg(dyn_linker_path).arg(crt1_path);
@@ -40,21 +44,38 @@ impl LDRunner {
             .arg("-o")
             .arg(out_path.to_str().unwrap());
 
-        #[cfg(feature = "log_output")]
-        println!(
+        log::debug!(
             "LDRunner: Executing linker to objfile at {:?} => {:?}",
-            input_path, out_path
+            input_path,
+            out_path
         );
         #[cfg(feature = "log_output")]
         dbg!(&ld);
 
-        ld.spawn().expect("Unable to execute ld!");
+        let ld_output = ld.output().expect("Unable to execute ld!");
+        if !ld_output.status.success() {
+            let code = ld_output.status.code().unwrap_or(255);
+            log::error!("LD exited with code {code}");
+            println!("{}", unsafe { String::from_utf8_unchecked(ld_output.stderr) });
+            return;
+        }
 
         thread::sleep(Duration::from_millis(100));
 
-        #[cfg(feature = "log_output")]
-        println!("Setting executable bit to {:?}..", out_path);
-        Command::new("chmod").arg("+x").arg(out_path).spawn().unwrap();
+        log::debug!("Setting executable bit to {:?}..", out_path);
+
+        let chmod_output = Command::new("chmod")
+            .arg("+x")
+            .arg(out_path)
+            .output()
+            .expect("Unable to execute ld!");
+
+        if !chmod_output.status.success() {
+            let code = chmod_output.status.code().unwrap_or(255);
+            log::error!("chmod exited with code {code}");
+            println!("{}", unsafe { String::from_utf8_unchecked(chmod_output.stderr) });
+            return;
+        }
         thread::sleep(Duration::from_millis(100));
     }
 }
@@ -64,6 +85,12 @@ fn find_objectfile(name: &str) -> String {
         .arg(&name)
         .output()
         .expect("Unable to execute whereis");
+    if !whereis.status.success() {
+        let code = whereis.status.code().unwrap_or(255);
+        log::error!("whereis exited with code {code}");
+        println!("{}", unsafe { String::from_utf8_unchecked(whereis.stderr) });
+        panic!();
+    }
     let whereis_output = String::from_utf8(whereis.stdout).unwrap();
 
     whereis_output
