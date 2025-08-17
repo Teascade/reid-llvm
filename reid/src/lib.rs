@@ -98,8 +98,7 @@ pub fn parse_module<'map, T: Into<String>>(
     map.set_tokens(id, tokens.clone());
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#?}", &tokens);
+    log::trace!("{:#?}", &tokens);
 
     Ok((id, tokens))
 }
@@ -158,8 +157,7 @@ pub fn compile_module<'map>(
     }
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&ast_module);
+    log::trace!("{:#?}", &ast_module);
 
     Ok(Ok(ast_module.process(module_id)))
 }
@@ -169,12 +167,10 @@ pub fn perform_all_passes<'map>(
     module_map: &'map mut ErrorModules,
 ) -> Result<(), ReidError> {
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&context);
+    log::trace!("{:#?}", &context);
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &context);
+    log::trace!("{:#}", &context);
 
     let state = context.pass(&mut LinkerPass {
         module_map,
@@ -188,14 +184,11 @@ pub fn perform_all_passes<'map>(
     }
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:-^100}", "LINKER OUTPUT");
+    log::trace!("{:-^100}", "LINKER OUTPUT");
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &context);
+    log::trace!("{:#}", &context);
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&state);
+    log::trace!("{:#?}", &state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(
@@ -216,14 +209,11 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut macro_pass)?;
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:-^100}", "MACRO OUTPUT");
+    log::trace!("{:-^100}", "MACRO OUTPUT");
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &context);
+    log::trace!("{:#}", &context);
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&state);
+    log::trace!("{:#?}", &state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(
@@ -257,17 +247,13 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut TypeInference { refs: &mut refs })?;
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:-^100}", "TYPE INFERRER OUTPUT");
+    log::trace!("{:-^70}", "TYPE INFERRER OUTPUT");
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{}", &refs);
+    log::trace!("{}", &refs);
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &context);
+    log::trace!("{:#}", &context);
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&state);
+    log::trace!("{:#?}", &state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(
@@ -283,14 +269,11 @@ pub fn perform_all_passes<'map>(
     let state = context.pass(&mut TypeCheck { refs: &refs })?;
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:-^100}", "TYPECHECKER OUTPUT");
+    log::trace!("{:-^100}", "TYPECHECKER OUTPUT");
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &context);
+    log::trace!("{:#}", &context);
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    dbg!(&state);
+    log::trace!("{:#?}", &state);
 
     if !state.errors.is_empty() {
         return Err(ReidError::from_kind(
@@ -302,9 +285,6 @@ pub fn perform_all_passes<'map>(
             module_map.clone(),
         ));
     }
-
-    #[cfg(feature = "context_debug")]
-    dbg!(&context);
 
     Ok(())
 }
@@ -330,11 +310,9 @@ pub fn compile_and_pass<'map>(
     perform_all_passes(&mut mir_context, module_map)?;
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:-^100}", "FINAL OUTPUT");
+    log::trace!("{:-^100}", "FINAL OUTPUT");
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{:#}", &mir_context);
+    log::trace!("{:#}", &mir_context);
 
     let mut context = Context::new(format!("Reid ({})", env!("CARGO_PKG_VERSION")));
     let codegen_modules = match mir_context.codegen(&mut context) {
@@ -343,8 +321,7 @@ pub fn compile_and_pass<'map>(
     };
 
     #[cfg(debug_assertions)]
-    #[cfg(feature = "log_output")]
-    println!("{}", &codegen_modules.context);
+    log::trace!("{}", &codegen_modules.context);
 
     let compiled = codegen_modules.compile(cpu, features);
     Ok((

@@ -1,9 +1,4 @@
-use std::{
-    path::PathBuf,
-    process::{Command, Stdio},
-    thread,
-    time::Duration,
-};
+use std::{path::PathBuf, process::Command, thread, time::Duration};
 
 pub struct LDRunner {
     command: String,
@@ -49,8 +44,6 @@ impl LDRunner {
             input_path,
             out_path
         );
-        #[cfg(feature = "log_output")]
-        dbg!(&ld);
 
         let ld_output = ld.output().expect("Unable to execute ld!");
         if !ld_output.status.success() {

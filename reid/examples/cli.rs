@@ -37,16 +37,13 @@ fn main() -> Result<(), std::io::Error> {
                 },
                 CustomIRs { llir, mir },
             )) => {
-                #[cfg(feature = "log_output")]
-                {
-                    println!("{}", _llvm_ir);
-                    println!("Compiled with triple: {}\n", &_triple);
-                    println!("Output LLVM IR to {:?}", llvm_ir_path);
-                    println!("Output Assembly to {:?}", asm_path);
-                    println!("Output Object-file to {:?}\n", object_path);
-                    println!("Output LLIR-file to {:?}\n", llir_path);
-                    println!("Output MIR-file to {:?}\n", mir_path);
-                }
+                log::trace!("{}", _llvm_ir);
+                log::debug!("Compiled with triple: {}\n", &_triple);
+                log::debug!("Output LLVM IR to {:?}", llvm_ir_path);
+                log::debug!("Output Assembly to {:?}", asm_path);
+                log::debug!("Output Object-file to {:?}\n", object_path);
+                log::debug!("Output LLIR-file to {:?}\n", llir_path);
+                log::debug!("Output MIR-file to {:?}\n", mir_path);
 
                 fs::write(&llvm_ir_path, &_llvm_ir).expect("Could not write LLVM IR -file!");
                 fs::write(&asm_path, &assembly).expect("Could not write Assembly-file!");
@@ -71,8 +68,7 @@ fn main() -> Result<(), std::io::Error> {
             Err(e) => panic!("{}", e),
         };
     } else {
-        #[cfg(feature = "log_output")]
-        println!("Please input compiled file path!")
+        log::error!("Please input compiled file path!")
     }
     Ok(())
 }
