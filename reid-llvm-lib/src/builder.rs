@@ -3,8 +3,6 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use llvm_sys::core::LLVMBuildIsNull;
-
 use crate::{
     Block, BlockData, CompileResult, ConstValueKind, CustomTypeKind, ErrorKind, FunctionData, Instr, InstructionData,
     ModuleData, NamedStruct, TerminatorKind, Type, TypeCategory, TypeData,

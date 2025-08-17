@@ -9,15 +9,15 @@ use reid::parse_module;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tower_lsp::lsp_types::{
-    self, CompletionItem, CompletionItemKind, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic,
-    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
-    DocumentFilter, GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams,
-    HoverProviderCapability, InitializeParams, InitializeResult, InitializedParams, Location, MarkedString,
-    MarkupContent, MarkupKind, MessageType, OneOf, Range, ReferenceParams, RenameParams, SemanticToken,
-    SemanticTokensLegend, SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult,
-    SemanticTokensServerCapabilities, ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit,
-    Url, WorkspaceEdit, WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    self, CompletionItem, CompletionOptions, CompletionParams, CompletionResponse, Diagnostic, DiagnosticSeverity,
+    DidChangeTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams, DocumentFilter,
+    GotoDefinitionParams, GotoDefinitionResponse, Hover, HoverContents, HoverParams, HoverProviderCapability,
+    InitializeParams, InitializeResult, InitializedParams, Location, MarkedString, MarkupContent, MarkupKind,
+    MessageType, OneOf, Range, ReferenceParams, RenameParams, SemanticToken, SemanticTokensLegend,
+    SemanticTokensOptions, SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
+    ServerCapabilities, TextDocumentItem, TextDocumentRegistrationOptions, TextDocumentSyncCapability,
+    TextDocumentSyncKind, TextDocumentSyncOptions, TextDocumentSyncSaveOptions, TextEdit, Url, WorkspaceEdit,
+    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
 };
 use tower_lsp::{Client, LanguageServer, LspService, Server, jsonrpc};
 
@@ -65,7 +65,7 @@ impl LanguageServer for Backend {
                 completion_item: Some(lsp_types::CompletionOptionsCompletionItem {
                     label_details_support: Some(true),
                 }),
-                resolve_provider: Some(true),
+                resolve_provider: Some(false),
                 work_done_progress_options: lsp_types::WorkDoneProgressOptions {
                     work_done_progress: Some(true),
                 },
@@ -170,20 +170,6 @@ impl LanguageServer for Backend {
 
         // dbg!(&list);
         Ok(Some(CompletionResponse::Array(list)))
-    }
-
-    async fn completion_resolve(&self, params: CompletionItem) -> jsonrpc::Result<CompletionItem> {
-        let data: Option<CompletionData> = if let Some(data) = &params.data {
-            serde_json::from_value(data.clone()).ok()
-        } else {
-            None
-        };
-        if let Some(data) = data {
-            let analysis = self.analysis.get(&data.path).unwrap();
-            let token = analysis.tokens.get(data.token_idx).unwrap();
-            if let Some(token_analysis) = analysis.state.map.get(&data.token_idx) {}
-        }
-        Ok(params)
     }
 
     async fn hover(&self, params: HoverParams) -> jsonrpc::Result<Option<Hover>> {

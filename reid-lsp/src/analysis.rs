@@ -2,16 +2,15 @@ use std::{collections::HashMap, hash::Hash, path::PathBuf};
 
 use reid::{
     ast::{
-        ReturnType,
         lexer::{FullToken, Token},
         token_stream::TokenRange,
     },
-    codegen::intrinsics::{self, get_intrinsic_assoc_functions},
+    codegen::intrinsics::get_intrinsic_assoc_functions,
     compile_module,
     error_raporting::{ErrorModules, ReidError},
     mir::{
-        self, Context, CustomTypeKey, FunctionCall, FunctionDefinitionKind, FunctionParam, IfExpression, Metadata,
-        SourceModuleId, StructType, TypeKind, WhileStatement, typecheck::typerefs::TypeRefs,
+        self, Context, CustomTypeKey, FunctionCall, FunctionParam, IfExpression, Metadata, SourceModuleId, StructType,
+        TypeKind, WhileStatement, typecheck::typerefs::TypeRefs,
     },
     perform_all_passes,
 };
@@ -197,26 +196,6 @@ impl AnalysisState {
                     symbol: Default::default(),
                 },
             );
-        }
-    }
-
-    pub fn set_documentation(&mut self, token_idx: usize, documentation: Option<String>) {
-        if let Some(documentation) = documentation {
-            if let Some(token) = self.map.get_mut(&token_idx) {
-                token.hover.documentation = Some(documentation);
-            } else {
-                self.map.insert(
-                    token_idx,
-                    SemanticToken {
-                        hover: Hover {
-                            documentation: Some(documentation),
-                            kind: None,
-                        },
-                        autocomplete: Vec::new(),
-                        symbol: Default::default(),
-                    },
-                );
-            }
         }
     }
 
@@ -717,7 +696,7 @@ pub fn analyze_context(
 
         let mut inner_scope = scope.inner();
 
-        analyze_function_parameters(context, module, function, &mut inner_scope);
+        analyze_function_parameters(module, function, &mut inner_scope);
 
         match &function.kind {
             mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
@@ -779,7 +758,7 @@ pub fn analyze_context(
 
         let mut inner_scope = scope.inner();
 
-        analyze_function_parameters(context, module, function, &mut inner_scope);
+        analyze_function_parameters(module, function, &mut inner_scope);
 
         match &function.kind {
             mir::FunctionDefinitionKind::Local(block, _) => analyze_block(context, module, block, &mut inner_scope),
@@ -872,7 +851,6 @@ pub fn analyze_context(
 }
 
 pub fn analyze_function_parameters(
-    context: &mir::Context,
     module: &mir::Module,
     function: &mir::FunctionDefinition,
     scope: &mut AnalysisScope,
