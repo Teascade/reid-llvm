@@ -25,19 +25,27 @@ impl LDRunner {
 
         let dyn_linker_path = find_objectfile(&self.dynamic_linker);
         let crt1_path = find_objectfile("crt1.o");
+        let crti_path = find_objectfile("crti.o");
+        let crtn_path = find_objectfile("crtn.o");
 
         log::debug!("LDRunner: Using dynamic linker at: {:?}", dyn_linker_path);
 
         let mut ld = Command::new(&self.command);
-        ld.arg("-dynamic-linker").arg(dyn_linker_path).arg(crt1_path);
+        ld.arg("-dynamic-linker")
+            .arg(dyn_linker_path)
+            .arg(crt1_path)
+            .arg(crti_path);
 
         for library in &self.libraries {
             ld.arg(format!("-l{}", library));
         }
+        ld.arg(crtn_path);
 
         ld.arg(input_path.to_str().unwrap())
             .arg("-o")
             .arg(out_path.to_str().unwrap());
+
+        log::debug!("{:#?}", ld);
 
         log::debug!(
             "LDRunner: Executing linker to objfile at {:?} => {:?}",
