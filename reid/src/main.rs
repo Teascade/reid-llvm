@@ -2,7 +2,11 @@ use std::{fs, path::PathBuf};
 
 use argh::FromArgs;
 use log::*;
-use reid::{compile_simple, ld::LDRunner, CustomIRs};
+use reid::{
+    compile_simple,
+    ld::{execute, LDRunner},
+    CustomIRs,
+};
 use reid_lib::compile::CompileOutput;
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -23,12 +27,24 @@ struct Options {
 #[argh(subcommand)]
 enum Command {
     Build(BuildOpts),
+    Run(RunOpts),
 }
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// Build an executable file without running it
 #[argh(subcommand, name = "build")]
 struct BuildOpts {
+    #[argh(option, long = "lib", short = 'l')]
+    /// additional libraries to link against (with ld)
+    libraries: Vec<String>,
+    #[argh(positional)]
+    path: PathBuf,
+}
+
+#[derive(FromArgs, PartialEq, Debug)]
+/// Build and then execute the executable
+#[argh(subcommand, name = "run")]
+struct RunOpts {
     #[argh(option, long = "lib", short = 'l')]
     /// additional libraries to link against (with ld)
     libraries: Vec<String>,
@@ -45,12 +61,12 @@ fn main() {
     }
     errlog.init().unwrap();
 
-    match options.command {
-        Command::Build(build) => {
+    match &options.command {
+        Command::Build(BuildOpts { libraries, path }) | Command::Run(RunOpts { libraries, path }) => {
             let cpu = std::env::var("CPU").unwrap_or("generic".to_owned());
             let features = std::env::var("REIDFLAGS").unwrap_or("".to_owned());
 
-            let path = match build.path.canonicalize() {
+            let path = match path.canonicalize() {
                 Ok(path) => path,
                 Err(e) => {
                     error!("{e}");
@@ -64,6 +80,7 @@ fn main() {
             let llir_path = parent.with_extension("llir");
             let mir_path = parent.with_extension("mir");
             let asm_path = parent.with_extension("asm");
+            let out_path = object_path.with_extension("out");
 
             let before = std::time::SystemTime::now();
 
@@ -108,13 +125,23 @@ fn main() {
 
                     let linker = std::env::var("LD").unwrap_or("ld".to_owned());
                     let mut linker = LDRunner::from_command(&linker).with_library("c").with_library("m");
-                    for library in build.libraries {
+                    for library in libraries {
                         linker = linker.with_library(&library);
                     }
-                    linker.invoke(&object_path, &object_path.with_extension("out"));
+                    linker.invoke(&object_path, &out_path);
                 }
-                Err(e) => panic!("{}", e),
+                Err(e) => {
+                    log::error!("{e}");
+                    return;
+                }
             };
+
+            match &options.command {
+                Command::Build(_) => {}
+                Command::Run(_) => {
+                    execute(&out_path);
+                }
+            }
         }
     }
 }
