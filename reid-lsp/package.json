@@ -13,6 +13,13 @@
     "Other"
   ],
   "main": "./dist/extension.js",
+  "icon": "./reid.png",
+  "publisher": "Teascade",
+  "author": {
+    "email": "teascade@teascade.net",
+    "name": "Teascade",
+    "url": "https://teascade.net"
+  },
   "contributes": {
     "languages": [
       {
@@ -42,7 +49,7 @@
         "reid-language-server.language-server-path": {
           "type": "string",
           "scope": "window",
-          "default": "$HOME/.cargo/bin/reid-lsp",
+          "default": "$HOME/.cargo/bin/reid-language-server",
           "description": "Path to the Reid Language Server executable"
         }
       }
