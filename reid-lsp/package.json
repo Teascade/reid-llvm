@@ -23,7 +23,11 @@
         "aliases": [
           "Reid"
         ],
-        "configuration": "./language-configuration.json"
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "dark": "./reid.png",
+          "light": "./reid.png"
+        }
       }
     ],
     "breakpoints": [
