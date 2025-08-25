@@ -239,7 +239,9 @@ impl mir::Expression {
                         vec![(function_call.generics.clone(), self.1)],
                     );
                 }
-                function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
+                if function_call.generics.len() > 0 {
+                    function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
+                }
             }
             mir::ExprKind::AssociatedFunctionCall(ty, function_call) => {
                 if let Some(calls) = assoc_calls.get_mut(&(ty.clone(), function_call.name.clone())) {
@@ -250,7 +252,9 @@ impl mir::Expression {
                         vec![(function_call.generics.clone(), self.1)],
                     );
                 }
-                function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
+                if function_call.generics.len() > 0 {
+                    function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
+                }
             }
             mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {
                 cond.find_calls(calls, assoc_calls);

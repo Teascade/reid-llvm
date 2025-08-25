@@ -216,7 +216,6 @@ impl mir::Module {
                         }
                     }
                 }
-                TypeDefinitionKind::Generic => panic!("Tried compiling a generic!"),
             };
 
             if is_ok {
@@ -241,7 +240,6 @@ impl mir::Module {
                             .collect(),
                     )))
                 }
-                TypeDefinitionKind::Generic => panic!("Tried compiling a generic!"),
             };
             types.insert(type_value, typedef.clone());
             type_values.insert(type_key.clone(), type_value);

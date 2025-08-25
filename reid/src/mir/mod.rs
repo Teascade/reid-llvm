@@ -133,7 +133,6 @@ pub enum TypeKind {
     Borrow(Box<TypeKind>, bool),
     UserPtr(Box<TypeKind>),
     CodegenPtr(Box<TypeKind>),
-    Generic(String),
     Vague(VagueType),
 }
 
@@ -457,7 +456,6 @@ pub struct TypeDefinition {
 #[derive(Debug, Clone)]
 pub enum TypeDefinitionKind {
     Struct(StructType),
-    Generic,
 }
 
 #[derive(Debug)]

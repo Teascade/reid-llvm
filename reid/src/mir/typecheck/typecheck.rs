@@ -48,7 +48,6 @@ impl<'t> Pass for TypeCheck<'t> {
                         }
                     }
                 }
-                TypeDefinitionKind::Generic => todo!(),
             }
 
             if typedef.source_module == module.module_id || typedef.importer == Some(module.module_id) {
@@ -107,7 +106,6 @@ fn check_typedefs_for_recursion<'a, 'b>(
                 }
             }
         }
-        TypeDefinitionKind::Generic => {}
     }
 }
 

@@ -96,7 +96,6 @@ impl TypeKind {
             TypeKind::UserPtr(type_kind) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
             TypeKind::CodegenPtr(type_kind) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
             TypeKind::Borrow(type_kind, _) => Type::Ptr(Box::new(type_kind.get_type(type_vals))),
-            TypeKind::Generic(_) => panic!("Tried to compile a generic type!"),
         }
     }
 }
@@ -211,7 +210,6 @@ impl TypeKind {
                             })
                         }
                     }
-                    TypeDefinitionKind::Generic => panic!("Tried to generate debug-info for a generic!"),
                 }
             }
             _ => DebugTypeData::Basic(DebugBasicType {

@@ -542,7 +542,6 @@ impl<'map> Pass for LinkerPass<'map> {
                             field.1 = field.1.update_imported(foreign_types);
                         }
                     }
-                    TypeDefinitionKind::Generic => {}
                 }
             }
         }
@@ -703,7 +702,6 @@ fn resolve_types_recursively(
                         types.extend(resolve_types_recursively(&field.1, modules, seen.clone())?);
                     }
                 }
-                TypeDefinitionKind::Generic => {}
             }
         }
         TypeKind::Array(type_kind, _) => types.extend(resolve_types_recursively(&type_kind, modules, seen.clone())?),

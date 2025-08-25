@@ -54,7 +54,6 @@ impl TypeKind {
             TypeKind::F128 => true,
             TypeKind::F80 => true,
             TypeKind::F128PPC => true,
-            TypeKind::Generic(_) => false,
         }
     }
 
@@ -83,7 +82,6 @@ impl TypeKind {
                         }
                         size
                     }
-                    TypeDefinitionKind::Generic => 404,
                 },
                 // Easy to recognize default number. Used e.g. when sorting
                 // types by size
@@ -100,7 +98,6 @@ impl TypeKind {
             TypeKind::F128 => 128,
             TypeKind::F80 => 80,
             TypeKind::F128PPC => 128,
-            TypeKind::Generic(_) => 0,
         }
     }
 
@@ -132,7 +129,6 @@ impl TypeKind {
             TypeKind::F128 => 128,
             TypeKind::F80 => 80,
             TypeKind::F128PPC => 128,
-            TypeKind::Generic(_) => 0,
         }
     }
 
@@ -177,7 +173,6 @@ impl TypeKind {
                 VagueType::TypeRef(_) => TypeCategory::TypeRef,
                 VagueType::Named(_) => TypeCategory::Other,
             },
-            TypeKind::Generic(_) => TypeCategory::Other,
         }
     }
 
