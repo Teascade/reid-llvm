@@ -8,7 +8,7 @@ use crate::{
     ast::token_stream::{self, TokenRange},
     codegen,
     lexer::{self, Cursor, FullToken, Position},
-    mir::{self, macros, pass, typecheck, Metadata, SourceModuleId},
+    mir::{self, generics, macros, pass, typecheck, Metadata, SourceModuleId},
 };
 
 use crate::mir::typecheck::ErrorKind as TypecheckError;
@@ -36,6 +36,8 @@ pub enum ErrorKind {
     LinkerError(#[from] mir::pass::Error<mir::linker::ErrorKind>),
     #[error("{}{}", label("(Macro) "), .0)]
     MacroError(#[from] mir::pass::Error<macros::ErrorKind>),
+    #[error("{}{}", label("(Generics) "), .0)]
+    GenericsError(#[from] mir::pass::Error<generics::ErrorKind>),
     #[error("{}{}", label("(Codegen) "), .0)]
     CodegenError(#[from] codegen::ErrorKind),
 }
@@ -62,6 +64,7 @@ impl ErrorKind {
                 codegen::ErrorKind::Null => Default::default(),
             },
             ErrorKind::MacroError(error) => error.metadata,
+            ErrorKind::GenericsError(error) => error.metadata,
         }
     }
 
@@ -74,6 +77,7 @@ impl ErrorKind {
             ErrorKind::LinkerError(_) => "linker",
             ErrorKind::MacroError(_) => "macro-pass",
             ErrorKind::CodegenError(_) => "codegen",
+            ErrorKind::GenericsError(_) => "generics",
         }
     }
 }

@@ -5,8 +5,5 @@ fn test<T>(value: T) -> T {
 }
 
 fn main() -> u32 {
-  let value = 0b110;
-  let other = 0o17;
-
-  return value * other + 7 * -value;
+  return test<u32>(5);
 }

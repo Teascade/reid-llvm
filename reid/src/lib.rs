@@ -70,6 +70,7 @@ use reid_lib::{compile::CompileOutput, Context};
 use crate::{
     ast::TopLevelStatement,
     mir::{
+        generics::GenericsPass,
         macros::{form_macros, MacroModule, MacroPass},
         SourceModuleId,
     },
@@ -177,6 +178,24 @@ pub fn perform_all_passes<'map>(
         is_lib: true,
     })?;
 
+    #[cfg(debug_assertions)]
+    log::trace!("{:-^100}", "LINKER OUTPUT");
+    #[cfg(debug_assertions)]
+    log::trace!("{:#}", &context);
+    #[cfg(debug_assertions)]
+    log::trace!("{:#?}", &state);
+
+    if !state.errors.is_empty() {
+        return Err(ReidError::from_kind(
+            state.errors.iter().map(|e| e.clone().into()).collect(),
+            module_map.clone(),
+        ));
+    }
+
+    let state = context.pass(&mut GenericsPass {
+        function_map: HashMap::new(),
+    })?;
+
     for module in &mut context.modules {
         for intrinsic in form_intrinsics() {
             module.1.functions.insert(0, intrinsic);
@@ -184,7 +203,7 @@ pub fn perform_all_passes<'map>(
     }
 
     #[cfg(debug_assertions)]
-    log::trace!("{:-^100}", "LINKER OUTPUT");
+    log::trace!("{:-^100}", "GENERICS OUTPUT");
     #[cfg(debug_assertions)]
     log::trace!("{:#}", &context);
     #[cfg(debug_assertions)]
