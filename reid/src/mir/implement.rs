@@ -83,6 +83,7 @@ impl TypeKind {
                         }
                         size
                     }
+                    TypeDefinitionKind::Generic => 404,
                 },
                 // Easy to recognize default number. Used e.g. when sorting
                 // types by size
@@ -174,6 +175,7 @@ impl TypeKind {
                 VagueType::Integer => TypeCategory::Integer,
                 VagueType::Decimal => TypeCategory::Real,
                 VagueType::TypeRef(_) => TypeCategory::TypeRef,
+                VagueType::Named(_) => TypeCategory::Other,
             },
             TypeKind::Generic(_) => TypeCategory::Other,
         }

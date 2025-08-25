@@ -216,6 +216,7 @@ impl mir::Module {
                         }
                     }
                 }
+                TypeDefinitionKind::Generic => panic!("Tried compiling a generic!"),
             };
 
             if is_ok {
@@ -240,6 +241,7 @@ impl mir::Module {
                             .collect(),
                     )))
                 }
+                TypeDefinitionKind::Generic => panic!("Tried compiling a generic!"),
             };
             types.insert(type_value, typedef.clone());
             type_values.insert(type_key.clone(), type_value);
@@ -1218,7 +1220,9 @@ impl mir::Expression {
                 let TypeKind::CustomType(key) = *inner.clone() else {
                     panic!("tried accessing non-custom-type");
                 };
-                let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&key).unwrap().kind.clone();
+                let TypeDefinitionKind::Struct(struct_ty) = scope.get_typedef(&key).unwrap().kind.clone() else {
+                    panic!();
+                };
                 let idx = struct_ty.find_index(field).unwrap();
 
                 let gep_n = format!("{}.{}.gep", key.0, field);
@@ -1259,7 +1263,10 @@ impl mir::Expression {
                 let TypeDefinition {
                     kind: TypeDefinitionKind::Struct(struct_ty),
                     ..
-                } = scope.types.get(scope.type_values.get(&key).unwrap()).unwrap();
+                } = scope.types.get(scope.type_values.get(&key).unwrap()).unwrap()
+                else {
+                    panic!()
+                };
 
                 let indices = struct_ty.0.iter().enumerate();
 

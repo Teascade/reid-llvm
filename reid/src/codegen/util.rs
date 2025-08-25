@@ -211,6 +211,7 @@ impl TypeKind {
                             })
                         }
                     }
+                    TypeDefinitionKind::Generic => panic!("Tried to generate debug-info for a generic!"),
                 }
             }
             _ => DebugTypeData::Basic(DebugBasicType {

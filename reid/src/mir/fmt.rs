@@ -140,6 +140,7 @@ impl Display for TypeDefinitionKind {
                 }
                 f.write_char('}')
             }
+            TypeDefinitionKind::Generic => write!(f, "generic"),
         }
     }
 }
@@ -490,12 +491,14 @@ impl Display for VagueType {
                 VagueType::Integer => write!(f, "Number"),
                 VagueType::TypeRef(id) => write!(f, "TypeRef({0})", id),
                 VagueType::Decimal => write!(f, "Decimal"),
+                VagueType::Named(name) => write!(f, "Named<{name}>"),
             }
         } else {
             match self {
                 VagueType::Unknown => write!(f, "{{unknown}}"),
                 VagueType::Integer => write!(f, "Number"),
                 VagueType::TypeRef(_) => write!(f, "{{unknown}}"),
+                VagueType::Named(name) => write!(f, "{name}"),
                 VagueType::Decimal => write!(f, "Decimal"),
             }
         }

@@ -150,6 +150,7 @@ impl<Data: Clone + Default> Scope<Data> {
         let ty = self.types.get(&key)?;
         match &ty.kind {
             TypeDefinitionKind::Struct(struct_ty) => Some(struct_ty),
+            TypeDefinitionKind::Generic => None,
         }
     }
 

@@ -290,10 +290,11 @@ impl TypeKind {
     pub(super) fn or_default(&self) -> Result<TypeKind, ErrorKind> {
         Ok(match self {
             TypeKind::Vague(vague_type) => match &vague_type {
-                Vague::Unknown => Err(ErrorKind::TypeIsVague(*vague_type))?,
+                Vague::Unknown => Err(ErrorKind::TypeIsVague(vague_type.clone()))?,
                 Vague::Integer => TypeKind::I32,
                 Vague::TypeRef(_) => panic!("Hinted default!"),
                 VagueType::Decimal => TypeKind::F32,
+                VagueType::Named(_) => panic!("Defaulted unknown named!"),
             },
             TypeKind::Array(type_kind, len) => TypeKind::Array(Box::new(type_kind.or_default()?), *len),
             TypeKind::Borrow(type_kind, mutable) => TypeKind::Borrow(Box::new(type_kind.or_default()?), *mutable),
@@ -339,7 +340,7 @@ impl TypeKind {
             TypeKind::Borrow(type_kind, _) => type_kind.is_known(state),
             TypeKind::UserPtr(type_kind) => type_kind.is_known(state),
             TypeKind::CodegenPtr(type_kind) => type_kind.is_known(state),
-            TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(*vague_type)),
+            TypeKind::Vague(vague_type) => Err(ErrorKind::TypeIsVague(vague_type.clone())),
             _ => Ok(()),
         }
     }

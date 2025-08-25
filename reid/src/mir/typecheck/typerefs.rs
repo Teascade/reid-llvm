@@ -368,6 +368,7 @@ impl<'outer> ScopeTypeRefs<'outer> {
                     self.narrow_to_type(&typeref, &self.try_default_deep(&typeref.resolve_deep()?)?)?
                         .resolve_deep()?
                 }
+                VagueType::Named(_) => ty.clone(),
             },
             _ => ty.clone(),
         })

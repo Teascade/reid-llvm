@@ -136,13 +136,14 @@ pub enum TypeKind {
     Vague(VagueType),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum VagueType {
     Unknown,
     /// Some integer value (e.g. 5)
     Integer,
     /// Some decimal fractional value (e.g. 1.5)
     Decimal,
+    Named(String),
     TypeRef(usize),
 }
 
@@ -165,7 +166,7 @@ impl StructType {
 impl TypeKind {
     pub fn known(&self) -> Result<TypeKind, VagueType> {
         if let TypeKind::Vague(vague) = self {
-            Err(*vague)
+            Err(vague.clone())
         } else {
             Ok(self.clone())
         }
@@ -421,6 +422,7 @@ pub struct TypeDefinition {
 #[derive(Debug, Clone)]
 pub enum TypeDefinitionKind {
     Struct(StructType),
+    Generic,
 }
 
 #[derive(Debug)]
