@@ -1,5 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use log::Metadata;
+
 use crate::mir::{
     self, generics, CustomTypeKey, FunctionCall, FunctionDefinition, FunctionParam, GlobalKind, GlobalValue,
     IfExpression, Literal, Module, SourceModuleId, TypeKind, WhileStatement,
@@ -11,9 +13,11 @@ use super::pass::{Pass, PassResult, PassState};
 pub enum ErrorKind {
     #[error("Should never be encountered!")]
     Null,
+    #[error("Expected {0} type-arguments, got {1}!")]
+    InvalidNumberTypeArguments(u32, u32),
 }
 
-type Calls = Vec<Vec<TypeKind>>;
+type Calls = Vec<(Vec<TypeKind>, mir::Metadata)>;
 
 pub struct GenericsPass {
     pub function_map: HashMap<SourceModuleId, Functions>,
@@ -92,17 +96,29 @@ impl Pass for GenericsPass {
                 let functions = self.function_map.get(&source).unwrap();
                 let calls = functions.calls.get(&function.name).unwrap();
 
+                for call in calls {
+                    if call.0.len() != function.generics.len() {
+                        state.note_errors(
+                            &vec![ErrorKind::InvalidNumberTypeArguments(
+                                function.generics.len() as u32,
+                                call.0.len() as u32,
+                            )],
+                            call.1,
+                        );
+                    }
+                }
+
                 if function.generics.len() > 0 {
                     for call in calls {
                         if let Some(clone) = function.try_clone() {
                             let generics = function
                                 .generics
                                 .iter()
-                                .zip(call)
+                                .zip(call.0.clone())
                                 .map(|((n, _), t)| (n.clone(), t.clone()))
                                 .collect();
                             module.functions.push(FunctionDefinition {
-                                name: name_fmt(function.name.clone(), call.clone()),
+                                name: name_fmt(function.name.clone(), call.0.clone()),
                                 return_type: function.return_type.replace_generic(&generics),
                                 parameters: function
                                     .parameters
@@ -185,19 +201,22 @@ impl mir::Expression {
             }
             mir::ExprKind::FunctionCall(function_call) => {
                 if let Some(calls) = calls.get_mut(&function_call.name) {
-                    calls.push(function_call.generics.clone());
+                    calls.push((function_call.generics.clone(), self.1));
                 } else {
-                    calls.insert(function_call.name.clone(), vec![function_call.generics.clone()]);
+                    calls.insert(
+                        function_call.name.clone(),
+                        vec![(function_call.generics.clone(), self.1)],
+                    );
                 }
                 function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
             }
             mir::ExprKind::AssociatedFunctionCall(ty, function_call) => {
                 if let Some(calls) = assoc_calls.get_mut(&(ty.clone(), function_call.name.clone())) {
-                    calls.push(function_call.generics.clone());
+                    calls.push((function_call.generics.clone(), self.1));
                 } else {
                     assoc_calls.insert(
                         (ty.clone(), function_call.name.clone()),
-                        vec![function_call.generics.clone()],
+                        vec![(function_call.generics.clone(), self.1)],
                     );
                 }
                 function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())

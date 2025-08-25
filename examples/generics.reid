@@ -5,5 +5,5 @@ fn test<T>(value: T) -> T {
 }
 
 fn main() -> u32 {
-  return test<u32>(5);
+  return test<u32>(15);
 }
