@@ -1,0 +1,12 @@
+// Arithmetic, function calls and imports!
+
+fn test<T>(value: T) -> T {
+  return value;
+}
+
+fn main() -> u32 {
+  let value = 0b110;
+  let other = 0o17;
+
+  return value * other + 7 * -value;
+}

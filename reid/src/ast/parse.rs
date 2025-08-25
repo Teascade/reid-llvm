@@ -182,6 +182,7 @@ impl Parse for AssociatedFunctionCall {
                 ty,
                 FunctionCallExpression {
                     name: String::new(),
+                    generics: Vec::new(),
                     params: Vec::new(),
                     range: stream.get_range_prev_curr().unwrap(),
                     is_macro: false,
@@ -200,6 +201,7 @@ impl Parse for AssociatedFunctionCall {
                         ty,
                         FunctionCallExpression {
                             name: fn_name,
+                            generics: Vec::new(),
                             params: Vec::new(),
                             range: stream.get_range_prev_curr().unwrap(),
                             is_macro: false,
@@ -211,6 +213,7 @@ impl Parse for AssociatedFunctionCall {
                         ty,
                         FunctionCallExpression {
                             name: String::new(),
+                            generics: Vec::new(),
                             params: Vec::new(),
                             range: stream.get_range_prev_curr().unwrap(),
                             is_macro: false,
@@ -591,7 +594,8 @@ impl Parse for FunctionCallExpression {
             let args = stream.parse::<FunctionArgs>()?;
             Ok(FunctionCallExpression {
                 name,
-                params: args.0,
+                generics: args.0,
+                params: args.1,
                 range: stream.get_range().unwrap(),
                 is_macro,
             })
@@ -602,10 +606,23 @@ impl Parse for FunctionCallExpression {
 }
 
 #[derive(Debug)]
-pub struct FunctionArgs(Vec<Expression>);
+pub struct FunctionArgs(Vec<Type>, Vec<Expression>);
 
 impl Parse for FunctionArgs {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
+        let mut generics: Vec<Type> = Vec::new();
+        if let Some(Token::LessThan) = stream.peek() {
+            stream.next();
+            if let Ok(ty) = stream.parse() {
+                generics.push(ty);
+                while let Some(Token::Comma) = stream.peek() {
+                    stream.next();
+                    generics.push(stream.parse()?);
+                }
+            }
+            stream.expect(Token::GreaterThan)?;
+        }
+
         stream.expect(Token::ParenOpen)?;
 
         let mut params = Vec::new();
@@ -618,7 +635,7 @@ impl Parse for FunctionArgs {
         }
         stream.expect(Token::ParenClose)?;
 
-        Ok(FunctionArgs(params))
+        Ok(FunctionArgs(generics, params))
     }
 }
 
@@ -780,6 +797,18 @@ impl Parse for SelfParam {
 impl Parse for FunctionSignature {
     fn parse(mut stream: TokenStream) -> Result<Self, Error> {
         if let Some(Token::Identifier(name)) = stream.next() {
+            let mut generics = Vec::new();
+
+            if let Some(Token::LessThan) = stream.peek() {
+                stream.next();
+                while let Some(Token::Identifier(ident)) = stream.peek() {
+                    stream.next();
+                    generics.push(ident);
+                }
+
+                stream.expect(Token::GreaterThan)?;
+            }
+
             stream.expect(Token::ParenOpen)?;
             let mut params = Vec::new();
 
@@ -814,6 +843,7 @@ impl Parse for FunctionSignature {
 
             Ok(FunctionSignature {
                 name,
+                generics,
                 documentation: None,
                 params,
                 self_kind,
@@ -961,7 +991,8 @@ impl Parse for DotIndexKind {
             if let Ok(args) = stream.parse::<FunctionArgs>() {
                 Ok(Self::FunctionCall(FunctionCallExpression {
                     name,
-                    params: args.0,
+                    generics: args.0,
+                    params: args.1,
                     range: stream.get_range_prev().unwrap(),
                     is_macro: false,
                 }))

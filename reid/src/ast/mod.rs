@@ -162,6 +162,7 @@ impl BinaryOperator {
 pub struct FunctionCallExpression {
     pub name: String,
     pub params: Vec<Expression>,
+    pub generics: Vec<Type>,
     pub range: TokenRange,
     pub is_macro: bool,
 }
@@ -192,6 +193,7 @@ pub struct FunctionDefinition(pub FunctionSignature, pub bool, pub Block, pub To
 #[derive(Debug, Clone)]
 pub struct FunctionSignature {
     pub name: String,
+    pub generics: Vec<String>,
     pub documentation: Option<String>,
     pub self_kind: SelfKind,
     pub params: Vec<(String, Type, TokenRange)>,
