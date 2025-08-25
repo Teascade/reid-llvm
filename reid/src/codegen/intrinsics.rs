@@ -77,6 +77,7 @@ pub fn form_intrinsics() -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: MALLOC_IDENT.to_owned(),
+        generics: Vec::new(),
         documentation: doc!("Allocates `size` bytes and returns a `u8`-pointer."),
         linkage_name: Some("malloc".to_owned()),
         is_pub: false,
@@ -104,6 +105,7 @@ pub fn simple_intrinsic<T: Into<String> + Clone>(
 ) -> FunctionDefinition {
     FunctionDefinition {
         name: name.into(),
+        generics: Vec::new(),
         documentation: Some(doc.into()),
         linkage_name: None,
         is_pub: true,
@@ -124,6 +126,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     if let TypeKind::Array(_, len) = ty {
         intrinsics.push(FunctionDefinition {
             name: "length".to_owned(),
+            generics: Vec::new(),
             documentation: doc!("Returns the length of this given array"),
             linkage_name: None,
             is_pub: true,
@@ -282,6 +285,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
         ));
         intrinsics.push(FunctionDefinition {
             name: "powi".to_owned(),
+            generics: Vec::new(),
             documentation: doc!("Returns `value` raised to the exponent of `exponent`."),
             linkage_name: None,
             is_pub: true,
@@ -326,6 +330,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
             if ty.signed() {
                 intrinsics.push(FunctionDefinition {
                     name: "abs".to_owned(),
+                    generics: Vec::new(),
                     documentation: doc!("Returns the absolute value of `value`."),
                     linkage_name: None,
                     is_pub: true,
@@ -357,6 +362,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     }
     intrinsics.push(FunctionDefinition {
         name: "sizeof".to_owned(),
+        generics: Vec::new(),
         documentation: doc!("Simply returns the size of type `T` in bytes."),
         linkage_name: None,
         is_pub: true,
@@ -369,6 +375,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
     });
     intrinsics.push(FunctionDefinition {
         name: "malloc".to_owned(),
+        generics: Vec::new(),
         documentation: doc!("Allocates `T::sizeof() * size` bytes and returns a pointer to `T`."),
         linkage_name: None,
         is_pub: true,
@@ -386,6 +393,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "memcpy".to_owned(),
+        generics: Vec::new(),
         documentation: doc!(
             "Copies `T::sizeof() * size` bytes from pointer `source` to pointer
 `destination`."
@@ -418,6 +426,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "null".to_owned(),
+        generics: Vec::new(),
         documentation: doc!("Returns a null-pointer of type `T`."),
         linkage_name: None,
         is_pub: true,
@@ -431,6 +440,7 @@ pub fn get_intrinsic_assoc_functions(ty: &TypeKind) -> Vec<FunctionDefinition> {
 
     intrinsics.push(FunctionDefinition {
         name: "is_null".to_owned(),
+        generics: Vec::new(),
         documentation: doc!("Returns a boolean representing if `val` is a nullptr or not."),
         linkage_name: None,
         is_pub: true,

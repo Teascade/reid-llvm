@@ -54,6 +54,7 @@ impl TypeKind {
             TypeKind::F128 => true,
             TypeKind::F80 => true,
             TypeKind::F128PPC => true,
+            TypeKind::Generic(_) => false,
         }
     }
 
@@ -98,6 +99,7 @@ impl TypeKind {
             TypeKind::F128 => 128,
             TypeKind::F80 => 80,
             TypeKind::F128PPC => 128,
+            TypeKind::Generic(_) => 0,
         }
     }
 
@@ -129,6 +131,7 @@ impl TypeKind {
             TypeKind::F128 => 128,
             TypeKind::F80 => 80,
             TypeKind::F128PPC => 128,
+            TypeKind::Generic(_) => 0,
         }
     }
 
@@ -172,6 +175,7 @@ impl TypeKind {
                 VagueType::Decimal => TypeCategory::Real,
                 VagueType::TypeRef(_) => TypeCategory::TypeRef,
             },
+            TypeKind::Generic(_) => TypeCategory::Other,
         }
     }
 

@@ -477,6 +477,7 @@ impl Display for TypeKind {
             TypeKind::F128 => write!(f, "f128"),
             TypeKind::F80 => write!(f, "f80"),
             TypeKind::F128PPC => write!(f, "f128ppc"),
+            TypeKind::Generic(name) => write!(f, "Generic<{}>", name),
         }
     }
 }

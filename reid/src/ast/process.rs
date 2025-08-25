@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
     ast::{self, ReturnType},
@@ -44,6 +44,8 @@ impl ast::Module {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         documentation: signature.documentation.clone(),
+                        // TODO generics parsing
+                        generics: Vec::new(),
                         linkage_name: None,
                         is_pub: false,
                         is_imported: false,
@@ -178,6 +180,8 @@ impl ast::FunctionDefinition {
         mir::FunctionDefinition {
             name: signature.name.clone(),
             documentation: signature.documentation.clone(),
+            // TODO generics parsing
+            generics: Vec::new(),
             linkage_name: None,
             is_pub: *is_pub,
             is_imported: false,
@@ -379,6 +383,8 @@ impl ast::Expression {
             ),
             ast::ExpressionKind::FunctionCall(fn_call_expr) => mir::ExprKind::FunctionCall(mir::FunctionCall {
                 name: fn_call_expr.name.clone(),
+                // TODO generics parsing
+                generics: Vec::new(),
                 return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
                 parameters: fn_call_expr.params.iter().map(|e| e.process(module_id)).collect(),
                 meta: fn_call_expr.range.as_meta(module_id),
@@ -468,6 +474,8 @@ impl ast::Expression {
                 ty.0.into_mir(module_id),
                 mir::FunctionCall {
                     name: fn_call_expr.name.clone(),
+                    // TODO generics parsing
+                    generics: Vec::new(),
                     return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
                     parameters: fn_call_expr.params.iter().map(|e| e.process(module_id)).collect(),
                     meta: fn_call_expr.range.as_meta(module_id),
@@ -491,6 +499,8 @@ impl ast::Expression {
                     mir::TypeKind::Vague(mir::VagueType::Unknown),
                     mir::FunctionCall {
                         name: fn_call_expr.name.clone(),
+                        // TODO generics parsing
+                        generics: Vec::new(),
                         return_type: mir::TypeKind::Vague(mir::VagueType::Unknown),
                         parameters: params,
                         meta: fn_call_expr.range.as_meta(module_id),

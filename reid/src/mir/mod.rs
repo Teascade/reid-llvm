@@ -132,6 +132,7 @@ pub enum TypeKind {
     Borrow(Box<TypeKind>, bool),
     UserPtr(Box<TypeKind>),
     CodegenPtr(Box<TypeKind>),
+    Generic(String),
     Vague(VagueType),
 }
 
@@ -309,6 +310,7 @@ pub struct IfExpression(pub Box<Expression>, pub Box<Expression>, pub Box<Option
 #[derive(Debug, Clone)]
 pub struct FunctionCall {
     pub name: String,
+    pub generics: Vec<TypeKind>,
     pub return_type: TypeKind,
     pub parameters: Vec<Expression>,
     pub is_macro: bool,
@@ -320,6 +322,7 @@ pub struct FunctionDefinition {
     pub name: String,
     pub documentation: Option<String>,
     pub linkage_name: Option<String>,
+    pub generics: Vec<String>,
     /// Whether this function is visible to outside modules
     pub is_pub: bool,
     /// Whether this module is from an external module, and has been imported
