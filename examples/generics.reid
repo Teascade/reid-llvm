@@ -1,9 +1,10 @@
 // Arithmetic, function calls and imports!
 
 fn test<T>(value: T) -> T {
-  return value;
+  let b: T = value;
+  return b;
 }
 
 fn main() -> u32 {
-  return test<u32>(15);
+  return test<u64>(15) as u32 + test<u32>(5);
 }

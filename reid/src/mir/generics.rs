@@ -29,10 +29,15 @@ pub struct Functions {
     assoc_calls: HashMap<(TypeKind, String), Calls>,
 }
 
-type GenericsPassState<'map, 'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
+#[derive(Default, Clone)]
+pub struct GenericsPassData {
+    generic_types: HashMap<String, TypeKind>,
+}
+
+type GenericsPassState<'map, 'st, 'sc> = PassState<'st, 'sc, GenericsPassData, ErrorKind>;
 
 impl Pass for GenericsPass {
-    type Data = ();
+    type Data = GenericsPassData;
     type TError = ErrorKind;
 
     fn context(&mut self, context: &mut mir::Context, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
@@ -139,6 +144,32 @@ impl Pass for GenericsPass {
             } else {
                 module.functions.push(function);
             }
+        }
+        Ok(())
+    }
+
+    fn function(
+        &mut self,
+        func: &mut FunctionDefinition,
+        mut state: PassState<Self::Data, Self::TError>,
+    ) -> PassResult {
+        for (name, ty) in &func.generics {
+            state.scope.data.generic_types.insert(name.clone(), ty.clone());
+        }
+        Ok(())
+    }
+
+    fn stmt(&mut self, stmt: &mut mir::Statement, mut state: PassState<Self::Data, Self::TError>) -> PassResult {
+        match &mut stmt.0 {
+            mir::StmtKind::Let(var_ref, _, _) => match var_ref.0.clone() {
+                TypeKind::CustomType(custom_type_key) => {
+                    if let Some(ty) = state.scope.data.generic_types.get(&custom_type_key.0) {
+                        var_ref.0 = ty.clone();
+                    }
+                }
+                _ => {}
+            },
+            _ => {}
         }
         Ok(())
     }
