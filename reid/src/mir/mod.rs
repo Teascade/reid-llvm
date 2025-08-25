@@ -324,7 +324,7 @@ pub struct FunctionDefinition {
     pub name: String,
     pub documentation: Option<String>,
     pub linkage_name: Option<String>,
-    pub generics: Vec<String>,
+    pub generics: Vec<(String, TypeKind)>,
     /// Whether this function is visible to outside modules
     pub is_pub: bool,
     /// Whether this module is from an external module, and has been imported
@@ -334,6 +334,40 @@ pub struct FunctionDefinition {
     pub kind: FunctionDefinitionKind,
     pub source: Option<SourceModuleId>,
     pub signature_meta: Metadata,
+}
+
+impl FunctionDefinition {
+    pub fn try_clone(&self) -> Option<FunctionDefinition> {
+        match &self.kind {
+            FunctionDefinitionKind::Local(block, metadata) => Some(FunctionDefinition {
+                name: self.name.clone(),
+                documentation: self.documentation.clone(),
+                linkage_name: self.linkage_name.clone(),
+                generics: self.generics.clone(),
+                is_pub: self.is_pub.clone(),
+                is_imported: self.is_imported.clone(),
+                return_type: self.return_type.clone(),
+                parameters: self.parameters.clone(),
+                kind: FunctionDefinitionKind::Local(block.clone(), metadata.clone()),
+                source: self.source.clone(),
+                signature_meta: self.signature_meta.clone(),
+            }),
+            FunctionDefinitionKind::Extern(e) => Some(FunctionDefinition {
+                name: self.name.clone(),
+                documentation: self.documentation.clone(),
+                linkage_name: self.linkage_name.clone(),
+                generics: self.generics.clone(),
+                is_pub: self.is_pub.clone(),
+                is_imported: self.is_imported.clone(),
+                return_type: self.return_type.clone(),
+                parameters: self.parameters.clone(),
+                kind: FunctionDefinitionKind::Extern(*e),
+                source: self.source.clone(),
+                signature_meta: self.signature_meta.clone(),
+            }),
+            FunctionDefinitionKind::Intrinsic(intrinsic_function) => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

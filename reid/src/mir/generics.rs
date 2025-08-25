@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::mir::{
-    self, FunctionCall, GlobalKind, GlobalValue, IfExpression, Literal, Module, SourceModuleId, TypeKind,
-    WhileStatement,
+    self, generics, CustomTypeKey, FunctionCall, FunctionDefinition, FunctionParam, GlobalKind, GlobalValue,
+    IfExpression, Literal, Module, SourceModuleId, TypeKind, WhileStatement,
 };
 
 use super::pass::{Pass, PassResult, PassState};
@@ -43,18 +43,18 @@ impl Pass for GenericsPass {
             );
         }
 
-        for module in &context.modules {
+        for module in &mut context.modules {
             let mut calls = HashMap::new();
             let mut assoc_calls = HashMap::new();
-            for function in &module.1.associated_functions {
-                match &function.1.kind {
+            for function in &mut module.1.associated_functions {
+                match &mut function.1.kind {
                     mir::FunctionDefinitionKind::Local(block, _) => block.find_calls(&mut calls, &mut assoc_calls),
                     mir::FunctionDefinitionKind::Extern(_) => {}
                     mir::FunctionDefinitionKind::Intrinsic(_) => {}
                 }
             }
-            for function in &module.1.functions {
-                match &function.kind {
+            for function in &mut module.1.functions {
+                match &mut function.kind {
                     mir::FunctionDefinitionKind::Local(block, _) => block.find_calls(&mut calls, &mut assoc_calls),
                     mir::FunctionDefinitionKind::Extern(_) => {}
                     mir::FunctionDefinitionKind::Intrinsic(_) => {}
@@ -80,7 +80,6 @@ impl Pass for GenericsPass {
                 }
             }
         }
-        dbg!(&function_map);
 
         self.function_map = function_map;
 
@@ -88,24 +87,61 @@ impl Pass for GenericsPass {
     }
 
     fn module(&mut self, module: &mut mir::Module, mut state: PassState<Self::Data, Self::TError>) -> PassResult {
+        for function in module.functions.drain(..).collect::<Vec<_>>() {
+            if let Some(source) = function.source {
+                let functions = self.function_map.get(&source).unwrap();
+                let calls = functions.calls.get(&function.name).unwrap();
+
+                if function.generics.len() > 0 {
+                    for call in calls {
+                        if let Some(clone) = function.try_clone() {
+                            let generics = function
+                                .generics
+                                .iter()
+                                .zip(call)
+                                .map(|((n, _), t)| (n.clone(), t.clone()))
+                                .collect();
+                            module.functions.push(FunctionDefinition {
+                                name: name_fmt(function.name.clone(), call.clone()),
+                                return_type: function.return_type.replace_generic(&generics),
+                                parameters: function
+                                    .parameters
+                                    .iter()
+                                    .map(|p| FunctionParam {
+                                        ty: p.ty.replace_generic(&generics),
+                                        ..p.clone()
+                                    })
+                                    .collect(),
+                                generics,
+                                ..clone
+                            });
+                        }
+                    }
+                } else {
+                    module.functions.push(function);
+                }
+            } else {
+                module.functions.push(function);
+            }
+        }
         Ok(())
     }
 }
 
 impl mir::Block {
-    fn find_calls(&self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
-        for statement in &self.statements {
+    fn find_calls(&mut self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
+        for statement in &mut self.statements {
             statement.find_calls(calls, assoc_calls);
         }
-        if let Some((_, Some(e))) = &self.return_expression {
+        if let Some((_, Some(e))) = &mut self.return_expression {
             e.find_calls(calls, assoc_calls);
         }
     }
 }
 
 impl mir::Statement {
-    fn find_calls(&self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
-        match &self.0 {
+    fn find_calls(&mut self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
+        match &mut self.0 {
             mir::StmtKind::Let(_, _, expression) => expression.find_calls(calls, assoc_calls),
             mir::StmtKind::Set(expression, expression1) => {
                 expression.find_calls(calls, assoc_calls);
@@ -122,8 +158,8 @@ impl mir::Statement {
 }
 
 impl mir::Expression {
-    fn find_calls(&self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
-        match &self.0 {
+    fn find_calls(&mut self, calls: &mut HashMap<String, Calls>, assoc_calls: &mut HashMap<(TypeKind, String), Calls>) {
+        match &mut self.0 {
             mir::ExprKind::Variable(_) => {}
             mir::ExprKind::Indexed(expression, _, expression1) => {
                 expression.find_calls(calls, assoc_calls);
@@ -142,7 +178,7 @@ impl mir::Expression {
                     item.1.find_calls(calls, assoc_calls);
                 }
             }
-            mir::ExprKind::Literal(_) => todo!(),
+            mir::ExprKind::Literal(_) => {}
             mir::ExprKind::BinOp(_, lhs, rhs, _) => {
                 lhs.find_calls(calls, assoc_calls);
                 rhs.find_calls(calls, assoc_calls);
@@ -153,6 +189,7 @@ impl mir::Expression {
                 } else {
                     calls.insert(function_call.name.clone(), vec![function_call.generics.clone()]);
                 }
+                function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
             }
             mir::ExprKind::AssociatedFunctionCall(ty, function_call) => {
                 if let Some(calls) = assoc_calls.get_mut(&(ty.clone(), function_call.name.clone())) {
@@ -163,11 +200,12 @@ impl mir::Expression {
                         vec![function_call.generics.clone()],
                     );
                 }
+                function_call.name = name_fmt(function_call.name.clone(), function_call.generics.clone())
             }
             mir::ExprKind::If(IfExpression(cond, then_e, else_e)) => {
                 cond.find_calls(calls, assoc_calls);
                 then_e.find_calls(calls, assoc_calls);
-                if let Some(else_e) = else_e.as_ref() {
+                if let Some(else_e) = else_e.as_mut() {
                     else_e.find_calls(calls, assoc_calls);
                 }
             }
@@ -176,6 +214,29 @@ impl mir::Expression {
             mir::ExprKind::Deref(expression) => expression.find_calls(calls, assoc_calls),
             mir::ExprKind::CastTo(expression, _) => expression.find_calls(calls, assoc_calls),
             mir::ExprKind::GlobalRef(_, _) => {}
+        }
+    }
+}
+
+fn name_fmt(name: String, generics: Vec<TypeKind>) -> String {
+    format!(
+        "{}.{}",
+        name,
+        generics.iter().map(|t| t.to_string()).collect::<Vec<_>>().join(".")
+    )
+}
+
+impl TypeKind {
+    fn replace_generic(&self, generics: &Vec<(String, TypeKind)>) -> TypeKind {
+        match self {
+            TypeKind::CustomType(CustomTypeKey(name, _)) => {
+                if let Some((_, inner)) = generics.iter().find(|(n, _)| n == name) {
+                    inner.clone()
+                } else {
+                    self.clone()
+                }
+            }
+            _ => self.clone(),
         }
     }
 }

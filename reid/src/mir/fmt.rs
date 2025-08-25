@@ -158,9 +158,14 @@ impl Display for FunctionDefinition {
         }
         write!(
             f,
-            "{}fn {}({}) -> {:#} ",
+            "{}fn {}<{}>({}) -> {:#} ",
             if self.is_pub { "pub " } else { "" },
             self.name,
+            self.generics
+                .iter()
+                .map(|(n, t)| format!("{n} = {:?}", t))
+                .collect::<Vec<_>>()
+                .join(", "),
             self.parameters
                 .iter()
                 .map(|FunctionParam { name, ty, .. }| format!("{}: {:#}", name, ty))

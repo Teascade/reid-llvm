@@ -16,7 +16,7 @@ BINARY="$(echo $1 | cut -d'.' -f1)"".out"
 
 echo $1
 
-cargo run -p reid -- $@ && \
+cargo run -p reid -- run $@ && \
 ./$BINARY ; echo "Return value: ""$?"
 
 ## Command from: clang -v hello.o -o test

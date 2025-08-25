@@ -1,7 +1,7 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use crate::{
-    ast::{self, ReturnType},
+    ast::{self, ReturnType, TypeKind},
     mir::{
         self, CustomTypeKey, FunctionParam, ModuleMap, NamedVariableRef, ReturnKind, SourceModuleId, StmtKind,
         StructField, StructType, WhileStatement,
@@ -44,7 +44,11 @@ impl ast::Module {
                     let def = mir::FunctionDefinition {
                         name: signature.name.clone(),
                         documentation: signature.documentation.clone(),
-                        generics: signature.generics.clone(),
+                        generics: signature
+                            .generics
+                            .iter()
+                            .map(|g| (g.clone(), mir::TypeKind::Vague(mir::VagueType::Unknown)))
+                            .collect(),
                         linkage_name: None,
                         is_pub: false,
                         is_imported: false,
@@ -176,11 +180,15 @@ impl ast::FunctionDefinition {
             ty: p.1 .0.into_mir(module_id),
             meta: p.2.as_meta(module_id),
         }));
+
         mir::FunctionDefinition {
             name: signature.name.clone(),
             documentation: signature.documentation.clone(),
-            // TODO generics parsing
-            generics: Vec::new(),
+            generics: signature
+                .generics
+                .iter()
+                .map(|g| (g.clone(), mir::TypeKind::Vague(mir::VagueType::Unknown)))
+                .collect(),
             linkage_name: None,
             is_pub: *is_pub,
             is_imported: false,
