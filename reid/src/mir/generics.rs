@@ -16,7 +16,13 @@ pub enum ErrorKind {
 type Calls = Vec<Vec<TypeKind>>;
 
 pub struct GenericsPass {
-    pub function_map: HashMap<SourceModuleId, HashMap<String, Vec<TypeKind>>>,
+    pub function_map: HashMap<SourceModuleId, Functions>,
+}
+
+#[derive(Debug)]
+pub struct Functions {
+    calls: HashMap<String, Calls>,
+    assoc_calls: HashMap<(TypeKind, String), Calls>,
 }
 
 type GenericsPassState<'map, 'st, 'sc> = PassState<'st, 'sc, (), ErrorKind>;
@@ -26,6 +32,17 @@ impl Pass for GenericsPass {
     type TError = ErrorKind;
 
     fn context(&mut self, context: &mut mir::Context, mut _state: PassState<Self::Data, Self::TError>) -> PassResult {
+        let mut function_map = HashMap::new();
+        for module in &context.modules {
+            function_map.insert(
+                module.0.clone(),
+                Functions {
+                    calls: HashMap::new(),
+                    assoc_calls: HashMap::new(),
+                },
+            );
+        }
+
         for module in &context.modules {
             let mut calls = HashMap::new();
             let mut assoc_calls = HashMap::new();
@@ -43,9 +60,29 @@ impl Pass for GenericsPass {
                     mir::FunctionDefinitionKind::Intrinsic(_) => {}
                 }
             }
-            dbg!(&calls);
-            dbg!(&assoc_calls);
+
+            for function in &module.1.associated_functions {
+                if let Some(source) = function.1.source {
+                    let key = (function.0.clone(), function.1.name.clone());
+                    function_map
+                        .get_mut(&source)
+                        .unwrap()
+                        .assoc_calls
+                        .insert(key.clone(), assoc_calls.get(&key).cloned().unwrap_or_default());
+                }
+            }
+            for function in &module.1.functions {
+                if let Some(source) = function.source {
+                    function_map.get_mut(&source).unwrap().calls.insert(
+                        function.name.clone(),
+                        calls.get(&function.name).cloned().unwrap_or_default(),
+                    );
+                }
+            }
         }
+        dbg!(&function_map);
+
+        self.function_map = function_map;
 
         Ok(())
     }
