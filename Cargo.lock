@@ -784,7 +784,7 @@ checksum = "53a49587ad06b26609c52e423de037e7f57f20d53535d66e08c695f347df952a"
 
 [[package]]
 name = "reid"
-version = "1.0.0-beta.4"
+version = "1.0.0"
 dependencies = [
  "argh",
  "colored",
@@ -796,7 +796,7 @@ dependencies = [
 
 [[package]]
 name = "reid-language-server"
-version = "1.0.0-beta.1"
+version = "1.0.0"
 dependencies = [
  "dashmap 6.1.0",
  "reid",
@@ -809,7 +809,7 @@ dependencies = [
 
 [[package]]
 name = "reid-lib"
-version = "1.0.0-beta.4"
+version = "1.0.0"
 dependencies = [
  "llvm-sys",
  "thiserror",
