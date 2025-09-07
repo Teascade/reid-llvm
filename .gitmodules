@@ -1,0 +1,3 @@
+[submodule "reid-llvm-lib"]
+	path = reid-llvm-lib
+	url = gitea@git.teascade.net:teascade/reid-llvm-lib.git
