@@ -1,13 +1,13 @@
 [package]
 name = "reid-language-server"
-version = "1.0.0-beta.1"
+version = "1.0.0"
 edition = "2024"
 
 [dependencies]
 socket = "0.0.7"
 tokio = { version = "1.47.0", features = ["full"] }
 tower-lsp = "0.20.0"
-reid = { path = "../reid", version = "1.0.0-beta.4", registry="gitea-teascade", features=[] }
+reid = { path = "../reid", version = "1.0.0", registry="gitea-teascade", features=[] }
 dashmap = "6.1.0"
 serde = "*"
 serde_json = "*"
